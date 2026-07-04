@@ -4,6 +4,27 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: process.env.NEXT_PUBLIC_SITE_URL ?? "https://fanengagepro.com",
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type,Authorization,X-Requested-With",
+          },
+          {
+            key: "Access-Control-Allow-Credentials",
+            value: "true",
+          },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           {
@@ -25,6 +46,10 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "geolocation=(), microphone=(), camera=(), payment=()",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
           },
         ],
       },

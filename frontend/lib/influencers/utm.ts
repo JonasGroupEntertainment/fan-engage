@@ -11,7 +11,7 @@ export interface InfluencerTrackingParams {
 
 export function generateInfluencerTrackingUrl(params: InfluencerTrackingParams): string {
   const {
-    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fanengage.com",
+    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fanengagepro.com",
     handle,
     promoCode,
   } = params;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPortalContext, roleAtLeast } from "@/lib/artist-portal/access";
 
 export default async function ArtistPortalLayout({
   children,
@@ -14,16 +15,11 @@ export default async function ArtistPortalLayout({
 
   if (!user) redirect("/login?next=/artist-portal");
 
-  // Look up whether this auth user is the owner of any artist community.
-  // admin_users.role = 'owner' links a fan/auth user to a community.
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id, role")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
+  // Any admin_users role (owner/admin/editor/viewer) grants portal access;
+  // individual pages/actions gate on the specific role.
+  const ctx = await getPortalContext();
 
-  if (!adminRow) {
+  if (!ctx) {
     return (
       <div className="min-h-screen bg-midnight flex items-center justify-center px-6">
         <div className="max-w-md w-full rounded-2xl border border-white/10 bg-black/40 p-8 text-center">
@@ -49,16 +45,20 @@ export default async function ArtistPortalLayout({
   const { data: community } = await supabase
     .from("communities")
     .select("slug, display_name, accent_from, accent_to")
-    .eq("slug", adminRow.community_id)
+    .eq("slug", ctx.communityId)
     .maybeSingle();
 
   const nav = [
     { href: "/artist-portal", label: "Dashboard" },
+    { href: "/artist-portal/copilot", label: "Copilot ✨" },
     { href: "/artist-portal/events", label: "Events" },
     { href: "/artist-portal/community", label: "Community" },
     { href: "/artist-portal/redemptions", label: "Redemptions" },
     { href: "/artist-portal/leaderboard", label: "Leaderboard" },
     { href: "/artist-portal/payouts", label: "Payouts" },
+    ...(roleAtLeast(ctx.role, "owner")
+      ? [{ href: "/artist-portal/team", label: "Team" }]
+      : []),
   ];
 
   return (
@@ -87,6 +87,9 @@ export default async function ArtistPortalLayout({
               </span>
             )}
             <span className="text-white/60">{user.email}</span>
+            <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/50">
+              {ctx.role}
+            </span>
           </div>
           <Link href="/" className="text-xs text-white/60 hover:text-white">
             ← Back to fan site

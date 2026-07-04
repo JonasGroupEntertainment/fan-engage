@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { suggestTagsFromBody } from "@/lib/tagging/suggest";
+import { apiRateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +35,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const userId = userRes.user.id;
+
+  const rl = apiRateLimiter.check(userId);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 },
+    );
+  }
 
   const last = lastCallByUser.get(userId) ?? 0;
   const now = Date.now();

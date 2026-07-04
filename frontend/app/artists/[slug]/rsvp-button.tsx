@@ -22,7 +22,7 @@ export default function RsvpButton({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
-  const artistUrl = `${appUrl}/artists/${artistSlug}`;
+  const shareUrl = `${appUrl}/share/rsvp/${artistSlug}/${eventId}`;
 
   async function handleClick() {
     const next = !rsvped;
@@ -61,13 +61,16 @@ export default function RsvpButton({
         {rsvped ? "✓ RSVPed" : atCapacity ? "Full" : "RSVP · +10 pts"}
       </button>
       {justRsvped && (
-        <InlineShareButton
-          title="I'm going!"
-          text="Just RSVPed on Fan Engage — come join me."
-          url={artistUrl}
-          label="↗ Share"
-          className="text-xs text-aurora hover:text-white transition"
-        />
+        <div className="flex flex-col items-end gap-1">
+          <p className="text-xs text-white/50">You&apos;re in! Invite friends to join you.</p>
+          <InlineShareButton
+            title="Bring a friend!"
+            text={`I just RSVPed — come join me: ${shareUrl}`}
+            url={shareUrl}
+            label="↗ Bring 2 friends"
+            className="text-xs text-aurora hover:text-white transition"
+          />
+        </div>
       )}
       {error && <p className="text-xs text-rose-300">{error}</p>}
     </div>

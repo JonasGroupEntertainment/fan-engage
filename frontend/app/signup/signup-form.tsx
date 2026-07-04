@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TurnstileWidget, verifyTurnstileToken } from "@/components/turnstile-widget";
 
 export type ReferrerArtist = {
   slug: string;
@@ -27,13 +28,27 @@ export function SignupForm({
   // Where to send the user after a successful signup. Preserve any
   // ?ref=<artist-slug> attribution from the artist-page Join CTA so the
   // welcome flow knows which fan experience they came from.
-  const onboardingHref = ref ? `/onboarding?ref=${encodeURIComponent(ref)}` : "/onboarding";
+  // Honor an explicit ?next= return path (used by the onboarding wizard and
+  // preview banners when a session expires mid-flow). Only relative paths —
+  // anything else would be an open redirect.
+  const rawNext = searchParams.get("next");
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const onboardingHref =
+    next ?? (ref ? `/onboarding?ref=${encodeURIComponent(ref)}` : "/onboarding");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "confirm">("idle");
   const [message, setMessage] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState(false);
+  const handleTurnstileSuccess = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setTurnstileError(false);
+  }, []);
+  const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
+  const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -67,6 +82,14 @@ export function SignupForm({
 
     setStatus("loading");
     setMessage("");
+
+    const captchaOk = await verifyTurnstileToken(turnstileToken);
+    if (!captchaOk) {
+      setStatus("error");
+      setMessage("Please complete the security check before continuing.");
+      return;
+    }
+
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
@@ -269,6 +292,16 @@ export function SignupForm({
               );
             })()}
           </label>
+
+          <TurnstileWidget
+            onSuccess={handleTurnstileSuccess}
+            onError={handleTurnstileError}
+            onExpire={handleTurnstileExpire}
+            theme="dark"
+          />
+          {turnstileError && (
+            <p className="text-xs text-rose-300">Security check failed. Please refresh and try again.</p>
+          )}
 
           <button
             type="submit"

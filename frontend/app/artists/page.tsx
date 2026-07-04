@@ -55,7 +55,7 @@ export default async function ArtistsIndexPage({ searchParams }: { searchParams?
       
       {allGenres.length > 0 && (
         <div className="flex flex-wrap gap-2" aria-label="Filter by genre">
-          <a
+          <Link
             href="/artists"
             className={
               "inline-flex items-center rounded-full border px-3 py-1 text-xs transition " +
@@ -65,7 +65,7 @@ export default async function ArtistsIndexPage({ searchParams }: { searchParams?
             }
           >
             All
-          </a>
+          </Link>
           {allGenres.map((g) => (
             <a
               key={g}

@@ -68,12 +68,14 @@ export default async function FounderSharePage({
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <section
-        className="relative overflow-hidden rounded-3xl border border-white/15 p-10 shadow-glass md:p-14"
+        className="relative overflow-hidden rounded-3xl border border-white/20 p-10 shadow-glass md:p-14"
         style={{
           background: `radial-gradient(circle at 15% 10%, ${artist.accentFrom}66, transparent 55%), radial-gradient(circle at 85% 95%, ${artist.accentTo}66, transparent 60%), #050b1f`,
+          boxShadow: `0 0 60px ${artist.accentFrom}22`,
         }}
       >
         <div className="relative flex flex-col items-center gap-6 text-center">
+          <p className="text-[10px] tracking-[0.2em] uppercase text-white/30 font-medium">Fan Engage</p>
           <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/70">
             Founding Fan
           </p>

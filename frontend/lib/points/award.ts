@@ -13,8 +13,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *                               Fan Home, Rewards, and tier progress
  *
  * Pass the admin client so this works in server actions, API routes, and
- * cron jobs alike. communityId defaults to "raelynn" as the platform
- * currently operates as single-tenant; update callers when multi-tenant.
+ * cron jobs alike.
+ *
+ * Multi-tenancy: callers should pass communityId explicitly. When omitted,
+ * we resolve the fan's community from their memberships — if they belong
+ * to exactly one community that's unambiguous; otherwise we fall back to
+ * "raelynn" (the original single-tenant default) so legacy behavior is
+ * preserved. The resolved community is stamped on the ledger row so every
+ * point event is attributable to a community.
  */
 export async function awardPoints(
   admin: SupabaseClient,
@@ -24,7 +30,7 @@ export async function awardPoints(
     source,
     sourceRef,
     note,
-    communityId = "raelynn",
+    communityId,
   }: {
     fanId: string;
     delta: number;
@@ -34,11 +40,24 @@ export async function awardPoints(
     communityId?: string;
   },
 ): Promise<void> {
+  if (!communityId) {
+    const { data: memberships } = await admin
+      .from("fan_community_memberships")
+      .select("community_id")
+      .eq("fan_id", fanId)
+      .limit(2);
+    communityId =
+      memberships && memberships.length === 1
+        ? (memberships[0].community_id as string)
+        : "raelynn";
+  }
+
   // 1. Ledger entry (audit trail)
   await admin.from("points_ledger").insert({
     fan_id: fanId,
     delta,
     source,
+    community_id: communityId,
     ...(sourceRef ? { source_ref: sourceRef } : {}),
     ...(note ? { note } : {}),
   });

@@ -1,8 +1,7 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recordCheckin } from "@/lib/data/checkins";
+import { apiRateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +10,14 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = apiRateLimiter.check(user.id);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 },
+    );
   }
 
   const body = await req.json().catch(() => ({}));

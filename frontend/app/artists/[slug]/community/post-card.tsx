@@ -71,10 +71,10 @@ export default function PostCard({
     const postUrl = `${appUrl}/artists/${post.artist_slug}/community?post=${post.id}`;
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
-        await (navigator as any).share({ title: post.title ?? "Check this out", url: postUrl });
+        await (navigator as Navigator & { share: (data: ShareData) => Promise<void> }).share({ title: post.title ?? "Check this out", url: postUrl });
         return;
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") return;
       }
     }
     try {

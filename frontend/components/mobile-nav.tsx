@@ -23,6 +23,7 @@ export function MobileNav({
 
   // Close on route change.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpen(false);
   }, [pathname]);
 

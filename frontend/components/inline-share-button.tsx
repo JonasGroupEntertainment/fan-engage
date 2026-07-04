@@ -20,8 +20,10 @@ export default function InlineShareButton({
   async function handleShare() {
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (navigator as any).share({ title, text, url });
         return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         if (e?.name === "AbortError") return;
       }

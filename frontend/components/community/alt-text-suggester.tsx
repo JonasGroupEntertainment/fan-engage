@@ -97,7 +97,7 @@ export default function AltTextSuggester({
     <div className="space-y-1.5 rounded-2xl border border-white/10 bg-black/30 p-3">
       <div className="flex items-center justify-between gap-2">
         <label className="text-[10px] uppercase tracking-wide text-white/50">
-          Alt text {aiGenerated && <span className="text-aurora">· AI-suggested, edit if you'd like</span>}
+          Alt text {aiGenerated && <span className="text-aurora">· AI-suggested, edit if you&apos;d like</span>}
         </label>
         {loading && (
           <span className="text-[10px] text-white/40">Thinking…</span>

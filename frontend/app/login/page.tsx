@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TurnstileWidget, verifyTurnstileToken } from "@/components/turnstile-widget";
 
 export default function LoginPage() {
   return (
@@ -30,6 +31,9 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "magic-sent">("idle");
   const [message, setMessage] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const handleTurnstileSuccess = useCallback((token: string) => setTurnstileToken(token), []);
+  const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
 
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -55,6 +59,13 @@ function LoginForm() {
     }
     setStatus("loading");
     setMessage("");
+
+    const captchaOk = await verifyTurnstileToken(turnstileToken);
+    if (!captchaOk) {
+      setStatus("error");
+      setMessage("Please complete the security check before continuing.");
+      return;
+    }
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
@@ -123,6 +134,12 @@ function LoginForm() {
           or
           <div className="h-px flex-1 bg-white/10" />
         </div>
+
+        <TurnstileWidget
+          onSuccess={handleTurnstileSuccess}
+          onExpire={handleTurnstileExpire}
+          theme="dark"
+        />
 
         <button
           type="button"

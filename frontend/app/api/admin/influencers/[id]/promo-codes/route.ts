@@ -36,13 +36,13 @@ export async function GET(
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Database error" }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true, data });
   } catch (err) {
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "Unknown error" },
+      { ok: false, error: err instanceof Error && err.message === "Unauthorized" ? "Unauthorized" : "Request failed" },
       { status: 401 },
     );
   }
@@ -80,13 +80,13 @@ export async function POST(
       .single();
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Database error" }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true, data }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "Unknown error" },
+      { ok: false, error: err instanceof Error && err.message === "Unauthorized" ? "Unauthorized" : "Request failed" },
       { status: 401 },
     );
   }

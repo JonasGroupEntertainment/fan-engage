@@ -34,6 +34,15 @@ export async function pickWinnerAction(formData: FormData) {
     metadata: { entry_id: entryId, fan_id: fanId },
   });
 
+  // Fetch the post up front — its artist_slug tells us which community
+  // the winner bonus belongs to, and we reuse title/body for the notification.
+  const { data: post } = await supa
+    .from("community_posts")
+    .select("artist_slug, title, body")
+    .eq("id", postId)
+    .maybeSingle();
+  const artistSlug = (post?.artist_slug as string | null) ?? "";
+
   // Award bonus points via ledger; idempotent guard.
   const refId = `challenge_winner:${postId}:${fanId}`;
   const { data: ledgerExists } = await supa
@@ -48,17 +57,12 @@ export async function pickWinnerAction(formData: FormData) {
       source: "challenge",
       sourceRef: refId,
       note: "Challenge winner bonus",
+      ...(artistSlug ? { communityId: artistSlug } : {}),
     });
   }
 
   // In-app notification for the winner — same dedup_key pattern as the
   // ledger guard, so repeated clicks never spam the fan's inbox.
-  const { data: post } = await supa
-    .from("community_posts")
-    .select("artist_slug, title, body")
-    .eq("id", postId)
-    .maybeSingle();
-  const artistSlug = (post?.artist_slug as string | null) ?? "";
   const postTitle = (post?.title as string | null) ?? null;
   const postBody = (post?.body as string | null) ?? "";
   await createNotification({

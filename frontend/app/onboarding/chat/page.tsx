@@ -45,7 +45,7 @@ export default async function OnboardingChatPage() {
         </h1>
         <p className="max-w-xl text-sm text-white/70">
           Chat with Claude for a minute so Fan Engage knows who you are —
-          city, music streaming service, why you're here. You can skip and finish
+          city, music streaming service, why you&apos;re here. You can skip and finish
           later from your profile.
         </p>
       </header>

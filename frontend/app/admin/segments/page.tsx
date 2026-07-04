@@ -130,6 +130,7 @@ export default async function AdminSegmentsPage() {
 
 function SegmentCard({ segment }: { segment: SegmentRow }) {
   const refreshed = new Date(segment.refreshed_at);
+  // eslint-disable-next-line react-hooks/purity
   const hours = Math.floor((Date.now() - refreshed.getTime()) / 3_600_000);
   const refreshedLabel =
     hours < 1

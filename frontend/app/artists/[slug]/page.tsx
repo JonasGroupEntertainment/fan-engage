@@ -16,6 +16,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import PremiumPaywall from "@/components/premium-paywall";
 import SocialIcon from "@/components/social-icon";
 import FollowButton from "./follow-button";
+import { WelcomeQuest } from "@/components/welcome-quest";
+import StreakTile from "@/components/streak-tile";
+import DailyDropCard from "@/components/daily-drop-card";
+import { touchStreak } from "@/lib/streaks/touch";
+import { claimDailyDrop } from "@/lib/drops/daily-drop";
+import { getCampaignGoals } from "@/lib/data/goals";
 import ShareButton from "@/components/share-button";
 import InlineShareButton from "@/components/inline-share-button";
 import RsvpButton from "./rsvp-button";
@@ -75,10 +81,13 @@ async function getFounderCount(communitySlug: string): Promise<{ count: number; 
 
 export default async function ArtistPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ welcome?: string }>;
 }) {
   const { slug } = await params;
+  const { welcome } = await searchParams;
   const [artist, fan, isFollowing, entitlement, founderData] = await Promise.all([
     getArtistFromDb(slug),
     getCurrentFan(),
@@ -89,6 +98,16 @@ export default async function ArtistPage({
   if (!artist) notFound();
   const isSignedIn = fan !== null;
   const needsProfile = isSignedIn && !fan.first_name;
+
+  // Daily retention loop: touch the streak (idempotent per UTC day, shared
+  // with Fan Home) and reveal today's variable-reward drop. Both credit
+  // points into this artist's community and never block the render.
+  const [streak, dailyDrop] = isSignedIn
+    ? await Promise.all([
+        touchStreak(fan.id, slug).catch(() => null),
+        claimDailyDrop(fan.id, slug).catch(() => null),
+      ])
+    : [null, null];
 
   // RSVP meta: counts + whether the current fan has RSVPed to each event.
   // Only events with a real DB id participate; fallback hardcoded events
@@ -124,7 +143,15 @@ export default async function ArtistPage({
       ? `${origin}/invite/${fan.referral_code}?artist=${encodeURIComponent(artist.slug)}`
       : `${origin}/artists/${artist.slug}`;
 
-  const showFounderLink = founderData && founderData.cap > 0;
+  const totalRsvps = Array.from(rsvpCounts.values()).reduce((a, b) => a + b, 0);
+
+  // Campaign goals are admin-configured rows in community_goals; live
+  // founder/RSVP counts are passed in so metric rows resolve without
+  // duplicate queries. Empty array → section hidden entirely.
+  const campaignGoals = await getCampaignGoals(slug, {
+    founderCount: founderData?.count ?? 0,
+    rsvpTotal: totalRsvps,
+  });
 
   return (
     <main className="mx-auto max-w-6xl space-y-10 px-6 py-12">
@@ -232,15 +259,64 @@ export default async function ArtistPage({
         </div>
       </section>
 
-      {/* Founder wall link */}
-      {showFounderLink && (
-        <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-4">
-          <Link
-            href={`/artists/${slug}/founders`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition"
-          >
-            👑 See the {founderData!.count} Founding {(founderData?.count ?? 0) === 1 ? "Fan" : "Fans"} →
-          </Link>
+      {/* First-visit celebration + starter quest (?welcome=1 after onboarding) */}
+      {welcome === "1" && isSignedIn && (
+        <WelcomeQuest
+          artistName={artist.name}
+          artistSlug={artist.slug}
+          accentFrom={artist.accentFrom}
+          accentTo={artist.accentTo}
+        />
+      )}
+
+      {/* Daily loop: streak + today's drop */}
+      {isSignedIn && (streak || dailyDrop) && (
+        <section className="grid gap-4 md:grid-cols-[2fr_1fr]">
+          {streak && (
+            <StreakTile
+              currentStreakDays={streak.currentStreakDays}
+              longestStreakDays={streak.longestStreakDays}
+              pointsAwardedThisVisit={streak.pointsAwardedThisVisit}
+              newMilestone={streak.newMilestone}
+            />
+          )}
+          {dailyDrop && <DailyDropCard drop={dailyDrop} />}
+        </section>
+      )}
+
+      {/* Campaign Unlock Goals — admin-configured in community_goals */}
+      {campaignGoals.length > 0 && (
+        <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">Campaign Goals</p>
+          {campaignGoals.map((goal) => (
+            <div key={goal.id} className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/80">
+                  {goal.emoji} {goal.label}
+                </span>
+                <span className="text-white/50 tabular-nums">
+                  {Math.min(goal.current, goal.target)} / {goal.target}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.round((goal.current / goal.target) * 100))}%`,
+                    backgroundImage: `linear-gradient(90deg, ${artist.accentFrom}, ${artist.accentTo})`,
+                  }}
+                />
+              </div>
+              {goal.linkHref && goal.linkLabel && (
+                <Link
+                  href={goal.linkHref}
+                  className="text-xs text-white/40 hover:text-white/70 transition"
+                >
+                  {goal.linkLabel}
+                </Link>
+              )}
+            </div>
+          ))}
         </section>
       )}
 

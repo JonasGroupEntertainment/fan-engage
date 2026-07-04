@@ -32,7 +32,7 @@ export function MarketplaceEmptyState({
           {headline}
         </h2>
         <p className="mt-3 text-white/70 leading-relaxed">
-          We're loading the shelves. Tour merch, signed memorabilia, and
+          We&apos;re loading the shelves. Tour merch, signed memorabilia, and
           backstage experiences will land here first — before the public
           store. Founding members get priority drops and tier-locked offers.
         </p>

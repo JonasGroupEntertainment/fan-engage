@@ -122,8 +122,8 @@ export default function NotificationPreferencesForm({
       <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <h2 className="text-base font-semibold text-white">What to send</h2>
         <p className="mt-1 text-xs text-white/60">
-          Applies to both push and SMS — we won't badger you on one channel
-          if you've muted the other.
+          Applies to both push and SMS — we won&apos;t badger you on one channel
+          if you&apos;ve muted the other.
         </p>
 
         <div className="mt-4 space-y-3">
@@ -143,7 +143,7 @@ export default function NotificationPreferencesForm({
       <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <h2 className="text-base font-semibold text-white">Quiet hours</h2>
         <p className="mt-1 text-xs text-white/60">
-          We'll hold non-urgent push during this window. RSVP and redemption
+          We&apos;ll hold non-urgent push during this window. RSVP and redemption
           confirmations are always delivered.
         </p>
 

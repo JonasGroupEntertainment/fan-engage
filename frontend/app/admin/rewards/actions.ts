@@ -146,6 +146,14 @@ export async function cancelRedemptionAction(
 
   const supabase = createAdminClient();
 
+  // Grab the redemption's community so the refund lands on the same
+  // membership the original spend came out of.
+  const { data: redemption } = await supabase
+    .from("reward_redemptions")
+    .select("community_id")
+    .eq("id", redemptionId)
+    .maybeSingle();
+
   // Update redemption status
   const { error: updateError } = await supabase
     .from("reward_redemptions")
@@ -166,6 +174,9 @@ export async function cancelRedemptionAction(
     source: "reward_redemption",
     sourceRef: `redemption:${redemptionId}:refund`,
     note: `Refunded: redemption cancelled`,
+    ...(redemption?.community_id
+      ? { communityId: redemption.community_id as string }
+      : {}),
   }).then(() => null).catch((e: Error) => e);
 
   if (pointsError) {

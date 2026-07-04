@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { draftComment } from "@/lib/drafts";
+import { apiRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,14 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Sign in to use the drafter." }, { status: 401 });
+  }
+
+  const rl = apiRateLimiter.check(user.id);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 },
+    );
   }
 
   let body: { postId?: string };

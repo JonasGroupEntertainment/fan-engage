@@ -98,7 +98,7 @@ export default function CaptionSuggester({
       {captions && (
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-wide text-white/50">
-            Pick one (it'll fill in your post body):
+            Pick one (it&apos;ll fill in your post body):
           </p>
           <div className="flex flex-col gap-1.5">
             {captions.map((c, i) => (

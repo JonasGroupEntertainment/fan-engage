@@ -73,7 +73,10 @@ function isSameDay(a: Date, b: Date): boolean {
  * we swallow the error and return a benign zero-state. Streak is a UX
  * affordance, not a contract — never block Fan Home from rendering.
  */
-export async function touchStreak(fanId: string): Promise<StreakState> {
+export async function touchStreak(
+  fanId: string,
+  communityId?: string,
+): Promise<StreakState> {
   const benign: StreakState = {
     currentStreakDays: 0,
     longestStreakDays: 0,
@@ -166,6 +169,7 @@ export async function touchStreak(fanId: string): Promise<StreakState> {
         source: "daily_checkin",
         sourceRef: `streak:${fanId}:${todayDateStr}`,
         note: `Day ${currentStreak} streak bonus`,
+        ...(communityId ? { communityId } : {}),
       });
       if (milestoneBonus > 0 && milestoneHit) {
         await awardPoints(admin, {
@@ -174,6 +178,7 @@ export async function touchStreak(fanId: string): Promise<StreakState> {
           source: "manual_adjustment",
           sourceRef: `streak-milestone:${fanId}:${milestoneHit}`,
           note: `Streak milestone: ${milestoneHit} days`,
+          ...(communityId ? { communityId } : {}),
         });
       }
     }

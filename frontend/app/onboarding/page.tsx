@@ -309,6 +309,7 @@ export default function OnboardingWizard() {
           musicOutlet: resolveMusicOutlet(),
           interest: formState.interest,
           referralCode: refCode,
+          communitySlug: refCode,
           smsOptedIn: Boolean(formState.phone) && smsConsent,
           emailOptedIn: Boolean(formState.email),
           consentAcceptedAt: new Date().toISOString(),
@@ -350,7 +351,17 @@ export default function OnboardingWizard() {
         }).catch((err) => console.warn("Twilio SMS did not complete:", err));
       }
 
-      router.push("/");
+      // If the fan came in through an artist page, land them directly on
+      // that artist with the welcome celebration instead of the generic
+      // mission page — the artist page IS the product they signed up for.
+      const onboardData = (await onboardRes.json().catch(() => null)) as
+        | { communityJoined?: string | null }
+        | null;
+      if (onboardData?.communityJoined) {
+        router.push(`/artists/${onboardData.communityJoined}?welcome=1`);
+      } else {
+        router.push("/onboarding/mission");
+      }
       router.refresh();
     } catch (error) {
       console.error(error);

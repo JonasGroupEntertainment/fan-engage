@@ -61,7 +61,7 @@ export default function PrivacyForm({
       )}
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/60">
-        <p className="font-semibold text-white/80">What's never shown publicly</p>
+        <p className="font-semibold text-white/80">What&apos;s never shown publicly</p>
         <p className="mt-2">
           Your email, phone number, mailing address, last login, payment
           details, and any moderation flags are{" "}

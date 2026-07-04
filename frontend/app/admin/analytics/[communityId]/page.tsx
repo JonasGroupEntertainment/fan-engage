@@ -45,6 +45,7 @@ interface SubscriptionActivity {
 
 async function getAnalyticsData(
   communityId: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ kpi: KpiData; daily: DailyActivity[]; topFans: TopFan[]; subscriptions: SubscriptionActivity[]; community: any }> {
   const admin = createAdminClient();
 
@@ -118,6 +119,7 @@ async function getAnalyticsData(
     .gte("created_at", thirtyDaysAgo.toISOString());
 
   const totalPointsThisMonth = (pointsRes.data ?? []).reduce(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (sum: number, row: any) => sum + (row.delta ?? 0),
     0
   );
@@ -158,6 +160,7 @@ async function getAnalyticsData(
       ]);
 
     const pointsEarned = (pointsRes.data ?? []).reduce(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sum: number, row: any) => sum + (row.delta ?? 0),
       0
     );
@@ -190,6 +193,7 @@ async function getAnalyticsData(
     .order("total_points", { ascending: false })
     .limit(10);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const topFans = (topFansRes.data ?? []).map((row: any) => {
     const fan = Array.isArray(row.fans) ? row.fans[0] : row.fans || {};
     return {
@@ -223,6 +227,7 @@ async function getAnalyticsData(
     .order("joined_at", { ascending: false })
     .limit(10);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptions = (subscriptionsRes.data ?? []).map((row: any) => {
     const fan = Array.isArray(row.fans) ? row.fans[0] : row.fans || {};
     return {

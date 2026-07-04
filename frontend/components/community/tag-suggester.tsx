@@ -95,7 +95,7 @@ export default function TagSuggester({
       {suggestions && suggestions.length === 0 && (
         <p className="text-xs text-white/60">
           No tag ideas — your post might be a bit short or off-topic for the
-          existing taxonomy. You can submit without tags; they'll be added
+          existing taxonomy. You can submit without tags; they&apos;ll be added
           automatically later.
         </p>
       )}

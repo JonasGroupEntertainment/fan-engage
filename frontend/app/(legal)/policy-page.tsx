@@ -62,10 +62,10 @@ export default async function PolicyPage({ slug }: { slug: string }) {
               about privacy, terms, cookies, data use, or your account,
               email{" "}
               <a
-                href="mailto:support@fanengage.com"
+                href="mailto:support@fanengagepro.com"
                 className="text-aurora underline-offset-4 hover:underline"
               >
-                support@fanengage.com
+                support@fanengagepro.com
               </a>
               . This page will be updated with the finalized policy before
               production rollout.

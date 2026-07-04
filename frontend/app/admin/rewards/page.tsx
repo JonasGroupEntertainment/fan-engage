@@ -45,6 +45,7 @@ export default async function AdminRewardsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {rewards.map((reward: any) => (
                 <tr key={reward.id} className="hover:bg-black/20">
                   <td className="px-4 py-3">{reward.title}</td>

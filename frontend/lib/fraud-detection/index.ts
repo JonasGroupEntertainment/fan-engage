@@ -71,6 +71,7 @@ interface AnthropicMessageResponse {
 // ---------- Stage 1: heuristic candidate gather ----------
 
 export async function gatherCandidates(admin: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
 }): Promise<{ fan_id: string; triggers: string[] }[]> {
   const dayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -139,6 +140,7 @@ export async function gatherCandidates(admin: {
 // ---------- Stage 2: gather evidence + Claude verdict ----------
 
 export async function evaluateCandidate(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   admin: { from: (table: string) => any },
   candidate: { fan_id: string; triggers: string[] },
 ): Promise<FraudFlag | null> {
@@ -373,6 +375,7 @@ Output JSON only — no commentary, no markdown fences.`;
 // ---------- Public API ----------
 
 export async function scanForFraud(admin: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
 }): Promise<FraudFlag[]> {
   const candidates = await gatherCandidates(admin);

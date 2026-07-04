@@ -75,6 +75,7 @@ async function getFoundersData(): Promise<CommunityData[]> {
       .order("founder_number", { ascending: true });
 
     const founders: Founder[] = (foundersResult.data ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((row: any) => {
         const fan = Array.isArray(row.fans)
           ? row.fans[0]

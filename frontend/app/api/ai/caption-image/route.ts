@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { suggestCaptions, CaptionError } from "@/lib/captions";
+import { apiRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Sign in to use the caption suggester." },
       { status: 401 },
+    );
+  }
+
+  const rl = apiRateLimiter.check(user.id);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429 },
     );
   }
 

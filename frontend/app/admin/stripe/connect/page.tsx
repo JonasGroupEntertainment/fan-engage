@@ -440,7 +440,7 @@ export default async function StripeConnectPage({
                 </div>
                 {!c.stripe_connect_onboarding_complete && c.stripe_connect_account_id && (
                   <p className="text-xs text-amber-300/70">
-                    Share the onboarding link with the artist — they'll enter their bank details directly in Stripe's secure flow. You'll see "Payouts enabled" here once complete.
+                    Share the onboarding link with the artist — they&apos;ll enter their bank details directly in Stripe&apos;s secure flow. You&apos;ll see &quot;Payouts enabled&quot; here once complete.
                   </p>
                 )}
               </div>

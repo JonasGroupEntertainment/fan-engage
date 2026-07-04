@@ -83,7 +83,7 @@ export default function InfluencerDetailPage() {
   // Generate tracking URL with UTM parameters
   const generateTrackingUrl = (code: string): string => {
     if (!influencer) return "";
-    return `${process.env.NEXT_PUBLIC_SITE_URL || "https://fanengage.com"}?utm_source=${influencer.handle}&utm_medium=influencer&utm_campaign=${code}`;
+    return `${process.env.NEXT_PUBLIC_SITE_URL || "https://fanengagepro.com"}?utm_source=${influencer.handle}&utm_medium=influencer&utm_campaign=${code}`;
   };
 
   if (loading) {

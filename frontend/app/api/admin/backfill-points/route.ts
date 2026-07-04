@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     .select("fan_id, delta");
 
   if (ledgerErr) {
-    return NextResponse.json({ error: ledgerErr.message }, { status: 500 });
+    console.error("[backfill-points] ledger read failed:", ledgerErr.message);
+    return NextResponse.json({ error: "Failed to read ledger" }, { status: 500 });
   }
 
   // Aggregate: fan_id → total
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
     .select("fan_id, community_id, total_points");
 
   if (memErr) {
-    return NextResponse.json({ error: memErr.message }, { status: 500 });
+    console.error("[backfill-points] memberships read failed:", memErr.message);
+    return NextResponse.json({ error: "Failed to read memberships" }, { status: 500 });
   }
 
   // 3. Update each membership whose points don't match the ledger sum
@@ -74,7 +76,8 @@ export async function POST(request: NextRequest) {
       .eq("community_id", communityId);
 
     if (updateErr) {
-      errors.push(`${fanId}/${communityId}: ${updateErr.message}`);
+      console.error(`[backfill-points] update failed for ${fanId}/${communityId}:`, updateErr.message);
+      errors.push(`${fanId}/${communityId}`);
     } else {
       updated++;
     }

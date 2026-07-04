@@ -41,12 +41,13 @@ export async function LatestStrip({ slug }: { slug: string }) {
   if (cards.length === 0) return null;
 
   // Sort: future events first (closest first), then by recency.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const now = Date.now();
   const sorted = cards
     .slice()
     .sort((a, b) => {
       const at = new Date(a.ts).getTime();
       const bt = new Date(b.ts).getTime();
-      const now = Date.now();
       const aFuture = at >= now;
       const bFuture = bt >= now;
       if (aFuture && !bFuture) return -1;

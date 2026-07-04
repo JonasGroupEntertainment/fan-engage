@@ -28,7 +28,7 @@ export default async function ArtistPortalEventsPage() {
     .order("starts_at", { ascending: true });
 
   const eventIds = (events ?? []).map((e) => e.id as string);
-  let rsvpCounts: Record<string, number> = {};
+  const rsvpCounts: Record<string, number> = {};
   if (eventIds.length > 0) {
     const { data: rsvps } = await supabase
       .from("fan_event_rsvps")

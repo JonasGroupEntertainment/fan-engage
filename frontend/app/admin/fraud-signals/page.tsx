@@ -226,7 +226,7 @@ function PendingFlagCard({
         {signal.reasons.length > 0 && (
           <div>
             <p className="text-[10px] uppercase tracking-wide text-white/50">
-              Claude's reasons
+              Claude&apos;s reasons
             </p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-white/80">
               {signal.reasons.map((r, i) => (
