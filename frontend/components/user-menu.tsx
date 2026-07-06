@@ -183,7 +183,6 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0 }: UserMenuProp
                 type="submit"
                 className="w-full px-4 py-2 text-left text-sm text-white/80 hover:bg-white/10 transition"
                 role="menuitem"
-                onClick={() => setIsOpen(false)}
               >
                 Sign out
               </button>
