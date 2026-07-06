@@ -32,7 +32,12 @@ function LoginForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "magic-sent">("idle");
   const [message, setMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const handleTurnstileSuccess = useCallback((token: string) => setTurnstileToken(token), []);
+  const [turnstileError, setTurnstileError] = useState(false);
+  const handleTurnstileSuccess = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setTurnstileError(false);
+  }, []);
+  const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
 
   async function handlePassword(e: React.FormEvent) {
@@ -120,6 +125,12 @@ function LoginForm() {
             />
           </label>
 
+          <div className="flex justify-end">
+            <Link href="/forgot-password" className="text-xs text-white/60 hover:text-white hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+
           <button
             type="submit"
             disabled={status === "loading"}
@@ -137,9 +148,13 @@ function LoginForm() {
 
         <TurnstileWidget
           onSuccess={handleTurnstileSuccess}
+          onError={handleTurnstileError}
           onExpire={handleTurnstileExpire}
           theme="dark"
         />
+        {turnstileError && (
+          <p className="text-xs text-rose-300">Security check failed. Please refresh and try again.</p>
+        )}
 
         <button
           type="button"
