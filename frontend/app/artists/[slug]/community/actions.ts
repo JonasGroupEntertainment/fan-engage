@@ -61,7 +61,9 @@ export async function createPostAction(formData: FormData) {
   const videoUrl = normalizeUrl(videoUrlRaw);
   const videoPosterUrl = normalizeUrl(videoPosterUrlRaw);
 
-  const { data: created } = await supabase
+  // tags is NOT NULL default '{}' in the DB — an explicit null here fails the
+  // constraint and silently killed every fan post, so always send an array.
+  const { data: created, error: insertErr } = await supabase
     .from("community_posts").insert({
       artist_slug: artistSlug,
       author_id: userId,
@@ -70,9 +72,13 @@ export async function createPostAction(formData: FormData) {
       image_url: imageUrl,
       video_url: videoUrl,
       video_poster_url: videoPosterUrl,
-      caption_used: captionUsed, tags: aiSuggestedTags.length > 0 ? aiSuggestedTags.slice(0, 6) : null, image_alt: imageAlt})
+      caption_used: captionUsed, tags: aiSuggestedTags.slice(0, 6), image_alt: imageAlt})
     .select("id")
     .single();
+  if (insertErr) {
+    console.error("[community] post insert failed", insertErr);
+    throw new Error("Your post couldn't be saved. Please try again.");
+  }
 
   // Fire-and-forget — embedding lands within seconds, backfill cron is the
   // safety net if this path fails.
