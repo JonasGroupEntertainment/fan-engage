@@ -48,10 +48,9 @@ export async function getPostsByArtist(
     const authorIds = [...new Set(posts.map((p) => p.author_id as string))];
 
     const [authorsRes, reactionsRes, myReactionsRes, commentCountRes] = await Promise.all([
-      supabase
-        .from("fans")
-        .select("id, first_name")
-        .in("id", authorIds),
+      // RPC, not a direct fans select — RLS only exposes the viewer's own
+      // fans row, which made every other author render as "Anonymous fan".
+      supabase.rpc("get_fan_display_names", { p_ids: authorIds }) as unknown as Promise<{ data: { id: string; first_name: string | null }[] | null }>,
       supabase
         .from("community_reactions")
         .select("post_id, emoji")
@@ -201,10 +200,9 @@ export async function getChallengeEntries(
     if (!data || data.length === 0) return [];
 
     const fanIds = [...new Set(data.map((e) => e.fan_id as string))];
-    const { data: fans } = await supabase
-      .from("fans")
-      .select("id, first_name")
-      .in("id", fanIds);
+    const { data: fans } = (await supabase.rpc("get_fan_display_names", {
+      p_ids: fanIds,
+    })) as { data: { id: string; first_name: string | null }[] | null };
     const nameById = new Map<string, string | null>(
       (fans ?? []).map((f) => [f.id as string, (f.first_name as string | null) ?? null]),
     );
@@ -241,10 +239,9 @@ export async function getCommentsByPost(
     if (!data || data.length === 0) return [];
 
     const authorIds = [...new Set(data.map((c) => c.author_id as string))];
-    const { data: authors } = await supabase
-      .from("fans")
-      .select("id, first_name")
-      .in("id", authorIds);
+    const { data: authors } = (await supabase.rpc("get_fan_display_names", {
+      p_ids: authorIds,
+    })) as { data: { id: string; first_name: string | null }[] | null };
     const nameById = new Map<string, string | null>(
       (authors ?? []).map((a) => [a.id as string, (a.first_name as string | null) ?? null]),
     );
