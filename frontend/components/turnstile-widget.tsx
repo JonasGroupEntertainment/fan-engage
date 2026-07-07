@@ -30,6 +30,28 @@ interface Props {
 
 const SCRIPT_ID = "cf-turnstile-script";
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+const MAX_SCRIPT_RETRIES = 3;
+
+let scriptRequested = false;
+
+// Retries with a cache-busting param: during a Cloudflare outage the browser
+// can cache the 503 for the script URL, which would otherwise block every
+// login until a hard refresh.
+function injectTurnstileScript(attempt = 0) {
+  document.getElementById(SCRIPT_ID)?.remove();
+  const script = document.createElement("script");
+  script.id = SCRIPT_ID;
+  const buster = attempt > 0 ? `&cb=${Date.now()}` : "";
+  script.src = `https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad${buster}`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => {
+    if (attempt < MAX_SCRIPT_RETRIES) {
+      setTimeout(() => injectTurnstileScript(attempt + 1), 1000 * (attempt + 1));
+    }
+  };
+  document.head.appendChild(script);
+}
 
 export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,13 +81,9 @@ export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }
     // Script not yet loaded — attach a loader callback and inject the script once
     window.onTurnstileLoad = renderWidget;
 
-    if (!document.getElementById(SCRIPT_ID)) {
-      const script = document.createElement("script");
-      script.id = SCRIPT_ID;
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    if (!scriptRequested) {
+      scriptRequested = true;
+      injectTurnstileScript();
     }
 
     return () => {
