@@ -76,8 +76,10 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: "/", label: "Fan Home" },
+  { href: "/community", label: "Community" },
   { href: "/rewards", label: "Rewards" },
   { href: "/marketplace", label: "Marketplace" },
+  { href: "/premium", label: "Premium" },
   { href: "/referrals", label: "Referrals" },
   { href: "/artists", label: "Artists" },
 ];

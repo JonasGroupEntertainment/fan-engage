@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getActiveOffers } from "@/lib/data/offers";
-import { getCurrentFan } from "@/lib/data/fan";
+import { getCurrentFan, getPrimaryCommunityId } from "@/lib/data/fan";
 import type { Offer, OfferCategory } from "@/lib/data/types";
 import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-empty-state";
 import PreviewSignupBanner from "@/components/preview-signup-banner";
@@ -63,8 +63,17 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
     ? (rawTab as Tab)
     : "Featured";
 
-  const [dbOffers, fan] = await Promise.all([getActiveOffers(), getCurrentFan()]);
+  const [dbOffers, fan, primaryCommunityId] = await Promise.all([
+    getActiveOffers(),
+    getCurrentFan(),
+    getPrimaryCommunityId(),
+  ]);
   const isSignedIn = fan !== null;
+  // Offers have no redemption backend yet — point fans at their community's
+  // rewards page, where redeem_reward is live.
+  const redeemHref = primaryCommunityId
+    ? `/artists/${primaryCommunityId}/rewards`
+    : "/artists";
   const usingDb = dbOffers.length >= MIN_INVENTORY;
 
   if (isSignedIn && !usingDb) {
@@ -162,9 +171,12 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                   <div className="mt-6 flex items-center justify-between">
                     <span className="text-lg font-semibold text-emerald-300">{item.pts}</span>
                     {isSignedIn ? (
-                      <button className="rounded-full border border-white/30 px-4 py-2 text-sm text-white/80">
+                      <Link
+                        href={redeemHref}
+                        className="rounded-full border border-white/30 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
+                      >
                         Redeem
-                      </button>
+                      </Link>
                     ) : (
                       <Link
                         href="/signup?next=/marketplace"

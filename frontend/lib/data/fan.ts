@@ -56,6 +56,39 @@ export async function getCurrentMembership(
   }
 }
 
+/**
+ * The signed-in fan's primary community: their earliest active membership.
+ * Returns null for signed-out users or fans who haven't joined a community.
+ */
+export async function getPrimaryCommunityId(): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("fan_community_memberships")
+      .select("community_id, joined_at")
+      .eq("fan_id", user.id)
+      .eq("status", "active")
+      .order("joined_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("getPrimaryCommunityId: supabase error", error.message);
+      return null;
+    }
+    return (data?.community_id as string | undefined) ?? null;
+  } catch (err) {
+    console.warn("getPrimaryCommunityId: failed", err);
+    return null;
+  }
+}
+
 export interface PointBreakdownRow {
   source: string;
   label: string;
