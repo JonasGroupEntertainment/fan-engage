@@ -196,23 +196,12 @@ export default async function Home({
                 <article key={card.title} className="rounded-2xl bg-white/10 p-4">
                   <p className="text-sm text-white/70">{card.title}</p>
                   <p className="mt-3 text-lg font-semibold text-emerald-300">{card.points}</p>
-                  <button className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-white">
-                    Start <span>→</span>
-                  </button>
                 </article>
               ))}
             </div>
           </section>
 
-          <section className="grid gap-6 lg:grid-cols-2">
-            <div className="glass-card space-y-4 p-6">
-              <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-white/60">
-                <span>📅</span> Upcoming Events
-              </p>
-              <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-center text-xs text-white/60">
-                No events scheduled yet. Artist drops and listening parties will show here.
-              </div>
-            </div>
+          <section className="grid gap-6">
             <div className="glass-card space-y-4 p-6">
               <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-white/60">
                 <span>🎁</span> Recommended Offers

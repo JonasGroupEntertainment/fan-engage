@@ -39,6 +39,18 @@ type ArtistRow = {
   merch_url: string | null;
 };
 
+/**
+ * An event is past once its end (or start, when no end is set) is behind us.
+ * Events with only a free-form `event_date` string can't be judged, so they
+ * stay visible until an admin deactivates them or sets timestamps.
+ */
+function isPastEvent(e: ArtistEvent, now: number): boolean {
+  const ts = e.ends_at ?? e.starts_at;
+  if (!ts) return false;
+  const t = Date.parse(ts);
+  return Number.isFinite(t) && t < now;
+}
+
 function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
   // Preserve the legacy Artist shape (merch still comes from the fallback
   // for now; future phase moves merch to DB-backed offers-per-artist).
@@ -56,7 +68,7 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
     genres: row.genres ?? [],
     social: row.social ?? [],
     upcoming: events
-      .filter((e) => e.active)
+      .filter((e) => e.active && !isPastEvent(e, Date.now()))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((e) => ({
         id: e.id,

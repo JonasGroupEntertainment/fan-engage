@@ -25,7 +25,9 @@ function LoginFallback() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/";
+  // Only allow same-origin relative paths ("//host" is protocol-relative).
+  const rawNext = searchParams.get("next") ?? "/";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,6 +46,12 @@ function LoginForm() {
     e.preventDefault();
     setStatus("loading");
     setMessage("");
+    const captchaOk = await verifyTurnstileToken(turnstileToken);
+    if (!captchaOk) {
+      setStatus("error");
+      setMessage("Please complete the security check before continuing.");
+      return;
+    }
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
