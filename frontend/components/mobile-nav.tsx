@@ -15,8 +15,10 @@ import { usePathname } from "next/navigation";
 
 export function MobileNav({
   navItems,
+  isSignedIn = false,
 }: {
   navItems: { href: string; label: string }[];
+  isSignedIn?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -95,6 +97,24 @@ export function MobileNav({
                 );
               })}
             </ul>
+            {!isSignedIn && (
+              <div className="flex gap-2 border-t border-white/10 px-4 py-3">
+                <Link
+                  href="/login"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 rounded-full border border-white/20 px-4 py-2 text-center text-sm font-medium text-white/80 hover:bg-white/10"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-center text-sm font-semibold text-white shadow-glass"
+                >
+                  Join
+                </Link>
+              </div>
+            )}
           </nav>
         </>
       )}

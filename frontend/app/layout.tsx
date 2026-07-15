@@ -168,7 +168,7 @@ export default async function RootLayout({
                   Fan Engage
                 </span>
               </Link>
-              <MobileNav navItems={navItems} />
+              <MobileNav navItems={navItems} isSignedIn={Boolean(user)} />
             </div>
             <DesktopNav navItems={navItems} />
             <div className="hidden flex-1 max-w-xs lg:block">
@@ -205,7 +205,7 @@ export default async function RootLayout({
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="hidden rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 sm:inline-flex"
+                  className="hidden rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10 min-[420px]:inline-flex"
                 >
                   Sign in
                 </Link>
