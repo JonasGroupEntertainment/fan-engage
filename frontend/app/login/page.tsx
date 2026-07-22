@@ -35,8 +35,13 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "magic-sent">("idle");
-  const [message, setMessage] = useState("");
+  // Surface errors passed back by /auth/callback (e.g. a failed or
+  // rate-limited magic-link exchange) — otherwise they die silently.
+  const callbackError = searchParams.get("error");
+  const [status, setStatus] = useState<"idle" | "loading" | "error" | "magic-sent">(
+    callbackError ? "error" : "idle",
+  );
+  const [message, setMessage] = useState(callbackError ?? "");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileKey, setTurnstileKey] = useState(0);

@@ -65,8 +65,16 @@ class RateLimiter {
 
 // Create global instances for different rate limit tiers
 export const authRateLimiter = new RateLimiter({
-  maxRequests: 5,
-  windowMs: 15 * 60 * 1000, // 5 attempts per 15 minutes
+  maxRequests: 10,
+  windowMs: 15 * 60 * 1000, // 10 attempts per 15 minutes
+});
+
+// Magic-link / email-confirmation callback. Deliberately NOT shared with
+// authRateLimiter: a user's failed Turnstile attempts must never consume the
+// budget that their emailed sign-in link needs to complete.
+export const callbackRateLimiter = new RateLimiter({
+  maxRequests: 20,
+  windowMs: 15 * 60 * 1000, // 20 attempts per 15 minutes
 });
 
 export const fanDataRateLimiter = new RateLimiter({
