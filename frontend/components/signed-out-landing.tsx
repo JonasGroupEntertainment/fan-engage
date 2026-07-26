@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Artist } from "@/lib/artists";
 import type { LandingStats } from "@/lib/data/landing-stats";
 import FoundingFanBlock from "@/components/founding-fan-block";
+import { getArtistAmbientImage } from "@/lib/artist-ambient";
 
 /**
  * Public-facing marketing landing rendered at `/` for signed-out visitors.
@@ -302,20 +303,31 @@ export default function SignedOutLanding({
               >
                 <div
                   aria-hidden
+                  className="absolute inset-0 bg-cover bg-center opacity-40 transition duration-300 group-hover:opacity-55"
+                  style={{ backgroundImage: `url(${getArtistAmbientImage(a.genres)})` }}
+                />
+                <div
+                  aria-hidden
+                  className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10"
+                />
+                <div
+                  aria-hidden
                   className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-80"
                   style={{
                     backgroundImage: `linear-gradient(90deg, ${a.accentFrom}, ${a.accentTo})`,
                   }}
                 />
-                <p className="mt-2 text-base font-semibold">{a.name}</p>
-                {a.tagline && (
-                  <p className="mt-1 text-xs text-white/55 line-clamp-2">
-                    {a.tagline}
+                <div className="relative">
+                  <p className="mt-2 text-base font-semibold">{a.name}</p>
+                  {a.tagline && (
+                    <p className="mt-1 text-xs text-white/55 line-clamp-2">
+                      {a.tagline}
+                    </p>
+                  )}
+                  <p className="mt-4 text-xs text-white/50 transition group-hover:text-white/80">
+                    Visit page →
                   </p>
-                )}
-                <p className="mt-4 text-xs text-white/50 transition group-hover:text-white/80">
-                  Visit page →
-                </p>
+                </div>
               </Link>
             ))}
           </div>
