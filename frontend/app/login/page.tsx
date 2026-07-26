@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -58,6 +58,34 @@ function LoginForm() {
     setTurnstileKey((k) => k + 1);
   }, []);
 
+  // Resending a magic link overwrites the previous one's PKCE verifier, so
+  // the older email stops working. Lock the button for a cooldown so a
+  // double-click or impatient retry can't silently invalidate a link
+  // that's already on its way.
+  const MAGIC_LINK_COOLDOWN_SECONDS = 45;
+  const [magicLinkCooldown, setMagicLinkCooldown] = useState(0);
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    };
+  }, []);
+
+  function startMagicLinkCooldown() {
+    setMagicLinkCooldown(MAGIC_LINK_COOLDOWN_SECONDS);
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    cooldownInterval.current = setInterval(() => {
+      setMagicLinkCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
@@ -82,6 +110,7 @@ function LoginForm() {
   }
 
   async function handleMagicLink() {
+    if (magicLinkCooldown > 0) return;
     if (!email) {
       setStatus("error");
       setMessage("Enter an email first.");
@@ -107,7 +136,10 @@ function LoginForm() {
       });
       if (error) throw error;
       setStatus("magic-sent");
-      setMessage("Magic link sent. Check your email.");
+      setMessage(
+        "Magic link sent. Check your email — use the newest link, since requesting another one invalidates it.",
+      );
+      startMagicLinkCooldown();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send magic link.");
@@ -186,10 +218,14 @@ function LoginForm() {
         <button
           type="button"
           onClick={handleMagicLink}
-          disabled={status === "loading"}
+          disabled={status === "loading" || magicLinkCooldown > 0}
           className="w-full rounded-full border border-white/20 px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10 disabled:opacity-60"
         >
-          Send me a magic link
+          {magicLinkCooldown > 0
+            ? `Resend magic link in ${magicLinkCooldown}s`
+            : status === "magic-sent"
+              ? "Resend magic link"
+              : "Send me a magic link"}
         </button>
 
         {message && (
