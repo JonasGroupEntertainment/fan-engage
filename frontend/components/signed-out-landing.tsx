@@ -26,12 +26,23 @@ export default function SignedOutLanding({
     <main className="overflow-hidden">
       {/* ─── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative border-b border-white/5">
-        {/* Soft aurora glow behind the hero */}
+        {/* Ambient stage-light video loop behind the hero */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
-          <div className="absolute -top-24 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-gradient-to-br from-aurora/40 via-ember/20 to-transparent blur-3xl" />
+          <video
+            className="absolute inset-0 h-full w-full object-cover opacity-60"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+          >
+            <source src="/videos/hero-aurora-loop.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-background" />
+          <div className="absolute -top-24 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-gradient-to-br from-aurora/30 via-ember/15 to-transparent blur-3xl" />
         </div>
 
         <div className="relative mx-auto grid max-w-6xl gap-10 px-6 py-20 lg:grid-cols-[1.15fr_1fr] lg:py-28">
