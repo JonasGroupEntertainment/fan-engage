@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { authRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
 
 /**
  * Handles:
@@ -10,32 +10,21 @@ import { authRateLimiter, getClientIp } from "@/lib/rate-limit";
  * Exchanges the `code` for a session and redirects to `next` (defaults to /).
  */
 export async function GET(request: NextRequest) {
+  const { searchParams, origin } = new URL(request.url);
+
   const clientIp = getClientIp(request.headers);
-  const rateLimitResult = authRateLimiter.check(clientIp);
+  const rateLimitResult = callbackRateLimiter.check(clientIp);
 
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        error: "Too many authentication attempts. Please try again later.",
-        retryAfter: Math.ceil(
-          (rateLimitResult.resetTime.getTime() - Date.now()) / 1000,
-        ),
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": Math.ceil(
-            (rateLimitResult.resetTime.getTime() - Date.now()) / 1000,
-          ).toString(),
-          "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-          "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-          "X-RateLimit-Reset": rateLimitResult.resetTime.toISOString(),
-        },
-      },
+    // A raw 429 JSON body here strands the user on a blank error page mid
+    // sign-in; send them back to /login with a readable message instead.
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(
+        "Too many sign-in attempts. Please wait a few minutes, then use a fresh link.",
+      )}`,
     );
   }
 
-  const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const rawNext = searchParams.get("next") ?? "/";
   // Only allow same-origin relative paths ("//host" is protocol-relative).

@@ -75,17 +75,18 @@ export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }
 
     if (window.turnstile) {
       renderWidget();
-      return;
+    } else {
+      // Script not yet loaded — attach a loader callback and inject the script once
+      window.onTurnstileLoad = renderWidget;
+
+      if (!scriptRequested) {
+        scriptRequested = true;
+        injectTurnstileScript();
+      }
     }
 
-    // Script not yet loaded — attach a loader callback and inject the script once
-    window.onTurnstileLoad = renderWidget;
-
-    if (!scriptRequested) {
-      scriptRequested = true;
-      injectTurnstileScript();
-    }
-
+    // Always clean up: the auth forms remount this widget (key bump) after
+    // every verify attempt, so stale instances must be removed each time.
     return () => {
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current);
@@ -100,11 +101,21 @@ export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }
   return <div ref={containerRef} className="mt-2" />;
 }
 
+export interface TurnstileVerifyResult {
+  success: boolean;
+  error?: string;
+}
+
 // Call this from a form submit handler to verify the token server-side.
-// Returns true if verified (or if Turnstile isn't configured).
-export async function verifyTurnstileToken(token: string | null): Promise<boolean> {
-  if (!SITE_KEY) return true; // not configured — allow through
-  if (!token) return false;
+// Succeeds if verified (or if Turnstile isn't configured).
+//
+// Tokens are SINGLE-USE and expire after ~5 minutes: after calling this —
+// whether it succeeds or fails — the token is spent, and the caller must
+// remount the TurnstileWidget (bump its `key`) to get a fresh one before
+// the next attempt.
+export async function verifyTurnstileToken(token: string | null): Promise<TurnstileVerifyResult> {
+  if (!SITE_KEY) return { success: true }; // not configured — allow through
+  if (!token) return { success: false, error: "missing_token" };
 
   try {
     const res = await fetch("/api/turnstile/verify", {
@@ -112,9 +123,19 @@ export async function verifyTurnstileToken(token: string | null): Promise<boolea
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     });
-    const data = (await res.json()) as { success: boolean };
-    return data.success === true;
+    if (res.status === 429) return { success: false, error: "rate_limited" };
+    const data = (await res.json()) as { success: boolean; error?: string };
+    if (data.success === true) return { success: true };
+    return { success: false, error: data.error ?? "challenge_failed" };
   } catch {
-    return false;
+    return { success: false, error: "network_error" };
   }
+}
+
+// User-facing message for a failed verification.
+export function turnstileFailureMessage(error?: string): string {
+  if (error === "rate_limited") {
+    return "Too many attempts. Please wait about 15 minutes, then try again.";
+  }
+  return "Security check expired. Please complete the new check and try again.";
 }

@@ -3,7 +3,11 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { TurnstileWidget, verifyTurnstileToken } from "@/components/turnstile-widget";
+import {
+  TurnstileWidget,
+  turnstileFailureMessage,
+  verifyTurnstileToken,
+} from "@/components/turnstile-widget";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -11,6 +15,7 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
+  const [turnstileKey, setTurnstileKey] = useState(0);
 
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -18,6 +23,12 @@ export default function ForgotPasswordPage() {
   }, []);
   const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  // Tokens are single-use: once verified (pass or fail) the widget must be
+  // remounted to issue a fresh one, or every retry fails with a stale token.
+  const resetChallenge = useCallback(() => {
+    setTurnstileToken(null);
+    setTurnstileKey((k) => k + 1);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,10 +40,11 @@ export default function ForgotPasswordPage() {
     setStatus("loading");
     setMessage("");
 
-    const captchaOk = await verifyTurnstileToken(turnstileToken);
-    if (!captchaOk) {
+    const captcha = await verifyTurnstileToken(turnstileToken);
+    resetChallenge();
+    if (!captcha.success) {
       setStatus("error");
-      setMessage("Please complete the security check before continuing.");
+      setMessage(turnstileFailureMessage(captcha.error));
       return;
     }
 
@@ -78,6 +90,7 @@ export default function ForgotPasswordPage() {
           </label>
 
           <TurnstileWidget
+            key={turnstileKey}
             onSuccess={handleTurnstileSuccess}
             onError={handleTurnstileError}
             onExpire={handleTurnstileExpire}
