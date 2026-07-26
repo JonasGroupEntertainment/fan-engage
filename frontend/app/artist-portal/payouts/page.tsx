@@ -23,6 +23,7 @@ async function getPayoutData(communityId: string): Promise<{
   payouts: PayoutRow[];
 }> {
   const admin = createAdminClient();
+  const supabase = await createClient();
 
   const { data: community } = await admin
     .from("communities")
@@ -34,7 +35,7 @@ async function getPayoutData(communityId: string): Promise<{
 
   let payouts: PayoutRow[] = [];
   try {
-    const { data } = await admin
+    const { data } = await supabase
       .from("artist_payouts")
       .select(
         "id, month_start, amount_cents, payout_split_pct, stripe_transfer_id, status, created_at"
