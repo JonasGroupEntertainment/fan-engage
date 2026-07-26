@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
@@ -28,6 +28,10 @@ const spaceGrotesk = Space_Grotesk({
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
 
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
@@ -46,7 +50,6 @@ export const metadata: Metadata = {
     "VIP access",
   ],
   manifest: "/manifest.json",
-  themeColor: "#7c3aed",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
