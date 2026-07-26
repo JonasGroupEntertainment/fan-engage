@@ -108,40 +108,53 @@ export default function SignedOutLanding({
                   </div>
                 </div>
                 {/* Front card */}
-                <div className="absolute left-0 top-0 h-[380px] w-[320px] -rotate-2 rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/40 via-slate-900 to-black p-6 shadow-glass">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs uppercase tracking-widest text-white/60">
-                      Fan Profile
-                    </p>
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
-                      Gold tier
-                    </span>
-                  </div>
-                  <p
-                    className="mt-6 text-4xl font-semibold text-white"
-                    style={{ fontFamily: "var(--font-display)" }}
+                <div className="absolute left-0 top-0 h-[380px] w-[320px] -rotate-2 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/40 via-slate-900 to-black p-6 shadow-glass">
+                  <video
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="auto"
                   >
-                    11,420
-                  </p>
-                  <p className="text-xs text-white/50">total points</p>
-                  <div className="mt-6 space-y-2">
-                    <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span className="flex items-center gap-2">
-                        <Icon name="trophy" size={16} /> Challenge crasher
+                    <source src="/videos/fan-profile-holo-loop.mp4" type="video/mp4" />
+                  </video>
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-widest text-white/60">
+                        Fan Profile
+                      </p>
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
+                        Gold tier
                       </span>
-                      <span className="text-emerald-300">+250</span>
                     </div>
-                    <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span className="flex items-center gap-2">
-                        <Icon name="ticket" size={16} /> Austin Listening Party
-                      </span>
-                      <span className="text-emerald-300">+25</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span className="flex items-center gap-2">
-                        <Icon name="handshake" size={16} /> Invited 3 friends
-                      </span>
-                      <span className="text-emerald-300">+450</span>
+                    <p
+                      className="mt-6 text-4xl font-semibold text-white"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      11,420
+                    </p>
+                    <p className="text-xs text-white/50">total points</p>
+                    <div className="mt-6 space-y-2">
+                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
+                        <span className="flex items-center gap-2">
+                          <Icon name="trophy" size={16} /> Challenge crasher
+                        </span>
+                        <span className="text-emerald-300">+250</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
+                        <span className="flex items-center gap-2">
+                          <Icon name="ticket" size={16} /> Austin Listening Party
+                        </span>
+                        <span className="text-emerald-300">+25</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
+                        <span className="flex items-center gap-2">
+                          <Icon name="handshake" size={16} /> Invited 3 friends
+                        </span>
+                        <span className="text-emerald-300">+450</span>
+                      </div>
                     </div>
                   </div>
                 </div>
