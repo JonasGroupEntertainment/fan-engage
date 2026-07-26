@@ -3,6 +3,7 @@ import type { Artist } from "@/lib/artists";
 import type { LandingStats } from "@/lib/data/landing-stats";
 import FoundingFanBlock from "@/components/founding-fan-block";
 import { getArtistAmbientImage } from "@/lib/artist-ambient";
+import { Icon, type IconName } from "@/components/icon";
 
 /**
  * Public-facing marketing landing rendered at `/` for signed-out visitors.
@@ -125,15 +126,21 @@ export default function SignedOutLanding({
                   <p className="text-xs text-white/50">total points</p>
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span>🏆 Challenge crasher</span>
+                      <span className="flex items-center gap-2">
+                        <Icon name="trophy" size={16} /> Challenge crasher
+                      </span>
                       <span className="text-emerald-300">+250</span>
                     </div>
                     <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span>🎟️ Austin Listening Party</span>
+                      <span className="flex items-center gap-2">
+                        <Icon name="ticket" size={16} /> Austin Listening Party
+                      </span>
                       <span className="text-emerald-300">+25</span>
                     </div>
                     <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                      <span>🤝 Invited 3 friends</span>
+                      <span className="flex items-center gap-2">
+                        <Icon name="handshake" size={16} /> Invited 3 friends
+                      </span>
                       <span className="text-emerald-300">+450</span>
                     </div>
                   </div>
@@ -150,17 +157,17 @@ export default function SignedOutLanding({
       {/* ─── Live proof tiles ─────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ProofTile label="Active artists" value={stats.activeArtists} icon="🎤" />
-          <ProofTile label="Live shows lined up" value={stats.activeEvents} icon="🎟️" />
+          <ProofTile label="Active artists" value={stats.activeArtists} icon="mic" />
+          <ProofTile label="Live shows lined up" value={stats.activeEvents} icon="ticket" />
           <ProofTile
             label="Founding fans inducted"
             value={stats.foundingFans}
-            icon="🏅"
+            icon="medal"
           />
           <ProofTile
             label="Days to claim founding"
             value={stats.daysUntilFoundingCloses}
-            icon="⏳"
+            icon="hourglass"
           />
         </div>
       </section>
@@ -182,19 +189,19 @@ export default function SignedOutLanding({
               n: "01",
               title: "Follow your artists",
               body: "Pick the artists you love. You'll get their drops, events, polls, and challenges in one feed.",
-              icon: "🎧",
+              icon: "headphones" as IconName,
             },
             {
               n: "02",
               title: "Earn points for every fan move",
               body: "RSVPing an event, voting in a poll, commenting, sharing your referral code — all of it earns points.",
-              icon: "⚡",
+              icon: "lightning" as IconName,
             },
             {
               n: "03",
               title: "Unlock real drops + access",
               body: "Signed vinyl, backstage soundchecks, VIP listening parties, limited merch. Points cash in for the real thing.",
-              icon: "🎁",
+              icon: "gift" as IconName,
             },
           ].map((step) => (
             <div
@@ -205,7 +212,7 @@ export default function SignedOutLanding({
                 <span className="text-xs font-mono text-white/40">
                   {step.n}
                 </span>
-                <span className="text-3xl">{step.icon}</span>
+                <Icon name={step.icon} size={32} />
               </div>
               <h3 className="mt-6 text-lg font-semibold">{step.title}</h3>
               <p className="mt-2 text-sm text-white/65">{step.body}</p>
@@ -240,29 +247,29 @@ export default function SignedOutLanding({
                 {
                   title: "Tier Journey",
                   body: "Bronze → Silver → Gold → Platinum. Every action moves you up.",
-                  icon: "🏅",
+                  icon: "medal" as IconName,
                 },
                 {
                   title: "Community Hub",
                   body: "Posts, polls, challenges — per artist, moderated, never spam.",
-                  icon: "💬",
+                  icon: "chat" as IconName,
                 },
                 {
                   title: "Event RSVPs",
                   body: "Capacity-limited listening parties, soundchecks, meet-ups. Reminders included.",
-                  icon: "🎟️",
+                  icon: "ticket" as IconName,
                 },
                 {
                   title: "Rewards Marketplace",
                   body: "Redeem points for signed gear, backstage access, or merch exclusives.",
-                  icon: "🎁",
+                  icon: "gift" as IconName,
                 },
               ].map((f) => (
                 <div
                   key={f.title}
                   className="rounded-2xl border border-white/10 bg-black/30 p-5"
                 >
-                  <p className="text-2xl">{f.icon}</p>
+                  <Icon name={f.icon} size={32} />
                   <h3 className="mt-3 font-semibold">{f.title}</h3>
                   <p className="mt-1 text-xs text-white/60">{f.body}</p>
                 </div>
@@ -381,12 +388,12 @@ function ProofTile({
 }: {
   label: string;
   value: number;
-  icon: string;
+  icon: IconName;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
       <div className="flex items-center justify-between">
-        <span className="text-2xl">{icon}</span>
+        <Icon name={icon} size={28} />
         <span
           className="text-3xl font-semibold tabular-nums text-white"
           style={{ fontFamily: "var(--font-display)" }}
