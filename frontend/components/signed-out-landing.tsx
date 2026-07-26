@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Artist } from "@/lib/artists";
 import type { LandingStats } from "@/lib/data/landing-stats";
 import FoundingFanBlock from "@/components/founding-fan-block";
-import { getArtistAmbientImage } from "@/lib/artist-ambient";
+import { getArtistKeyArt } from "@/lib/artist-keyart";
 import { Icon, type IconName } from "@/components/icon";
 
 /**
@@ -310,8 +310,8 @@ export default function SignedOutLanding({
               >
                 <div
                   aria-hidden
-                  className="absolute inset-0 bg-cover bg-center opacity-40 transition duration-300 group-hover:opacity-55"
-                  style={{ backgroundImage: `url(${getArtistAmbientImage(a.genres)})` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-60 transition duration-300 group-hover:opacity-80"
+                  style={{ backgroundImage: `url(${getArtistKeyArt(a.slug, a.genres)})` }}
                 />
                 <div
                   aria-hidden
