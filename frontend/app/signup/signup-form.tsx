@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -61,6 +61,34 @@ export function SignupForm({
     setTurnstileKey((k) => k + 1);
   }, []);
 
+  // Resubmitting signUp() for the same address silently resends the
+  // confirmation email and regenerates its token, invalidating whatever
+  // link is already in the inbox. Lock the button after a successful send
+  // so a double-click or impatient retry can't do that.
+  const CONFIRM_COOLDOWN_SECONDS = 45;
+  const [confirmCooldown, setConfirmCooldown] = useState(0);
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    };
+  }, []);
+
+  function startConfirmCooldown() {
+    setConfirmCooldown(CONFIRM_COOLDOWN_SECONDS);
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    cooldownInterval.current = setInterval(() => {
+      setConfirmCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   function validateEmail(value: string): string | null {
@@ -77,6 +105,7 @@ export function SignupForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (confirmCooldown > 0) return;
 
     // Inline validation BEFORE we hit Supabase. Surface field-specific
     // errors so a 6-character password isn't silently rejected as a
@@ -124,6 +153,7 @@ export function SignupForm({
       // Otherwise Supabase emailed a confirmation link — prompt them to check it.
       setStatus("confirm");
       setMessage("Check your email to confirm and finish signing up.");
+      startConfirmCooldown();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to create account.");
@@ -318,10 +348,16 @@ export function SignupForm({
 
           <button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === "loading" || confirmCooldown > 0}
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
-            {status === "loading" ? "Creating account…" : "Create account"}
+            {confirmCooldown > 0
+              ? `Resend confirmation email in ${confirmCooldown}s`
+              : status === "loading"
+                ? "Creating account…"
+                : status === "confirm"
+                  ? "Resend confirmation email"
+                  : "Create account"}
           </button>
         </form>
 
@@ -333,7 +369,10 @@ export function SignupForm({
             <ol className="mt-3 space-y-2 text-xs text-emerald-100/90">
               <li className="flex gap-2">
                 <span className="font-mono text-emerald-300/70">1.</span>
-                <span>Check your email and click the confirmation link we just sent.</span>
+                <span>
+                  Check your email and click the confirmation link we just sent — use the
+                  newest one, since requesting another invalidates it.
+                </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-mono text-emerald-300/70">2.</span>
