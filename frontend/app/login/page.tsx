@@ -4,6 +4,7 @@ import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
   turnstileFailureMessage,
@@ -131,7 +132,7 @@ function LoginForm() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          emailRedirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent(next)}`,
         },
       });
       if (error) throw error;

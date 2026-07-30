@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
   turnstileFailureMessage,
@@ -137,7 +138,7 @@ export function SignupForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(onboardingHref)}`,
+          emailRedirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent(onboardingHref)}`,
         },
       });
       if (error) throw error;

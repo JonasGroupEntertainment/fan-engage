@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
   turnstileFailureMessage,
@@ -51,7 +52,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
+        redirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
       });
       if (error) throw error;
       setStatus("sent");

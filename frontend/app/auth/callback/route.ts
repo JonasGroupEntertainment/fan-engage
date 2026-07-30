@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { APP_URL } from "@/lib/app-url";
 import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
 
 /**
@@ -10,7 +11,7 @@ import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
  * Exchanges the `code` for a session and redirects to `next` (defaults to /).
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
 
   const clientIp = getClientIp(request.headers);
   const rateLimitResult = callbackRateLimiter.check(clientIp);
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     // A raw 429 JSON body here strands the user on a blank error page mid
     // sign-in; send them back to /login with a readable message instead.
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(
+      `${APP_URL}/login?error=${encodeURIComponent(
         "Too many sign-in attempts. Please wait a few minutes, then use a fresh link.",
       )}`,
     );
@@ -35,10 +36,10 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent(error.message)}`,
+        `${APP_URL}/login?error=${encodeURIComponent(error.message)}`,
       );
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(`${APP_URL}${next}`);
 }
