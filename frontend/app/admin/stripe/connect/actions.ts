@@ -1,70 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminContext } from "@/lib/admin";
-import { getStripe } from "@/lib/stripe";
-
-const RETURN_URL =
-  (process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app") +
-  "/admin/stripe/connect";
 
 /**
- * Create or retrieve a Stripe Express Connect account for a community,
- * then return an Account Link URL for the artist to complete onboarding
- * (bank info, identity verification, etc.).
+ * NOTE — Stripe Connect onboarding has been retired.
+ *
+ * This app now runs on a merchant-of-record model: ONE platform Stripe
+ * account, ONE bank account attached to it. Every artist/community's
+ * revenue is tagged with `community_id` / `community_slug` metadata on
+ * the relevant Stripe object (Checkout Session, Subscription, Price,
+ * Product) so the accountant can filter/group Stripe reports per
+ * community and pay artists out manually via bank transfer — money never
+ * moves automatically out of the platform's Stripe account.
+ *
+ * `createConnectOnboardingLinkAction` and `syncConnectStatusAction` used
+ * to create Stripe Express connected accounts and drive artists through
+ * Stripe's hosted onboarding (which is where the bank-info prompt came
+ * from). Both are removed. The `stripe_connect_*` columns on
+ * `communities` are left in place but unused.
  */
-/**
- * Create or retrieve a Stripe Express Connect account for a community,
- * then redirect the admin to Stripe's hosted onboarding flow where the
- * artist enters their bank details.
- */
-export async function createConnectOnboardingLinkAction(
-  formData: FormData,
-): Promise<void> {
-  const ctx = await getAdminContext();
-  if (!ctx?.isSuperAdmin) throw new Error("Super-admin only");
-
-  const communityId = String(formData.get("community_id") ?? "").trim();
-  if (!communityId) throw new Error("Missing community_id");
-
-  const admin = createAdminClient();
-  const { data: community } = await admin
-    .from("communities")
-    .select("slug, display_name, stripe_connect_account_id")
-    .eq("slug", communityId)
-    .maybeSingle();
-
-  if (!community) throw new Error("Community not found");
-
-  const stripe = getStripe();
-
-  let accountId = community.stripe_connect_account_id as string | null;
-  if (!accountId) {
-    const account = await stripe.accounts.create({
-      type: "express",
-      metadata: { community_id: communityId, display_name: community.display_name as string },
-    });
-    accountId = account.id;
-    await admin
-      .from("communities")
-      .update({ stripe_connect_account_id: accountId })
-      .eq("slug", communityId);
-  }
-
-  const link = await stripe.accountLinks.create({
-    account: accountId,
-    refresh_url: RETURN_URL + "?refresh=" + communityId,
-    return_url: RETURN_URL + "?onboarded=" + communityId,
-    type: "account_onboarding",
-  });
-
-  redirect(link.url);
-}
 
 /**
- * Update the payout split percentage for a community.
+ * Update the payout split percentage for a community. Still used for
+ * reporting purposes — it drives the "artist share" figure shown on this
+ * page and is informational for the accountant, not a live Stripe split.
  */
 export async function updatePayoutSplitAction(formData: FormData): Promise<void> {
   const ctx = await getAdminContext();
@@ -110,41 +71,4 @@ export async function updatePricingAction(formData: FormData): Promise<void> {
 
   revalidatePath("/admin/stripe/connect");
   revalidatePath("/admin/stripe/seed");
-}
-
-/**
- * Mark a Connect account as onboarding-complete after checking its status
- * with Stripe. Called from the return URL handler.
- */
-export async function syncConnectStatusAction(
-  formData: FormData,
-): Promise<void> {
-  const ctx = await getAdminContext();
-  if (!ctx?.isSuperAdmin) throw new Error("Super-admin only");
-
-  const communityId = String(formData.get("community_id") ?? "").trim();
-  if (!communityId) throw new Error("Missing community_id");
-
-  const admin = createAdminClient();
-  const { data: community } = await admin
-    .from("communities")
-    .select("stripe_connect_account_id")
-    .eq("slug", communityId)
-    .maybeSingle();
-
-  const accountId = community?.stripe_connect_account_id as string | null;
-  if (!accountId) throw new Error("No Connect account for this community");
-
-  const stripe = getStripe();
-  const account = await stripe.accounts.retrieve(accountId);
-  const complete =
-    account.details_submitted &&
-    (account.payouts_enabled ?? false);
-
-  await admin
-    .from("communities")
-    .update({ stripe_connect_onboarding_complete: complete })
-    .eq("slug", communityId);
-
-  revalidatePath("/admin/stripe/connect");
 }

@@ -13,8 +13,6 @@ type PayoutRow = {
 };
 
 type CommunityPayoutInfo = {
-  stripe_connect_account_id: string | null;
-  stripe_connect_onboarding_complete: boolean;
   payout_split_pct: number;
 };
 
@@ -26,9 +24,7 @@ async function getPayoutData(communityId: string): Promise<{
 
   const { data: community } = await admin
     .from("communities")
-    .select(
-      "stripe_connect_account_id, stripe_connect_onboarding_complete, payout_split_pct"
-    )
+    .select("payout_split_pct")
     .eq("slug", communityId)
     .maybeSingle();
 
@@ -75,10 +71,7 @@ export default async function ArtistPortalPayoutsPage() {
 
   const { community, payouts } = await getPayoutData(adminRow.community_id);
 
-  const artistPct = community
-    ? 100 - community.payout_split_pct
-    : 80;
-  const connected = community?.stripe_connect_onboarding_complete ?? false;
+  const artistPct = community ? 100 - community.payout_split_pct : 80;
 
   return (
     <div className="space-y-8">
@@ -94,37 +87,19 @@ export default async function ArtistPortalPayoutsPage() {
         </p>
       </div>
 
-      {/* Connect status */}
+      {/* How payouts work */}
       <div className="rounded-2xl border border-white/10 bg-black/30 p-5 space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-white/60">
-          Stripe Connect
+          How payouts work
         </h2>
 
-        <div className="flex items-center gap-3">
-          <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ${
-              connected ? "bg-green-400" : "bg-yellow-400"
-            }`}
-          />
-          <span className="text-sm text-white">
-            {connected ? "Connected & verified" : "Not yet connected"}
-          </span>
-        </div>
-
-        {community?.stripe_connect_account_id && (
-          <p className="text-xs text-white/40 font-mono">
-            {community.stripe_connect_account_id}
-          </p>
-        )}
-
-        {!connected && (
-          <a
-            href="/admin/stripe/connect"
-            className="inline-flex items-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 transition-colors"
-          >
-            Set up payouts →
-          </a>
-        )}
+        <p className="text-sm text-white/70">
+          All fan revenue for your community — subscriptions, tickets, merch, and tips — is
+          collected through the platform&apos;s own Stripe account and tagged so it can be
+          tracked back to you. There&apos;s no bank account to link and nothing for you to set
+          up in Stripe. Your team&apos;s accountant reviews tracked sales each month and pays
+          your share directly by bank transfer, outside of Stripe.
+        </p>
 
         {/* Revenue split */}
         <div className="mt-4 rounded-xl bg-white/5 p-4">
@@ -159,8 +134,8 @@ export default async function ArtistPortalPayoutsPage() {
         </h2>
         {payouts.length === 0 ? (
           <p className="text-sm text-white/40">
-            No payouts recorded yet.{" "}
-            {!connected && "Connect Stripe above to start receiving payouts."}
+            No payouts recorded yet. Your accountant will record payouts here once they&apos;re
+            sent.
           </p>
         ) : (
           <div className="overflow-x-auto">

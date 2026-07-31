@@ -133,6 +133,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
     metadata: {
       fan_id: user.id,
       community_id: communityId,
+      community_slug: communityId,
       tier: asFounder ? "founder" : "standard",
       billing_period: billingPeriod,
     },
@@ -140,6 +141,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
       metadata: {
         fan_id: user.id,
         community_id: communityId,
+        community_slug: communityId,
         tier: asFounder ? "founder" : "standard",
         billing_period: billingPeriod,
       },
