@@ -32,6 +32,10 @@ export function getStripe(): Stripe {
     // whenever the SDK is upgraded and the API version changes.
     apiVersion: "2026-03-25.dahlia",
     typescript: true,
+    // Node's default http(s) agent frequently throws StripeConnectionError
+    // on Vercel's serverless runtime (sockets aren't reliably reused across
+    // invocations). The fetch-based client avoids this.
+    httpClient: Stripe.createFetchHttpClient(),
     appInfo: {
       name: "Fan Engage",
       url: process.env.NEXT_PUBLIC_APP_URL ?? "https://fanengagepro.com",
