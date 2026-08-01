@@ -49,11 +49,10 @@ export interface FounderState {
 }
 
 /**
- * Count memberships that have ever been premium (active + past_due +
- * cancelled — i.e. anyone who has at some point paid). Founders = first N
- * by time. Once 100 people have subscribed, the cap is hit; subsequent
- * subscribers get standard pricing even if they sign up via /premium with
- * a founder query param.
+ * Count memberships flagged `is_founder` (set at signup once the first N
+ * subscribers claim founder pricing). Matches the same flag used by the
+ * founders wall (`/artists/[slug]/founders`) so the count shown here can't
+ * drift from the count shown there.
  */
 export async function getFounderState(communityId: string): Promise<FounderState> {
   const admin = createAdminClient();
@@ -67,7 +66,7 @@ export async function getFounderState(communityId: string): Promise<FounderState
       .from("fan_community_memberships")
       .select("fan_id", { count: "exact", head: true })
       .eq("community_id", communityId)
-      .in("subscription_tier", ["premium", "past_due", "cancelled"]),
+      .eq("is_founder", true),
   ]);
 
   const founderCap = (community?.founder_cap as number) ?? 100;

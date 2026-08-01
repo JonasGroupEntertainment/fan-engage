@@ -1,7 +1,11 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getCurrentFan } from "@/lib/data/fan";
-import { getMyReferrals, getReferralLeaderboard } from "@/lib/data/referrals";
+import {
+  getMyReferrals,
+  getReferralLeaderboard,
+  getRecentReferralActivity,
+} from "@/lib/data/referrals";
 import { listArtistsFromDb } from "@/lib/data/artists";
 import InviteQRCode from "@/components/invite-qr";
 import CopyLinkButton from "./copy-link-button";
@@ -13,15 +17,6 @@ const ladder = [
   { level: "3 referrals", reward: "Signed postcard" },
   { level: "5 referrals", reward: "Exclusive merch" },
   { level: "10 referrals", reward: "VIP livestream" },
-];
-
-// Static preview leaderboard shown only to anonymous visitors so the page
-// isn't blank. Signed-in users see the real state — empty or populated.
-const previewLeaderboard = [
-  { name: "Alexis", total: "27 referrals" },
-  { name: "Brandon", total: "21 referrals" },
-  { name: "Maya", total: "18 referrals" },
-  { name: "Theo", total: "16 referrals" },
 ];
 
 async function buildInviteUrl(code: string | null | undefined): Promise<string> {
@@ -41,12 +36,23 @@ async function getAppOrigin(): Promise<string> {
 
 export const metadata = { title: "Referrals" };
 
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.max(1, Math.round(diffMs / 60_000));
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 export default async function ReferralsPage() {
-  const [fan, myReferrals, leaderboard, artists] = await Promise.all([
+  const [fan, myReferrals, leaderboard, artists, recentActivity] = await Promise.all([
     getCurrentFan(),
     getMyReferrals(),
     getReferralLeaderboard(5),
     listArtistsFromDb(),
+    getRecentReferralActivity(5),
   ]);
 
   const isSignedIn = fan !== null;
@@ -58,12 +64,10 @@ export default async function ReferralsPage() {
   const inviterName = fan?.first_name ?? "me";
   const featuredArtists = artists.slice(0, 4);
 
-  const leaderboardRows = isSignedIn
-    ? leaderboard.map((row) => ({
-        name: row.display_name,
-        total: `${row.referral_count} referral${row.referral_count === 1 ? "" : "s"}`,
-      }))
-    : previewLeaderboard;
+  const leaderboardRows = leaderboard.map((row) => ({
+    name: row.display_name,
+    total: `${row.referral_count} referral${row.referral_count === 1 ? "" : "s"}`,
+  }));
 
   const possessive = fan?.first_name ? `${fan.first_name}'s` : "your";
 
@@ -75,7 +79,7 @@ export default async function ReferralsPage() {
             <PreviewSignupBanner
               eyebrow="🎟️ Preview"
               headline="Sign up to get your invite link"
-              body="Fans earn points every time a friend joins, but the best shares are artist-specific: invite someone into a real fan experience, not just a generic account."
+              body="Members earn points every time a friend joins, but the best shares are artist-specific: invite someone into a real fan experience, not just a generic account."
               bullets={[
                 "Invite friends into specific artist hubs",
                 "Both fans get a clear reason to join and keep going",
@@ -95,7 +99,7 @@ export default async function ReferralsPage() {
             <p className="mt-4 text-sm text-white/70">
               {isSignedIn
                 ? `You've invited ${myCount} fan${myCount === 1 ? "" : "s"} so far. Share an artist experience and help a friend get their first 100 points while you earn 150 after they join.`
-                : "Fans get personal invite links they can attach to artists, drops, shows, and badges so every share feels like a real invitation."}
+                : "Members get personal invite links they can attach to artists, drops, shows, and badges so every share feels like a real invitation."}
             </p>
             {isSignedIn && (
               <>
@@ -251,7 +255,7 @@ export default async function ReferralsPage() {
                 <div className="mt-4 space-y-4">
                   {leaderboardRows.map((entry, index) => (
                     <div
-                      key={entry.name}
+                      key={`${entry.name}-${index}`}
                       className="flex items-center justify-between rounded-2xl bg-black/30 px-4 py-3"
                     >
                       <span className="text-sm font-semibold">
@@ -301,12 +305,20 @@ export default async function ReferralsPage() {
                   No activity yet — share your invite link to get started.
                 </div>
               )
-            ) : (
+            ) : recentActivity.length > 0 ? (
               <ul className="mt-4 space-y-3 text-sm text-white/70">
-                <li>• Taylor accepted your invite 2 hours ago (+150 pts)</li>
-                <li>• Casey unlocked the Referral badge yesterday</li>
-                <li>• Devon claimed the Gold drop you shared</li>
+                {recentActivity.map((r) => (
+                  <li key={r.id}>
+                    • {r.first_name} {r.status === "verified" ? "joined" : "was invited"}{" "}
+                    {formatRelativeTime(r.created_at)}
+                    {r.points_awarded ? ` (+${r.points_awarded} pts)` : ""}
+                  </li>
+                ))}
               </ul>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-center text-xs text-white/60">
+                No activity yet — be the first to invite a friend.
+              </div>
             )}
           </section>
         </aside>
