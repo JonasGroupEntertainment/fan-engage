@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { APP_URL } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
@@ -118,11 +118,6 @@ export async function createCheckoutSessionAction(formData: FormData) {
   });
 
   // 7) Create the Checkout Session
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "fanengagepro.com";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const origin = `${proto}://${host}`;
-
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
@@ -146,8 +141,8 @@ export async function createCheckoutSessionAction(formData: FormData) {
         billing_period: billingPeriod,
       },
     },
-    success_url: `${origin}/premium/welcome?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/premium?canceled=1`,
+    success_url: `${APP_URL}/premium/welcome?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${APP_URL}/premium?canceled=1`,
   });
 
   if (!session.url) {

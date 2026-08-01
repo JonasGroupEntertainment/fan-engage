@@ -1,5 +1,28 @@
 import type { NextConfig } from "next";
 
+const authSensitiveHeaders = [
+  { key: "Cache-Control", value: "private, no-store, no-cache, max-age=0, must-revalidate, no-transform" },
+  { key: "CDN-Cache-Control", value: "no-store" },
+  { key: "Vercel-CDN-Cache-Control", value: "no-store" },
+];
+
+const authSensitiveRoutes = [
+  "/auth/:path*",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/onboarding",
+  "/onboarding/:path*",
+  "/premium",
+  "/premium/:path*",
+  "/account/:path*",
+  "/me/:path*",
+  "/admin/:path*",
+  "/inbox/:path*",
+  "/api/stripe/:path*",
+];
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -12,22 +35,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      {
-        source: "/auth/:path*",
-        headers: [
-          { key: "Cache-Control", value: "private, no-store, no-cache, max-age=0, must-revalidate, no-transform" },
-          { key: "CDN-Cache-Control", value: "no-store" },
-          { key: "Vercel-CDN-Cache-Control", value: "no-store" },
-        ],
-      },
-      {
-        source: "/login",
-        headers: [
-          { key: "Cache-Control", value: "private, no-store, no-cache, max-age=0, must-revalidate, no-transform" },
-          { key: "CDN-Cache-Control", value: "no-store" },
-          { key: "Vercel-CDN-Cache-Control", value: "no-store" },
-        ],
-      },
+      ...authSensitiveRoutes.map((source) => ({
+        source,
+        headers: authSensitiveHeaders,
+      })),
       {
         source: "/api/:path*",
         headers: [
