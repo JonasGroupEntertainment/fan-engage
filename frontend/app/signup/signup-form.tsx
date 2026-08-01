@@ -10,6 +10,7 @@ import {
   turnstileFailureMessage,
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
+import { ConsentModal, type ConsentDoc } from "@/components/consent-modal";
 
 export type ReferrerArtist = {
   slug: string;
@@ -22,9 +23,13 @@ export type ReferrerArtist = {
 export function SignupForm({
   referrerName,
   referrerArtist,
+  consentDocs,
+  rewardsPublished,
 }: {
   referrerName?: string | null;
   referrerArtist?: ReferrerArtist | null;
+  consentDocs?: ConsentDoc[];
+  rewardsPublished?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +54,8 @@ export function SignupForm({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileKey, setTurnstileKey] = useState(0);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileError(false);
@@ -121,6 +128,16 @@ export function SignupForm({
       return;
     }
 
+    // Explicit, logged consent is required before an account is created.
+    // Hold here and let the scroll-to-accept modal drive the actual submit.
+    if (hasConsentDocs) {
+      setConsentOpen(true);
+      return;
+    }
+    await createAccount();
+  }
+
+  async function createAccount(consentVersion?: string) {
     setStatus("loading");
     setMessage("");
 
@@ -139,6 +156,12 @@ export function SignupForm({
         password,
         options: {
           emailRedirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent(onboardingHref)}`,
+          data: consentVersion
+            ? {
+                consent_accepted_at: new Date().toISOString(),
+                consent_version: consentVersion,
+              }
+            : undefined,
         },
       });
       if (error) throw error;
@@ -423,6 +446,22 @@ export function SignupForm({
           </Link>
         </p>
       </div>
+
+      {hasConsentDocs && (
+        <ConsentModal
+          open={consentOpen}
+          docs={consentDocs!}
+          rewardsPublished={!!rewardsPublished}
+          onCancel={() => {
+            setConsentOpen(false);
+            setStatus("idle");
+          }}
+          onAccept={(version) => {
+            setConsentOpen(false);
+            void createAccount(version);
+          }}
+        />
+      )}
     </main>
   );
 }

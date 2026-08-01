@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type PolicySlug = "terms" | "privacy" | "cookie_policy";
+export type PolicySlug =
+  | "terms"
+  | "privacy"
+  | "cookie_policy"
+  | "cancellation_refund"
+  | "rewards_terms";
 
 export interface PolicyPage {
   slug: PolicySlug | string;

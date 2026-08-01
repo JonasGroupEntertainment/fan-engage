@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPolicy } from "@/lib/data/policies";
 import { SignupForm, type ReferrerArtist } from "./signup-form";
 
 export const metadata = { title: "Sign up" };
@@ -64,13 +65,25 @@ export default async function SignupPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (user) redirect("/");
   const sp = (await searchParams) ?? {};
-  const [referrerName, referrerArtist] = await Promise.all([
+  const [referrerName, referrerArtist, terms, privacy, rewardsTerms] = await Promise.all([
     getReferrerName(),
     getReferrerArtist(sp.ref),
+    getPolicy("terms"),
+    getPolicy("privacy"),
+    getPolicy("rewards_terms"),
   ]);
+  const consentDocs = [terms, privacy]
+    .filter((p): p is NonNullable<typeof p> => !!p && !p.is_draft)
+    .map((p) => ({ slug: p.slug, title: p.title, content_md: p.content_md }));
+  const rewardsPublished = !!rewardsTerms && !rewardsTerms.is_draft;
   return (
     <Suspense fallback={null}>
-      <SignupForm referrerName={referrerName} referrerArtist={referrerArtist} />
+      <SignupForm
+        referrerName={referrerName}
+        referrerArtist={referrerArtist}
+        consentDocs={consentDocs}
+        rewardsPublished={rewardsPublished}
+      />
     </Suspense>
   );
 }

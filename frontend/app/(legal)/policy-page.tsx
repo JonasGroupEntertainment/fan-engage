@@ -28,6 +28,7 @@ export default async function PolicyPage({ slug }: { slug: string }) {
       terms: "Terms of Service",
       cookie_policy: "Cookie Policy",
       cancellation_refund: "Cancellation & Refund Policy",
+      rewards_terms: "Rewards Program Terms & Conditions",
     }[slug] ?? "Policy";
 
   return (
