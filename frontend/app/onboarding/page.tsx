@@ -143,7 +143,13 @@ export default function OnboardingWizard() {
         // Anonymous visitor (or expired session) — onboarding wizard
         // expects an authenticated user. Send them to /signup with a
         // return URL so the auth callback bounces them back here.
-        router.replace("/signup?next=/onboarding");
+        const searchParams = new URLSearchParams(window.location.search);
+        const rawNext = searchParams.get("next");
+        const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/onboarding";
+        const ref = searchParams.get("ref");
+        const params = new URLSearchParams({ next });
+        if (ref) params.set("ref", ref);
+        router.replace(`/signup?${params.toString()}`);
         return;
       }
       if (user.email) {
@@ -151,7 +157,7 @@ export default function OnboardingWizard() {
         setEmailAutoFilled(true);
       }
     });
-  }, []);
+  }, [router]);
 
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));

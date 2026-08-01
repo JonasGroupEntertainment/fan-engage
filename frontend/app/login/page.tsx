@@ -33,6 +33,8 @@ function LoginForm() {
   // Only allow same-origin relative paths ("//host" is protocol-relative).
   const rawNext = searchParams.get("next") ?? "/";
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const signupHref =
+    next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -241,7 +243,7 @@ function LoginForm() {
 
         <p className="text-center text-sm text-white/60">
           New fan?{" "}
-          <Link href="/signup" className="text-white underline-offset-4 hover:underline">
+          <Link href={signupHref} className="text-white underline-offset-4 hover:underline">
             Create an account
           </Link>
         </p>

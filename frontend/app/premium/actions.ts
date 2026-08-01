@@ -39,7 +39,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) {
-    redirect(`/login?next=${encodeURIComponent("/premium")}`);
+    redirect(`/signup?next=${encodeURIComponent("/premium")}`);
   }
 
   // 2) Which community?

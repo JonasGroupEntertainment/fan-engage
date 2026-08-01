@@ -45,6 +45,10 @@ export function SignupForm({
   const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
   const onboardingHref =
     next ?? (ref ? `/onboarding?ref=${encodeURIComponent(ref)}` : "/onboarding");
+  const loginHref =
+    onboardingHref === "/onboarding"
+      ? "/login"
+      : `/login?next=${encodeURIComponent(onboardingHref)}`;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -432,7 +436,7 @@ export function SignupForm({
         </p>
         <p className="text-center text-sm text-white/60">
           Already have an account?{" "}
-          <Link href="/login" className="text-white underline-offset-4 hover:underline">
+          <Link href={loginHref} className="text-white underline-offset-4 hover:underline">
             Sign in
           </Link>
         </p>
