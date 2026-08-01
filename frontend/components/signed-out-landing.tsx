@@ -23,6 +23,8 @@ export default function SignedOutLanding({
   stats: LandingStats;
 }) {
   const featured = artists.slice(0, 5);
+  const launchSignupHref = "/signup?ref=raelynn";
+  const launchArtistHref = "/artists/raelynn";
 
   return (
     <main className="overflow-hidden">
@@ -51,34 +53,34 @@ export default function SignedOutLanding({
           <div className="flex flex-col justify-center">
             <p className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-widest text-white/70">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              The fan experience platform
+              RaeLynn is live on Fan Engage Pro
             </p>
             <h1
               className="text-5xl font-semibold leading-[1.05] md:text-6xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Turn casual fans
+              Join RaeLynn&apos;s
               <br />
-              <span className="bg-gradient-to-r from-aurora via-fuchsia-400 to-ember bg-clip-text text-transparent">
-                into real fan experiences.
+              <span className="text-aurora">
+                fan experience.
               </span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-white/70">
-              Follow the artists you love, earn points for every fan move, and
-              unlock real drops, events, and access the casuals never see.
+              Follow RaeLynn, earn points for every fan move, and unlock the
+              drops, events, and access the casual crowd never sees.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                href="/onboarding"
+                href={launchSignupHref}
                 className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
               >
-                Create your fan profile →
+                Join RaeLynn free →
               </Link>
               <Link
-                href="/login"
+                href={launchArtistHref}
                 className="rounded-full border border-white/20 px-5 py-3 text-sm font-medium text-white/80 hover:bg-white/10"
               >
-                Sign in
+                See RaeLynn&apos;s page
               </Link>
             </div>
             <p className="mt-4 text-xs text-white/50">
@@ -178,9 +180,9 @@ export default function SignedOutLanding({
             icon="medal"
           />
           <ProofTile
-            label="Days to claim founding"
-            value={stats.daysUntilFoundingCloses}
-            icon="hourglass"
+            label="Signup bonus points"
+            value={100}
+            icon="lightning"
           />
         </div>
       </section>
@@ -376,10 +378,10 @@ export default function SignedOutLanding({
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/onboarding"
+              href={launchSignupHref}
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
-              Create fan profile →
+              Join RaeLynn free →
             </Link>
             <Link
               href="/artists"

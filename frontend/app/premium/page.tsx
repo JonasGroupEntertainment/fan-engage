@@ -79,6 +79,9 @@ export default async function PremiumPage({
   const annualSavingsPct = Math.round(
     (1 - annual / (monthly * 12)) * 100,
   );
+  const premiumNextPath = "/premium";
+  const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
+  const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
 
   const perks = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments, works-in-progress, voice notes." },
@@ -150,7 +153,7 @@ export default async function PremiumPage({
             }}
           >
             <span aria-hidden>🌟</span>
-            Founding Fan pricing — {founder.slotsRemaining} of {founder.founderCap} spots left. Lock in today&apos;s price forever.
+            Founding Fan pricing — {founder.slotsRemaining.toLocaleString("en-US")} {founder.slotsRemaining === 1 ? "spot" : "spots"} remaining of {founder.founderCap.toLocaleString("en-US")}.
           </div>
         )}
         {founder.isFull && (
@@ -297,11 +300,11 @@ export default async function PremiumPage({
         {!user && (
           <p className="mt-4 text-sm text-white/60">
             You&apos;ll need to{" "}
-            <Link href={`/signup?next=${encodeURIComponent("/premium")}`} className="underline hover:text-white">
+            <Link href={premiumSignupHref} className="underline hover:text-white">
               create a free fan profile
             </Link>{" "}
             or{" "}
-            <Link href={`/login?next=${encodeURIComponent("/premium")}`} className="underline hover:text-white">
+            <Link href={premiumLoginHref} className="underline hover:text-white">
               sign in
             </Link>{" "}
             before you can subscribe. It takes 60 seconds.

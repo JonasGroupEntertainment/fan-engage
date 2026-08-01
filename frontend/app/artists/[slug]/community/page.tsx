@@ -129,7 +129,7 @@ export default async function ArtistCommunityPage({
               Sign in
             </Link>
             <Link
-              href={`/signup`}
+              href={`/signup?ref=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/artists/${slug}/community`)}`}
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-xs font-semibold text-white shadow-glass"
             >
               Create account

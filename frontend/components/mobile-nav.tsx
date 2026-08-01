@@ -107,7 +107,7 @@ export function MobileNav({
                   Sign in
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/signup?ref=raelynn"
                   onClick={() => setOpen(false)}
                   className="flex-1 rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-center text-sm font-semibold text-white shadow-glass"
                 >

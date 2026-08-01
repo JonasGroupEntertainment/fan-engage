@@ -110,7 +110,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
             <PreviewSignupBanner
               eyebrow="🎟️ Preview"
               headline="Sign up to redeem these drops"
-              body="Members earn points by showing up — events, posts, referrals — then trade them for the merch, experiences, and collectibles below. Drops are tier-locked so the people who care the most get first crack."
+              body="Fans earn points by showing up — events, posts, referrals — then trade them for the merch, experiences, and collectibles below. Drops are tier-locked so the people who care the most get first crack."
               bullets={[
                 "Real merch + experiences from your favorite artists",
                 "Points-only or fan-priority pricing",

@@ -39,14 +39,14 @@ export const metadata: Metadata = {
     template: "%s · Fan Engage",
   },
   description:
-    "The fan experience platform. Follow the artists, performers, and creators you love, earn points for every fan move, and unlock real drops, members-only events, and behind-the-scenes access.",
+    "The fan experience platform. Follow the artists, performers, and creators you love, earn points for every fan move, and unlock real drops, fan-only events, and behind-the-scenes access.",
   applicationName: "Fan Engage",
   keywords: [
     "fan experience",
     "fan experience",
     "artist community",
     "fan rewards",
-    "members-only events",
+    "fan-only events",
     "VIP access",
   ],
   manifest: "/manifest.json",
@@ -213,7 +213,7 @@ export default async function RootLayout({
                   Sign in
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/signup?ref=raelynn"
                   className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
                 >
                   Join

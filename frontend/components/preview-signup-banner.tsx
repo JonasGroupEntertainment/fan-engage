@@ -32,9 +32,9 @@ export default function PreviewSignupBanner({
    */
   firstRewardLine?: string;
 }) {
-  const signupHref = nextPath
-    ? `/signup?next=${encodeURIComponent(nextPath)}`
-    : "/signup";
+  const signupParams = new URLSearchParams({ ref: "raelynn" });
+  if (nextPath) signupParams.set("next", nextPath);
+  const signupHref = `/signup?${signupParams.toString()}`;
   const loginHref = nextPath
     ? `/login?next=${encodeURIComponent(nextPath)}`
     : "/login";
@@ -72,7 +72,7 @@ export default function PreviewSignupBanner({
           href={loginHref}
           className="text-sm text-white/70 underline-offset-2 hover:text-white hover:underline"
         >
-          Already a member? Sign in
+          Already a fan? Sign in
         </Link>
       </div>
       {firstRewardLine && (

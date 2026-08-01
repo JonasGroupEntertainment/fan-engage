@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const metadata = {
   title: "Artists",
   description:
-    "Browse artist fan experiences on Fan Engage and discover rewards, drops, events, and member-only experiences. Follow the artists you love.",
+    "Browse artist fan experiences on Fan Engage and discover rewards, drops, events, and fan-only experiences. Follow the artists you love.",
   alternates: { canonical: "/artists" },
   openGraph: {
     type: "website",

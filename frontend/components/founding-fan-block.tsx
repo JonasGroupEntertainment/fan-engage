@@ -35,7 +35,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
             >
               First {stats.foundingTarget} fans get permanent
               <br />
-              <span className="bg-gradient-to-r from-aurora via-fuchsia-400 to-ember bg-clip-text text-transparent">
+              <span className="text-aurora">
                 Founding Fan status.
               </span>
             </h2>
@@ -65,7 +65,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
                 : `${stats.daysUntilFoundingCloses} days left — closes July 15`}
             </p>
             <Link
-              href="/onboarding"
+              href="/signup?ref=raelynn"
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
               Claim founding status →

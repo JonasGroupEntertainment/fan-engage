@@ -105,7 +105,7 @@ export default async function RewardsPage() {
             <PreviewSignupBanner
               eyebrow="🎟️ Preview"
               headline="Sign up to start earning real points + climbing real tiers"
-              body="The badges, points, and tier progress below are a preview of what fans see once they join. Members earn points by showing up — RSVPs, posts, referrals — and trade them for drops the casual crowd never gets."
+              body="The badges, points, and tier progress below are a preview of what fans see once they join. Fans earn points by showing up — RSVPs, posts, referrals — and trade them for drops the casual crowd never gets."
               bullets={[
                 "Real points the moment you sign up — no minimum to start",
                 "Badges that climb tiers and unlock fan-only perks",

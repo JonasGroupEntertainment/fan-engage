@@ -75,7 +75,7 @@ export default async function ReferralsPage() {
             <PreviewSignupBanner
               eyebrow="🎟️ Preview"
               headline="Sign up to get your invite link"
-              body="Members earn points every time a friend joins, but the best shares are artist-specific: invite someone into a real fan experience, not just a generic account."
+              body="Fans earn points every time a friend joins, but the best shares are artist-specific: invite someone into a real fan experience, not just a generic account."
               bullets={[
                 "Invite friends into specific artist hubs",
                 "Both fans get a clear reason to join and keep going",
@@ -95,7 +95,7 @@ export default async function ReferralsPage() {
             <p className="mt-4 text-sm text-white/70">
               {isSignedIn
                 ? `You've invited ${myCount} fan${myCount === 1 ? "" : "s"} so far. Share an artist experience and help a friend get their first 100 points while you earn 150 after they join.`
-                : "Members get personal invite links they can attach to artists, drops, shows, and badges so every share feels like a real invitation."}
+                : "Fans get personal invite links they can attach to artists, drops, shows, and badges so every share feels like a real invitation."}
             </p>
             {isSignedIn && (
               <>
