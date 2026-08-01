@@ -33,17 +33,20 @@ export async function createCheckoutSessionAction(formData: FormData) {
     throw new Error("Invalid billing_period");
   }
 
+  const communityId = await getCurrentCommunityId();
+
   // 1) Who's subscribing?
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) {
-    redirect(`/signup?next=${encodeURIComponent("/premium")}`);
+    const nextPath = encodeURIComponent("/premium");
+    const ref = encodeURIComponent(communityId);
+    redirect(`/signup?ref=${ref}&next=${nextPath}`);
   }
 
   // 2) Which community?
-  const communityId = await getCurrentCommunityId();
   const admin = createAdminClient();
   const { data: community } = await admin
     .from("communities")
