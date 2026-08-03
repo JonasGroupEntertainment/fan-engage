@@ -16,11 +16,11 @@
 -- external platforms and can't be observed by a DB trigger the way an insert
 -- into community_posts or artist_events can.
 do $$ begin
-  alter type point_source add value 'presave' if not exists;
+  alter type point_source add value if not exists 'presave';
 exception when others then null; end $$;
 
 do $$ begin
-  alter type point_source add value 'radio_support' if not exists;
+  alter type point_source add value if not exists 'radio_support';
 exception when others then null; end $$;
 
 -- Ticket-purchase earn already fits the existing 'purchase' point_source —
