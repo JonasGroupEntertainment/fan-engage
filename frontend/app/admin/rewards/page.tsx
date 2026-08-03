@@ -12,11 +12,11 @@ export default async function AdminRewardsPage() {
 
   const supabase = createAdminClient();
 
-  // Get rewards for this community
+  // Get rewards for this community, including global rewards (community_id null)
   const { data: rewards } = await supabase
     .from("rewards_catalog")
     .select("*")
-    .eq("community_id", ctx.currentCommunityId || "")
+    .or(`community_id.eq.${ctx.currentCommunityId || ""},community_id.is.null`)
     .order("sort_order", { ascending: true });
 
   return (
