@@ -209,7 +209,7 @@ function renderPost(h: SearchHit) {
         <p className="text-sm font-semibold text-white">{h.data.title}</p>
       ) : null}
       <p className="mt-1 line-clamp-3 text-xs text-white/70">{h.data.body}</p>
-      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">
+      <p className="mt-2 text-xs uppercase tracking-wide text-white/50">
         in {h.data.artist_slug} · {absoluteDate(h.data.created_at)}
       </p>
     </Link>
@@ -224,7 +224,7 @@ function renderComment(h: SearchHit) {
       className="block"
     >
       <p className="line-clamp-3 text-xs text-white/80">{h.data.body}</p>
-      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">
+      <p className="mt-2 text-xs uppercase tracking-wide text-white/50">
         comment in {h.data.artist_slug} · {absoluteDate(h.data.created_at)}
       </p>
     </Link>
@@ -239,7 +239,7 @@ function renderEvent(h: SearchHit) {
       {h.data.detail ? (
         <p className="mt-1 line-clamp-2 text-xs text-white/70">{h.data.detail}</p>
       ) : null}
-      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">
+      <p className="mt-2 text-xs uppercase tracking-wide text-white/50">
         {h.data.artist_slug}
         {h.data.event_date ? ` · ${absoluteDate(h.data.event_date)}` : ""}
       </p>
@@ -257,7 +257,7 @@ function renderReward(h: SearchHit) {
           {h.data.description}
         </p>
       ) : null}
-      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">
+      <p className="mt-2 text-xs uppercase tracking-wide text-white/50">
         {h.data.point_cost.toLocaleString()} pts
       </p>
     </Link>

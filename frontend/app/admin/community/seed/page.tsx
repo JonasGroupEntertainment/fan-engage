@@ -69,7 +69,7 @@ export default async function CommunitySeedPage() {
                     {seeded ? (
                       <span className="text-emerald-300">{count} posts</span>
                     ) : (
-                      <span className="text-white/40">0 posts</span>
+                      <span className="text-white/50">0 posts</span>
                     )}
                   </td>
                   <td className="px-4 py-4 text-xs text-white/60">
@@ -103,7 +103,7 @@ export default async function CommunitySeedPage() {
         </table>
       </div>
 
-      <p className="mt-6 text-xs text-white/40">
+      <p className="mt-6 text-xs text-white/50">
         After seeding, visit each artist community to confirm the posts render
         correctly, then pin or unpin as needed from{" "}
         <a href="/admin/community" className="underline hover:text-white/70">

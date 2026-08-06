@@ -249,7 +249,7 @@ function QueueCard({ row }: { row: QueueRow }) {
             </p>
           )}
 
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-white/50">
             Classified{" "}
             {row.classified_at
               ? new Date(row.classified_at).toLocaleString()

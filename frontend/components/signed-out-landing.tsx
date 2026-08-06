@@ -228,7 +228,7 @@ export default function SignedOutLanding({
               className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-6"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-white/40">
+                <span className="text-xs font-mono text-white/50">
                   {step.n}
                 </span>
                 <Icon name={step.icon} size={32} />

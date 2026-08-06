@@ -206,7 +206,7 @@ function CandidatesTable({ log }: { log: LogRow[] }) {
             >
               <td className="px-3 py-2 text-white">
                 {r.fan.first_name ?? "—"}
-                <div className="text-xs text-white/40">
+                <div className="text-xs text-white/50">
                   {r.fan.email ?? ""}
                 </div>
               </td>
@@ -239,7 +239,7 @@ function CandidatesTable({ log }: { log: LogRow[] }) {
                     ready
                   </span>
                 ) : (
-                  <span className="text-xs text-white/40">below cap</span>
+                  <span className="text-xs text-white/50">below cap</span>
                 )}
               </td>
             </tr>

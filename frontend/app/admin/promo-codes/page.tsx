@@ -115,12 +115,12 @@ export default async function PromoCodesPage() {
 
         {/* Code list */}
         {(codes ?? []).length === 0 ? (
-          <p className="text-sm text-white/40">No codes yet.</p>
+          <p className="text-sm text-white/50">No codes yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-white/10">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/40">
+                <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/50">
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Community</th>
@@ -147,13 +147,13 @@ export default async function PromoCodesPage() {
                           : "Never"}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${c.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white/40"}`}>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${c.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white/50"}`}>
                           {c.active ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <form action={togglePromoCode.bind(null, c.id as string, !c.active)}>
-                          <button type="submit" className="text-xs text-white/40 hover:text-white transition">
+                          <button type="submit" className="text-xs text-white/50 hover:text-white transition">
                             {c.active ? "Deactivate" : "Activate"}
                           </button>
                         </form>

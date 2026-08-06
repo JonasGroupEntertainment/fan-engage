@@ -100,7 +100,7 @@ export default function AltTextSuggester({
           Alt text {aiGenerated && <span className="text-aurora">· AI-suggested, edit if you&apos;d like</span>}
         </label>
         {loading && (
-          <span className="text-[10px] text-white/40">Thinking…</span>
+          <span className="text-[10px] text-white/50">Thinking…</span>
         )}
       </div>
       <input
@@ -118,7 +118,7 @@ export default function AltTextSuggester({
             ? "Generating alt text…"
             : "Describe the image for screen readers"
         }
-        className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+        className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
       />
       {error && (
         <p className="text-[10px] text-rose-300/70">

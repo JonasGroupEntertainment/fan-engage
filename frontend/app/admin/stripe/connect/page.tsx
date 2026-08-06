@@ -217,7 +217,7 @@ export default async function StripeConnectPage() {
           <div key={label} className="rounded-xl border border-white/10 bg-white/5 p-4">
             <p className="text-2xl font-bold text-white">{value}</p>
             <p className="mt-0.5 text-xs uppercase tracking-wide text-white/50">{label}</p>
-            <p className={`mt-1 text-xs ${warn ? "text-amber-300" : "text-white/40"}`}>{sub}</p>
+            <p className={`mt-1 text-xs ${warn ? "text-amber-300" : "text-white/50"}`}>{sub}</p>
           </div>
         ))}
       </div>
@@ -249,7 +249,7 @@ export default async function StripeConnectPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {!c.active && (
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/40">Inactive</span>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/50">Inactive</span>
                   )}
                   {hasPastDue && (
                     <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
@@ -268,7 +268,7 @@ export default async function StripeConnectPage() {
                   </p>
                 </div>
                 <div className={`rounded-xl p-3 ${hasPastDue ? "bg-amber-500/10" : "bg-white/5"}`}>
-                  <p className={`text-lg font-bold ${hasPastDue ? "text-amber-300" : "text-white/40"}`}>
+                  <p className={`text-lg font-bold ${hasPastDue ? "text-amber-300" : "text-white/50"}`}>
                     {rev.pastDueCount}
                   </p>
                   <p className="text-xs text-white/50">Past-due</p>
@@ -286,7 +286,7 @@ export default async function StripeConnectPage() {
               {/* Sparkline */}
               <div className="flex items-center gap-3">
                 <Sparkline mrrCents={displayMrr} />
-                <p className="text-xs text-white/40">MRR trend (illustrative)</p>
+                <p className="text-xs text-white/50">MRR trend (illustrative)</p>
               </div>
 
               {/* Pricing edit */}
@@ -323,7 +323,7 @@ export default async function StripeConnectPage() {
                   >
                     Save prices
                   </button>
-                  <p className="w-full text-xs text-white/40">
+                  <p className="w-full text-xs text-white/50">
                     Saves to DB only — existing subscribers keep their current Stripe price.
                     Run <Link href="/admin/stripe/seed" className="underline">Stripe seed</Link> after to push new Prices to Stripe.
                   </p>
@@ -363,7 +363,7 @@ export default async function StripeConnectPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
                   Artist payouts
                 </p>
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-white/50">
                   All revenue for this community lands in the platform&apos;s Stripe account,
                   tagged with <code className="text-white/50">community_id: {c.slug}</code>. The
                   accountant filters the Stripe dashboard/reports by that tag and pays the artist

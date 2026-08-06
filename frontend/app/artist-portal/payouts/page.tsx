@@ -103,7 +103,7 @@ export default async function ArtistPortalPayoutsPage() {
 
         {/* Revenue split */}
         <div className="mt-4 rounded-xl bg-white/5 p-4">
-          <p className="text-xs uppercase tracking-wide text-white/40 mb-3">
+          <p className="text-xs uppercase tracking-wide text-white/50 mb-3">
             Revenue split
           </p>
           <div className="flex items-center gap-4">
@@ -133,7 +133,7 @@ export default async function ArtistPortalPayoutsPage() {
           Payout History
         </h2>
         {payouts.length === 0 ? (
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-white/50">
             No payouts recorded yet. Your accountant will record payouts here once they&apos;re
             sent.
           </p>
@@ -142,16 +142,16 @@ export default async function ArtistPortalPayoutsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
-                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/40">
+                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/50">
                     Month
                   </th>
-                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/40">
+                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/50">
                     Amount
                   </th>
-                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/40">
+                  <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/50">
                     Your %
                   </th>
-                  <th className="pb-3 text-xs font-medium uppercase tracking-wide text-white/40">
+                  <th className="pb-3 text-xs font-medium uppercase tracking-wide text-white/50">
                     Status
                   </th>
                 </tr>

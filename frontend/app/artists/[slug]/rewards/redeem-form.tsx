@@ -125,20 +125,25 @@ export function RedeemForm({
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-white/80">
+                <label htmlFor="delivery-details" className="block text-xs font-medium uppercase tracking-wide text-white/80">
                   Delivery Details (optional)
                 </label>
                 <textarea
+                  id="delivery-details"
                   value={deliveryDetails}
                   onChange={(e) => setDeliveryDetails(e.target.value)}
                   placeholder="E.g., shirt size, shipping address hint, etc."
+                  aria-describedby={error ? "redeem-form-error" : "delivery-details-hint"}
                   className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none"
                   rows={3}
                 />
+                <p id="delivery-details-hint" className="sr-only">
+                  Optional details the artist needs to fulfill this reward, such as size or shipping address.
+                </p>
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                <div id="redeem-form-error" role="alert" className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                   {error}
                 </div>
               )}

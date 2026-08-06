@@ -116,7 +116,7 @@ export default function SocialForm({ slug, social }: Props) {
             </label>
             <div className="mt-2 flex items-stretch overflow-hidden rounded-lg border border-white/15 bg-black/30 focus-within:border-aurora">
               {f.prefix && (
-                <span className="flex items-center px-3 text-xs text-white/40">
+                <span className="flex items-center px-3 text-xs text-white/50">
                   {f.prefix}
                 </span>
               )}
@@ -133,7 +133,7 @@ export default function SocialForm({ slug, social }: Props) {
               />
             </div>
             {f.hint && (
-              <p className="mt-1 text-xs text-white/40">{f.hint}</p>
+              <p className="mt-1 text-xs text-white/50">{f.hint}</p>
             )}
           </div>
         ))}
@@ -147,7 +147,7 @@ export default function SocialForm({ slug, social }: Props) {
         >
           {pending ? "Saving…" : "Save social links"}
         </button>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-white/50">
           Empty fields are skipped. Re-saving overwrites the full set.
         </p>
         {status.kind === "ok" && (

@@ -142,10 +142,10 @@ export default async function AdminNetworkPage() {
               <tbody className="divide-y divide-white/5">
                 {superfans.map((s, i) => (
                   <tr key={`${s.network_id}-${s.artist_slug ?? ""}`}>
-                    <td className="px-4 py-2 text-white/40">{i + 1}</td>
+                    <td className="px-4 py-2 text-white/50">{i + 1}</td>
                     <td className="px-4 py-2">
                       {s.fan_name ?? s.fan_email ?? (
-                        <span className="font-mono text-white/40">
+                        <span className="font-mono text-white/50">
                           {s.network_id.slice(0, 8)}…
                         </span>
                       )}

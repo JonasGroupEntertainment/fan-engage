@@ -183,7 +183,7 @@ function EventRow({
               <p className="mt-1 text-sm text-white/60">{event.event_date}</p>
             )}
             {event.location && (
-              <p className="text-xs text-white/40">{event.location}</p>
+              <p className="text-xs text-white/50">{event.location}</p>
             )}
             <p className="mt-2 text-xs text-purple-300">
               {rsvpCount} RSVP{rsvpCount !== 1 ? "s" : ""}
@@ -208,7 +208,7 @@ function EventRow({
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="text-xs text-white/40 hover:text-white"
+                  className="text-xs text-white/50 hover:text-white"
                 >
                   Cancel
                 </button>
@@ -216,7 +216,7 @@ function EventRow({
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/40 hover:border-rose-500/30 hover:text-rose-300 transition-colors"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:border-rose-500/30 hover:text-rose-300 transition-colors"
               >
                 Delete
               </button>
@@ -272,7 +272,7 @@ export default function EventsClient({
       )}
 
       {events.length === 0 && !showCreate && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 py-16 text-center text-white/40">
+        <div className="rounded-2xl border border-white/10 bg-black/20 py-16 text-center text-white/50">
           No events yet. Add your first one above.
         </div>
       )}

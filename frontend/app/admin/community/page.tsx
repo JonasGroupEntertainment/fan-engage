@@ -214,7 +214,7 @@ export default async function AdminCommunityPage() {
                   >
                     {c.author_first_name ?? "Anonymous"}
                   </Link>
-                  <span className="text-white/40"> on post {c.post_id.slice(0, 8)}…</span>
+                  <span className="text-white/50"> on post {c.post_id.slice(0, 8)}…</span>
                 </p>
                 <p className="mt-1 line-clamp-2 text-sm text-white/80">{c.body}</p>
               </div>
@@ -260,7 +260,7 @@ export default async function AdminCommunityPage() {
                   >
                     {e.fan_first_name ?? "Anonymous"}
                   </Link>
-                  <span className="text-white/40">
+                  <span className="text-white/50">
                     {" "}entry on challenge {e.post_id.slice(0, 8)}…
                   </span>
                 </p>

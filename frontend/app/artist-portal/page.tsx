@@ -105,7 +105,7 @@ export default async function ArtistPortalDashboardPage() {
             Posts
           </p>
           <p className="mt-2 text-4xl font-semibold">{recentPosts.length}</p>
-          <p className="mt-1 text-xs text-white/40">shown: last 3</p>
+          <p className="mt-1 text-xs text-white/50">shown: last 3</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
           <p className="text-xs uppercase tracking-wide text-white/50">
@@ -123,14 +123,14 @@ export default async function ArtistPortalDashboardPage() {
             Top 5 Fans
           </h2>
           {topFans.length === 0 ? (
-            <p className="text-sm text-white/40">No fans yet.</p>
+            <p className="text-sm text-white/50">No fans yet.</p>
           ) : (
             <ol className="space-y-3">
               {topFans.map((f, i) => {
                 const fan = (f.fans as unknown) as { display_name: string | null; avatar_url: string | null } | null;
                 return (
                   <li key={f.fan_id} className="flex items-center gap-3">
-                    <span className="w-6 shrink-0 text-xs text-white/40">
+                    <span className="w-6 shrink-0 text-xs text-white/50">
                       {i + 1}.
                     </span>
                     <div className="h-8 w-8 shrink-0 rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-xs text-white/50">
@@ -140,7 +140,7 @@ export default async function ArtistPortalDashboardPage() {
                       <p className="truncate text-sm font-medium text-white">
                         {fan?.display_name ?? "Anonymous"}
                       </p>
-                      <p className="text-xs text-white/40">
+                      <p className="text-xs text-white/50">
                         {f.total_points.toLocaleString()} pts · {f.current_tier}
                       </p>
                     </div>
@@ -157,7 +157,7 @@ export default async function ArtistPortalDashboardPage() {
             Recent Posts
           </h2>
           {recentPosts.length === 0 ? (
-            <p className="text-sm text-white/40">No posts yet.</p>
+            <p className="text-sm text-white/50">No posts yet.</p>
           ) : (
             <ul className="space-y-4">
               {recentPosts.map((p) => {
@@ -172,7 +172,7 @@ export default async function ArtistPortalDashboardPage() {
                     <p className="mt-0.5 text-sm text-white/70 line-clamp-2">
                       {p.body}
                     </p>
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className="mt-1 text-xs text-white/50">
                       by {author?.display_name ?? "Unknown"} ·{" "}
                       {new Date(p.created_at as string).toLocaleDateString()}
                     </p>
@@ -194,7 +194,7 @@ export default async function ArtistPortalDashboardPage() {
             {nextEvents.map((e) => (
               <li key={e.id} className="flex items-start gap-4">
                 <div className="shrink-0 rounded-lg bg-white/5 px-3 py-2 text-center">
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-white/50">
                     {e.event_date
                       ? new Date(e.event_date as string).toLocaleDateString("en-US", {
                           month: "short",
@@ -213,7 +213,7 @@ export default async function ArtistPortalDashboardPage() {
                     <p className="text-xs text-white/50">{e.location}</p>
                   )}
                   {e.detail && (
-                    <p className="mt-0.5 text-xs text-white/40 line-clamp-1">
+                    <p className="mt-0.5 text-xs text-white/50 line-clamp-1">
                       {e.detail}
                     </p>
                   )}

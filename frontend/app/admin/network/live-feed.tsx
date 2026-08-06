@@ -56,7 +56,7 @@ export function LiveFeed({ initialEvents }: { initialEvents: FanEvent[] }) {
     <div className="rounded-2xl border border-white/10 bg-black/30">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <p className="text-sm font-semibold">Live feed</p>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-white/50">
           {lastPolled
             ? `updated ${timeAgo(lastPolled.toISOString())}`
             : `refreshes every ${POLL_MS / 1000}s`}
@@ -68,7 +68,7 @@ export function LiveFeed({ initialEvents }: { initialEvents: FanEvent[] }) {
         <ul className="max-h-96 divide-y divide-white/5 overflow-y-auto">
           {events.map((e) => (
             <li key={e.id} className="flex items-baseline gap-3 px-4 py-2 text-xs">
-              <span className="shrink-0 text-white/40">{timeAgo(e.occurred_at)}</span>
+              <span className="shrink-0 text-white/50">{timeAgo(e.occurred_at)}</span>
               <span
                 className={`shrink-0 font-mono ${sourceColors[e.source_app] ?? "text-white/70"}`}
               >
@@ -77,7 +77,7 @@ export function LiveFeed({ initialEvents }: { initialEvents: FanEvent[] }) {
               <span className="font-semibold text-white">{e.event_type}</span>
               {e.artist_slug && <span className="text-white/60">{e.artist_slug}</span>}
               {e.entity_type && (
-                <span className="truncate text-white/40">
+                <span className="truncate text-white/50">
                   {e.entity_type}
                   {e.entity_id ? ` · ${e.entity_id}` : ""}
                 </span>

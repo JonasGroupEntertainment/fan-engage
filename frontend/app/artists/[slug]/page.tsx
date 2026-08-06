@@ -252,7 +252,7 @@ export default async function ArtistPage({
             </p>
           )}
           {!artist.heroImage && (
-            <p className="mt-6 text-xs text-white/40">
+            <p className="mt-6 text-xs text-white/50">
               Hero imagery pending Box asset drop.
             </p>
           )}
@@ -287,7 +287,7 @@ export default async function ArtistPage({
       {/* Campaign Unlock Goals — admin-configured in community_goals */}
       {campaignGoals.length > 0 && (
         <section className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">Campaign Goals</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">Campaign Goals</p>
           {campaignGoals.map((goal) => (
             <div key={goal.id} className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
@@ -310,7 +310,7 @@ export default async function ArtistPage({
               {goal.linkHref && goal.linkLabel && (
                 <Link
                   href={goal.linkHref}
-                  className="text-xs text-white/40 hover:text-white/70 transition"
+                  className="text-xs text-white/50 hover:text-white/70 transition"
                 >
                   {goal.linkLabel}
                 </Link>
@@ -332,7 +332,7 @@ export default async function ArtistPage({
           <p className="text-sm uppercase tracking-wide text-white/60">Follow</p>
           <div className="mt-4 flex flex-wrap gap-3">
             {artist.social.length === 0 ? (
-              <p className="text-xs text-white/40">Social links pending.</p>
+              <p className="text-xs text-white/50">Social links pending.</p>
             ) : (
               artist.social.map((s) => (
                 <SocialIcon key={s.label} label={s.label} href={s.href} />
@@ -388,7 +388,7 @@ export default async function ArtistPage({
                     {e.location && (
                       <p className="mt-1 text-xs text-white/60">📍 {e.location}</p>
                     )}
-                    <p className="mt-3 text-xs uppercase tracking-wide text-white/40">
+                    <p className="mt-3 text-xs uppercase tracking-wide text-white/50">
                       {e.date}
                     </p>
                     {eventId && (

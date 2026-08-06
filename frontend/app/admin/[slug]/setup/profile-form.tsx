@@ -52,7 +52,7 @@ export default function ProfileForm({ slug, tagline, bio }: Props) {
           placeholder="One short line that lives under the artist name"
           className="mt-2 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm placeholder:text-white/30 focus:border-aurora focus:outline-none"
         />
-        <p className="mt-1 text-xs text-white/40">
+        <p className="mt-1 text-xs text-white/50">
           {taglineVal.length}/120
         </p>
       </div>
@@ -74,7 +74,7 @@ export default function ProfileForm({ slug, tagline, bio }: Props) {
           placeholder="2-4 sentences about the artist. This shows in the About block on the public page."
           className="mt-2 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm placeholder:text-white/30 focus:border-aurora focus:outline-none"
         />
-        <p className="mt-1 text-xs text-white/40">{bioVal.length}/1000</p>
+        <p className="mt-1 text-xs text-white/50">{bioVal.length}/1000</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

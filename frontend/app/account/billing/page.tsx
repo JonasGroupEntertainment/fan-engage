@@ -119,7 +119,7 @@ export default async function BillingPage() {
               Manage billing on Stripe →
             </button>
           </form>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-white/50">
             Opens Stripe&apos;s secure billing portal — update your card,
             switch plans, or cancel. You&apos;ll be returned here when done.
           </p>

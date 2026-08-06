@@ -40,3 +40,23 @@ body {
   box-shadow: var(--shadow-glass);
   backdrop-filter: blur(24px);
 }
+
+/*
+ * Reduced motion: keep state-change feedback (color/opacity) but strip
+ * transform-based movement (translate/scale/rotate) and cap durations,
+ * rather than a blanket 0.01ms kill that would hide focus/loading state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  *[class*="animate-"] {
+    animation: none !important;
+  }
+}

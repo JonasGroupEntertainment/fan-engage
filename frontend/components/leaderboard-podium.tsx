@@ -122,7 +122,7 @@ export default function LeaderboardPodium({
                 <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-white/15 text-2xl text-white/30">
                   ?
                 </div>
-                <p className="text-center text-xs text-white/40">Open</p>
+                <p className="text-center text-xs text-white/50">Open</p>
               </>
             )}
 

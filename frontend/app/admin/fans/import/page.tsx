@@ -123,7 +123,7 @@ export default function FanImportPage() {
             </span>
           ))}
         </div>
-        <p className="mt-3 text-white/40">* required — all others optional</p>
+        <p className="mt-3 text-white/50">* required — all others optional</p>
       </div>
 
       {/* Community selector */}
@@ -139,13 +139,22 @@ export default function FanImportPage() {
             <option key={c.slug} value={c.slug}>{c.label}</option>
           ))}
         </select>
-        <p className="text-xs text-white/40">Fans will be segmented to this artist community. No emails will be sent.</p>
+        <p className="text-xs text-white/50">Fans will be segmented to this artist community. No emails will be sent.</p>
       </div>
 
       {/* Drop zone */}
       <div
-        className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/20 p-10 text-center transition hover:border-white/40 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-label="Choose a CSV file to upload, or drag and drop one here"
+        className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/20 p-10 text-center transition hover:border-white/40 cursor-pointer focus:outline-none focus:border-white/60"
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();

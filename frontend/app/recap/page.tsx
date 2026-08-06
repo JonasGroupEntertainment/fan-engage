@@ -139,13 +139,13 @@ function Big({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-black/40 px-4 py-4">
-      <p className="text-xs uppercase tracking-wide text-white/40">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-white/50">{label}</p>
       <p className="mt-1 text-2xl font-bold text-white">
         {prefix}
         {value.toLocaleString()}
         {suffix}
       </p>
-      {note && <p className="text-xs text-white/40">{note}</p>}
+      {note && <p className="text-xs text-white/50">{note}</p>}
     </div>
   );
 }

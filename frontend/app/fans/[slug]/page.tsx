@@ -307,7 +307,7 @@ export default async function FanProfilePage({
                   {p.artistName && p.artistSlug ? (
                     <Link
                       href={`/artists/${p.artistSlug}`}
-                      className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                      className="text-xs text-white/50 hover:text-white/70 transition-colors"
                     >
                       {p.artistName} community
                     </Link>

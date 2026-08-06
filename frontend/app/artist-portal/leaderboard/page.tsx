@@ -32,7 +32,7 @@ export default async function ArtistPortalLeaderboardPage() {
   const tierColor: Record<string, string> = {
     founder: "text-amber-300",
     premium: "text-purple-300",
-    free: "text-white/40",
+    free: "text-white/50",
   };
 
   return (
@@ -47,7 +47,7 @@ export default async function ArtistPortalLeaderboardPage() {
       </div>
 
       {(!members || members.length === 0) && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 py-16 text-center text-white/40">
+        <div className="rounded-2xl border border-white/10 bg-black/20 py-16 text-center text-white/50">
           No fans yet.
         </div>
       )}
@@ -71,7 +71,7 @@ export default async function ArtistPortalLeaderboardPage() {
                 <p className="text-sm font-medium text-white truncate">
                   {fan?.first_name ?? "Fan"}
                 </p>
-                <p className={`text-xs capitalize ${tierColor[tier] ?? "text-white/40"}`}>
+                <p className={`text-xs capitalize ${tierColor[tier] ?? "text-white/50"}`}>
                   {tier}
                 </p>
               </div>
@@ -79,7 +79,7 @@ export default async function ArtistPortalLeaderboardPage() {
                 <p className="text-sm font-semibold text-white">
                   {(m.total_points as number ?? 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-white/40">pts</p>
+                <p className="text-xs text-white/50">pts</p>
               </div>
             </div>
           );

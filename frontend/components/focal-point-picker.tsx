@@ -135,7 +135,7 @@ export default function FocalPointPicker({
           >
             Reset to center
           </button>
-          <p className="ml-auto text-xs text-white/40">
+          <p className="ml-auto text-xs text-white/50">
             Saves with the rest of the form.
           </p>
         </div>

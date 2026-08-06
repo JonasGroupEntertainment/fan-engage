@@ -131,7 +131,7 @@ export default async function AdminPostDraftsPage() {
                   >
                     {d.status}
                   </span>
-                  <span className="text-white/40">
+                  <span className="text-white/50">
                     {d.reviewed_at
                       ? new Date(d.reviewed_at).toLocaleString()
                       : new Date(d.created_at).toLocaleString()}
@@ -164,7 +164,7 @@ function PendingDraftCard({ draft }: { draft: DraftRow }) {
           <span className="rounded-full border border-aurora/30 bg-aurora/10 px-2 py-0.5 uppercase tracking-wide text-aurora">
             {draft.kind === "announcement" ? "📢 Announcement" : "Post"}
           </span>
-          <span className="text-white/40">
+          <span className="text-white/50">
             Drafted {new Date(draft.created_at).toLocaleString()}
           </span>
         </div>

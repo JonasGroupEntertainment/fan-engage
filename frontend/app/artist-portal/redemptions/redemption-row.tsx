@@ -61,7 +61,7 @@ export default function RedemptionRow({
           <p className="font-medium text-white text-sm">
             {fanName} · {redemption.rewards?.title ?? "Reward"}
           </p>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/50 mt-0.5">
             {redemption.point_cost.toLocaleString()} pts ·{" "}
             {new Date(redemption.created_at).toLocaleDateString()}
           </p>

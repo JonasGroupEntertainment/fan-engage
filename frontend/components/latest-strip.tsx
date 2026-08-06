@@ -86,7 +86,7 @@ export async function LatestStrip({ slug }: { slug: string }) {
               >
                 {KIND_LABEL[c.kind]}
               </span>
-              <span className="text-xs text-white/40">{c.when}</span>
+              <span className="text-xs text-white/50">{c.when}</span>
             </div>
             <div className="font-medium leading-snug group-hover:text-white">
               {c.title}

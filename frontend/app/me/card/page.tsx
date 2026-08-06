@@ -112,7 +112,7 @@ export default async function FanCardPage() {
                   }}
                 />
               </div>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/50">
                 {kpis.points_to_next_tier.toLocaleString()} pts to{" "}
                 {nextTierData.display_name}
               </p>

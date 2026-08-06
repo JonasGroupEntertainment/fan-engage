@@ -300,7 +300,7 @@ export function SignupForm({
               onBlur={() => setEmailError(validateEmail(email))}
               aria-invalid={!!emailError}
               className={
-                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none " +
+                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none " +
                 (emailError
                   ? "border-rose-500/60 focus:border-rose-400"
                   : "border-white/10 focus:border-white/40")
@@ -326,7 +326,7 @@ export function SignupForm({
               onBlur={() => setPasswordError(validatePassword(password))}
               aria-invalid={!!passwordError}
               className={
-                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none " +
+                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none " +
                 (passwordError
                   ? "border-rose-500/60 focus:border-rose-400"
                   : "border-white/10 focus:border-white/40")
@@ -423,7 +423,7 @@ export function SignupForm({
           </p>
         )}
 
-        <p className="text-center text-xs text-white/40">
+        <p className="text-center text-xs text-white/50">
           By creating an account, you agree to our{" "}
           <Link href="/terms" className="underline-offset-4 hover:underline hover:text-white/60">
             Terms

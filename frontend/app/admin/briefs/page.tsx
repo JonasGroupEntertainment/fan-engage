@@ -114,7 +114,7 @@ function BriefCard({ brief, defaultOpen }: { brief: BriefRow; defaultOpen: boole
             )}
           </p>
         </div>
-        <span className="text-xs uppercase tracking-wide text-white/40">
+        <span className="text-xs uppercase tracking-wide text-white/50">
           {brief.model.replace("claude-", "")}
         </span>
       </summary>

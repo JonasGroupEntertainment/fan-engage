@@ -129,12 +129,12 @@ export default async function AdminCampaignsPage() {
                     )}
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {Object.entries(c.items).length === 0 ? (
-                        <span className="text-xs text-white/40">No items</span>
+                        <span className="text-xs text-white/50">No items</span>
                       ) : (
                         Object.entries(c.items).map(([kind, count]) => itemBadge(kind, count))
                       )}
                     </div>
-                    <p className="mt-2 text-xs text-white/40">
+                    <p className="mt-2 text-xs text-white/50">
                       {c.published_at
                         ? `Published ${new Date(c.published_at as string).toLocaleString()}`
                         : "Draft"}

@@ -248,7 +248,7 @@ export default function PostCard({
                 <p className="text-xs font-semibold">
                   {c.author_first_name ?? "Anonymous fan"}
                 </p>
-                <p className="text-xs uppercase tracking-wide text-white/40">
+                <p className="text-xs uppercase tracking-wide text-white/50">
                   {relativeTime(c.created_at)}
                 </p>
               </div>

@@ -116,7 +116,7 @@ export default async function LegalPage() {
               {/* Link / Coming Soon */}
               <div className="mt-4">
                 {isComingSoon ? (
-                  <span className="inline-block rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/40">
+                  <span className="inline-block rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-white/50">
                     Coming soon
                   </span>
                 ) : (

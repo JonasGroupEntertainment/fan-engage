@@ -100,7 +100,7 @@ export default async function NotificationPreferencesPage() {
 
       <PreferencesForm initial={prefs} hadRow={foundRow} />
 
-      <p className="mt-8 text-xs text-white/40">
+      <p className="mt-8 text-xs text-white/50">
         We never sell your data. You can unsubscribe from emails at any
         time via the link at the bottom of any email.
       </p>
@@ -121,7 +121,7 @@ function ChannelChip({
         "inline-flex items-center rounded-full border px-2 py-0.5 text-xs " +
         (available
           ? "border-emerald-400/30 text-emerald-300"
-          : "border-white/10 text-white/40")
+          : "border-white/10 text-white/50")
       }
       title={available ? `${label} is set up` : `${label} is not set up`}
     >

@@ -95,7 +95,7 @@ export default async function AdminSegmentsPage() {
               placeholder="super-engaged gold/platinum fans in Tennessee who've posted in the last month"
               className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm placeholder-white/40 outline-none focus:border-aurora/40"
             />
-            <p className="mt-1 text-xs text-white/40">
+            <p className="mt-1 text-xs text-white/50">
               Examples: &quot;new bronze fans this month&quot;, &quot;loyal
               fans willing to receive SMS&quot;, &quot;high-points members
               in California&quot;.
@@ -158,7 +158,7 @@ function SegmentCard({ segment }: { segment: SegmentRow }) {
           </p>
           <FilterChips filter={segment.filter_json} />
           <details>
-            <summary className="cursor-pointer text-xs uppercase tracking-wide text-white/40">
+            <summary className="cursor-pointer text-xs uppercase tracking-wide text-white/50">
               Filter JSON
             </summary>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-black/50 p-3 text-xs text-white/70">
@@ -213,7 +213,7 @@ function FilterChips({ filter }: { filter: SegmentFilter }) {
 
   if (chips.length === 0) {
     return (
-      <p className="text-xs text-white/40">(no filters — matches all fans)</p>
+      <p className="text-xs text-white/50">(no filters — matches all fans)</p>
     );
   }
 

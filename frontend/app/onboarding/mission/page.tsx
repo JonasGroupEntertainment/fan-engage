@@ -116,7 +116,7 @@ export default function MissionPage() {
     <main className="min-h-screen bg-[#050b1f] text-white flex flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-lg flex flex-col gap-6">
         <div className="text-center flex flex-col gap-2">
-          <p className="text-xs tracking-widest uppercase text-white/40">
+          <p className="text-xs tracking-widest uppercase text-white/50">
             You&apos;re in
           </p>
           <h1 className="text-3xl font-bold">Complete your first missions</h1>

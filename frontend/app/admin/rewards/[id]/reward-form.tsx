@@ -47,8 +47,9 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
       <input type="hidden" name="id" value={reward.id} />
 
       <div>
-        <label className="block text-sm font-medium">Title *</label>
+        <label htmlFor="reward-title" className="block text-sm font-medium">Title *</label>
         <input
+          id="reward-title"
           type="text"
           name="title"
           required
@@ -58,8 +59,9 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium">Description</label>
+        <label htmlFor="reward-description" className="block text-sm font-medium">Description</label>
         <textarea
+          id="reward-description"
           name="description"
           defaultValue={reward.description || ""}
           className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-white focus:border-white/30 focus:outline-none"
@@ -68,8 +70,9 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium">Image URL</label>
+        <label htmlFor="reward-image-url" className="block text-sm font-medium">Image URL</label>
         <input
+          id="reward-image-url"
           type="url"
           name="image_url"
           defaultValue={reward.image_url || ""}
@@ -79,20 +82,24 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium">Point Cost *</label>
+          <label htmlFor="reward-point-cost" className="block text-sm font-medium">Point Cost *</label>
           <input
+            id="reward-point-cost"
             type="number"
             name="point_cost"
             required
             min="1"
             defaultValue={reward.point_cost}
+            aria-describedby="reward-point-cost-hint"
             className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-white focus:border-white/30 focus:outline-none"
           />
+          <p id="reward-point-cost-hint" className="sr-only">Number of points a fan spends to redeem this reward.</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Kind *</label>
+          <label htmlFor="reward-kind" className="block text-sm font-medium">Kind *</label>
           <select
+            id="reward-kind"
             name="kind"
             required
             defaultValue={reward.kind}
@@ -110,8 +117,9 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium">Stock</label>
+          <label htmlFor="reward-stock" className="block text-sm font-medium">Stock</label>
           <input
+            id="reward-stock"
             type="number"
             name="stock"
             min="0"
@@ -121,8 +129,9 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Requires Tier</label>
+          <label htmlFor="reward-requires-tier" className="block text-sm font-medium">Requires Tier</label>
           <select
+            id="reward-requires-tier"
             name="requires_tier"
             defaultValue={reward.requires_tier || ""}
             className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-white focus:border-white/30 focus:outline-none"
@@ -151,13 +160,14 @@ export default function EditRewardForm({ reward }: { reward: RewardRow }) {
         <button
           type="submit"
           disabled={submitting}
+          aria-describedby={businessError ? "reward-form-error" : undefined}
           className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 px-4 py-2 font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? "Saving…" : "Save Changes"}
         </button>
         <SaveStatusIndicator status={status} />
         {businessError && (
-          <span className="text-xs text-rose-300" title={businessError}>
+          <span id="reward-form-error" role="alert" className="text-xs text-rose-300" title={businessError}>
             ✗ {businessError}
           </span>
         )}

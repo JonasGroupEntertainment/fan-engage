@@ -140,7 +140,7 @@ export default async function StripeSeedPage() {
                         </div>
                       </div>
                     ) : (
-                      <span className="text-white/40">— not seeded</span>
+                      <span className="text-white/50">— not seeded</span>
                     )}
                   </td>
                   <td className="px-4 py-4 text-right">
@@ -172,7 +172,7 @@ export default async function StripeSeedPage() {
         </table>
       </div>
 
-      <p className="mt-8 text-xs text-white/40">
+      <p className="mt-8 text-xs text-white/50">
         Products land in Stripe test mode (the key currently starts with{" "}
         <code className="rounded bg-white/10 px-1.5 py-0.5">sk_test_</code>).
         Review in the{" "}

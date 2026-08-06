@@ -169,7 +169,7 @@ function LoginForm() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               placeholder="you@email.com"
             />
           </label>
@@ -181,7 +181,7 @@ function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               placeholder="••••••••"
             />
           </label>
@@ -201,7 +201,7 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-white/40">
+        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-white/50">
           <div className="h-px flex-1 bg-white/10" />
           or
           <div className="h-px flex-1 bg-white/10" />

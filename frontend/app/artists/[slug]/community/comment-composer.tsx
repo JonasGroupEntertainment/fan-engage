@@ -139,7 +139,7 @@ export default function CommentComposer({ postId, artistSlug }: Props) {
                   {d}
                 </button>
               ))}
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/50">
                 Pick one to fill the box. You can still edit before
                 posting.
               </p>
@@ -182,7 +182,7 @@ export default function CommentComposer({ postId, artistSlug }: Props) {
           value={body}
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder="Add a comment… (+2 pts)"
-          className="flex-1 resize-none rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+          className="flex-1 resize-none rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
         />
 
         <SubmitButton />

@@ -157,7 +157,7 @@ export default async function InboxPage({
         <div className="space-y-4">
         {Array.from(groupedKinds.entries()).map(([groupName, groupItems]) => (
           <section key={groupName}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/50">
               {groupName}
             </h3>
             <ul className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
@@ -179,10 +179,10 @@ export default async function InboxPage({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs uppercase tracking-widest text-white/40">
+                      <span className="text-xs uppercase tracking-widest text-white/50">
                         {kindLabel(n.kind)}
                       </span>
-                      <span className="text-xs text-white/40">
+                      <span className="text-xs text-white/50">
                         · {relativeTime(n.created_at)}
                       </span>
                     </div>

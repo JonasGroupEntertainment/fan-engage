@@ -60,14 +60,14 @@ export default async function ArtistPortalRedemptionsPage() {
       </div>
 
       {pending.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-black/20 py-12 text-center text-white/40">
+        <div className="rounded-2xl border border-white/10 bg-black/20 py-12 text-center text-white/50">
           No pending redemptions — you&apos;re all caught up!
         </div>
       )}
 
       {pending.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-white/40">Pending</p>
+          <p className="text-xs uppercase tracking-wide text-white/50">Pending</p>
           {pending.map((r) => (
             <RedemptionRow
               key={r.id as string}
@@ -80,7 +80,7 @@ export default async function ArtistPortalRedemptionsPage() {
 
       {fulfilled.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-white/40">Recently fulfilled</p>
+          <p className="text-xs uppercase tracking-wide text-white/50">Recently fulfilled</p>
           {fulfilled.map((r) => (
             <RedemptionRow
               key={r.id as string}

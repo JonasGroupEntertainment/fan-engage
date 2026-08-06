@@ -21,7 +21,7 @@ export default function PromoCodeForm() {
           name="code"
           type="text"
           placeholder="Enter promo code"
-          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm uppercase tracking-wider text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-white/40 focus:border-aurora/50 focus:outline-none"
+          className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm uppercase tracking-wider text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-white/50 focus:border-aurora/50 focus:outline-none"
           autoComplete="off"
           spellCheck={false}
         />

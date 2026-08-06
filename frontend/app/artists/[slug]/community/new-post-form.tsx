@@ -182,7 +182,7 @@ export default function NewPostForm({
               ? "Announcement headline (optional)"
               : "Challenge title (optional)"
           }
-          className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+          className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
         />
       )}
 
@@ -202,7 +202,7 @@ export default function NewPostForm({
                 : "What's on your mind? Share with the community…"
         }
         rows={3}
-        className="w-full resize-none rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+        className="w-full resize-none rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
       />
       <input type="hidden" name="caption_used" value={captionUsed ? "1" : "0"} />
 
@@ -224,7 +224,7 @@ export default function NewPostForm({
                 }}
                 maxLength={120}
                 placeholder={`Option ${i + 1}`}
-                className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
+                className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               />
               {pollOptions.length > 2 && (
                 <button

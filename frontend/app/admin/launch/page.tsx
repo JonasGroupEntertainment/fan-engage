@@ -146,7 +146,7 @@ export default async function LaunchWizardPage() {
             Initialize
           </button>
         </form>
-        <p className="mt-3 text-xs text-white/40">
+        <p className="mt-3 text-xs text-white/50">
           Idempotent — safe to re-run. If an approved application exists for
           this slug its bio, images, and socials seed automatically. The
           community starts hidden until you mark it live below.
@@ -167,7 +167,7 @@ export default async function LaunchWizardPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-white">
                     {s.displayName}
-                    <span className="ml-2 text-xs text-white/40">/{s.slug}</span>
+                    <span className="ml-2 text-xs text-white/50">/{s.slug}</span>
                   </h3>
                   <p className="mt-0.5 text-xs text-white/50">
                     {s.memberCount} member{s.memberCount === 1 ? "" : "s"}

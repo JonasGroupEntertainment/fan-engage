@@ -59,7 +59,7 @@ export default async function AdminRedemptionsPage() {
                     {redemption.delivery_details && (
                       <p className="mt-1 text-xs text-white/60">{redemption.delivery_details}</p>
                     )}
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className="mt-1 text-xs text-white/50">
                       {new Date(redemption.created_at).toLocaleDateString()}
                     </p>
                   </div>

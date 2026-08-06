@@ -346,7 +346,7 @@ export default async function PremiumPage({
           </div>
         </section>
 
-        <p className="mt-12 text-xs text-white/40">
+        <p className="mt-12 text-xs text-white/50">
           Secure checkout via Stripe. Cancel anytime from your{" "}
           <a href="/account/billing" className="underline hover:text-white/70">
             billing settings

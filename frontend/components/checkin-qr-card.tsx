@@ -29,7 +29,7 @@ export default function CheckinQrCard({
         </div>
         <div className="space-y-2 text-left">
           <p className="text-xs text-white/50 break-all">{url}</p>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-white/50">
             One check-in per fan per day. Points post instantly.
           </p>
           <button

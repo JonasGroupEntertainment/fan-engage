@@ -82,7 +82,7 @@ export default function PolicyEditForm({
             spellCheck={false}
             className="w-full rounded-2xl border border-white/10 bg-black/60 px-3 py-2 font-mono text-xs text-white/90"
           />
-          <p className="mt-1 text-xs text-white/40">
+          <p className="mt-1 text-xs text-white/50">
             Supports # headings, **bold**, *italic*, [links](url), -/1. lists, &gt; blockquotes, --- rules.
           </p>
         </div>

@@ -472,7 +472,7 @@ export default async function AdminCommunityAnalyticsPage({
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs text-white/40 mt-1">
+                  <p className="text-xs text-white/50 mt-1">
                     Joined {formatDate(sub.joined_at)}
                     {sub.current_period_end && (
                       <> • Renews {formatDate(sub.current_period_end)}</>

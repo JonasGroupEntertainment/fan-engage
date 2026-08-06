@@ -198,7 +198,7 @@ function PredictionCard({
           </span>
         ))}
       </div>
-      <p className="mt-2 text-xs text-white/40">
+      <p className="mt-2 text-xs text-white/50">
         {phase === "open" &&
           prediction.prediction_closes_at &&
           `Closes ${new Date(prediction.prediction_closes_at).toLocaleString()}`}
@@ -221,7 +221,7 @@ function PredictionResolveCard({
     <div className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-4">
       <p className="text-sm text-white/90">{prediction.body}</p>
       {prediction.prediction_closes_at && (
-        <p className="mt-1 text-xs text-white/40">
+        <p className="mt-1 text-xs text-white/50">
           Closed {new Date(prediction.prediction_closes_at).toLocaleString()}
         </p>
       )}
@@ -247,7 +247,7 @@ function PredictionResolveCard({
         </div>
         {prediction.points_for_correct != null &&
           prediction.points_for_correct > 0 && (
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-white/50">
               {prediction.points_for_correct} pts awarded to correct voters
             </p>
           )}

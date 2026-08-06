@@ -92,7 +92,7 @@ export default function RewardCardWithForm({
             text={`Check out this drop on Fan Engage: ${reward.title} for ${reward.point_cost.toLocaleString()} pts.`}
             url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/artists/${artistSlug}/rewards`}
             label="↗ Share drop"
-            className="text-xs text-white/40 hover:text-white/70 transition"
+            className="text-xs text-white/50 hover:text-white/70 transition"
           />
         </div>
       </div>

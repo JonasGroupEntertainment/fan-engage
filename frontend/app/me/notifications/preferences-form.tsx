@@ -176,7 +176,7 @@ export function PreferencesForm({
             <span className="text-emerald-300">Saved.</span>
           )}
           {!savedAt && !error && !hadRow && dirty && (
-            <span className="text-white/40">
+            <span className="text-white/50">
               First save creates your preferences row.
             </span>
           )}
@@ -188,7 +188,7 @@ export function PreferencesForm({
           className={
             "inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium transition " +
             (!dirty || pending
-              ? "bg-white/10 text-white/40 cursor-not-allowed"
+              ? "bg-white/10 text-white/50 cursor-not-allowed"
               : "bg-white text-black hover:bg-white/90")
           }
         >

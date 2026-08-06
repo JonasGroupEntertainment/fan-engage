@@ -88,7 +88,7 @@ export default async function AdminCommunitiesPage() {
                     }}
                   />
                   <div className="mt-2 flex items-baseline justify-between gap-3">
-                    <span className="text-xs uppercase tracking-widest text-white/40">
+                    <span className="text-xs uppercase tracking-widest text-white/50">
                       {c.type.replace("_", " ")}
                     </span>
                     {!c.active && (

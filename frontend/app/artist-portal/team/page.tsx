@@ -77,7 +77,7 @@ export default async function TeamPage() {
                     <p className="font-medium text-white">
                       {fan?.display_name || fan?.email || m.user_id.slice(0, 8)}
                       {isSelf && (
-                        <span className="ml-2 text-xs text-white/40">(you)</span>
+                        <span className="ml-2 text-xs text-white/50">(you)</span>
                       )}
                     </p>
                     {fan?.display_name && fan?.email && (
@@ -88,7 +88,7 @@ export default async function TeamPage() {
                     <span className="rounded-full border border-white/15 px-2 py-0.5 text-xs uppercase tracking-wide text-white/70">
                       {m.role}
                     </span>
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className="mt-1 text-xs text-white/50">
                       {ROLE_DESCRIPTIONS[m.role] ?? ""}
                     </p>
                   </td>
@@ -151,7 +151,7 @@ export default async function TeamPage() {
             Add member
           </button>
         </form>
-        <p className="mt-3 text-xs text-white/40">
+        <p className="mt-3 text-xs text-white/50">
           They need a Fan Engage account first — send them to the fan site to
           sign up, then add their email here.
         </p>

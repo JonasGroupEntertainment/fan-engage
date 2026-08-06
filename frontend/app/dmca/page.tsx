@@ -43,7 +43,7 @@ export default function DmcaPage() {
             </a>
           </p>
         </div>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-white/50">
           This agent information is consistent with our registration in the U.S. Copyright Office
           DMCA Designated Agent Directory.
         </p>
@@ -123,7 +123,7 @@ export default function DmcaPage() {
         </p>
       </section>
 
-      <p className="text-xs text-white/40 pt-4">
+      <p className="text-xs text-white/50 pt-4">
         Last updated June 20, 2026 · Fan Engage Pro LLC
       </p>
     </main>

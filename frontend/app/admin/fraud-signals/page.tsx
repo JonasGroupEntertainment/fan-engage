@@ -143,12 +143,12 @@ export default async function FraudSignalsPage() {
                   >
                     {s.status}
                   </span>
-                  <span className="text-white/40">
+                  <span className="text-white/50">
                     {fansById.get(s.fan_id)?.first_name ??
                       s.fan_id.slice(0, 8)}{" "}
                     · {s.verdict} · {Math.round(s.confidence * 100)}%
                   </span>
-                  <span className="text-white/40">
+                  <span className="text-white/50">
                     {s.reviewed_at
                       ? new Date(s.reviewed_at).toLocaleString()
                       : ""}
@@ -192,7 +192,7 @@ function PendingFlagCard({
               {t}
             </span>
           ))}
-          <span className="ml-auto text-white/40">
+          <span className="ml-auto text-white/50">
             scanned {new Date(signal.scanned_at).toLocaleString()}
           </span>
         </div>

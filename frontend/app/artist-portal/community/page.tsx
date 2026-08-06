@@ -136,7 +136,7 @@ export default async function ArtistPortalCommunityPage() {
       {/* Post list */}
       <div className="space-y-4">
         {recentPosts.length === 0 ? (
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-white/50">
             No posts yet. Write one above.
           </p>
         ) : (
@@ -156,7 +156,7 @@ export default async function ArtistPortalCommunityPage() {
                   {p.body}
                 </p>
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-white/50">
                     {author?.display_name ?? "Artist"} ·{" "}
                     {new Date(p.created_at as string).toLocaleString()}
                   </p>

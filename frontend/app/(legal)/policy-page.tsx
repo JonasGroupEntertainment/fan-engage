@@ -83,7 +83,7 @@ export default async function PolicyPage({ slug }: { slug: string }) {
         // ─── Final policy rendering ──────────────────────────────────
         <>
           <SimpleMarkdown source={policy.content_md} />
-          <p className="pt-6 text-xs text-white/40">
+          <p className="pt-6 text-xs text-white/50">
             Last updated {new Date(policy.updated_at).toLocaleDateString()}.
           </p>
         </>

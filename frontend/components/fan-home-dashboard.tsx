@@ -365,7 +365,7 @@ function RecentActivityFeed({
                 <p className="mt-1 line-clamp-2 text-xs font-semibold text-white group-hover:text-white">
                   {display}
                 </p>
-                <p className="mt-1 text-xs text-white/40">
+                <p className="mt-1 text-xs text-white/50">
                   {post.artist_name ?? post.artist_slug}
                   {post.author_first_name ? ` · ${post.author_first_name}` : ""}
                   {" · "}

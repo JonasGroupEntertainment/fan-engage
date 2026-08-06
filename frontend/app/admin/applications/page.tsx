@@ -71,7 +71,7 @@ export default async function AdminApplicationsPage() {
                     {a.contact_name} · {a.contact_email}
                     {a.contact_phone ? ` · ${a.contact_phone}` : ""}
                   </p>
-                  <p className="mt-1 text-xs text-white/40">
+                  <p className="mt-1 text-xs text-white/50">
                     {new Date(a.created_at).toLocaleString()}
                     {a.genres?.length ? ` · ${a.genres.join(" / ")}` : ""}
                     {a.monthly_listeners

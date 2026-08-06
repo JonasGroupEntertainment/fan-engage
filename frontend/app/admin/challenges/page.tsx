@@ -149,7 +149,7 @@ export default async function AdminChallengesPage() {
                             {e.fan_first_name ?? "Anonymous"}
                             {isWinner && " 🏆"}
                           </Link>
-                          <span className="text-xs text-white/40">
+                          <span className="text-xs text-white/50">
                             {new Date(e.created_at).toLocaleString()}
                           </span>
                         </div>

@@ -98,7 +98,7 @@ export default async function CopilotPage() {
                 <p className="mt-1 text-sm text-white/60">{a.why}</p>
                 {a.suggestedPost && (
                   <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                    <p className="mb-1 text-xs uppercase tracking-wide text-white/40">
+                    <p className="mb-1 text-xs uppercase tracking-wide text-white/50">
                       Suggested post — copy, tweak, publish
                     </p>
                     <p className="whitespace-pre-wrap text-sm text-white/80">
@@ -115,7 +115,7 @@ export default async function CopilotPage() {
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/50">
           Fans going quiet{" "}
-          <span className="normal-case text-white/40">
+          <span className="normal-case text-white/50">
             (engaged before, silent 14+ days)
           </span>
         </h2>
@@ -160,7 +160,7 @@ export default async function CopilotPage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-white/40">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-white/50">{label}</p>
       <p className="mt-1 text-xl font-bold text-white">
         {value.toLocaleString()}
       </p>
