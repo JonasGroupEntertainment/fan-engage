@@ -8,6 +8,12 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 
 ## 🗄️ Supabase migrations to apply
 
+**Reconciled 2026-08-06.** This table was stale (only listed through 0023 + a stray 0034) — the repo actually has files through 0049, and Supabase had **32 additional migrations applied directly against the live database that were never checked into this repo** (timestamp-named files below, not the 00xx sequence). Those 32 have now been pulled down verbatim from `schema_migrations` and written into `supabase/migrations/` so the repo is once again a complete record of what's live. All 0001-0049 + all 32 backfilled files are `✅ applied` (confirmed against Supabase's actual migration history, not assumed).
+
+⚠️ **Needs your eyes, not mine:** 18 of the backfilled migrations are `network_*` files (`network_backbone_v1`, `network_autonomy_spine_v1`, `network_agent_rpcs_v1`, `network_incron_autonomy_v1`, `network_command_layer_v1`, etc.), applied 2026-07-22 through 2026-07-31. That naming and shape (autonomy spine, agent RPCs, watchdog, trust ladder, command layer) reads like the **JG Advisors / Network autonomy layer**, not fan-facing Fan Engage schema — but they were applied to *this* project's database (`uhovonrljcauaoctypbg`), confirmed via direct query, not a different one. Worth confirming with whoever ran those whether that was intentional (shared infra) or a wrong-project mistake, since it's now permanently part of Fan Engage's schema history.
+
+**Duplicate `0040` resolved:** both `0040_bailee_madison.sql` and `0040_secure_financial_and_leaderboard_tables.sql` existed with the same number. By commit date, `bailee_madison` came first (2026-06-17); `secure_financial_and_leaderboard_tables` (committed 2026-07-14) was renamed to `0049_secure_financial_and_leaderboard_tables.sql`. Contents untouched — this is a filename-only fix, currently staged but **not committed**.
+
 | # | File | Adds | Status |
 |---|---|---|---|
 | 0001 | `0001_init.sql` | Fans, points, tiers, badges, referrals, offers, purchases | ✅ applied |
@@ -33,9 +39,46 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | 0021 | `0021_rewards_redemption.sql` | rewards_catalog + reward_redemptions tables + redeem_reward() RPC + 4 seeded rewards | ✅ applied |
 | 0022 | `0022_community_videos.sql` | video_url + video_poster_url columns + community-videos bucket | ✅ applied |
 | 0023 | `0023_fix_award_badge_delegate.sql` | Patch award_badge(uuid, text) — delegates to award_community_badge to fix 42P10 ON CONFLICT mismatch that was rejecting every signup since 0011 | ✅ applied |
-| 0034 | `0034_fan_profile_handle.sql` | Public fan profile handles + public_profile_enabled flag, backfill, unique index, signup trigger | ⏳ apply via Supabase SQL editor |
+| 0024 | `0024_content_embeddings.sql` | Content embeddings for AI features | ✅ applied |
+| 0025 | `0025_moderation.sql` | Moderation tooling | ✅ applied |
+| 0026 | `0026_draft_used.sql` | Draft-used tracking | ✅ applied |
+| 0027 | `0027_digest.sql` | Digest infrastructure | ✅ applied |
+| 0028 | `0028_post_tags.sql` | Post tags | ✅ applied |
+| 0029 | `0029_event_match.sql` | Event matching | ✅ applied |
+| 0030 | `0030_reward_recs.sql` | Reward recommendations | ✅ applied |
+| 0031 | `0031_caption_used.sql` | Caption-used tracking | ✅ applied |
+| 0032 | `0032_admin_briefs.sql` | Admin briefs | ✅ applied |
+| 0033 | `0033_music_outlet.sql` | Music outlet integration | ✅ applied |
+| 0034 | `0034_founder_fan_badge.sql` | Founder fan badge (repo file renamed from earlier `0034_fan_profile_handle.sql` reference — verify handle work landed under a different number if needed) | ✅ applied |
+| 0035 | `0035_focal_point.sql` | Image focal point | ✅ applied |
+| 0036 | `0036_influencers_and_promo_codes.sql` | Influencers + promo codes | ✅ applied |
+| 0037 | `0037_stripe_connect.sql` | Stripe Connect | ✅ applied |
+| 0038 | `0038_artist_payouts.sql` | Artist payouts | ✅ applied |
+| 0039 | `0039_leaderboard_snapshots.sql` | Leaderboard snapshots | ✅ applied |
+| 0040 | `0040_bailee_madison.sql` | Bailee Madison artist setup | ✅ applied |
+| 0041 | `0041_denise_jonas.sql` | Denise Jonas artist setup | ✅ applied |
+| 0042 | `0042_franklin_jonas.sql` | Franklin Jonas artist setup | ✅ applied |
+| 0043 | `0043_fan_display_names.sql` | Fan display names | ✅ applied |
+| 0044 | `0044_super_admin_grants.sql` | Standing super-admin grants (Raymond direct; Hana/aiassistant pending signup at time of writing) | ✅ applied |
+| 0045 | `0045_membership_points_sync.sql` | Fixes engagement-points-not-reaching-visible-balance defect (trigger award path for posts/comments/polls/challenges) | ✅ applied |
+| 0046 | `0046_economy_rebalance.sql` | Points economy rebalance | ✅ applied |
+| 0047 | `0047_rewards_terms_policy.sql` | Rewards terms policy | ✅ applied |
+| 0048 | `0048_music_artist_rewards_expansion.sql` | Music/artist rewards expansion | ✅ applied |
+| 0049 | `0049_secure_financial_and_leaderboard_tables.sql` | Secures financial + leaderboard tables (renamed from duplicate `0040`, see note above) | ✅ applied |
+| — | `20260620195030_stamp_cards.sql` | Stamp cards | ✅ applied (backfilled) |
+| — | `20260620195039_checkins.sql` | Check-ins | ✅ applied (backfilled) |
+| — | `20260704054542_create_community_goals.sql` | Community goals | ✅ applied (backfilled) |
+| — | `20260704055238_backfill_points_ledger_community.sql` | Points-ledger community backfill | ✅ applied (backfilled) |
+| — | `20260704060113_create_copilot_briefs.sql` | Copilot briefs | ✅ applied (backfilled) |
+| — | `20260713111819_enable_rls_payouts_and_leaderboard.sql` | RLS on payouts + leaderboard | ✅ applied (backfilled) |
+| — | `20260722112323_snapshot_before_network_backbone.sql` | Pre-network-backbone snapshot | ✅ applied (backfilled) ⚠️ see network note above |
+| — | `20260722112525_network_backbone_v1.sql` through `20260731090331_network_command_layer_v1.sql` (18 files) | Network autonomy layer — backbone, publishers, scoring/realtime, hardened triggers, briefs, autonomy spine, agent RPCs, incron autonomy, day-one engine, resume, economy layer, weekly rituals, pending admins, launch plan(s), daily brief countdown, learning loop, watchdog, trust ladder, command layer | ✅ applied (backfilled) ⚠️ see network note above |
+| — | `20260801121329_pause_non_raelynn_artists.sql` | Pauses non-RaeLynn artists | ✅ applied (backfilled) |
+| — | `20260801125906_pause_family_artists.sql` | Pauses family artists | ✅ applied (backfilled) |
+| — | `20260803195847_rewards_expansion_enum_presave.sql` | Rewards enum: presave | ✅ applied (backfilled) |
+| — | `20260803195854_rewards_expansion_enum_radio_support.sql` | Rewards enum: radio support | ✅ applied (backfilled) |
 
-**How to apply:** Supabase dashboard → SQL Editor → paste raw file contents from <https://github.com/KevinJonasSr/Superfan-platform/tree/main/supabase/migrations> → Run. Confirm the "destructive operations" dialog when it appears (it's always just `drop policy if exists` / `drop trigger if exists` being safely idempotent).
+**How to apply new migrations going forward:** Supabase dashboard → SQL Editor → paste raw file contents from <https://github.com/KevinJonasSr/Superfan-platform/tree/main/supabase/migrations> → Run. Confirm the "destructive operations" dialog when it appears (it's always just `drop policy if exists` / `drop trigger if exists` being safely idempotent). Going forward, prefer running new migrations through this repo's file-based flow rather than the SQL editor directly, so this table doesn't drift from reality again.
 
 ---
 
@@ -93,14 +136,17 @@ Vercel cold starts intermittently return 503 on Server Action POSTs, which React
 - [x] Admin community moderation (`/admin/community` — pin/unpin, delete post, delete comment, delete entry)
 - [x] Fan suspend / unsuspend (`/admin/fans/[id]` ModerationButton)
 
+**Newly protected:**
+
+- [x] **Challenges admin** — `/admin/challenges` pick-winner + delete-entry actions (`EntryActions`)
+- [x] **Offers admin** — `/admin/offers` create (`NewOfferForm`) + active/hidden toggle (`OfferActiveToggle`)
+- [x] **Policies admin** — `/admin/policies/[slug]` save/publish/draft toggle (`PolicyEditForm`)
+- [x] **Campaigns admin** — `/admin/campaigns/new` builder (`createAndPublishCampaign` converted from `redirect()` to the `{ success, ... }` return contract; builder now shows save status + business errors and navigates via `router.push` on success)
+
 **Remaining unprotected — recommended before public launch:**
 
 - [ ] **Event delete + send-reminder** — `/admin/artists/[slug]/page.tsx` still has two `<form action={X}>` buttons inside the events list. Replace with `<ModerationButton>`.
 - [ ] **Founders admin** — `/admin/founders/*` whatever click actions exist there (claim/revoke/comp).
-- [ ] **Challenges admin** — `/admin/challenges/*` create/edit/delete forms.
-- [ ] **Offers admin** — `/admin/offers/*` create/edit/delete forms.
-- [ ] **Policies admin** — `/admin/policies/*` save/publish/draft toggles.
-- [ ] **Campaigns admin** — `/admin/campaigns/*` create/send/archive flows.
 - [ ] **Authentication forms** — login, signup, magic-link request. Lower priority because failures here are usually clearly visible (no auth = redirect loop), but worth doing for consistency.
 - [ ] **Onboarding profile form** — `/onboarding/*` whatever form sets first_name + city + DOB. Same silent-503 risk on profile creation.
 - [ ] **Marketplace purchase / Stripe Checkout buttons** — these go through Stripe so are mostly Stripe's responsibility, but the "create checkout session" server action is ours and could 503.
