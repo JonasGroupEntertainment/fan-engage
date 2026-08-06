@@ -20,6 +20,8 @@ export interface LeaderboardEntry {
   rank: number;            // 1-based; ties resolved by earliest activity timestamp
   display_name: string;
   avatar_url: string | null;
+  /** Public profile slug for linking to /fans/[slug]; null if the fan has opted out. */
+  profile_slug: string | null;
   current_tier: string | null;
   score: number;
   /** Activity breakdown — useful for the "what counts" tooltip on the page. */

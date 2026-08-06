@@ -54,6 +54,7 @@ export function ConsentModal({
     requestAnimationFrame(() => {
       const el = scrollRef.current;
       if (!el) return;
+      el.scrollTop = 0;
       const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       if (atBottom) setScrolledEnd((prev) => ({ ...prev, [i]: true }));
     });

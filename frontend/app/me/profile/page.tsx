@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfileAction } from "./actions";
+import ImageUploader from "@/components/image-uploader";
 
 export const metadata = { title: "Edit profile" };
 export const dynamic = "force-dynamic";
@@ -55,19 +56,17 @@ export default async function EditProfilePage() {
           />
         </label>
 
-        <label className="block text-sm text-white/80">
-          <span>Avatar URL</span>
-          <input
-            type="url"
-            name="avatarUrl"
-            defaultValue={fan?.avatar_url ?? ""}
-            placeholder="https://..."
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
-          />
-          <span className="mt-1 block text-xs text-white/50">
-            Link to an image hosted online (e.g. Twitter/X profile pic URL).
-          </span>
-        </label>
+        <div className="block text-sm text-white/80">
+          <span>Avatar</span>
+          <div className="mt-2">
+            <ImageUploader
+              bucket="avatars"
+              name="avatarUrl"
+              initialUrl={fan?.avatar_url ?? null}
+              label="Change avatar"
+            />
+          </div>
+        </div>
 
         <div className="flex items-center gap-4 pt-2">
           <button

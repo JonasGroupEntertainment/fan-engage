@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { LeaderboardEntry } from "@/lib/leaderboard/types";
 
 /**
@@ -45,6 +46,23 @@ const RANK_THEME: Record<number, { ring: string; halo: string; medal: string; he
   },
 };
 
+function PodiumEntryLink({
+  href,
+  children,
+}: {
+  href: string | null;
+  children: React.ReactNode;
+}) {
+  if (href) {
+    return (
+      <Link href={href} className="flex flex-col items-center hover:opacity-80">
+        {children}
+      </Link>
+    );
+  }
+  return <>{children}</>;
+}
+
 export default function LeaderboardPodium({
   entries,
   viewerFanId,
@@ -80,7 +98,7 @@ export default function LeaderboardPodium({
             />
 
             {entry ? (
-              <>
+              <PodiumEntryLink href={entry.profile_slug ? `/fans/${entry.profile_slug}` : null}>
                 {entry.avatar_url ? (
                   <div
                     className={`relative mb-2 h-16 w-16 overflow-hidden rounded-full ring-2 ${theme.ring} ${
@@ -116,7 +134,7 @@ export default function LeaderboardPodium({
                 <p className="mt-0.5 text-xs uppercase tracking-wide text-white/55">
                   {entry.score.toLocaleString()} pts
                 </p>
-              </>
+              </PodiumEntryLink>
             ) : (
               <>
                 <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-white/15 text-2xl text-white/30">

@@ -193,7 +193,7 @@ export async function gatherArtistLeaderboard(opts: {
     const fanIds = sorted.map(([fanId]) => fanId);
     const { data: fanRows } = await admin
       .from("fans")
-      .select("id, first_name, last_name, avatar_url, current_tier")
+      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled")
       .in("id", fanIds);
     const fanInfoById = new Map<
       string,
@@ -201,16 +201,19 @@ export async function gatherArtistLeaderboard(opts: {
         display_name: string;
         avatar_url: string | null;
         current_tier: string | null;
+        profile_slug: string | null;
       }
     >();
     for (const f of fanRows ?? []) {
       const first = (f.first_name as string | null) ?? "";
       const last = (f.last_name as string | null) ?? "";
       const display = [first, last].filter(Boolean).join(" ").trim() || "A fan";
+      const publicProfileEnabled = (f.public_profile_enabled as boolean | null) ?? false;
       fanInfoById.set(f.id as string, {
         display_name: display,
         avatar_url: (f.avatar_url as string | null) ?? null,
         current_tier: (f.current_tier as string | null) ?? null,
+        profile_slug: publicProfileEnabled ? ((f.profile_slug as string | null) ?? null) : null,
       });
     }
 
@@ -223,6 +226,7 @@ export async function gatherArtistLeaderboard(opts: {
         display_name: info?.display_name ?? "A fan",
         avatar_url: info?.avatar_url ?? null,
         current_tier: info?.current_tier ?? null,
+        profile_slug: info?.profile_slug ?? null,
         score: s.score,
         reactions: s.reactions,
         comments: s.comments,

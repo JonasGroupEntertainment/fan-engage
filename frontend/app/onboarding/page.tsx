@@ -62,7 +62,7 @@ const steps: { title: string; description: string; fields: Field[] }[] = [
     description: "Fans choose what they care about—rewards, marketplace drops, live moments.",
     fields: [
       {
-        label: "Pick a lane",
+        label: "What are your areas of interest?",
         name: "interest",
         placeholder: "Rewards, VIP, Marketplace",
         type: "text",
@@ -161,6 +161,7 @@ export default function OnboardingWizard() {
 
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
+    if (name === "phone" && !value.trim()) setSmsConsent(false);
   };
 
   /**
@@ -518,13 +519,15 @@ export default function OnboardingWizard() {
                   </span>
                 </label>
                 {formState.phone && (
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={smsConsent}
-                      onChange={(e) => setSmsConsent(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-aurora"
-                    />
+                  <label className="flex items-center gap-3 py-1">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={smsConsent}
+                        onChange={(e) => setSmsConsent(e.target.checked)}
+                        className="h-5 w-5 accent-aurora"
+                      />
+                    </span>
                     <span>
                       I consent to receive SMS from Fan Engage about artist drops, events, and
                       rewards. Msg &amp; data rates may apply. Reply STOP to opt out.
