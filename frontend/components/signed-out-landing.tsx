@@ -177,7 +177,7 @@ export default function SignedOutLanding({
           <ProofTile label="Active artists" value={stats.activeArtists} icon="mic" />
           <ProofTile label="Live shows lined up" value={stats.activeEvents} icon="ticket" />
           <ProofTile
-            label="Founding fans inducted"
+            label="Founding members inducted"
             value={stats.foundingFans}
             icon="medal"
           />

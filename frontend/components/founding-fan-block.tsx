@@ -36,13 +36,14 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               First {stats.foundingTarget} fans get permanent
               <br />
               <span className="text-aurora">
-                Founding Fan status.
+                Founding Member status.
               </span>
             </h2>
             <p className="mt-4 text-sm text-white/75">
-              Locked-in early access to drops, the 🏅 Founding Fan badge in
+              Locked-in early access to drops, the 🏅 Founding Member badge in
               your profile forever, and bragging rights you can&apos;t earn
-              after July 15.
+              after July 15. (Separate from paid Founding Fan pricing slots —
+              this one&apos;s free.)
             </p>
           </div>
 
