@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Offer } from "@/lib/data/types";
-import { createOfferAction, toggleOfferActiveAction } from "./actions";
+import NewOfferForm from "./new-offer-form";
+import OfferActiveToggle from "./offer-active-toggle";
 
 async function listAllOffers(): Promise<Offer[]> {
   try {
@@ -33,69 +34,7 @@ export default async function AdminOffersPage() {
 
       <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
         <h2 className="text-sm uppercase tracking-wide text-white/60">Add a new offer</h2>
-        <form action={createOfferAction} className="mt-4 grid gap-3 md:grid-cols-2">
-          <input
-            name="title"
-            placeholder="Signed vinyl"
-            required
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-          />
-          <input
-            name="slug"
-            placeholder="signed-vinyl"
-            required
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-          />
-          <select
-            name="category"
-            required
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-            defaultValue="merch"
-          >
-            <option value="merch">Merch</option>
-            <option value="experience">Experience</option>
-            <option value="collectible">Collectible</option>
-            <option value="digital">Digital</option>
-            <option value="ticket">Ticket</option>
-          </select>
-          <select
-            name="min_tier"
-            required
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-            defaultValue="bronze"
-          >
-            <option value="bronze">Bronze+</option>
-            <option value="silver">Silver+</option>
-            <option value="gold">Gold+</option>
-            <option value="platinum">Platinum</option>
-          </select>
-          <input
-            name="price_points"
-            type="number"
-            min={0}
-            placeholder="Price in points"
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-          />
-          <input
-            name="inventory"
-            type="number"
-            min={0}
-            placeholder="Inventory (optional)"
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
-          />
-          <textarea
-            name="description"
-            placeholder="Description"
-            rows={2}
-            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm md:col-span-2"
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white md:col-span-2"
-          >
-            Create offer
-          </button>
-        </form>
+        <NewOfferForm />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-white/10">
@@ -140,13 +79,7 @@ export default async function AdminOffersPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <form action={toggleOfferActiveAction}>
-                    <input type="hidden" name="id" value={o.id} />
-                    <input type="hidden" name="active" value={String(!o.active)} />
-                    <button className="text-xs text-white/70 hover:text-white">
-                      {o.active ? "Hide" : "Activate"}
-                    </button>
-                  </form>
+                  <OfferActiveToggle id={o.id} active={o.active} />
                 </td>
               </tr>
             ))}

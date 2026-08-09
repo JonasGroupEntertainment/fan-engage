@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import { createAndPublishCampaign } from "../actions";
 
 type Artist = { slug: string; name: string };
@@ -79,7 +81,9 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
   const [includeSms, setIncludeSms] = useState(false);
   const [smsBody, setSmsBody] = useState("");
 
-  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+  const [businessError, setBusinessError] = useState<string | null>(null);
+  const { status, submit, submitting } = useFormSave();
 
   function addCTA(kind: CTAKind) {
     const defaults = DEFAULT_CTA_BY_KIND[kind];
@@ -105,37 +109,38 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
   }
 
   async function handleSubmit(formData: FormData) {
-    setSubmitting(true);
-    try {
-      if (!includeAnnouncement) formData.set("announcement_body", "");
-      if (includePoll && pollQuestion.trim()) {
-        formData.set(
-          "poll_json",
-          JSON.stringify({
-            question: pollQuestion,
-            options: pollOptions.filter((o) => o.trim()),
-          }),
-        );
-      }
-      if (!includeChallenge) formData.set("challenge_body", "");
-      if (!includeOffer) formData.set("offer_title", "");
-      if (ctas.length > 0) {
-        formData.set("ctas_json", JSON.stringify(ctas.filter((c) => c.title.trim())));
-      }
-      if (!includeEvent) {
-        formData.set("event_title", "");
-        formData.set("target_event_rsvpers", "false");
-      } else {
-        formData.set("target_event_rsvpers", String(targetEventRsvpers));
-      }
-      if (!includeEmail) {
-        formData.set("email_subject", "");
-        formData.set("email_body", "");
-      }
-      if (!includeSms) formData.set("sms_body", "");
-      await createAndPublishCampaign(formData);
-    } finally {
-      setSubmitting(false);
+    setBusinessError(null);
+    if (!includeAnnouncement) formData.set("announcement_body", "");
+    if (includePoll && pollQuestion.trim()) {
+      formData.set(
+        "poll_json",
+        JSON.stringify({
+          question: pollQuestion,
+          options: pollOptions.filter((o) => o.trim()),
+        }),
+      );
+    }
+    if (!includeChallenge) formData.set("challenge_body", "");
+    if (!includeOffer) formData.set("offer_title", "");
+    if (ctas.length > 0) {
+      formData.set("ctas_json", JSON.stringify(ctas.filter((c) => c.title.trim())));
+    }
+    if (!includeEvent) {
+      formData.set("event_title", "");
+      formData.set("target_event_rsvpers", "false");
+    } else {
+      formData.set("target_event_rsvpers", String(targetEventRsvpers));
+    }
+    if (!includeEmail) {
+      formData.set("email_subject", "");
+      formData.set("email_body", "");
+    }
+    if (!includeSms) formData.set("sms_body", "");
+    const result = await submit(createAndPublishCampaign, formData);
+    if (result?.success) {
+      router.push("/admin/campaigns");
+    } else if (result && !result.success) {
+      setBusinessError(result.error);
     }
   }
 
@@ -523,6 +528,12 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
         >
           Cancel
         </a>
+        <SaveStatusIndicator status={status} />
+        {businessError && (
+          <span role="alert" className="text-xs text-rose-300">
+            ✗ {businessError}
+          </span>
+        )}
         <button
           type="submit"
           disabled={submitting || !title.trim() || !artistSlug}

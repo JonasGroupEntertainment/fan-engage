@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { adminDeleteEntryAction } from "@/app/admin/community/actions";
-import { pickWinnerAction } from "./actions";
+import EntryActions from "./entry-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -164,26 +163,12 @@ export default async function AdminChallengesPage() {
                             className="mt-2 max-h-48 w-full rounded-lg object-cover"
                           />
                         )}
-                        <div className="mt-3 flex items-center justify-between">
-                          {!c.winner_id ? (
-                            <form action={pickWinnerAction}>
-                              <input type="hidden" name="post_id" value={c.id} />
-                              <input type="hidden" name="entry_id" value={e.id} />
-                              <input type="hidden" name="fan_id" value={e.fan_id} />
-                              <button className="rounded-full bg-gradient-to-r from-aurora to-ember px-3 py-1 text-xs font-semibold text-white">
-                                Pick winner · +200 pts
-                              </button>
-                            </form>
-                          ) : (
-                            <span />
-                          )}
-                          <form action={adminDeleteEntryAction}>
-                            <input type="hidden" name="entry_id" value={e.id} />
-                            <button className="text-xs text-rose-300/80 hover:text-rose-300">
-                              Delete
-                            </button>
-                          </form>
-                        </div>
+                        <EntryActions
+                          postId={c.id}
+                          entryId={e.id}
+                          fanId={e.fan_id}
+                          hasWinner={Boolean(c.winner_id)}
+                        />
                       </div>
                     );
                   })}

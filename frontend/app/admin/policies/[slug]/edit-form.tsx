@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SimpleMarkdown } from "@/components/simple-markdown";
+import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import { updatePolicyAction } from "../actions";
 
 export default function PolicyEditForm({
@@ -22,21 +23,17 @@ export default function PolicyEditForm({
   const [contentMd, setContentMd] = useState(initial.content_md);
   const [effectiveDate, setEffectiveDate] = useState(initial.effective_date);
   const [isDraft, setIsDraft] = useState(initial.is_draft);
-  const [submitting, setSubmitting] = useState(false);
+  const { status, submit, submitting } = useFormSave({
+    onSuccess: () => router.refresh(),
+  });
 
   async function handleSubmit(formData: FormData) {
-    setSubmitting(true);
-    try {
-      formData.set("slug", slug);
-      formData.set("title", title);
-      formData.set("content_md", contentMd);
-      formData.set("effective_date", effectiveDate);
-      formData.set("is_draft", String(isDraft));
-      await updatePolicyAction(formData);
-      router.refresh();
-    } finally {
-      setSubmitting(false);
-    }
+    formData.set("slug", slug);
+    formData.set("title", title);
+    formData.set("content_md", contentMd);
+    formData.set("effective_date", effectiveDate);
+    formData.set("is_draft", String(isDraft));
+    await submit(updatePolicyAction, formData);
   }
 
   return (
@@ -94,7 +91,8 @@ export default function PolicyEditForm({
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <SaveStatusIndicator status={status} />
         <button
           type="submit"
           disabled={submitting}

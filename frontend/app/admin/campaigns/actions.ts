@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/admin";
 import { broadcastEmail, broadcastSms } from "@/lib/broadcast";
@@ -34,7 +33,7 @@ export async function createAndPublishCampaign(formData: FormData) {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  if (!artistSlug || !title) return;
+  if (!artistSlug || !title) return { success: false as const, error: "Artist and title are required." };
 
   // 1) Create the campaign row
   const { data: campaign } = await supa
@@ -48,7 +47,7 @@ export async function createAndPublishCampaign(formData: FormData) {
     })
     .select("id")
     .single();
-  if (!campaign) return;
+  if (!campaign) return { success: false as const, error: "Failed to create campaign." };
 
   const campaignId = campaign.id as string;
 
@@ -298,7 +297,7 @@ export async function createAndPublishCampaign(formData: FormData) {
   revalidatePath("/admin/campaigns");
   revalidatePath(`/artists/${artistSlug}/community`);
   revalidatePath(`/artists/${artistSlug}`);
-  redirect(`/admin/campaigns`);
+  return { success: true as const, campaignId };
 }
 
 export async function deactivateCampaignAction(formData: FormData) {
