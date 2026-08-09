@@ -66,25 +66,48 @@ export async function getPrimaryCommunityId(): Promise<string | null> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return null;
 
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("fan_community_memberships")
-      .select("community_id, joined_at")
-      .eq("fan_id", user.id)
-      .eq("status", "active")
-      .order("joined_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    if (user) {
+      const admin = createAdminClient();
+      const { data, error } = await admin
+        .from("fan_community_memberships")
+        .select("community_id, joined_at")
+        .eq("fan_id", user.id)
+        .eq("status", "active")
+        .order("joined_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) {
-      console.warn("getPrimaryCommunityId: supabase error", error.message);
-      return null;
+      if (error) {
+        console.warn("getPrimaryCommunityId: supabase error", error.message);
+      } else if (data?.community_id) {
+        return data.community_id as string;
+      }
     }
-    return (data?.community_id as string | undefined) ?? null;
+
+    // Logged-out visitors, or fans with no active membership yet: send them
+    // to the single active artist's community rather than the bare
+    // directory. Falls back to null (→ /artists) once there's more than one.
+    return await getSoleActiveArtistSlug();
   } catch (err) {
     console.warn("getPrimaryCommunityId: failed", err);
+    return null;
+  }
+}
+
+/** Returns the lone active artist's slug, or null if there's zero or more than one. */
+async function getSoleActiveArtistSlug(): Promise<string | null> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("artists")
+      .select("slug")
+      .eq("active", true)
+      .limit(2);
+    if (error || !data || data.length !== 1) return null;
+    return data[0].slug as string;
+  } catch (err) {
+    console.warn("getSoleActiveArtistSlug: failed", err);
     return null;
   }
 }
