@@ -335,6 +335,7 @@ export default function SearchInput({
             placeholder={placeholder}
             autoComplete="off"
             spellCheck={false}
+            role="combobox"
             aria-autocomplete="list"
             aria-expanded={showDropdown}
             aria-controls="global-search-typeahead"
