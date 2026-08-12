@@ -108,8 +108,8 @@ export function SignupForm({
   // Invite deep-links: write fanengage_ref after cookie Accept (same gate as
   // /invite/[code]), so attribution survives invite → signup without Accept.
   useEffect(() => {
-    if (!inviteCode) return;
-    const code = inviteCode;
+    if (typeof inviteCode !== "string" || inviteCode.length === 0) return;
+    const code: string = inviteCode;
     function writeRefCookie() {
       if (!hasAcceptedCookieConsent()) return;
       const maxAge = 60 * 60 * 24 * 30;
