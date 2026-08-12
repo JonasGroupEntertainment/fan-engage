@@ -109,10 +109,11 @@ export function SignupForm({
   // /invite/[code]), so attribution survives invite → signup without Accept.
   useEffect(() => {
     if (!inviteCode) return;
+    const code = inviteCode;
     function writeRefCookie() {
       if (!hasAcceptedCookieConsent()) return;
       const maxAge = 60 * 60 * 24 * 30;
-      document.cookie = `fanengage_ref=${encodeURIComponent(inviteCode)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      document.cookie = `fanengage_ref=${encodeURIComponent(code)}; path=/; max-age=${maxAge}; SameSite=Lax`;
     }
     writeRefCookie();
     window.addEventListener(COOKIE_CONSENT_EVENT, writeRefCookie);
