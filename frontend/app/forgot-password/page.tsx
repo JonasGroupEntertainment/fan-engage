@@ -158,9 +158,7 @@ export default function ForgotPasswordPage() {
             disabled={
               status === "loading" ||
               resendCooldown > 0 ||
-              (turnstileConfigured &&
-                !turnstileToken &&
-                turnstileLoadState !== "error")
+              (turnstileConfigured && !turnstileToken)
             }
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
