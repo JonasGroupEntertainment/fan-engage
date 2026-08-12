@@ -52,11 +52,20 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 | Door | Status | Notes |
 |------|--------|--------|
-| Password login | Primary | No Turnstile; clear “Welcome back” copy |
-| Magic link | Secondary | Turnstile + 45s cooldown; “newest link wins” copy is good |
+| Password login | Primary | No Turnstile; clear “Welcome back” copy — prefer this in CS macros |
+| Magic link | Secondary | Turnstile + 45s cooldown; “newest link wins” / PKCE overwrite — support load (B-P1-0) |
 | Signup | Email + password | Turnstile + consent modal; OAuth **commented out** (correct — do not re-enable) |
 | Forgot / reset | Working shape | Turnstile on forgot; reset page lacks session/expired-link UX |
-| OAuth | Gated | Blocked until custom auth domain (`LAUNCH_CHECKLIST` G.4) |
+| OAuth | Gated | Blocked until custom auth domain (`LAUNCH_CHECKLIST` G.4); needs guest-facing “coming soon” line (B-P1-0b) |
+
+### Guide (CS) production themes incorporated
+
+| Theme | Finding | Severity |
+|-------|---------|----------|
+| `/onboarding` wizard then bounce to `/signup` | B-P0-4 (code-verified) | P0 |
+| Invite credit only after cookie Accept | B-P0-3 | P0 |
+| Magic-link Turnstile + PKCE “link broken” tickets | B-P1-0 | P1 |
+| OAuth missing with no explanation | B-P1-0b | P1 |
 
 ---
 
