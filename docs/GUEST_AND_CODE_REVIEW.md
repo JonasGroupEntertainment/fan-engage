@@ -443,7 +443,7 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 - [ ] Confirm Supabase email confirm template preserves `/auth/callback?next=…` (B-P0-2)
 
 **Must before driving guest signup traffic (hard for “excellent” first experience):**
-- [ ] **Merge #11** — blank magic-link Turnstile + homepage/onboarding CTA (B-P0-5, B-P0-4)
+- [ ] **Merge #11** — auth P0s first (B-P0-5, B-P0-4), then marketplace Coming soon (B-P1-17)
 - [ ] Signup always completes onboarding before `?next=` destinations (B-P0-1) — see #9
 - [ ] Invite credit after cookie Accept path works end-to-end (B-P0-3) — Guide CS
 - [ ] Guest-facing “email signup only for now” where OAuth is hidden (B-P1-0b) — Guide CS / #11
