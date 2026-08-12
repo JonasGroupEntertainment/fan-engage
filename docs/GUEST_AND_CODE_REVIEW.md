@@ -325,9 +325,9 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 | PR | Contents |
 |----|----------|
-| Guest funnel P0/P1 (optional companion) | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs |
-| Payments/RLS P0 | Webhook processed_at; `redeem_reward` auth check migration; membership update lockdown |
-| Ops P1 | Twilio fail-closed; `.env.example`; Turnstile client honor `failedOpen`; founder reward gate |
+| [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs; invite attribution; Turnstile fail-closed honor |
+| Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check migration; membership update lockdown |
+| Ops P1 (not yet opened) | Twilio fail-closed; `.env.example`; founder reward gate |
 
 ---
 
