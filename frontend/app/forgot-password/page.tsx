@@ -6,16 +6,21 @@ import { createClient } from "@/lib/supabase/client";
 import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
+  isTurnstileConfigured,
   turnstileFailureMessage,
   verifyTurnstileToken,
+  type TurnstileLoadState,
 } from "@/components/turnstile-widget";
 
 export default function ForgotPasswordPage() {
+  const turnstileConfigured = isTurnstileConfigured();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "sent">("idle");
   const [message, setMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
+  const [turnstileLoadState, setTurnstileLoadState] =
+    useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
 
   const handleTurnstileSuccess = useCallback((token: string) => {
@@ -24,10 +29,14 @@ export default function ForgotPasswordPage() {
   }, []);
   const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
+    setTurnstileLoadState(state);
+  }, []);
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
   const resetChallenge = useCallback(() => {
     setTurnstileToken(null);
+    setTurnstileLoadState("loading");
     setTurnstileKey((k) => k + 1);
   }, []);
 
@@ -119,20 +128,38 @@ export default function ForgotPasswordPage() {
             />
           </label>
 
-          <TurnstileWidget
-            key={turnstileKey}
-            onSuccess={handleTurnstileSuccess}
-            onError={handleTurnstileError}
-            onExpire={handleTurnstileExpire}
-            theme="dark"
-          />
-          {turnstileError && (
-            <p className="text-xs text-rose-300">Security check failed. Please refresh and try again.</p>
+          {turnstileConfigured && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-white/45">Security check</p>
+              <TurnstileWidget
+                key={turnstileKey}
+                onSuccess={handleTurnstileSuccess}
+                onError={handleTurnstileError}
+                onExpire={handleTurnstileExpire}
+                onLoadStateChange={handleTurnstileLoadState}
+                theme="dark"
+              />
+              {turnstileLoadState === "error" && (
+                <p className="text-xs text-rose-200">
+                  Security check didn&apos;t load. Tap Retry above, wait a moment, or
+                  try again from a different network.
+                </p>
+              )}
+              {turnstileError && turnstileLoadState !== "error" && (
+                <p className="text-xs text-rose-300">
+                  Security check failed. Please retry and try again.
+                </p>
+              )}
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={status === "loading" || resendCooldown > 0}
+            disabled={
+              status === "loading" ||
+              resendCooldown > 0 ||
+              (turnstileConfigured && !turnstileToken)
+            }
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
             {resendCooldown > 0
@@ -141,7 +168,11 @@ export default function ForgotPasswordPage() {
                 ? "Sending…"
                 : status === "sent"
                   ? "Resend reset link"
-                  : "Send reset link"}
+                  : turnstileConfigured && turnstileLoadState === "loading"
+                    ? "Security check loading…"
+                    : turnstileConfigured && !turnstileToken && turnstileLoadState !== "error"
+                      ? "Complete security check, then send link"
+                      : "Send reset link"}
           </button>
         </form>
 

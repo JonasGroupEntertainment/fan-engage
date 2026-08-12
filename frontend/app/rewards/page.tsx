@@ -9,6 +9,7 @@ import {
 } from "@/lib/data/fan";
 import { getTiers, tierIcon } from "@/lib/data/tiers";
 import type { Badge, BadgeCategory, TierSlug } from "@/lib/data/types";
+import { isMarketplaceLive } from "@/lib/marketplace-live";
 
 // ─── Static preview content ────────────────────────────────────────────────
 const fallbackBadges: Badge[] = [
@@ -34,7 +35,9 @@ type EarnMore = {
 };
 const earnMore: EarnMore[] = [
   { title: "Share referral link", detail: "Every verified signup", reward: "+150 pts", href: "/referrals" },
-  { title: "Browse marketplace", detail: "Redeem points for drops", reward: "—", href: "/marketplace" },
+  isMarketplaceLive()
+    ? { title: "Browse marketplace", detail: "Redeem points for drops", reward: "—", href: "/marketplace" }
+    : { title: "Merch — coming soon", detail: "Shop opens after soft launch", reward: "—", href: "/marketplace" },
 ];
 
 // Static preview breakdown shown only to signed-out visitors.

@@ -14,6 +14,7 @@ import type { TierSlug } from "@/lib/data/types";
 
 import { touchStreak } from "@/lib/streaks/touch";
 import { gatherWeeklyRecap } from "@/lib/personal-recap/gather";
+import { isMarketplaceLive } from "@/lib/marketplace-live";
 // ─── Signed-in dashboard content ──────────────────────────────────────────
 // Signed-out visitors render <SignedOutLanding/> earlier and never see any
 // of this.
@@ -26,7 +27,10 @@ const journeyCards = [
 
 const quickActions: { label: string; href: string }[] = [
   { label: "Share referral link", href: "/referrals" },
-  { label: "Browse marketplace", href: "/marketplace" },
+  {
+    label: isMarketplaceLive() ? "Browse marketplace" : "Merch — coming soon",
+    href: "/marketplace",
+  },
   { label: "Check rewards", href: "/rewards" },
   { label: "Invite a friend", href: "/referrals" },
 ];

@@ -69,7 +69,7 @@ export default function SignedOutLanding({
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                href="/onboarding"
+                href="/signup?ref=raelynn&next=%2Fonboarding"
                 className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
               >
                 Create your fan profile →
@@ -174,8 +174,16 @@ export default function SignedOutLanding({
             stats.foundingClosed ? "lg:grid-cols-3" : "lg:grid-cols-4"
           }`}
         >
-          <ProofTile label="Active artists" value={stats.activeArtists} icon="mic" />
-          <ProofTile label="Live shows lined up" value={stats.activeEvents} icon="ticket" />
+          <ProofTile
+            label={stats.activeArtists === 1 ? "Active artist" : "Active artists"}
+            value={stats.activeArtists}
+            icon="mic"
+          />
+          <ProofTile
+            label={stats.activeEvents === 1 ? "Live show lined up" : "Live shows lined up"}
+            value={stats.activeEvents}
+            icon="ticket"
+          />
           <ProofTile
             label="Founding members inducted"
             value={stats.foundingFans}
@@ -280,7 +288,7 @@ export default function SignedOutLanding({
                 },
                 {
                   title: "Rewards Marketplace",
-                  body: "Redeem points for signed gear, backstage access, or merch exclusives.",
+                  body: "Earn points now — RaeLynn merch & redemptions open soon (not live at soft launch).",
                   icon: "gift" as IconName,
                 },
               ].map((f) => (
@@ -382,7 +390,7 @@ export default function SignedOutLanding({
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/onboarding"
+              href="/signup?ref=raelynn&next=%2Fonboarding"
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
               Create fan profile →

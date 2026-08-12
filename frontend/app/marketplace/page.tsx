@@ -1,3 +1,5 @@
+import { isMarketplaceLive } from "@/lib/marketplace-live";
+import MarketplaceComingSoon from "@/components/marketplace-coming-soon";
 import Link from "next/link";
 import { getActiveOffers } from "@/lib/data/offers";
 import { getCurrentFan, getPrimaryCommunityId } from "@/lib/data/fan";
@@ -19,8 +21,8 @@ const TAB_CATEGORIES: Record<Tab, OfferCategory[] | null> = {
   "Fan-Exclusive": ["digital", "ticket"],
 };
 
-// Static preview content used when Supabase has no offers yet, OR for
-// anonymous visitors so the marketplace marketing page has visual weight.
+// Static preview content used when Supabase has no offers yet — only when
+// marketplace is live (NEXT_PUBLIC_MARKETPLACE_LIVE=true).
 const fallbackProducts = [
   { title: "Signed World Tour Hoodie", tier: "Silver", pts: "3,400 pts", category: "Merch" as Tab, badge: "Limited" },
   { title: "Backstage Polaroid Pack", tier: "Gold", pts: "5,200 pts", category: "Featured" as Tab, badge: "Drop" },
@@ -50,13 +52,25 @@ function offerCategoryToTab(cat: OfferCategory): Tab {
   }
 }
 
-export const metadata = { title: "Marketplace" };
+export const metadata = { title: "Marketplace — Coming soon" };
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function MarketplacePage({ searchParams }: PageProps) {
+  // Soft launch: marketplace not open (provider issues). Always Coming soon
+  // until NEXT_PUBLIC_MARKETPLACE_LIVE=true.
+  if (!isMarketplaceLive()) {
+    return (
+      <div className="min-h-screen bg-midnight">
+        <main className="mx-auto max-w-3xl px-6 py-12">
+          <MarketplaceComingSoon artistName="RaeLynn" />
+        </main>
+      </div>
+    );
+  }
+
   const params = await searchParams;
   const rawTab = Array.isArray(params.tab) ? params.tab[0] : (params.tab ?? "");
   const activeTab: Tab = (TABS as readonly string[]).includes(rawTab)
@@ -69,8 +83,6 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
     getPrimaryCommunityId(),
   ]);
   const isSignedIn = fan !== null;
-  // Offers have no redemption backend yet — point fans at their community's
-  // rewards page, where redeem_reward is live.
   const redeemHref = primaryCommunityId
     ? `/artists/${primaryCommunityId}/rewards`
     : "/artists";
@@ -114,7 +126,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
               bullets={[
                 "Real merch + experiences from your favorite artists",
                 "Points-only or fan-priority pricing",
-                "Tier-locked so casual visitors don&apos;t outbid fans",
+                "Tier-locked so casual visitors don't outbid fans",
               ]}
               primaryCta="Sign up to redeem →"
               nextPath="/marketplace"
@@ -138,12 +150,11 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                   <Link
                     key={tab}
                     href={href}
-                    className={`rounded-full px-4 py-2 text-sm transition-colors ${
+                    className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
                       isActive
-                        ? "bg-white text-midnight font-medium"
-                        : "border border-white/20 text-white/70 hover:border-white/40 hover:text-white"
+                        ? "bg-white text-black"
+                        : "border border-white/15 text-white/70 hover:bg-white/5"
                     }`}
-                    aria-current={isActive ? "page" : undefined}
                   >
                     {tab}
                   </Link>
@@ -152,44 +163,26 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
             </nav>
           </section>
 
-          {products.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-sm text-white/60">
-              No {activeTab.toLowerCase()} drops available right now. Check back soon.
-            </div>
-          ) : (
-            <section className="grid gap-4 md:grid-cols-2">
-              {products.map((item) => (
-                <div key={item.slug} className="glass-card p-5">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-wide text-white/50">
-                    <span>{item.tier !== "Bronze" && item.tier !== "All tiers" && "🔒 "}{item.tier}</span>
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-white/70">{item.badge}</span>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {products.map((p) => (
+              <Link
+                key={p.slug}
+                href={isSignedIn ? redeemHref : "/signup?next=/marketplace"}
+                className="rounded-3xl border border-white/10 bg-black/30 p-5 transition hover:border-white/25"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">{p.tier}</p>
+                    <p className="mt-1 text-base font-semibold">{p.title}</p>
                   </div>
-                  <h3 className="mt-4 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-white/70">Category · {item.category}</p>
-                  <div className="mt-6 flex items-center justify-between">
-                    <span className="text-lg font-semibold text-emerald-300">{item.pts}</span>
-                    {isSignedIn ? (
-                      <Link
-                        href={redeemHref}
-                        className="rounded-full border border-white/30 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-                      >
-                        Redeem
-                      </Link>
-                    ) : (
-                      <Link
-                        href="/signup?next=/marketplace"
-                        className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-                      >
-                        Sign up to redeem
-                      </Link>
-                    )}
-                  </div>
+                  <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/60">
+                    {p.badge}
+                  </span>
                 </div>
-              ))}
-            </section>
-          )}
+                <p className="mt-4 text-lg font-semibold text-emerald-300">{p.pts}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       </main>
     </div>

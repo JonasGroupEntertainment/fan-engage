@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 declare global {
   interface Window {
@@ -21,89 +21,205 @@ interface TurnstileOptions {
   "expired-callback"?: () => void;
 }
 
+export type TurnstileLoadState = "loading" | "ready" | "error";
+
 interface Props {
   onSuccess: (token: string) => void;
   onError?: () => void;
   onExpire?: () => void;
+  onLoadStateChange?: (state: TurnstileLoadState) => void;
   theme?: "light" | "dark" | "auto";
 }
 
 const SCRIPT_ID = "cf-turnstile-script";
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 const MAX_SCRIPT_RETRIES = 3;
+const LOAD_TIMEOUT_MS = 12_000;
 
 let scriptRequested = false;
+const loadListeners = new Set<() => void>();
+
+function notifyTurnstileLoaded() {
+  for (const listener of [...loadListeners]) {
+    try {
+      listener();
+    } catch {
+      /* ignore listener errors */
+    }
+  }
+}
 
 /** True when a Turnstile site key is configured (widget will render). */
 export function isTurnstileConfigured(): boolean {
   return Boolean(SITE_KEY);
 }
 
+/** Reset module loader state so a Retry can re-inject the script. */
+export function resetTurnstileScriptLoader() {
+  scriptRequested = false;
+  document.getElementById(SCRIPT_ID)?.remove();
+}
+
 // Retries with a cache-busting param: during a Cloudflare outage the browser
 // can cache the 503 for the script URL, which would otherwise block every
 // login until a hard refresh.
-function injectTurnstileScript(attempt = 0) {
+function injectTurnstileScript(attempt = 0, onGiveUp?: () => void) {
   document.getElementById(SCRIPT_ID)?.remove();
   const script = document.createElement("script");
   script.id = SCRIPT_ID;
   const buster = attempt > 0 ? `&cb=${Date.now()}` : "";
-  script.src = `https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad${buster}`;
+  // Explicit render mode — we call turnstile.render ourselves.
+  script.src = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad${buster}`;
   script.async = true;
   script.defer = true;
   script.onerror = () => {
     if (attempt < MAX_SCRIPT_RETRIES) {
-      setTimeout(() => injectTurnstileScript(attempt + 1), 1000 * (attempt + 1));
+      setTimeout(() => injectTurnstileScript(attempt + 1, onGiveUp), 1000 * (attempt + 1));
+    } else {
+      onGiveUp?.();
     }
   };
   document.head.appendChild(script);
 }
 
-export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }: Props) {
+export function TurnstileWidget({
+  onSuccess,
+  onError,
+  onExpire,
+  onLoadStateChange,
+  theme = "dark",
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const [loadState, setLoadState] = useState<TurnstileLoadState>("loading");
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  const setState = useCallback(
+    (state: TurnstileLoadState) => {
+      setLoadState(state);
+      onLoadStateChange?.(state);
+    },
+    [onLoadStateChange],
+  );
 
   const renderWidget = useCallback(() => {
-    if (!containerRef.current || !window.turnstile || !SITE_KEY) return;
-    if (widgetIdRef.current) return; // already rendered
+    if (!containerRef.current || !window.turnstile || !SITE_KEY) return false;
+    if (widgetIdRef.current) return true;
 
-    widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: SITE_KEY,
-      theme,
-      callback: onSuccess,
-      "error-callback": onError,
-      "expired-callback": onExpire,
-    });
-  }, [onSuccess, onError, onExpire, theme]);
+    try {
+      // Clear any leftover iframe markup from a prior failed attempt.
+      containerRef.current.innerHTML = "";
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: SITE_KEY,
+        theme,
+        callback: (token: string) => {
+          setState("ready");
+          onSuccess(token);
+        },
+        "error-callback": () => {
+          setState("error");
+          onError?.();
+        },
+        "expired-callback": () => {
+          onExpire?.();
+        },
+      });
+      setState("ready");
+      return true;
+    } catch (err) {
+      console.warn("[turnstile] render failed", err);
+      setState("error");
+      onError?.();
+      return false;
+    }
+  }, [onSuccess, onError, onExpire, theme, setState]);
 
   useEffect(() => {
-    if (!SITE_KEY) return; // Turnstile not configured — skip silently
+    if (!SITE_KEY) return;
+
+    let cancelled = false;
+    setState("loading");
+
+    const tryRender = () => {
+      if (cancelled) return;
+      renderWidget();
+    };
+
+    loadListeners.add(tryRender);
+    window.onTurnstileLoad = () => {
+      notifyTurnstileLoaded();
+    };
 
     if (window.turnstile) {
-      renderWidget();
-    } else {
-      // Script not yet loaded — attach a loader callback and inject the script once
-      window.onTurnstileLoad = renderWidget;
-
-      if (!scriptRequested) {
-        scriptRequested = true;
-        injectTurnstileScript();
-      }
+      tryRender();
+    } else if (!scriptRequested) {
+      scriptRequested = true;
+      injectTurnstileScript(0, () => {
+        if (!cancelled) {
+          setState("error");
+          onError?.();
+        }
+      });
     }
 
-    // Always clean up: the auth forms remount this widget (key bump) after
-    // every verify attempt, so stale instances must be removed each time.
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      if (!widgetIdRef.current) {
+        console.warn("[turnstile] load timed out — widget never rendered");
+        setState("error");
+        onError?.();
+      }
+    }, LOAD_TIMEOUT_MS);
+
     return () => {
+      cancelled = true;
+      loadListeners.delete(tryRender);
+      window.clearTimeout(timeout);
       if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          /* ignore */
+        }
         widgetIdRef.current = null;
       }
     };
-  }, [renderWidget]);
+  }, [renderWidget, setState, onError, retryNonce]);
+
+  function handleRetry() {
+    resetTurnstileScriptLoader();
+    widgetIdRef.current = null;
+    if (containerRef.current) containerRef.current.innerHTML = "";
+    setState("loading");
+    setRetryNonce((n) => n + 1);
+  }
 
   // If no site key is configured (dev / unconfigured), render nothing
   if (!SITE_KEY) return null;
 
-  return <div ref={containerRef} className="mt-2" />;
+  return (
+    <div className="space-y-2">
+      <div ref={containerRef} className="mt-2 min-h-[65px]" />
+      {loadState === "loading" && (
+        <p className="text-xs text-white/40">Loading security check…</p>
+      )}
+      {loadState === "error" && (
+        <div className="space-y-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2">
+          <p className="text-xs text-rose-200">
+            Security check couldn&apos;t load. Check your connection, then retry —
+            or use password sign-in instead.
+          </p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/10"
+          >
+            Retry security check
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export interface TurnstileVerifyResult {
@@ -142,14 +258,19 @@ export async function verifyTurnstileToken(token: string | null): Promise<Turnst
     if (data.success === true) {
       return { success: true, failedOpen: data.failedOpen };
     }
-    // Server may still return upstream_error when TURNSTILE_FAIL_OPEN=false.
-    // Client-side transport failures also fail-open below.
-    if (data.error === "upstream_error" || data.error === "network_error") {
+    // Honor server fail-closed: only treat upstream/network as success when
+    // the API explicitly failed open (TURNSTILE_FAIL_OPEN enabled).
+    if (
+      data.failedOpen === true &&
+      (data.error === "upstream_error" || data.error === "network_error")
+    ) {
       console.warn(`[turnstile] ${data.error} from verify API — failing open`);
       return { success: true, failedOpen: true, error: data.error };
     }
     return { success: false, error: data.error ?? "challenge_failed" };
   } catch (err) {
+    // Transport failure — cannot reach our verify API. Fail open so a brief
+    // outage doesn't hard-block signup/magic-link.
     console.warn("[turnstile] network_error calling verify API — failing open", err);
     return { success: true, failedOpen: true, error: "network_error" };
   }
@@ -159,6 +280,9 @@ export async function verifyTurnstileToken(token: string | null): Promise<Turnst
 export function turnstileFailureMessage(error?: string): string {
   if (error === "rate_limited") {
     return "Too many attempts. Please wait about 15 minutes, then try again.";
+  }
+  if (error === "missing_token") {
+    return "Complete the security check, then try again — or use password sign-in.";
   }
   return "Security check expired. Please complete the new check and try again.";
 }
