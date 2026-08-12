@@ -66,6 +66,7 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 | Invite credit only after cookie Accept | B-P0-3 | P0 |
 | Magic-link Turnstile + PKCE “link broken” tickets | B-P1-0 | P1 |
 | OAuth missing with no explanation | B-P1-0b | P1 |
+| Literal `don&apos;t` on guest UI | B-P1-0c (`/marketplace` preview bullet) | P1 |
 
 ---
 
@@ -209,6 +210,11 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - **Paths:** `frontend/app/signup/signup-form.tsx` (OAuth block commented out until custom auth domain / G.4); login has no Google/Apple either
 - **Why (Guide):** Soft-launch fans expect “Continue with Google.” Buttons are gone with **no** “Email signup only for now” line — looks incomplete or broken, not intentional.
 - **Fix:** One calm line under the signup/login email forms: “Google & Apple sign-in coming soon — create your fan account with email for now.” **Do not re-enable OAuth** until custom auth domain.
+
+#### B-P1-0c. Literal `don&apos;t` on marketplace preview (Guide CS — production)
+- **Path:** `frontend/app/marketplace/page.tsx` (PreviewSignupBanner `bullets` array) → rendered by `frontend/components/preview-signup-banner.tsx` as `{b}` text
+- **Why:** HTML entity `&apos;` was placed inside a **JS string**. React text children do not decode HTML entities, so signed-out guests on `/marketplace` see the literal characters `don&apos;t`. Matches Guide’s report near rewards/marketplace/premium/referrals (same preview-banner pattern; only marketplace had the bad string).
+- **Fix:** Use a real apostrophe in the string (`don't`). Prefer apostrophes/`'` in JS/TS strings; reserve `&apos;` for JSX text nodes only. **Fixed in #10.**
 
 #### B-P1-1. Onboarding reads like an internal admin tool
 - **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Twilio/Mailchimp error copy
@@ -366,6 +372,7 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 | PR | Contents |
 |----|----------|
 | [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs; invite attribution; Turnstile fail-closed honor; `/onboarding` signed-out interstitial (Guide); OAuth-hidden messaging |
+| [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | Marketplace preview bullet `don&apos;t` → `don't` (B-P1-0c) |
 | Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check migration; membership update lockdown |
 | Ops P1 (not yet opened) | Twilio fail-closed; `.env.example`; founder reward gate |
 
