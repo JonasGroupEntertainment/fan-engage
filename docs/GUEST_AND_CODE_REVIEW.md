@@ -5,17 +5,27 @@
 **Reviewed at:** `3022e389` (merge of PR #7 — password primary, Turnstile on magic-link / signup / forgot only)  
 **Scope:** Soft launch for first-time fans (RaeLynn). No OAuth re-enable. No large refactors. Findings verified against this repo (not invented metrics).
 
+### Product framing (binding)
+
+**Fan Engage Pro is a SUPERFAN site for artist–fan relationships** — artists, fans, drops, backstage access, tour moments, rewards, and community. All guest-flow and copy review in this document uses that frame.
+
+This is **not** Brand Engage Pro (BEP). Do not evaluate or rewrite guest UX as a brand/loyalty/restaurant/retail product. Sister-product notes elsewhere in the repo (`docs/CONTEXT_HANDOFF.md`, launch plan) do not apply to soft-launch guest copy or journey language here.
+
+Guest-facing language should read as: join an artist’s fan experience → earn points → unlock drops / backstage / rewards — not “members of a brand program.”
+
 ---
 
 ## Verdict
 
 **Conditional soft launch — not a hard “go” until the P0 payment/entitlement holes and the guest onboarding skip are closed.**
 
-Auth UX after PR #7 is coherent for returning fans (password primary, magic-link secondary, OAuth gated). The soft-launch risk is concentrated in: (1) Stripe webhook idempotency that can permanently drop premium unlocks, (2) RLS/RPC holes that let clients self-grant premium or spend another fan’s points, and (3) signup paths that skip onboarding and the promised first 100 points.
+Auth UX after PR #7 is coherent for returning fans (password primary, magic-link secondary, OAuth gated). The soft-launch risk is concentrated in: (1) Stripe webhook idempotency that can permanently drop premium unlocks, (2) RLS/RPC holes that let clients self-grant premium or spend another fan’s points, and (3) signup paths that skip onboarding and the promised first 100 points (the first SUPERFAN moment).
 
 ---
 
 ## Guest journey map (actual routes)
+
+Frame: first-time fan joins an **artist** SUPERFAN experience (not a brand loyalty signup).
 
 Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_CHECKLIST.md`.
 
@@ -177,8 +187,8 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 #### B-P1-1. Onboarding reads like an internal admin tool
 - **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Twilio/Mailchimp error copy
-- **Why:** First-time fans feel like they’re in a demo/ops screen.
-- **Fix:** Fan-facing titles/hints; hide SMS debug panel; plain “Couldn’t send text — try again.”
+- **Why:** First-time fans feel like they’re in a demo/ops screen, not joining an artist’s SUPERFAN experience (profile → interests → drops/rewards access).
+- **Fix:** Fan-facing titles/hints (artist, points, drops, backstage); hide SMS debug panel; plain “Couldn’t send text — try again.”
 
 #### B-P1-2. Last-step SMS “or” path traps
 - **Path:** same file — “Send confirmation text” calls onboard early; Finish also onboards; phone forces SMS consent
@@ -237,8 +247,10 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 ### P2 — confusing copy, empty states, dead ends
 
-#### B-P2-1. “Member” language on guest surfaces
-- Landing / referrals / marketplace empty states still use “members” in places; prelaunch checklist asks for fan language.
+#### B-P2-1. “Member” / brand-program language on guest surfaces
+- Landing / referrals / marketplace empty states still use “members” in places; prelaunch checklist asks for **fan** language.
+- **Why it hurts:** Soft-launch guests should feel they’re joining an artist’s SUPERFAN circle (drops, backstage, rewards) — not a generic membership club or Brand Engage–style loyalty program.
+- **Fix:** Prefer fan / Founding Fan / artist-community wording on public surfaces; reserve “member” for internal schema (`fan_community_memberships`) only.
 
 #### B-P2-2. Dev-facing empty copy on artist page
 - “Hero imagery pending Box asset drop.” / “Social links pending.”
@@ -314,10 +326,10 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 4. **Reset-password expired session state** — recovers forgot-password edge cases (B-P1-9).
 5. **Cookie banner hide/padding on forgot, reset, onboarding, invite** — mobile Submit/Finish no longer covered (B-P1-4).
 6. **Invite attribution + consent coherence** — soft-launch referral/influencer links actually credit (B-P0-3).
-7. **Fan-facing onboarding + single Finish path** — removes demo/ops tone and SMS “or” traps (B-P1-1, B-P1-2).
-8. **Sticky mobile Join on artist hub** — keeps the primary conversion CTA visible (B-P1-6).
+7. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (artist/drops/rewards), not demo/ops; kill SMS “or” traps (B-P1-1, B-P1-2).
+8. **Sticky mobile Join on artist hub** — keeps the primary conversion CTA visible on the artist page (B-P1-6).
 9. **Publish real legal/rewards terms before gating Accept** — trust at the consent modal (B-P1-11).
-10. **Artist empty states + fan language (not “member”)** — page doesn’t look unfinished or off-brand (B-P1-12, B-P2-1).
+10. **Artist empty states + SUPERFAN/fan language (not “member” / brand-loyalty tone)** — artist hub feels like a fan experience, not an unfinished brand program (B-P1-12, B-P2-1).
 
 ---
 
