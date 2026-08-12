@@ -13,6 +13,8 @@ This is **not** Brand Engage Pro (BEP). Do not evaluate or rewrite guest UX as a
 
 Guest-facing language should read as: join an artist’s fan experience → earn points → unlock drops / backstage / rewards — not “members of a brand program.”
 
+**Soft-launch merch:** RaeLynn marketplace is **not open** at soft launch (provider issues). Guest-facing `/marketplace` and merch CTAs must show a clear **Coming soon** state — not a broken empty shop, not dual Shopify + marketplace CTAs. Ops expects merch within ~a month; flip with `NEXT_PUBLIC_MARKETPLACE_LIVE=true` (see **#11** / B-P1-17).
+
 ---
 
 ## Verdict
@@ -81,12 +83,13 @@ Severity table mapping Guide’s walk → review IDs. Product frame: **artist↔
 |---|---------|-----|----|-----------|
 | R1 | Magic-link disabled copy with **no separate email field** — unclear it uses password EMAIL above; need recovery when Turnstile blank | **P1** | B-P1-15 | **#11** — “email address above” + Retry / password / forgot recovery |
 | R2 | Signup consent: Privacy less obvious than Terms; onboarding mentions weekly digest but signup lacks marketing-email cue | **P1** | B-P1-16 | **#11** — always-underlined Terms + Privacy; digest/opt-out cue on signup |
-| R3 | Artist merch confusion: “See merchandise” → `/marketplace` vs “Shop merch ↗” → Shopify | **P1** | B-P1-17 | **#11** — “Browse marketplace drops” vs “Official store ↗” |
+| R3 | Artist merch confusion + empty/Shopify dual shop | **P1** | B-P1-17 | **#11** — **Coming soon** wall; hide Shopify until live (`NEXT_PUBLIC_MARKETPLACE_LIVE`) |
 | R4 | CTA vocabulary sprawl (Join / Create fan profile / Create account / …) | **P2** | B-P2-12 | Recommend soft-launch glossary; no mass rename in #11 |
 | R5 | Onboarding flash → signup with **no explanatory banner** | **P1** | B-P1-18 | **#11** — banner when `next=/onboarding` |
 | R6 | Marketplace `don&apos;t` still live on prod | **P1** | B-P1-0c | Must merge **#11** (or #10); already fixed on branch |
+| R7 | `/marketplace` + nav push live shop while catalog not open | **P1** | B-P1-17 | **#11** — Coming soon; nav **Merch soon** |
 
-**P0 unchanged:** Turnstile blank/stuck + onboarding CTA/flash.
+**P0 unchanged (ship first):** Turnstile blank/stuck + onboarding CTA/flash. **Then** marketplace Coming soon. Do not let other polish block auth.
 
 Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), magic-link PKCE support load (**B-P1-0**).
 
@@ -114,6 +117,13 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 > Soft launch Premium and Founding Fan pricing are for **RaeLynn’s** fan experience right now. If you see both “spots remaining” and “X / 100 claimed,” that’s the **same number shown two ways** — a display bug that can look conflicting. The real count is how many Founding Fan spots are claimed out of 100; remaining = 100 − claimed. We’re cleaning up the copy so it’s one clear counter.
 
 **Eng match:** B-P1-13 — unify to one counter; add soft-launch “RaeLynn’s fan experience” framing. Do **not** invent a second waitlist or say spots are sold out unless `remaining === 0`.
+
+#### 4) Merch / marketplace looks broken or sends them to Shopify
+
+**Tell the fan:**
+> RaeLynn’s **merch marketplace isn’t open for soft launch yet** — you’ll see **Coming soon** on the Marketplace / Merch pages. We’re lining up the shop (target around a month). Keep earning points in the community and rewards so you’re ready when it opens. If you hit an old “Official store” Shopify link, ignore it for now — we’re not dual-running that with Fan Engage merch at launch.
+
+**Eng match:** B-P1-17 / **#11** — Coming soon wall + hide Shopify until `NEXT_PUBLIC_MARKETPLACE_LIVE=true`. Do **not** promise a hard open date in guest copy.
 
 ---
 
@@ -376,10 +386,10 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 - **Why:** Privacy Policy looked less linked than Terms; onboarding mentions weekly digest but signup had no marketing-email cue.
 - **Fix:** Equal always-underlined Terms + Privacy; short digest/preferences cue on signup. **#11.**
 
-#### B-P1-17. Artist page merch CTA collision (Guide re-run)
-- **Path:** `frontend/app/artists/[slug]/page.tsx` — “See merchandise” → `/marketplace` vs “Shop merch ↗” → `raelynnshop.myshopify.com`
-- **Why:** Near-identical labels, different destinations (fan drops vs official store).
-- **Fix:** “Browse marketplace drops” vs “Official store ↗”. **#11.**
+#### B-P1-17. Marketplace / merch not open at soft launch (product — supersedes rename-only fix)
+- **Paths:** `frontend/app/marketplace/page.tsx`, `frontend/lib/marketplace-live.ts`, `frontend/components/marketplace-coming-soon.tsx`, artist page CTAs/merch section, nav (`layout.tsx`), home quick actions, rewards earn-more, landing “Rewards Marketplace” pillar
+- **Why (product):** RaeLynn marketplace **not open** at soft launch (provider issues). Empty shop + dual “See merchandise” → `/marketplace` vs “Shop merch ↗” → Shopify looked broken / confusing. Merch expected ~1 month (ops target, not a guest promise date).
+- **Fix:** Gate live catalog behind `NEXT_PUBLIC_MARKETPLACE_LIVE=true`. Default = **Coming soon** wall; hide Shopify / Official store CTAs; nav **Merch soon**; artist/home/rewards entry points say Coming soon. Earlier “rename CTAs” approach is **retired** in favor of Coming soon. **#11.**
 
 #### B-P1-18. Signup needs banner after onboarding bounce (Guide re-run)
 - **Path:** `frontend/app/signup/signup-form.tsx` when `next=/onboarding`
@@ -462,16 +472,16 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 
 ## Top 10 guest-experience fixes (by impact)
 
-1. **Magic-link Turnstile blank → loading/error/Retry** — Guide P0; never infinite-disabled blank (B-P0-5) → **#11**.
-2. **Homepage CTA + `/onboarding` interstitial** — Guide P0; no wizard flash-bounce (B-P0-4) → **#11**.
-3. **Never skip onboarding for `?next=`** — preserves the promised first 100 points (B-P0-1).
-4. **Invite credit after cookie Accept** — influencer/fan invite links actually credit (B-P0-3).
-5. **Unify `/premium` founder counter copy** — stop “97 remaining” vs “3 claimed” confusion (B-P1-13).
-6. **Nav Community explicit for soft launch** — “RaeLynn community” not silent redirect (B-P1-14).
-7. **OAuth-hidden messaging + password-first CS macros** — document, do not re-enable (B-P1-0b).
-8. **Marketplace `don't` + JS-string apostrophe hygiene** (B-P1-0c) → **#10/#11**.
-9. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (B-P1-1, B-P1-2).
-10. **Cookie/hero + 1280 overflow polish** (B-P2-11, B-P2-8).
+1. **Magic-link Turnstile blank → loading/error/Retry** — Guide P0; never infinite-disabled blank (B-P0-5) → **#11** (**ship first**).
+2. **Homepage CTA + `/onboarding` interstitial** — Guide P0; no wizard flash-bounce (B-P0-4) → **#11** (**ship first**).
+3. **Marketplace Coming soon** — RaeLynn merch not open; no empty shop / Shopify dual CTAs (B-P1-17) → **#11**.
+4. **Never skip onboarding for `?next=`** — preserves the promised first 100 points (B-P0-1).
+5. **Invite credit after cookie Accept** — influencer/fan invite links actually credit (B-P0-3).
+6. **Unify `/premium` founder counter copy** — stop “97 remaining” vs “3 claimed” confusion (B-P1-13).
+7. **Nav Community explicit for soft launch** — “RaeLynn community” not silent redirect (B-P1-14).
+8. **OAuth-hidden messaging + password-first CS macros** — document, do not re-enable (B-P1-0b).
+9. **Marketplace `don't` + JS-string apostrophe hygiene** (B-P1-0c) → **#10/#11**.
+10. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (B-P1-1, B-P1-2).
 
 ---
 
@@ -479,7 +489,7 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 
 | PR | Contents |
 |----|----------|
-| **[#11](https://github.com/JonasGroupEntertainment/fan-engage/pull/11) Guide P0 + re-run polish** | Turnstile blank/retry; homepage → signup; onboarding interstitial; signup banner when `next=/onboarding`; magic-link email-field clarity; merch CTA rename; Privacy/digest cues; marketplace `don't`; forgot-password Turnstile load UX; singular artist tile |
+| **[#11](https://github.com/JonasGroupEntertainment/fan-engage/pull/11) Auth P0s + marketplace Coming soon** | **(1)** Turnstile blank/retry; homepage → signup; onboarding interstitial; signup banner; magic-link clarity; forgot-password Turnstile UX. **(2)** Marketplace Coming soon gate (`NEXT_PUBLIC_MARKETPLACE_LIVE`); hide Shopify; nav/home/rewards/artist merch CTAs; Privacy/digest; marketplace `don't`; singular artist tile |
 | [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Broader funnel (onboarding-always next, invite, paywall CTAs, reset-password, cookie hide) — overlaps #11 on interstitial |
 | [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | Marketplace-only (superseded if #11 merges first) |
 | Premium/Community P1 (not yet opened) | Unify founder counters (B-P1-13); Community nav label (B-P1-14) |
