@@ -77,6 +77,31 @@ Severity table mapping Guide’s walk → review IDs. Product frame: **artist↔
 
 Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), magic-link PKCE support load (**B-P1-0**).
 
+### CS reply stories (support ↔ engineering)
+
+Use these verbatim (or close) when fans hit the issues below. Engineering fixes in **#11** / follow-ups must match what support promises.
+
+#### 1) Magic-link button greyed / Security check blank
+
+**Tell the fan:**
+> Sign in with your **email and password** instead — that’s the main door. If you don’t remember it, use **Forgot password?** on the sign-in page and set a new one. The “Email me a magic link” path needs a security check that sometimes doesn’t load; that’s a bug we’re fixing. You haven’t lost your account.
+
+**Eng match:** B-P0-5 / **#11** — never leave blank infinite-disabled Turnstile; Retry + steer to password. Do **not** tell fans to wait on magic-link as the primary unblock.
+
+#### 2) Onboarding page flashed then sent them to signup
+
+**Tell the fan:**
+> Nothing’s lost. Creating your **fan account** comes first; then you’ll finish your **profile** (name, interests, etc.) and land in the artist experience with your signup points. Tap **Create account**, confirm your email, and continue — we’ll take you through profile next.
+
+**Eng match:** B-P0-4 / **#11** — homepage CTAs go to signup; `/onboarding` shows “Create your fan account first” interstitial (no wizard flash). Do **not** imply they broke something or skipped a step forever.
+
+#### 3) Premium / Founding Fan spots look wrong or “only RaeLynn”
+
+**Tell the fan:**
+> Soft launch Premium and Founding Fan pricing are for **RaeLynn’s** fan experience right now. If you see both “spots remaining” and “X / 100 claimed,” that’s the **same number shown two ways** — a display bug that can look conflicting. The real count is how many Founding Fan spots are claimed out of 100; remaining = 100 − claimed. We’re cleaning up the copy so it’s one clear counter.
+
+**Eng match:** B-P1-13 — unify to one counter; add soft-launch “RaeLynn’s fan experience” framing. Do **not** invent a second waitlist or say spots are sold out unless `remaining === 0`.
+
 ---
 
 ## A) Code / engineering findings
@@ -206,12 +231,14 @@ Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), ma
 - **Paths:** `frontend/app/onboarding/page.tsx`; homepage CTAs in `frontend/components/signed-out-landing.tsx`; also `frontend/app/onboarding/mission/page.tsx`
 - **Verified in code + Guide walk:** Client wizard mounts immediately; `getUser()` then `router.replace(/signup?…)`. Homepage primary CTA linked to `/onboarding`, so first-timers see a fake join wizard then a yank to signup.
 - **Why it hurts SUPERFAN guests:** Feels broken (“the join flow crashed”), not “create an account first.”
+- **CS reply:** Nothing lost — create account first, then profile (see **CS reply stories §2**).
 - **Fix:** (1) Homepage CTA → `/signup?ref=raelynn&next=/onboarding`. (2) Do **not** render the wizard until auth is resolved — signed-out interstitial “Create your fan account first.” **Shipped in #11.**
 
 #### B-P0-5. Magic-link Turnstile Security check blank / infinite disabled (Guide CS — production)
 - **Paths:** `frontend/components/turnstile-widget.tsx`; `frontend/app/login/page.tsx`
 - **Verified:** Production `/login` shows “Security check” label + empty area; magic-link button stuck on “Complete security check for magic link.” Password path works (no Turnstile). Root causes in widget: silent script/render failure, no timeout, no Retry UI, `isTurnstileConfigured()` still true so the button stays disabled over blank space. CSP already allows `challenges.cloudflare.com` (`next.config.ts`); also verify Cloudflare Turnstile hostname allowlist includes `fanengagepro.com`.
 - **Why:** Soft-launch returning fans who prefer magic-link hit a dead secondary door; CS can’t unblock without “use password.”
+- **CS reply:** Use password / Forgot password; blank Turnstile is a bug we’re fixing (see **CS reply stories §1**).
 - **Fix:** Visible loading + error + Retry; never leave blank infinite-disabled; button copy steers to password when unavailable; explicit Turnstile render. **Shipped in #11.** Keep password primary; do not Turnstile the password door.
 
 ### P1 — soft-launch friction / trust / mobile
@@ -234,6 +261,7 @@ Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), ma
 #### B-P1-13. `/premium` dual founder counters look contradictory (Guide walk)
 - **Paths:** `frontend/app/premium/page.tsx` (“N spots remaining of 100”) + `frontend/app/premium/founder-slots-counter.tsx` (“X / 100 claimed”)
 - **Why:** For filled=3, remaining=97 both are true, but guests read them as two disagreeing systems. Soft-launch also feels RaeLynn-only (correct for single active artist) without saying so.
+- **CS reply:** RaeLynn-specific soft launch; dual counters are a display bug — remaining = 100 − claimed (see **CS reply stories §3**).
 - **Fix:** One counter source of truth (prefer “3 of 100 Founding Fan spots claimed · 97 left”); short line “Premium for RaeLynn’s fan experience” when sole active artist.
 
 #### B-P1-14. Nav Community silently lands on RaeLynn (Guide walk)
