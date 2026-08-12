@@ -220,8 +220,96 @@ export default async function PremiumPage({
           </section>
         )}
 
-        {/* Plan picker — only when they're not already premium */}
-        {!isPremium && (
+        {/* Signed-out: auth-first CTAs. Stripe plan buttons only after sign-in. */}
+        {!isPremium && !user && (
+          <section className="mt-10 space-y-6">
+            <div
+              className="rounded-3xl border border-white/15 bg-gradient-to-r from-white/10 via-black/40 to-white/5 p-6"
+              style={{ borderColor: `${community.accent_from}66` }}
+            >
+              <p className="text-xs uppercase tracking-widest text-white/50">
+                Start here
+              </p>
+              <h2
+                className="mt-2 text-2xl font-semibold"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Create a free fan account first
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-white/70">
+                Make your profile, then come back to choose monthly or annual
+                Premium. It takes about a minute.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link
+                  href={premiumSignupHref}
+                  className="inline-flex rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, ${community.accent_from}, ${community.accent_to})`,
+                  }}
+                >
+                  Create account
+                </Link>
+                <Link
+                  href={premiumLoginHref}
+                  className="inline-flex rounded-full border border-white/20 px-5 py-2.5 text-sm text-white/80 transition hover:bg-white/10"
+                >
+                  Sign in
+                </Link>
+              </div>
+            </div>
+
+            {/* Pricing preview only — no Stripe checkout until signed in */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col items-start rounded-3xl border border-white/10 bg-black/40 p-6">
+                <p className="text-xs uppercase tracking-widest text-white/50">
+                  Monthly
+                </p>
+                <p
+                  className="mt-3 text-4xl font-semibold"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {fmtPrice(monthly)}
+                  <span className="ml-1 text-base font-normal text-white/50">
+                    /mo
+                  </span>
+                </p>
+                <p className="mt-2 text-xs text-white/55">
+                  Cancel anytime. No long-term commitment.
+                </p>
+                <p className="mt-6 text-xs text-white/45">
+                  Available after you create an account.
+                </p>
+              </div>
+              <div className="relative flex flex-col items-start rounded-3xl border-2 border-white/20 bg-gradient-to-br from-white/8 to-black/40 p-6">
+                <span className="absolute right-4 top-4 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
+                  Save {annualSavingsPct}%
+                </span>
+                <p className="text-xs uppercase tracking-widest text-white/50">
+                  Annual
+                </p>
+                <p
+                  className="mt-3 text-4xl font-semibold"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {fmtPrice(annual)}
+                  <span className="ml-1 text-base font-normal text-white/50">
+                    /yr
+                  </span>
+                </p>
+                <p className="mt-2 text-xs text-white/55">
+                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo. Two months free.
+                </p>
+                <p className="mt-6 text-xs text-white/45">
+                  Available after you create an account.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Plan picker — signed-in, not already premium */}
+        {!isPremium && user && (
           <section className="mt-10 grid gap-4 md:grid-cols-2">
             {/* Monthly */}
             <form action={createCheckoutSessionAction} className="contents">
@@ -294,21 +382,6 @@ export default async function PremiumPage({
               </button>
             </form>
           </section>
-        )}
-
-        {/* Signed-out prompt */}
-        {!user && (
-          <p className="mt-4 text-sm text-white/60">
-            You&apos;ll need to{" "}
-            <Link href={premiumSignupHref} className="underline hover:text-white">
-              create a free fan profile
-            </Link>{" "}
-            or{" "}
-            <Link href={premiumLoginHref} className="underline hover:text-white">
-              sign in
-            </Link>{" "}
-            before you can subscribe. It takes 60 seconds.
-          </p>
         )}
 
         {/* Promo code entry — shown to signed-in non-premium fans */}
