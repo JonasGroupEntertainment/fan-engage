@@ -178,12 +178,28 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - **Why:** If Supabase email templates use Site URL without the signup `emailRedirectTo` query, guests confirm and land signed-in with no onboarding / no signup bonus.
 - **Fix:** Lock Supabase email template / Site URL to ConfirmationURL → `/auth/callback`; default confirm `next` to `/onboarding` when profile incomplete (middleware or callback check).
 
-#### B-P0-3. Invite referral cookie gated on Accept, then signup hides banner
-- **Paths:** `frontend/app/invite/[code]/set-ref-cookie.tsx` + `frontend/components/cookie-banner.tsx` (`HIDE_ON` includes `/signup`, not `/invite`)
-- **Why:** Guest can leave `/invite` without Accept → `/signup` never shows banner → `fanengage_ref` never set → inviter attribution silently fails.
-- **Fix:** Essential ref cookie with clear legal basis, or force Accept before invite CTA, or show banner on signup when invite pending.
+#### B-P0-3. Invite credit only after cookie Accept (Guide CS theme)
+- **Paths:** `frontend/app/invite/[code]/set-ref-cookie.tsx`; `frontend/components/cookie-banner.tsx` (`HIDE_ON` includes `/signup`); invite CTA → `/signup` without carrying invite code (main, pre-#9)
+- **Why (Guide):** Soft-launch influencers/fans share `/invite/[code]`. Guests who tap Create account without Accept never get `fanengage_ref` — inviter credit silently fails. Signup hides the banner, so there’s often no second chance to Accept.
+- **Fix:** (a) Show Accept on invite and on `/signup?invite=…`; (b) carry `invite=` on the signup CTA; (c) write `fanengage_ref` after Accept on signup; or treat invite attribution as essential with clear Cookie Policy copy. **Partial fix in #9.**
+
+#### B-P0-4. `/onboarding` paints the wizard then silently bounces to `/signup` (Guide CS — production)
+- **Paths:** `frontend/app/onboarding/page.tsx` (~139–153); also `frontend/app/onboarding/mission/page.tsx` (~59–61)
+- **Verified in code:** Client wizard mounts and renders immediately. `useEffect` calls `supabase.auth.getUser()`; if unauthenticated (or session incomplete/expired), `router.replace(/signup?next=…&ref=…)`. Deep links and landing CTAs that still point at `/onboarding` (or bookmarks / shared links) show a fake “onboarding started” moment, then yank first-timers to signup.
+- **Why it hurts SUPERFAN guests:** Feels broken (“the join flow crashed”), not “create an account first.” Confuses CS and first-timers on soft launch.
+- **Fix:** Do **not** render the wizard until auth is resolved. For signed-out visitors, show a clear interstitial: “Create your fan account first to join this artist’s experience” + primary **Create account** (`/signup?ref=…&next=/onboarding…`) + secondary **Sign in**. Optional: server-side redirect in a layout/page wrapper so HTML never includes the wizard for anon. Point marketing CTAs at `/signup?ref=raelynn` (related: B-P1-10).
 
 ### P1 — soft-launch friction / trust / mobile
+
+#### B-P1-0. Magic-link path: Turnstile + PKCE support load (Guide CS theme)
+- **Paths:** `frontend/app/login/page.tsx` (magic-link secondary); `frontend/components/turnstile-widget.tsx`; `frontend/app/auth/callback/route.ts`
+- **Why (Guide):** Returning fans who pick “Email me a magic link instead” must wait for Cloudflare Turnstile script load/complete before the button enables; each resend invalidates the prior PKCE link (“newest link wins”). Slow networks, cached Turnstile 503s, or impatient resends generate “link doesn’t work” tickets even when password login would have been fine.
+- **Fix:** Keep password primary (already done). Add a short loading state while Turnstile script injects (“Security check loading…”) instead of a dead button; surface cooldown + “use the newest link” more prominently after send; in CS macros, steer soft-launch fans to password + forgot-password first. Do not put Turnstile on the password door.
+
+#### B-P1-0b. OAuth hidden with no guest-facing explanation (Guide CS theme)
+- **Paths:** `frontend/app/signup/signup-form.tsx` (OAuth block commented out until custom auth domain / G.4); login has no Google/Apple either
+- **Why (Guide):** Soft-launch fans expect “Continue with Google.” Buttons are gone with **no** “Email signup only for now” line — looks incomplete or broken, not intentional.
+- **Fix:** One calm line under the signup/login email forms: “Google & Apple sign-in coming soon — create your fan account with email for now.” **Do not re-enable OAuth** until custom auth domain.
 
 #### B-P1-1. Onboarding reads like an internal admin tool
 - **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Twilio/Mailchimp error copy
@@ -230,10 +246,10 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - **Why:** Expired/opened-without-session link → opaque `updateUser` failure.
 - **Fix:** On mount `getSession()` / `getUser()`; if missing, “Link expired — request a new reset” + CTA to `/forgot-password`.
 
-#### B-P1-10. Landing primary CTA bounces through `/onboarding`
-- **Path:** `frontend/components/signed-out-landing.tsx` → `/onboarding` → redirect signup
-- **Why:** Extra hop vs documented `/signup?ref=raelynn`.
-- **Fix:** Point soft-launch CTAs at `/signup?ref=raelynn`.
+#### B-P1-10. Landing / deep links still send guests into `/onboarding` (feeds B-P0-4)
+- **Paths:** `frontend/components/signed-out-landing.tsx` → `/onboarding` (main); any shared `/onboarding` or `/onboarding/mission` URL
+- **Why:** Documented soft-launch entry is `/signup?ref=raelynn`. Landing (and bookmarks) that hit `/onboarding` first trigger the wizard-flash bounce (B-P0-4).
+- **Fix:** Soft-launch CTAs → `/signup?ref=raelynn`. Keep `/onboarding` as post-auth only; signed-out hits get the interstitial from B-P0-4. **Landing CTA fix in #9.**
 
 #### B-P1-11. Legal / rewards terms may still be holding states
 - **Paths:** `(legal)/policy-page.tsx`; consent modal via `getPolicy`
@@ -296,10 +312,13 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 **Must before driving guest signup traffic (hard for “excellent” first experience):**
 - [ ] Signup always completes onboarding before `?next=` destinations (B-P0-1)
+- [ ] `/onboarding` signed-out: interstitial, no wizard flash / silent bounce (B-P0-4) — Guide CS
+- [ ] Invite credit after cookie Accept path works end-to-end (B-P0-3) — Guide CS
+- [ ] Guest-facing “email signup only for now” where OAuth is hidden (B-P1-0b) — Guide CS
+- [ ] Magic-link Turnstile loading/PKCE copy clear enough for CS macros (B-P1-0) — Guide CS
 - [ ] Reset-password expired-link UX (B-P1-9)
 - [ ] Cookie banner does not cover forgot/reset/onboarding CTAs (B-P1-4)
 - [ ] Signed-out premium/rewards CTAs prefer Create account (B-P1-7, B-P1-8)
-- [ ] Invite → signup attribution path works with consent model (B-P0-3)
 - [ ] Published legal/rewards terms for consent modal (B-P1-11)
 - [ ] Twilio fail-closed + `NEXT_PUBLIC_APP_URL` aligned (A-P1-1, A-P1-2)
 
@@ -320,16 +339,16 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 ## Top 10 guest-experience fixes (by impact)
 
-1. **Never skip onboarding for `?next=`** — preserves the promised first 100 points and profile (B-P0-1).
-2. **Guarantee email-confirm lands on onboarding when profile incomplete** — closes the silent home dead-end (B-P0-2).
-3. **Signed-out Premium / rewards CTAs → Create account first** — stops sending new fans to the returning-fan door (B-P1-7, B-P1-8).
-4. **Reset-password expired session state** — recovers forgot-password edge cases (B-P1-9).
-5. **Cookie banner hide/padding on forgot, reset, onboarding, invite** — mobile Submit/Finish no longer covered (B-P1-4).
-6. **Invite attribution + consent coherence** — soft-launch referral/influencer links actually credit (B-P0-3).
-7. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (artist/drops/rewards), not demo/ops; kill SMS “or” traps (B-P1-1, B-P1-2).
-8. **Sticky mobile Join on artist hub** — keeps the primary conversion CTA visible on the artist page (B-P1-6).
-9. **Publish real legal/rewards terms before gating Accept** — trust at the consent modal (B-P1-11).
-10. **Artist empty states + SUPERFAN/fan language (not “member” / brand-loyalty tone)** — artist hub feels like a fan experience, not an unfinished brand program (B-P1-12, B-P2-1).
+1. **`/onboarding` signed-out interstitial (no wizard flash)** — Guide CS production report; stops “broken join” bounce (B-P0-4).
+2. **Never skip onboarding for `?next=`** — preserves the promised first 100 points and profile (B-P0-1).
+3. **Guarantee email-confirm lands on onboarding when profile incomplete** — closes the silent home dead-end (B-P0-2).
+4. **Invite credit after cookie Accept** — influencer/fan invite links actually credit (B-P0-3).
+5. **Signed-out Premium / rewards CTAs → Create account first** — stops sending new fans to the returning-fan door (B-P1-7, B-P1-8).
+6. **OAuth-hidden + magic-link Turnstile/PKCE support clarity** — fewer “where’s Google?” / “link broken” tickets (B-P1-0, B-P1-0b).
+7. **Reset-password expired session state** — recovers forgot-password edge cases (B-P1-9).
+8. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (artist/drops/rewards), not demo/ops (B-P1-1, B-P1-2).
+9. **Sticky mobile Join on artist hub** — keeps the primary conversion CTA visible (B-P1-6).
+10. **Artist empty states + SUPERFAN/fan language** — artist hub feels like a fan experience, not a brand program (B-P1-12, B-P2-1).
 
 ---
 
@@ -337,7 +356,7 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 | PR | Contents |
 |----|----------|
-| [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs; invite attribution; Turnstile fail-closed honor |
+| [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs; invite attribution; Turnstile fail-closed honor; `/onboarding` signed-out interstitial (Guide); OAuth-hidden messaging |
 | Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check migration; membership update lockdown |
 | Ops P1 (not yet opened) | Twilio fail-closed; `.env.example`; founder reward gate |
 
