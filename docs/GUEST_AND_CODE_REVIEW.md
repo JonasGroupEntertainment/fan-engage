@@ -58,15 +58,24 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 | Forgot / reset | Working shape | Turnstile on forgot; reset page lacks session/expired-link UX |
 | OAuth | Gated | Blocked until custom auth domain (`LAUNCH_CHECKLIST` G.4); needs guest-facing “coming soon” line (B-P1-0b) |
 
-### Guide (CS) production themes incorporated
+### Guide (CS) full logged-out production walk (fanengagepro.com)
 
-| Theme | Finding | Severity |
-|-------|---------|----------|
-| `/onboarding` wizard then bounce to `/signup` | B-P0-4 (code-verified) | P0 |
-| Invite credit only after cookie Accept | B-P0-3 | P0 |
-| Magic-link Turnstile + PKCE “link broken” tickets | B-P1-0 | P1 |
-| OAuth missing with no explanation | B-P1-0b | P1 |
-| Literal `don&apos;t` on guest UI | B-P1-0c (`/marketplace` preview bullet) | P1 |
+Severity table mapping Guide’s walk → review IDs. Product frame: **artist↔fan SUPERFAN** (not Brand Engage).
+
+| # | Guide finding | Sev | ID | Paths / notes | Fix PR |
+|---|---------------|-----|----|---------------|--------|
+| 1 | Magic-link **SECURITY CHECK blank**; button stuck “Complete security check…”; password OK | **P0** | B-P0-5 | `turnstile-widget.tsx`, `login/page.tsx` — configured key + silent load/render failure → infinite disabled | **#11** |
+| 2 | Homepage “Create your fan profile →” → `/onboarding` paints wizard then → `/signup?next=/onboarding` | **P0** | B-P0-4 | `signed-out-landing.tsx`, `onboarding/page.tsx` | **#11** (CTA + interstitial) |
+| 3 | `/premium` RaeLynn-only feel + contradictory counters (“97 spots remaining of 100” vs “3 / 100 claimed”) | **P1** | B-P1-13 | `premium/page.tsx` banner + `founder-slots-counter.tsx` — math matches (3 claimed ⇒ 97 left) but **dual copy looks contradictory**; soft-launch is single-artist | open |
+| 4 | Literal `don&apos;t` on `/marketplace` | **P1** | B-P1-0c | JS string in preview bullets only (unsubscribe/billing/share JSX `&apos;` decode OK) | **#10 / #11** |
+| 5 | OAuth hidden — document for CS, **do not re-enable** | **P1** | B-P1-0b | signup/login — no guest “coming soon” on main | **#9 / #11** copy |
+| 6 | Nav **Community** silently → `/artists/raelynn/community` | **P1** | B-P1-14 | `layout.tsx` → `/community` → `community/route.ts` + `getSoleActiveArtistSlug()` | open — label “RaeLynn community” or chooser copy |
+| 7 | Horizontal overflow / clipped avatar @ 1280 | **P2** | B-P2-8 | layout/header avatar cluster | open |
+| 8 | “1 ACTIVE ARTISTS” grammar | **P2** | B-P2-9 | `signed-out-landing.tsx` ProofTile always plural | **#11** singular when 1 |
+| 9 | Forgot-password Turnstile vs PR #7 intent | **P2** | B-P2-10 | `forgot-password/page.tsx` **has** Turnstile — matches PR #7 (Turnstile on magic-link/signup/**forgot**, not password) | verify only |
+| 10 | Cookie banner covering hero | **P2** | B-P2-11 | `cookie-banner.tsx` fixed bottom on `/` | open — delay/position or hero padding |
+
+Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), magic-link PKCE support load (**B-P1-0**).
 
 ---
 
@@ -194,17 +203,23 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - **Fix:** (a) Show Accept on invite and on `/signup?invite=…`; (b) carry `invite=` on the signup CTA; (c) write `fanengage_ref` after Accept on signup; or treat invite attribution as essential with clear Cookie Policy copy. **Partial fix in #9.**
 
 #### B-P0-4. `/onboarding` paints the wizard then silently bounces to `/signup` (Guide CS — production)
-- **Paths:** `frontend/app/onboarding/page.tsx` (~139–153); also `frontend/app/onboarding/mission/page.tsx` (~59–61)
-- **Verified in code:** Client wizard mounts and renders immediately. `useEffect` calls `supabase.auth.getUser()`; if unauthenticated (or session incomplete/expired), `router.replace(/signup?next=…&ref=…)`. Deep links and landing CTAs that still point at `/onboarding` (or bookmarks / shared links) show a fake “onboarding started” moment, then yank first-timers to signup.
-- **Why it hurts SUPERFAN guests:** Feels broken (“the join flow crashed”), not “create an account first.” Confuses CS and first-timers on soft launch.
-- **Fix:** Do **not** render the wizard until auth is resolved. For signed-out visitors, show a clear interstitial: “Create your fan account first to join this artist’s experience” + primary **Create account** (`/signup?ref=…&next=/onboarding…`) + secondary **Sign in**. Optional: server-side redirect in a layout/page wrapper so HTML never includes the wizard for anon. Point marketing CTAs at `/signup?ref=raelynn` (related: B-P1-10).
+- **Paths:** `frontend/app/onboarding/page.tsx`; homepage CTAs in `frontend/components/signed-out-landing.tsx`; also `frontend/app/onboarding/mission/page.tsx`
+- **Verified in code + Guide walk:** Client wizard mounts immediately; `getUser()` then `router.replace(/signup?…)`. Homepage primary CTA linked to `/onboarding`, so first-timers see a fake join wizard then a yank to signup.
+- **Why it hurts SUPERFAN guests:** Feels broken (“the join flow crashed”), not “create an account first.”
+- **Fix:** (1) Homepage CTA → `/signup?ref=raelynn&next=/onboarding`. (2) Do **not** render the wizard until auth is resolved — signed-out interstitial “Create your fan account first.” **Shipped in #11.**
+
+#### B-P0-5. Magic-link Turnstile Security check blank / infinite disabled (Guide CS — production)
+- **Paths:** `frontend/components/turnstile-widget.tsx`; `frontend/app/login/page.tsx`
+- **Verified:** Production `/login` shows “Security check” label + empty area; magic-link button stuck on “Complete security check for magic link.” Password path works (no Turnstile). Root causes in widget: silent script/render failure, no timeout, no Retry UI, `isTurnstileConfigured()` still true so the button stays disabled over blank space. CSP already allows `challenges.cloudflare.com` (`next.config.ts`); also verify Cloudflare Turnstile hostname allowlist includes `fanengagepro.com`.
+- **Why:** Soft-launch returning fans who prefer magic-link hit a dead secondary door; CS can’t unblock without “use password.”
+- **Fix:** Visible loading + error + Retry; never leave blank infinite-disabled; button copy steers to password when unavailable; explicit Turnstile render. **Shipped in #11.** Keep password primary; do not Turnstile the password door.
 
 ### P1 — soft-launch friction / trust / mobile
 
 #### B-P1-0. Magic-link path: Turnstile + PKCE support load (Guide CS theme)
-- **Paths:** `frontend/app/login/page.tsx` (magic-link secondary); `frontend/components/turnstile-widget.tsx`; `frontend/app/auth/callback/route.ts`
-- **Why (Guide):** Returning fans who pick “Email me a magic link instead” must wait for Cloudflare Turnstile script load/complete before the button enables; each resend invalidates the prior PKCE link (“newest link wins”). Slow networks, cached Turnstile 503s, or impatient resends generate “link doesn’t work” tickets even when password login would have been fine.
-- **Fix:** Keep password primary (already done). Add a short loading state while Turnstile script injects (“Security check loading…”) instead of a dead button; surface cooldown + “use the newest link” more prominently after send; in CS macros, steer soft-launch fans to password + forgot-password first. Do not put Turnstile on the password door.
+- **Paths:** `frontend/app/login/page.tsx`; `frontend/components/turnstile-widget.tsx`; `frontend/app/auth/callback/route.ts`
+- **Why (Guide):** Even when the widget loads, fans must complete Turnstile; each resend invalidates the prior PKCE link (“newest link wins”) → “link doesn’t work” tickets.
+- **Fix:** Prefer password in CS macros; surface cooldown + newest-link copy; loading/error UI from B-P0-5. Do not put Turnstile on the password door.
 
 #### B-P1-0b. OAuth hidden with no guest-facing explanation (Guide CS theme)
 - **Paths:** `frontend/app/signup/signup-form.tsx` (OAuth block commented out until custom auth domain / G.4); login has no Google/Apple either
@@ -213,8 +228,18 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 #### B-P1-0c. Literal `don&apos;t` on marketplace preview (Guide CS — production)
 - **Path:** `frontend/app/marketplace/page.tsx` (PreviewSignupBanner `bullets` array) → rendered by `frontend/components/preview-signup-banner.tsx` as `{b}` text
-- **Why:** HTML entity `&apos;` was placed inside a **JS string**. React text children do not decode HTML entities, so signed-out guests on `/marketplace` see the literal characters `don&apos;t`. Matches Guide’s report near rewards/marketplace/premium/referrals (same preview-banner pattern; only marketplace had the bad string).
-- **Fix:** Use a real apostrophe in the string (`don't`). Prefer apostrophes/`'` in JS/TS strings; reserve `&apos;` for JSX text nodes only. **Fixed in #10.**
+- **Why:** HTML entity `&apos;` inside a **JS string** (not JSX text). React does not decode it. Repo scan: only marketplace guest path had this pattern; unsubscribe/billing/share/drop/admin setup use JSX `&apos;` which renders correctly as `'`.
+- **Fix:** Real apostrophe in JS strings. **#10 / #11.**
+
+#### B-P1-13. `/premium` dual founder counters look contradictory (Guide walk)
+- **Paths:** `frontend/app/premium/page.tsx` (“N spots remaining of 100”) + `frontend/app/premium/founder-slots-counter.tsx` (“X / 100 claimed”)
+- **Why:** For filled=3, remaining=97 both are true, but guests read them as two disagreeing systems. Soft-launch also feels RaeLynn-only (correct for single active artist) without saying so.
+- **Fix:** One counter source of truth (prefer “3 of 100 Founding Fan spots claimed · 97 left”); short line “Premium for RaeLynn’s fan experience” when sole active artist.
+
+#### B-P1-14. Nav Community silently lands on RaeLynn (Guide walk)
+- **Paths:** `frontend/app/layout.tsx` (`href: "/community"`); `frontend/app/community/route.ts` → `getPrimaryCommunityId()` / `getSoleActiveArtistSlug()` in `frontend/lib/data/fan.ts`
+- **Why:** Logged-out guests tap Community and appear inside RaeLynn with no chooser/copy — feels like a bug or hard-coded trap.
+- **Fix:** Soft-launch: nav label “RaeLynn” / “RaeLynn community”, or interstitial “Continue to RaeLynn’s community” before redirect.
 
 #### B-P1-1. Onboarding reads like an internal admin tool
 - **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Twilio/Mailchimp error copy
@@ -283,6 +308,23 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - **Why it hurts:** Soft-launch guests should feel they’re joining an artist’s SUPERFAN circle (drops, backstage, rewards) — not a generic membership club or Brand Engage–style loyalty program.
 - **Fix:** Prefer fan / Founding Fan / artist-community wording on public surfaces; reserve “member” for internal schema (`fan_community_memberships`) only.
 
+#### B-P2-8. Horizontal overflow / clipped avatar @ ~1280 (Guide walk)
+- **Why:** Header/nav avatar or proof row clips on mid-width desktops.
+- **Fix:** Audit `layout.tsx` header flex; allow wrap / shrink avatar; test 1280×800.
+
+#### B-P2-9. “1 ACTIVE ARTISTS” grammar (Guide walk)
+- **Path:** `frontend/components/signed-out-landing.tsx` ProofTile label always “Active artists”
+- **Fix:** Singular when count === 1. **#11.**
+
+#### B-P2-10. Forgot-password Turnstile vs PR #7 intent (Guide walk)
+- **Path:** `frontend/app/forgot-password/page.tsx`
+- **Status:** Turnstile **is present** — matches PR #7 / `3022e389` (Turnstile on signup, magic-link, **forgot**; password door captcha-free). No change required; document for CS.
+
+#### B-P2-11. Cookie banner covering hero (Guide walk)
+- **Path:** `frontend/components/cookie-banner.tsx` fixed bottom on `/`
+- **Why:** Accept chip overlaps hero CTA on mobile/short viewports.
+- **Fix:** Extra bottom padding on hero while banner shown, or non-overlapping placement.
+
 #### B-P2-2. Dev-facing empty copy on artist page
 - “Hero imagery pending Box asset drop.” / “Social links pending.”
 
@@ -326,13 +368,14 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 - [ ] Confirm Supabase email confirm template preserves `/auth/callback?next=…` (B-P0-2)
 
 **Must before driving guest signup traffic (hard for “excellent” first experience):**
-- [ ] Signup always completes onboarding before `?next=` destinations (B-P0-1)
-- [ ] `/onboarding` signed-out: interstitial, no wizard flash / silent bounce (B-P0-4) — Guide CS
+- [ ] **Merge #11** — blank magic-link Turnstile + homepage/onboarding CTA (B-P0-5, B-P0-4)
+- [ ] Signup always completes onboarding before `?next=` destinations (B-P0-1) — see #9
 - [ ] Invite credit after cookie Accept path works end-to-end (B-P0-3) — Guide CS
-- [ ] Guest-facing “email signup only for now” where OAuth is hidden (B-P1-0b) — Guide CS
-- [ ] Magic-link Turnstile loading/PKCE copy clear enough for CS macros (B-P1-0) — Guide CS
+- [ ] Guest-facing “email signup only for now” where OAuth is hidden (B-P1-0b) — Guide CS / #11
+- [ ] Magic-link Turnstile never blank-disabled; CS macros prefer password (B-P0-5, B-P1-0)
+- [ ] Confirm Turnstile hostname allowlist includes `fanengagepro.com`
 - [ ] Reset-password expired-link UX (B-P1-9)
-- [ ] Cookie banner does not cover forgot/reset/onboarding CTAs (B-P1-4)
+- [ ] Cookie banner does not cover forgot/reset/onboarding CTAs or hero (B-P1-4, B-P2-11)
 - [ ] Signed-out premium/rewards CTAs prefer Create account (B-P1-7, B-P1-8)
 - [ ] Published legal/rewards terms for consent modal (B-P1-11)
 - [ ] Twilio fail-closed + `NEXT_PUBLIC_APP_URL` aligned (A-P1-1, A-P1-2)
@@ -354,16 +397,16 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 ## Top 10 guest-experience fixes (by impact)
 
-1. **`/onboarding` signed-out interstitial (no wizard flash)** — Guide CS production report; stops “broken join” bounce (B-P0-4).
-2. **Never skip onboarding for `?next=`** — preserves the promised first 100 points and profile (B-P0-1).
-3. **Guarantee email-confirm lands on onboarding when profile incomplete** — closes the silent home dead-end (B-P0-2).
+1. **Magic-link Turnstile blank → loading/error/Retry** — Guide P0; never infinite-disabled blank (B-P0-5) → **#11**.
+2. **Homepage CTA + `/onboarding` interstitial** — Guide P0; no wizard flash-bounce (B-P0-4) → **#11**.
+3. **Never skip onboarding for `?next=`** — preserves the promised first 100 points (B-P0-1).
 4. **Invite credit after cookie Accept** — influencer/fan invite links actually credit (B-P0-3).
-5. **Signed-out Premium / rewards CTAs → Create account first** — stops sending new fans to the returning-fan door (B-P1-7, B-P1-8).
-6. **OAuth-hidden + magic-link Turnstile/PKCE support clarity** — fewer “where’s Google?” / “link broken” tickets (B-P1-0, B-P1-0b).
-7. **Reset-password expired session state** — recovers forgot-password edge cases (B-P1-9).
-8. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (artist/drops/rewards), not demo/ops (B-P1-1, B-P1-2).
-9. **Sticky mobile Join on artist hub** — keeps the primary conversion CTA visible (B-P1-6).
-10. **Artist empty states + SUPERFAN/fan language** — artist hub feels like a fan experience, not a brand program (B-P1-12, B-P2-1).
+5. **Unify `/premium` founder counter copy** — stop “97 remaining” vs “3 claimed” confusion (B-P1-13).
+6. **Nav Community explicit for soft launch** — “RaeLynn community” not silent redirect (B-P1-14).
+7. **OAuth-hidden messaging + password-first CS macros** — document, do not re-enable (B-P1-0b).
+8. **Marketplace `don't` + JS-string apostrophe hygiene** (B-P1-0c) → **#10/#11**.
+9. **Fan-facing onboarding + single Finish path** — SUPERFAN tone (B-P1-1, B-P1-2).
+10. **Cookie/hero + 1280 overflow polish** (B-P2-11, B-P2-8).
 
 ---
 
@@ -371,11 +414,12 @@ Soft-launch entry (docs): `/signup?ref=raelynn` — see `docs/RAELYNN_PRELAUNCH_
 
 | PR | Contents |
 |----|----------|
-| [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Onboarding-always; cookie hide list; reset-password guard; paywall/rewards signup CTAs; invite attribution; Turnstile fail-closed honor; `/onboarding` signed-out interstitial (Guide); OAuth-hidden messaging |
-| [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | Marketplace preview bullet `don&apos;t` → `don't` (B-P1-0c) |
-| Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check migration; membership update lockdown |
-| Ops P1 (not yet opened) | Twilio fail-closed; `.env.example`; founder reward gate |
+| **[#11](https://github.com/JonasGroupEntertainment/fan-engage/pull/11) Guide P0 Turnstile + onboarding CTA** | Blank magic-link Security check fix; homepage → signup; onboarding interstitial; marketplace apostrophe; singular artist tile |
+| [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Broader funnel (onboarding-always next, invite, paywall CTAs, reset-password, cookie hide) — overlaps #11 on interstitial |
+| [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | Marketplace-only (superseded if #11 merges first) |
+| Premium/Community P1 (not yet opened) | Unify founder counters (B-P1-13); Community nav label (B-P1-14) |
+| Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check; membership update lockdown |
 
 ---
 
-*Generated from repository inspection at `3022e389`. Re-smoke production after merging companion fix PRs.*
+*Generated from repository inspection at `3022e389` + Guide logged-out production walk. Re-smoke `fanengagepro.com` after merging #11.*
