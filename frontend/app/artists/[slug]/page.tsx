@@ -130,7 +130,7 @@ export default async function ArtistPage({
 
   const secondaryCta = isSignedIn
     ? { label: "My rewards", href: "/rewards" }
-    : { label: "See merchandise", href: "/marketplace" };
+    : { label: "Browse marketplace drops", href: "/marketplace" };
 
   const headerList = await headers();
   const host =
@@ -242,7 +242,7 @@ export default async function ArtistPage({
                 rel="noreferrer noopener"
                 className="rounded-full border border-white/30 bg-black/30 px-6 py-3 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/10"
               >
-                🛍 Shop merch ↗
+                🛍 Official store ↗
               </a>
             )}
           </div>

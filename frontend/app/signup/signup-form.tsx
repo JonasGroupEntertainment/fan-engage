@@ -43,8 +43,17 @@ export function SignupForm({
   // anything else would be an open redirect.
   const rawNext = searchParams.get("next");
   const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
-  const onboardingHref =
-    next ?? (ref ? `/onboarding?ref=${encodeURIComponent(ref)}` : "/onboarding");
+  // Always complete onboarding (signup bonus + profile). Carry ?next= as a
+  // post-Finish return path — never skip the wizard.
+  const onboardingParams = new URLSearchParams();
+  if (ref) onboardingParams.set("ref", ref);
+  if (next && !next.startsWith("/onboarding")) {
+    onboardingParams.set("next", next);
+  }
+  const onboardingQs = onboardingParams.toString();
+  const onboardingHref = onboardingQs ? `/onboarding?${onboardingQs}` : "/onboarding";
+  const fromOnboardingBounce =
+    next === "/onboarding" || (rawNext?.startsWith("/onboarding") ?? false);
   const loginHref =
     onboardingHref === "/onboarding"
       ? "/login"
@@ -311,6 +320,21 @@ export function SignupForm({
             (e.g. auth.fanengage.com) and the Google OAuth client's
             redirect URIs point at the new domain. The original block
             in git history at the commit before this one. */}
+        <p className="text-xs text-white/50">
+          Google &amp; Apple sign-in coming soon — create your fan account with
+          email for now.
+        </p>
+
+        {fromOnboardingBounce && (
+          <div className="rounded-2xl border border-aurora/30 bg-aurora/10 px-4 py-3 text-sm text-white/85">
+            <p className="font-medium text-white">Create your fan account first</p>
+            <p className="mt-1 text-xs text-white/70">
+              Nothing&apos;s lost — after you confirm your email you&apos;ll finish your
+              profile (about a minute), then jump into the artist experience with your
+              signup points.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <label className="block space-y-1">
@@ -450,16 +474,17 @@ export function SignupForm({
           </p>
         )}
 
-        <p className="text-center text-xs text-white/50">
+        <p className="text-center text-xs text-white/55">
           By creating an account, you agree to our{" "}
-          <Link href="/terms" className="underline-offset-4 hover:underline hover:text-white/60">
-            Terms
+          <Link href="/terms" className="text-white/80 underline underline-offset-4 hover:text-white">
+            Terms of Service
           </Link>{" "}
           and{" "}
-          <Link href="/privacy" className="underline-offset-4 hover:underline hover:text-white/60">
+          <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">
             Privacy Policy
           </Link>
-          .
+          . We may email a weekly fan digest and product updates — you can
+          manage email preferences anytime after signup.
         </p>
         <p className="text-center text-sm text-white/60">
           Already have an account?{" "}

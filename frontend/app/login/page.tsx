@@ -220,8 +220,10 @@ function LoginForm() {
 
         <div className="space-y-3 border-t border-white/10 pt-5">
           <p className="text-xs text-white/50">
-            Prefer a passwordless email link? Complete the security check, then we&apos;ll
-            send one. Use the newest link — each request invalidates the previous one.
+            Prefer a passwordless email link? We&apos;ll send it to the{" "}
+            <span className="text-white/70">Email address above</span>. Complete the
+            security check, then send. Use the newest link — each request invalidates
+            the previous one.
           </p>
 
           {turnstileConfigured && (
@@ -235,6 +237,16 @@ function LoginForm() {
                 onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
               />
+              {turnstileLoadState === "error" && (
+                <p className="text-xs text-rose-200">
+                  Security check didn&apos;t load. Tap <span className="font-medium">Retry</span>{" "}
+                  above, or use <span className="font-medium">password sign-in</span> /{" "}
+                  <Link href="/forgot-password" className="underline hover:text-white">
+                    Forgot password
+                  </Link>
+                  .
+                </p>
+              )}
               {turnstileError && turnstileLoadState !== "error" && (
                 <p className="text-xs text-rose-300">
                   Security check failed. Retry above, or sign in with your password.
@@ -258,7 +270,7 @@ function LoginForm() {
                   : turnstileConfigured && turnstileLoadState === "error"
                     ? "Use password sign-in — security check unavailable"
                     : turnstileConfigured && !turnstileToken
-                      ? "Complete security check for magic link"
+                      ? "Complete security check above, then email magic link"
                       : "Email me a magic link instead"}
           </button>
         </div>
