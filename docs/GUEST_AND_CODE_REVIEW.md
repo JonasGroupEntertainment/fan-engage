@@ -64,16 +64,29 @@ Severity table mapping Guide’s walk → review IDs. Product frame: **artist↔
 
 | # | Guide finding | Sev | ID | Paths / notes | Fix PR |
 |---|---------------|-----|----|---------------|--------|
-| 1 | Magic-link **SECURITY CHECK blank**; button stuck “Complete security check…”; password OK | **P0** | B-P0-5 | `turnstile-widget.tsx`, `login/page.tsx` — configured key + silent load/render failure → infinite disabled | **#11** |
-| 2 | Homepage “Create your fan profile →” → `/onboarding` paints wizard then → `/signup?next=/onboarding` | **P0** | B-P0-4 | `signed-out-landing.tsx`, `onboarding/page.tsx` | **#11** (CTA + interstitial) |
-| 3 | `/premium` RaeLynn-only feel + contradictory counters (“97 spots remaining of 100” vs “3 / 100 claimed”) | **P1** | B-P1-13 | `premium/page.tsx` banner + `founder-slots-counter.tsx` — math matches (3 claimed ⇒ 97 left) but **dual copy looks contradictory**; soft-launch is single-artist | open |
-| 4 | Literal `don&apos;t` on `/marketplace` | **P1** | B-P1-0c | JS string in preview bullets only (unsubscribe/billing/share JSX `&apos;` decode OK) | **#10 / #11** |
-| 5 | OAuth hidden — document for CS, **do not re-enable** | **P1** | B-P1-0b | signup/login — no guest “coming soon” on main | **#9 / #11** copy |
-| 6 | Nav **Community** silently → `/artists/raelynn/community` | **P1** | B-P1-14 | `layout.tsx` → `/community` → `community/route.ts` + `getSoleActiveArtistSlug()` | open — label “RaeLynn community” or chooser copy |
-| 7 | Horizontal overflow / clipped avatar @ 1280 | **P2** | B-P2-8 | layout/header avatar cluster | open |
-| 8 | “1 ACTIVE ARTISTS” grammar | **P2** | B-P2-9 | `signed-out-landing.tsx` ProofTile always plural | **#11** singular when 1 |
-| 9 | Forgot-password Turnstile vs PR #7 intent | **P2** | B-P2-10 | `forgot-password/page.tsx` **has** Turnstile — matches PR #7 (Turnstile on magic-link/signup/**forgot**, not password) | verify only |
-| 10 | Cookie banner covering hero | **P2** | B-P2-11 | `cookie-banner.tsx` fixed bottom on `/` | open — delay/position or hero padding |
+| 1 | Magic-link **SECURITY CHECK blank**; button stuck; password OK | **P0** | B-P0-5 | `turnstile-widget.tsx`, `login/page.tsx` | **#11** |
+| 2 | Homepage CTA → `/onboarding` wizard flash → signup | **P0** | B-P0-4 | `signed-out-landing.tsx`, `onboarding/page.tsx` | **#11** |
+| 3 | `/premium` RaeLynn-only + dual founder counters | **P1** | B-P1-13 | banner + `founder-slots-counter.tsx` | open |
+| 4 | Literal `don&apos;t` on `/marketplace` (**still live on prod** until merge) | **P1** | B-P1-0c | JS string in preview bullets; fixed in #11 branch | **#10 / #11** |
+| 5 | OAuth hidden — document for CS, **do not re-enable** | **P1** | B-P1-0b | signup/login | **#11** copy |
+| 6 | Nav **Community** silently → RaeLynn community | **P1** | B-P1-14 | `community/route.ts` | open |
+| 7 | Horizontal overflow / clipped avatar @ 1280 | **P2** | B-P2-8 | header | open |
+| 8 | “1 ACTIVE ARTISTS” grammar | **P2** | B-P2-9 | ProofTile | **#11** |
+| 9 | Forgot-password Turnstile | **P2** | B-P2-10 | **Present in code** (`forgot-password/page.tsx`); first walk “missing” was **flaky** — do not claim absent | **#11** load/retry UX |
+| 10 | Cookie banner covering hero | **P2** | B-P2-11 | `cookie-banner.tsx` | open |
+
+#### Guide re-run deltas (clarified P1–P2)
+
+| # | Finding | Sev | ID | Eng / fix |
+|---|---------|-----|----|-----------|
+| R1 | Magic-link disabled copy with **no separate email field** — unclear it uses password EMAIL above; need recovery when Turnstile blank | **P1** | B-P1-15 | **#11** — “email address above” + Retry / password / forgot recovery |
+| R2 | Signup consent: Privacy less obvious than Terms; onboarding mentions weekly digest but signup lacks marketing-email cue | **P1** | B-P1-16 | **#11** — always-underlined Terms + Privacy; digest/opt-out cue on signup |
+| R3 | Artist merch confusion: “See merchandise” → `/marketplace` vs “Shop merch ↗” → Shopify | **P1** | B-P1-17 | **#11** — “Browse marketplace drops” vs “Official store ↗” |
+| R4 | CTA vocabulary sprawl (Join / Create fan profile / Create account / …) | **P2** | B-P2-12 | Recommend soft-launch glossary; no mass rename in #11 |
+| R5 | Onboarding flash → signup with **no explanatory banner** | **P1** | B-P1-18 | **#11** — banner when `next=/onboarding` |
+| R6 | Marketplace `don&apos;t` still live on prod | **P1** | B-P1-0c | Must merge **#11** (or #10); already fixed on branch |
+
+**P0 unchanged:** Turnstile blank/stuck + onboarding CTA/flash.
 
 Earlier Guide themes still in force: invite credit after Accept (**B-P0-3**), magic-link PKCE support load (**B-P1-0**).
 
@@ -344,14 +357,38 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 - **Path:** `frontend/components/signed-out-landing.tsx` ProofTile label always “Active artists”
 - **Fix:** Singular when count === 1. **#11.**
 
-#### B-P2-10. Forgot-password Turnstile vs PR #7 intent (Guide walk)
+#### B-P2-10. Forgot-password Turnstile vs PR #7 intent (Guide walk + re-run correction)
 - **Path:** `frontend/app/forgot-password/page.tsx`
-- **Status:** Turnstile **is present** — matches PR #7 / `3022e389` (Turnstile on signup, magic-link, **forgot**; password door captcha-free). No change required; document for CS.
+- **Status (code-verified):** Turnstile widget **is present** and matches PR #7 / `3022e389` (Turnstile on signup, magic-link, **forgot**; password door captcha-free). First walk “missing” was **flaky** (same blank-widget class as B-P0-5) — **do not claim absent** without re-checking. **#11** shares load/error/Retry UX with login.
 
 #### B-P2-11. Cookie banner covering hero (Guide walk)
 - **Path:** `frontend/components/cookie-banner.tsx` fixed bottom on `/`
 - **Why:** Accept chip overlaps hero CTA on mobile/short viewports.
 - **Fix:** Extra bottom padding on hero while banner shown, or non-overlapping placement.
+
+#### B-P1-15. Magic-link UX: shared email field + recovery copy (Guide re-run)
+- **Path:** `frontend/app/login/page.tsx`
+- **Why:** Disabled “Complete security check…” sits under the password form with **no second email field** — fans think magic-link needs its own email. When Turnstile is blank, they need Retry / password / forgot guidance.
+- **Fix:** Explicit “we’ll send it to the email address above”; recovery copy on widget error. **#11.**
+
+#### B-P1-16. Signup consent / digest consistency (Guide re-run)
+- **Paths:** `frontend/app/signup/signup-form.tsx`; onboarding weekly-digest copy in `frontend/app/onboarding/page.tsx`
+- **Why:** Privacy Policy looked less linked than Terms; onboarding mentions weekly digest but signup had no marketing-email cue.
+- **Fix:** Equal always-underlined Terms + Privacy; short digest/preferences cue on signup. **#11.**
+
+#### B-P1-17. Artist page merch CTA collision (Guide re-run)
+- **Path:** `frontend/app/artists/[slug]/page.tsx` — “See merchandise” → `/marketplace` vs “Shop merch ↗” → `raelynnshop.myshopify.com`
+- **Why:** Near-identical labels, different destinations (fan drops vs official store).
+- **Fix:** “Browse marketplace drops” vs “Official store ↗”. **#11.**
+
+#### B-P1-18. Signup needs banner after onboarding bounce (Guide re-run)
+- **Path:** `frontend/app/signup/signup-form.tsx` when `next=/onboarding`
+- **Why:** Even after interstitial, landing on signup with no explanation feels like a dead redirect.
+- **Fix:** Banner: “Create your fan account first… then finish profile.” **#11.**
+
+#### B-P2-12. CTA vocabulary sprawl (Guide re-run)
+- Join / Create fan profile / Create account / Join the Fan Experience / Sign up free — soft-launch inconsistency.
+- **Fix (recommendation):** Soft-launch glossary — primary = **Create account** / **Join**; secondary = Sign in. Mass rename out of #11 scope.
 
 #### B-P2-2. Dev-facing empty copy on artist page
 - “Hero imagery pending Box asset drop.” / “Social links pending.”
@@ -442,7 +479,7 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 
 | PR | Contents |
 |----|----------|
-| **[#11](https://github.com/JonasGroupEntertainment/fan-engage/pull/11) Guide P0 Turnstile + onboarding CTA** | Blank magic-link Security check fix; homepage → signup; onboarding interstitial; marketplace apostrophe; singular artist tile |
+| **[#11](https://github.com/JonasGroupEntertainment/fan-engage/pull/11) Guide P0 + re-run polish** | Turnstile blank/retry; homepage → signup; onboarding interstitial; signup banner when `next=/onboarding`; magic-link email-field clarity; merch CTA rename; Privacy/digest cues; marketplace `don't`; forgot-password Turnstile load UX; singular artist tile |
 | [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Broader funnel (onboarding-always next, invite, paywall CTAs, reset-password, cookie hide) — overlaps #11 on interstitial |
 | [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | Marketplace-only (superseded if #11 merges first) |
 | Premium/Community P1 (not yet opened) | Unify founder counters (B-P1-13); Community nav label (B-P1-14) |
