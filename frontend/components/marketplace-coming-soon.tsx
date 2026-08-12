@@ -19,9 +19,9 @@ export default function MarketplaceComingSoon({
         {artistName} drops — coming soon
       </h1>
       <p className="mt-4 max-w-xl text-sm text-white/75 leading-relaxed">
-        We&apos;re lining up fan-only merch and experiences for {artistName}&apos;s
-        fan experience. The marketplace isn&apos;t open for soft launch yet —
-        check back soon. Earn points in the community and rewards in the meantime.
+        The marketplace isn&apos;t open for soft launch yet — you&apos;ll see Coming
+        soon here. Create your fan profile and earn points so you&apos;re ready when{" "}
+        {artistName}&apos;s merch and drops go live.
       </p>
       <ul className="mt-5 space-y-2 text-sm text-white/70">
         <li className="flex items-start gap-2">
