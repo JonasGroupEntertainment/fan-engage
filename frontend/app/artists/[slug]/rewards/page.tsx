@@ -52,7 +52,11 @@ export default async function RewardsPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return redirect(`/login?next=/artists/${slug}/rewards`);
+    // Soft-launch: new fans following a rewards link should hit signup, not
+    // the returning-fan login door. Carry next so onboarding can return here.
+    return redirect(
+      `/signup?ref=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/artists/${slug}/rewards`)}`,
+    );
   }
 
   const artist = await getArtistFromDb(slug);

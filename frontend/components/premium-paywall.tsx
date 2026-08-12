@@ -37,15 +37,20 @@ export default function PremiumPaywall({
   const from = accentFrom ?? "#7c3aed";
   const to = accentTo ?? "#fb923c";
 
-  const ctaHref = reason === "signed-out"
-    ? `/login?next=${encodeURIComponent(`/premium${communityId ? `?c=${communityId}` : ""}`)}`
-    : "/premium";
+  const premiumPath = `/premium${communityId ? `?c=${communityId}` : ""}`;
+  const signupHref = communityId
+    ? `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumPath)}`
+    : `/signup?next=${encodeURIComponent(premiumPath)}`;
+  const loginHref = `/login?next=${encodeURIComponent(premiumPath)}`;
+  // Soft-launch guests hit gated content before they have an account —
+  // primary CTA is Create account; Sign in is secondary for returners.
+  const ctaHref = reason === "signed-out" ? signupHref : "/premium";
 
   let ctaLabel: string;
   let featureCopy: string;
 
   if (reason === "signed-out") {
-    ctaLabel = "Sign in to unlock";
+    ctaLabel = "Create account to unlock";
     featureCopy = `${feature} is for Premium fans`;
   } else if (reason === "needs-founder") {
     ctaLabel = "Become a Founding Fan";
@@ -79,7 +84,7 @@ export default function PremiumPaywall({
           className="flex-none rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-glass transition hover:brightness-110"
           style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
         >
-          {reason === "signed-out" ? "Sign in" : reason === "needs-founder" ? "Founders" : "Upgrade"}
+          {reason === "signed-out" ? "Join" : reason === "needs-founder" ? "Founders" : "Upgrade"}
         </Link>
       </div>
     );
@@ -97,7 +102,7 @@ export default function PremiumPaywall({
               {reason === "needs-founder"
                 ? "Founders only — the first 100 paying fans"
                 : reason === "signed-out"
-                  ? "Sign in to unlock Premium"
+                  ? "Join to unlock Premium"
                   : "Upgrade to Premium"}
             </p>
             <h3 className="mt-2 text-lg font-bold text-white">{featureCopy}</h3>
@@ -136,13 +141,23 @@ export default function PremiumPaywall({
           )}
         </div>
 
-        <Link
-          href={ctaHref}
-          className="inline-block rounded-full px-5 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
-          style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
-        >
-          {ctaLabel}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={ctaHref}
+            className="inline-block rounded-full px-5 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
+            style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
+          >
+            {ctaLabel}
+          </Link>
+          {reason === "signed-out" && (
+            <Link
+              href={loginHref}
+              className="text-sm text-white/70 underline-offset-2 hover:text-white hover:underline"
+            >
+              Already a fan? Sign in
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   );

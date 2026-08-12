@@ -10,6 +10,10 @@ import {
   turnstileFailureMessage,
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
+import {
+  COOKIE_CONSENT_EVENT,
+  hasAcceptedCookieConsent,
+} from "@/components/cookie-banner";
 import { ConsentModal, type ConsentDoc } from "@/components/consent-modal";
 
 export type ReferrerArtist = {
@@ -35,6 +39,7 @@ export function SignupForm({
   const searchParams = useSearchParams();
   const community = searchParams.get("community");
   const ref = searchParams.get("ref");
+  const inviteCode = searchParams.get("invite");
   // Where to send the user after a successful signup. Preserve any
   // ?ref=<artist-slug> attribution from the artist-page Join CTA so the
   // welcome flow knows which fan experience they came from.
@@ -99,6 +104,20 @@ export function SignupForm({
       if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     };
   }, []);
+
+  // Invite deep-links: write fanengage_ref after cookie Accept (same gate as
+  // /invite/[code]), so attribution survives invite → signup without Accept.
+  useEffect(() => {
+    if (!inviteCode) return;
+    function writeRefCookie() {
+      if (!hasAcceptedCookieConsent()) return;
+      const maxAge = 60 * 60 * 24 * 30;
+      document.cookie = `fanengage_ref=${encodeURIComponent(inviteCode)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    }
+    writeRefCookie();
+    window.addEventListener(COOKIE_CONSENT_EVENT, writeRefCookie);
+    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, writeRefCookie);
+  }, [inviteCode]);
 
   function startConfirmCooldown() {
     setConfirmCooldown(CONFIRM_COOLDOWN_SECONDS);
