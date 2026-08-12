@@ -123,16 +123,16 @@ export default async function ArtistCommunityPage({
           </p>
           <div className="mt-3 flex gap-2">
             <Link
-              href={`/login?next=/artists/${slug}/community`}
-              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10"
-            >
-              Sign in
-            </Link>
-            <Link
               href={`/signup?ref=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/artists/${slug}/community`)}`}
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-xs font-semibold text-white shadow-glass"
             >
               Create account
+            </Link>
+            <Link
+              href={`/login?next=/artists/${slug}/community`}
+              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10"
+            >
+              Sign in
             </Link>
           </div>
         </section>

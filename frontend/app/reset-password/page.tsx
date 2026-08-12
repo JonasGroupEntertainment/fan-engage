@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -8,8 +9,18 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [sessionState, setSessionState] = useState<"checking" | "ready" | "missing">(
+    "checking",
+  );
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "done">("idle");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSessionState(session ? "ready" : "missing");
+    });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +49,45 @@ export default function ResetPasswordPage() {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to update password.");
     }
+  }
+
+  if (sessionState === "checking") {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-6 py-12">
+        <div className="glass-card p-8 text-center text-sm text-white/60">Loading…</div>
+      </main>
+    );
+  }
+
+  if (sessionState === "missing") {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
+        <div className="glass-card space-y-6 p-8">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-wide text-white/60">Fan Engage</p>
+            <h1 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              Reset link expired
+            </h1>
+            <p className="text-sm text-white/70">
+              This password reset link is invalid or has already been used. Request a new
+              one and open it in the same browser.
+            </p>
+          </div>
+          <Link
+            href="/forgot-password"
+            className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass"
+          >
+            Request a new reset link
+          </Link>
+          <p className="text-center text-sm text-white/60">
+            Remember your password?{" "}
+            <Link href="/login" className="text-white underline-offset-4 hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (

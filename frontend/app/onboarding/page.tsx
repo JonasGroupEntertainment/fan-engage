@@ -373,13 +373,24 @@ export default function OnboardingWizard() {
         }).catch((err) => console.warn("Twilio SMS did not complete:", err));
       }
 
-      // If the fan came in through an artist page, land them directly on
-      // that artist with the welcome celebration instead of the generic
-      // mission page — the artist page IS the product they signed up for.
+      // Prefer the artist welcome celebration (first points moment). If signup
+      // carried an explicit in-app destination (community / rewards / premium),
+      // honor that after onboard so preview-banner funnels still land correctly.
       const onboardData = (await onboardRes.json().catch(() => null)) as
         | { communityJoined?: string | null }
         | null;
-      if (onboardData?.communityJoined) {
+      const rawReturn =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
+      const returnTo =
+        rawReturn && rawReturn.startsWith("/") && !rawReturn.startsWith("//")
+          ? rawReturn
+          : null;
+
+      if (returnTo) {
+        router.push(returnTo);
+      } else if (onboardData?.communityJoined) {
         router.push(`/artists/${onboardData.communityJoined}?welcome=1`);
       } else {
         router.push("/onboarding/mission");

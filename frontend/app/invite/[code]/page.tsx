@@ -43,9 +43,11 @@ export default async function InvitePage({
   if (!inviter) notFound();
 
   const inviterName = inviter.firstName ?? "A Fan Engage fan";
-  const signupHref = artist
-    ? `/signup?ref=${encodeURIComponent(artist.slug)}`
-    : "/signup";
+  // Carry the invite code onto signup so fanengage_ref can still be written
+  // after Accept if the guest skipped the banner on this page.
+  const signupParams = new URLSearchParams({ invite: code });
+  if (artist) signupParams.set("ref", artist.slug);
+  const signupHref = `/signup?${signupParams.toString()}`;
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-3xl flex-col justify-center gap-6 px-6 py-12">
