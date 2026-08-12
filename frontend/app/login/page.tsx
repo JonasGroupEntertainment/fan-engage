@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
+  isTurnstileConfigured,
   turnstileFailureMessage,
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
@@ -36,6 +37,7 @@ function LoginForm() {
   const signupHref =
     next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`;
 
+  const turnstileConfigured = isTurnstileConfigured();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Surface errors passed back by /auth/callback (e.g. a failed or
@@ -89,17 +91,11 @@ function LoginForm() {
     }, 1000);
   }
 
+  // Primary door: email + password. No Turnstile — least-confused path.
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
     setMessage("");
-    const captcha = await verifyTurnstileToken(turnstileToken);
-    resetChallenge();
-    if (!captcha.success) {
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      return;
-    }
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -112,11 +108,17 @@ function LoginForm() {
     }
   }
 
+  // Secondary door: magic link. Turnstile only on this path.
   async function handleMagicLink() {
     if (magicLinkCooldown > 0) return;
     if (!email) {
       setStatus("error");
       setMessage("Enter an email first.");
+      return;
+    }
+    if (turnstileConfigured && !turnstileToken) {
+      setStatus("error");
+      setMessage("Complete the security check below, then send a magic link.");
       return;
     }
     setStatus("loading");
@@ -140,7 +142,7 @@ function LoginForm() {
       if (error) throw error;
       setStatus("magic-sent");
       setMessage(
-        "Magic link sent. Check your email — use the newest link, since requesting another one invalidates it.",
+        "Magic link sent. Check your email — use the newest link; requesting another one invalidates the previous one.",
       );
       startMagicLinkCooldown();
     } catch (err) {
@@ -148,6 +150,11 @@ function LoginForm() {
       setMessage(err instanceof Error ? err.message : "Unable to send magic link.");
     }
   }
+
+  const magicLinkDisabled =
+    status === "loading" ||
+    magicLinkCooldown > 0 ||
+    (turnstileConfigured && !turnstileToken);
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
@@ -157,7 +164,7 @@ function LoginForm() {
           <h1 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
             Welcome back
           </h1>
-          <p className="text-sm text-white/70">Sign in to access your rewards and perks.</p>
+          <p className="text-sm text-white/70">Sign in with your email and password.</p>
         </div>
 
         <form onSubmit={handlePassword} className="space-y-4">
@@ -201,35 +208,45 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-white/50">
-          <div className="h-px flex-1 bg-white/10" />
-          or
-          <div className="h-px flex-1 bg-white/10" />
+        <div className="space-y-3 border-t border-white/10 pt-5">
+          <p className="text-xs text-white/50">
+            Prefer a passwordless email link? Complete the security check, then we&apos;ll
+            send one. Use the newest link — each request invalidates the previous one.
+          </p>
+
+          {turnstileConfigured && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-white/45">Security check</p>
+              <TurnstileWidget
+                key={turnstileKey}
+                onSuccess={handleTurnstileSuccess}
+                onError={handleTurnstileError}
+                onExpire={handleTurnstileExpire}
+                theme="dark"
+              />
+              {turnstileError && (
+                <p className="text-xs text-rose-300">
+                  Security check failed. Please refresh and try again.
+                </p>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleMagicLink}
+            disabled={magicLinkDisabled}
+            className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm font-medium text-white/70 hover:bg-white/5 disabled:opacity-50"
+          >
+            {magicLinkCooldown > 0
+              ? `Resend magic link in ${magicLinkCooldown}s`
+              : status === "magic-sent"
+                ? "Resend magic link"
+                : turnstileConfigured && !turnstileToken
+                  ? "Complete security check for magic link"
+                  : "Email me a magic link instead"}
+          </button>
         </div>
-
-        <TurnstileWidget
-          key={turnstileKey}
-          onSuccess={handleTurnstileSuccess}
-          onError={handleTurnstileError}
-          onExpire={handleTurnstileExpire}
-          theme="dark"
-        />
-        {turnstileError && (
-          <p className="text-xs text-rose-300">Security check failed. Please refresh and try again.</p>
-        )}
-
-        <button
-          type="button"
-          onClick={handleMagicLink}
-          disabled={status === "loading" || magicLinkCooldown > 0}
-          className="w-full rounded-full border border-white/20 px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10 disabled:opacity-60"
-        >
-          {magicLinkCooldown > 0
-            ? `Resend magic link in ${magicLinkCooldown}s`
-            : status === "magic-sent"
-              ? "Resend magic link"
-              : "Send me a magic link"}
-        </button>
 
         {message && (
           <p

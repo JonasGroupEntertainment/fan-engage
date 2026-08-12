@@ -39,14 +39,23 @@ function formatPts(n: number | null | undefined) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; next?: string }>;
 }) {
   // Supabase's default email templates point the confirmation link at
   // `{SITE_URL}?code=...` — i.e., the root — instead of `/auth/callback`.
   // Forward any code to the real callback route so sessions actually complete.
+  // Preserve an explicit ?next= when present; otherwise default to "/" so
+  // returning fans aren't forced through onboarding.
   const params = await searchParams;
   if (params.code) {
-    redirect(`/auth/callback?code=${encodeURIComponent(params.code)}&next=/onboarding`);
+    const rawNext = params.next;
+    const next =
+      rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+        ? rawNext
+        : "/";
+    redirect(
+      `/auth/callback?code=${encodeURIComponent(params.code)}&next=${encodeURIComponent(next)}`,
+    );
   }
 
   // First pass: just fetch the fan. If signed-out, render the marketing

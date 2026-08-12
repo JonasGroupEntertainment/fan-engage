@@ -34,6 +34,11 @@ const MAX_SCRIPT_RETRIES = 3;
 
 let scriptRequested = false;
 
+/** True when a Turnstile site key is configured (widget will render). */
+export function isTurnstileConfigured(): boolean {
+  return Boolean(SITE_KEY);
+}
+
 // Retries with a cache-busting param: during a Cloudflare outage the browser
 // can cache the 503 for the script URL, which would otherwise block every
 // login until a hard refresh.
@@ -104,6 +109,7 @@ export function TurnstileWidget({ onSuccess, onError, onExpire, theme = "dark" }
 export interface TurnstileVerifyResult {
   success: boolean;
   error?: string;
+  failedOpen?: boolean;
 }
 
 // Call this from a form submit handler to verify the token server-side.
@@ -113,6 +119,10 @@ export interface TurnstileVerifyResult {
 // whether it succeeds or fails — the token is spent, and the caller must
 // remount the TurnstileWidget (bump its `key`) to get a fresh one before
 // the next attempt.
+//
+// Upstream/network failures fail-open (logged server-side) so a Cloudflare
+// outage doesn't hard-block auth. Missing tokens and real challenge failures
+// stay fail-closed when keys are configured.
 export async function verifyTurnstileToken(token: string | null): Promise<TurnstileVerifyResult> {
   if (!SITE_KEY) return { success: true }; // not configured — allow through
   if (!token) return { success: false, error: "missing_token" };
@@ -124,11 +134,24 @@ export async function verifyTurnstileToken(token: string | null): Promise<Turnst
       body: JSON.stringify({ token }),
     });
     if (res.status === 429) return { success: false, error: "rate_limited" };
-    const data = (await res.json()) as { success: boolean; error?: string };
-    if (data.success === true) return { success: true };
+    const data = (await res.json()) as {
+      success: boolean;
+      error?: string;
+      failedOpen?: boolean;
+    };
+    if (data.success === true) {
+      return { success: true, failedOpen: data.failedOpen };
+    }
+    // Server may still return upstream_error when TURNSTILE_FAIL_OPEN=false.
+    // Client-side transport failures also fail-open below.
+    if (data.error === "upstream_error" || data.error === "network_error") {
+      console.warn(`[turnstile] ${data.error} from verify API — failing open`);
+      return { success: true, failedOpen: true, error: data.error };
+    }
     return { success: false, error: data.error ?? "challenge_failed" };
-  } catch {
-    return { success: false, error: "network_error" };
+  } catch (err) {
+    console.warn("[turnstile] network_error calling verify API — failing open", err);
+    return { success: true, failedOpen: true, error: "network_error" };
   }
 }
 
