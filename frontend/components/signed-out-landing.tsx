@@ -288,7 +288,7 @@ export default function SignedOutLanding({
                 },
                 {
                   title: "Rewards Marketplace",
-                  body: "Redeem points for signed gear, backstage access, or merch exclusives.",
+                  body: "Earn points now — RaeLynn merch & redemptions open soon (not live at soft launch).",
                   icon: "gift" as IconName,
                 },
               ].map((f) => (

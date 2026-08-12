@@ -27,6 +27,7 @@ import InlineShareButton from "@/components/inline-share-button";
 import RsvpButton from "./rsvp-button";
 import { ExpandableEventGrid } from "./expandable-event-grid";
 import { focalPointStyle } from "@/lib/images/focal-point";
+import { isMarketplaceLive } from "@/lib/marketplace-live";
 
 
 // Per-artist hero focal-point now comes from artists.hero_focal_x /
@@ -119,18 +120,25 @@ export default async function ArtistPage({
   const ctaGradient = `linear-gradient(to right, ${artist.accentFrom}, ${artist.accentTo})`;
 
   // Primary CTA adapts to the viewer's state:
-  // - anonymous  → "Join the Fan Experience" → /onboarding?ref=<slug>
-  // - signed in, no profile → "Complete profile" → /onboarding?ref=<slug>
-  // - signed in, profile done → "Shop drops" → /marketplace
+  // - anonymous  → "Join the Fan Experience" → signup
+  // - signed in, no profile → "Complete profile" → /onboarding
+  // - signed in, profile done → drops / rewards (marketplace not open at soft launch)
+  const marketplaceLive = isMarketplaceLive();
   const primaryCta = !isSignedIn
     ? { label: "Join the Fan Experience", href: `/signup?ref=${artist.slug}` }
     : needsProfile
       ? { label: "Complete your profile", href: `/onboarding?ref=${artist.slug}` }
-      : { label: "Shop drops", href: "/marketplace" };
+      : marketplaceLive
+        ? { label: "Shop drops", href: "/marketplace" }
+        : { label: "My rewards", href: "/rewards" };
 
   const secondaryCta = isSignedIn
-    ? { label: "My rewards", href: "/rewards" }
-    : { label: "Browse marketplace drops", href: "/marketplace" };
+    ? marketplaceLive
+      ? { label: "My rewards", href: "/rewards" }
+      : { label: "Merch — coming soon", href: "/marketplace" }
+    : marketplaceLive
+      ? { label: "Browse marketplace drops", href: "/marketplace" }
+      : { label: "Merch — coming soon", href: "/marketplace" };
 
   const headerList = await headers();
   const host =
@@ -235,16 +243,17 @@ export default async function ArtistPage({
             >
               {secondaryCta.label}
             </Link>
-            {artist.merchUrl && (
+            {/* Soft launch: hide Shopify until marketplace provider is ready */}
+            {marketplaceLive && artist.merchUrl ? (
               <a
                 href={artist.merchUrl}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="rounded-full border border-white/30 bg-black/30 px-6 py-3 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/10"
               >
-                🛍 Official store ↗
+                Official store ↗
               </a>
-            )}
+            ) : null}
           </div>
           {!isSignedIn && (
             <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-aurora/30 bg-aurora/10 px-3 py-1 text-xs font-medium text-aurora">
@@ -450,30 +459,67 @@ export default async function ArtistPage({
       {/* Top fans leaderboard preview */}
       <LeaderboardMiniCard artistSlug={slug} />
 
-      {/* Merch */}
+      {/* Merch — soft launch: Coming soon (not a live shop / not Shopify) */}
       <section className="glass-card p-8">
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm uppercase tracking-wide text-white/60">Fan Experience rewards</p>
-          {artist.merchUrl && (
-            <a
-              href={artist.merchUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1 text-xs text-white/70 hover:border-white/40 hover:text-white transition"
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-wide text-white/60">Merchandise</p>
+            <h2
+              className="mt-1 text-xl font-semibold"
+              style={{ fontFamily: "var(--font-display)" }}
             >
-              🛍 Official merch store ↗
-            </a>
-          )}
+              {marketplaceLive
+                ? `Shop ${artist.name} merch`
+                : `${artist.name} merch — coming soon`}
+            </h2>
+            {!marketplaceLive ? (
+              <p className="mt-2 max-w-xl text-sm text-white/65">
+                Official merch and point redemptions aren&apos;t open for soft launch yet.
+                Join the fan club and earn points so you&apos;re ready when the shop opens.
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/marketplace"
+              className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+            >
+              {marketplaceLive ? "Browse marketplace" : "Coming soon"}
+            </Link>
+            {marketplaceLive && artist.merchUrl ? (
+              <a
+                href={artist.merchUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1 text-xs text-white/70 hover:border-white/40 hover:text-white transition"
+              >
+                Official merch store ↗
+              </a>
+            ) : null}
+          </div>
         </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {artist.merch.map((m) => (
-            <div key={m.title} className="rounded-2xl bg-black/30 p-5">
-              <p className="text-xs uppercase tracking-wide text-white/50">{m.tier}</p>
-              <p className="mt-1 text-sm font-semibold">{m.title}</p>
-              <p className="mt-3 text-sm font-semibold text-emerald-300">{m.points}</p>
-            </div>
-          ))}
-        </div>
+        {marketplaceLive ? (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {artist.merch.map((m) => (
+              <div key={m.title} className="rounded-2xl bg-black/30 p-5">
+                <p className="text-xs uppercase tracking-wide text-white/50">{m.tier}</p>
+                <p className="mt-1 text-sm font-semibold">{m.title}</p>
+                <p className="mt-3 text-sm font-semibold text-emerald-300">{m.points}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ul className="mt-5 space-y-2 text-sm text-white/65">
+            <li className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+              Tour merch &amp; signed items (when live)
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+              Point redemptions &amp; fan-priority drops
+            </li>
+          </ul>
+        )}
       </section>
     </main>
   );
