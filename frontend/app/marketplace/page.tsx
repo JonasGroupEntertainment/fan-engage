@@ -114,7 +114,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
               bullets={[
                 "Real merch + experiences from your favorite artists",
                 "Points-only or fan-priority pricing",
-                "Tier-locked so casual visitors don&apos;t outbid fans",
+                "Tier-locked so casual visitors don't outbid fans",
               ]}
               primaryCta="Sign up to redeem →"
               nextPath="/marketplace"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Star, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -115,6 +116,11 @@ const experiences = [
 
 export default function OnboardingWizard() {
   const router = useRouter();
+  const [authGate, setAuthGate] = useState<"checking" | "signed-out" | "ready">(
+    "checking",
+  );
+  const [signupHref, setSignupHref] = useState("/signup?ref=raelynn&next=%2Fonboarding");
+  const [loginHref, setLoginHref] = useState("/login?next=/onboarding");
   const [stepIndex, setStepIndex] = useState(0);
   const [formState, setFormState] = useState<Record<string, string>>({});
   const [smsStatus, setSmsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -132,32 +138,41 @@ export default function OnboardingWizard() {
   const currentStep = steps[stepIndex];
   const progress = useMemo(() => ((stepIndex + 1) / steps.length) * 100, [stepIndex]);
 
-  // Pre-fill the email field from the authenticated user. The wizard already
-  // sits behind /signup so by the time someone reaches /onboarding their
-  // email is in auth.users — make it visible (read-only) instead of asking
-  // them to retype it.
+  // Never paint the wizard for signed-out guests (deep links / old homepage
+  // CTAs). Show a clear “create account first” gate instead of a silent bounce.
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const rawNext = searchParams.get("next");
+    const next =
+      rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+        ? rawNext
+        : "/onboarding";
+    const ref = searchParams.get("ref");
+    const signupParams = new URLSearchParams({ next });
+    if (ref) signupParams.set("ref", ref);
+    else signupParams.set("ref", "raelynn");
+    setSignupHref(`/signup?${signupParams.toString()}`);
+    setLoginHref(
+      `/login?next=${encodeURIComponent(
+        next === "/onboarding" && ref
+          ? `/onboarding?ref=${encodeURIComponent(ref)}`
+          : next,
+      )}`,
+    );
+
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
-        // Anonymous visitor (or expired session) — onboarding wizard
-        // expects an authenticated user. Send them to /signup with a
-        // return URL so the auth callback bounces them back here.
-        const searchParams = new URLSearchParams(window.location.search);
-        const rawNext = searchParams.get("next");
-        const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/onboarding";
-        const ref = searchParams.get("ref");
-        const params = new URLSearchParams({ next });
-        if (ref) params.set("ref", ref);
-        router.replace(`/signup?${params.toString()}`);
+        setAuthGate("signed-out");
         return;
       }
       if (user.email) {
         setFormState((prev) => ({ ...prev, email: user.email ?? "" }));
         setEmailAutoFilled(true);
       }
+      setAuthGate("ready");
     });
-  }, [router]);
+  }, []);
 
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
@@ -378,6 +393,51 @@ export default function OnboardingWizard() {
 
   const isLastStep = stepIndex === steps.length - 1;
   const stepValid = canAdvanceCurrentStep();
+
+  if (authGate === "checking") {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-6 py-12">
+        <div className="glass-card p-8 text-center text-sm text-white/60">Loading…</div>
+      </main>
+    );
+  }
+
+  if (authGate === "signed-out") {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
+        <div className="glass-card space-y-6 p-8">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-wide text-white/60">Fan Engage</p>
+            <h1
+              className="text-2xl font-semibold"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Create your fan account first
+            </h1>
+            <p className="text-sm text-white/70">
+              Join with email to unlock your artist experience — points, drops,
+              backstage moments, and rewards. Takes about a minute.
+            </p>
+          </div>
+          <Link
+            href={signupHref}
+            className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass"
+          >
+            Create account →
+          </Link>
+          <p className="text-center text-sm text-white/60">
+            Already a fan?{" "}
+            <Link
+              href={loginHref}
+              className="text-white underline-offset-4 hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white">

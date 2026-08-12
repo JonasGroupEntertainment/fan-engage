@@ -10,6 +10,7 @@ import {
   isTurnstileConfigured,
   turnstileFailureMessage,
   verifyTurnstileToken,
+  type TurnstileLoadState,
 } from "@/components/turnstile-widget";
 
 export default function LoginPage() {
@@ -49,6 +50,8 @@ function LoginForm() {
   const [message, setMessage] = useState(callbackError ?? "");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
+  const [turnstileLoadState, setTurnstileLoadState] =
+    useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -56,10 +59,14 @@ function LoginForm() {
   }, []);
   const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
+    setTurnstileLoadState(state);
+  }, []);
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
   const resetChallenge = useCallback(() => {
     setTurnstileToken(null);
+    setTurnstileLoadState("loading");
     setTurnstileKey((k) => k + 1);
   }, []);
 
@@ -165,6 +172,9 @@ function LoginForm() {
             Welcome back
           </h1>
           <p className="text-sm text-white/70">Sign in with your email and password.</p>
+          <p className="text-xs text-white/45">
+            Google &amp; Apple sign-in coming soon — use email for now.
+          </p>
         </div>
 
         <form onSubmit={handlePassword} className="space-y-4">
@@ -222,11 +232,12 @@ function LoginForm() {
                 onSuccess={handleTurnstileSuccess}
                 onError={handleTurnstileError}
                 onExpire={handleTurnstileExpire}
+                onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
               />
-              {turnstileError && (
+              {turnstileError && turnstileLoadState !== "error" && (
                 <p className="text-xs text-rose-300">
-                  Security check failed. Please refresh and try again.
+                  Security check failed. Retry above, or sign in with your password.
                 </p>
               )}
             </div>
@@ -242,9 +253,13 @@ function LoginForm() {
               ? `Resend magic link in ${magicLinkCooldown}s`
               : status === "magic-sent"
                 ? "Resend magic link"
-                : turnstileConfigured && !turnstileToken
-                  ? "Complete security check for magic link"
-                  : "Email me a magic link instead"}
+                : turnstileConfigured && turnstileLoadState === "loading"
+                  ? "Security check loading…"
+                  : turnstileConfigured && turnstileLoadState === "error"
+                    ? "Use password sign-in — security check unavailable"
+                    : turnstileConfigured && !turnstileToken
+                      ? "Complete security check for magic link"
+                      : "Email me a magic link instead"}
           </button>
         </div>
 
