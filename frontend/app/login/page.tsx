@@ -218,6 +218,12 @@ function LoginForm() {
           </button>
         </form>
 
+        {/*
+          Magic-link MUST stay outside the password <form> as type="button".
+          If it were type="submit" (or inside the form), an empty required
+          password field would HTML5-block the click — BEP Guide regression.
+          Email is shared via React state from the field above; no form submit.
+        */}
         <div className="space-y-3 border-t border-white/10 pt-5">
           <p className="text-xs text-white/50">
             Prefer a passwordless email link? We&apos;ll send it to the{" "}
