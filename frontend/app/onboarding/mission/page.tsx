@@ -20,6 +20,7 @@ interface Step {
 export default function MissionPage() {
   const router = useRouter();
   const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
   const [steps, setSteps] = useState<Step[]>([
     {
       id: 1,
@@ -57,7 +58,9 @@ export default function MissionPage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.replace("/signup?next=/onboarding/mission");
+        // Clear interstitial — do not silently bounce (same trap as /onboarding).
+        setSignedOut(true);
+        setLoading(false);
         return;
       }
 
@@ -108,6 +111,38 @@ export default function MissionPage() {
     return (
       <main className="min-h-screen bg-[#050b1f] flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      </main>
+    );
+  }
+
+  if (signedOut) {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12 text-white">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] space-y-6 p-8">
+          <div className="space-y-2">
+            <p className="text-xs tracking-widest uppercase text-white/50">Fan Engage</p>
+            <h1 className="text-2xl font-bold">Create your fan account first</h1>
+            <p className="text-sm text-white/60">
+              Sign up to start your first missions — follow an artist, earn a badge,
+              and invite a friend.
+            </p>
+          </div>
+          <Link
+            href="/signup?ref=raelynn&next=%2Fonboarding%2Fmission"
+            className="inline-flex w-full items-center justify-center rounded-full bg-white px-4 py-3 text-sm font-semibold text-[#050b1f]"
+          >
+            Create account →
+          </Link>
+          <p className="text-center text-sm text-white/50">
+            Already a fan?{" "}
+            <Link
+              href="/login?next=/onboarding/mission"
+              className="text-white underline-offset-4 hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </main>
     );
   }
