@@ -118,12 +118,12 @@ Use these verbatim (or close) when fans hit the issues below. Engineering fixes 
 
 **Eng match:** B-P1-13 — unify to one counter; add soft-launch “RaeLynn’s fan experience” framing. Do **not** invent a second waitlist or say spots are sold out unless `remaining === 0`.
 
-#### 4) Merch / marketplace looks broken or sends them to Shopify
+#### 4) Merch / marketplace (Guide CS script — mirror in #11 PR)
 
 **Tell the fan:**
-> RaeLynn’s **merch marketplace isn’t open for soft launch yet** — you’ll see **Coming soon** on the Marketplace / Merch pages. We’re lining up the shop (target around a month). Keep earning points in the community and rewards so you’re ready when it opens. If you hit an old “Official store” Shopify link, ignore it for now — we’re not dual-running that with Fan Engage merch at launch.
+> The marketplace isn’t open for soft launch — you’ll see **Coming soon**. Merch is expected within about a month. You can still **create your fan profile and earn points** so you’re ready when the shop opens.
 
-**Eng match:** B-P1-17 / **#11** — Coming soon wall + hide Shopify until `NEXT_PUBLIC_MARKETPLACE_LIVE=true`. Do **not** promise a hard open date in guest copy.
+**Eng match:** B-P1-17 / **#11** — Coming soon UI + remove dual Shopify/marketplace CTAs. Sign-in P0s remain first. Do **not** dual-run Shopify at soft launch; do **not** put a hard calendar date in guest UI (CS may say “~a month”).
 
 ---
 
