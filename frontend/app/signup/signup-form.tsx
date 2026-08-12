@@ -60,6 +60,10 @@ export function SignupForm({
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentOpen, setConsentOpen] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
+  // One-shot: Turnstile is verified before the consent modal opens so the
+  // ~5min token can't expire while the user scrolls ToS. createAccount
+  // consumes this flag instead of re-verifying after Accept.
+  const captchaVerifiedRef = useRef(false);
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileError(false);
@@ -132,9 +136,25 @@ export function SignupForm({
       return;
     }
 
+    // Verify Turnstile *before* the consent modal. Tokens are single-use and
+    // ~5min TTL; reading ToS behind the modal would otherwise race the
+    // widget (which sits under the overlay and can't be refreshed).
+    setStatus("loading");
+    setMessage("");
+    const captcha = await verifyTurnstileToken(turnstileToken);
+    resetChallenge();
+    if (!captcha.success) {
+      captchaVerifiedRef.current = false;
+      setStatus("error");
+      setMessage(turnstileFailureMessage(captcha.error));
+      return;
+    }
+    captchaVerifiedRef.current = true;
+
     // Explicit, logged consent is required before an account is created.
     // Hold here and let the scroll-to-accept modal drive the actual submit.
     if (hasConsentDocs) {
+      setStatus("idle");
       setConsentOpen(true);
       return;
     }
@@ -145,13 +165,20 @@ export function SignupForm({
     setStatus("loading");
     setMessage("");
 
-    const captcha = await verifyTurnstileToken(turnstileToken);
-    resetChallenge();
-    if (!captcha.success) {
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      return;
+    // Prefer the pre-consent verification; fall back to a live verify when
+    // createAccount is reached without that one-shot (shouldn't happen in
+    // the normal consent path, but keeps the no-docs path safe on retry).
+    if (!captchaVerifiedRef.current) {
+      const captcha = await verifyTurnstileToken(turnstileToken);
+      resetChallenge();
+      if (!captcha.success) {
+        setStatus("error");
+        setMessage(turnstileFailureMessage(captcha.error));
+        return;
+      }
+      captchaVerifiedRef.current = true;
     }
+    captchaVerifiedRef.current = false;
 
     try {
       const supabase = createClient();
@@ -458,6 +485,9 @@ export function SignupForm({
           rewardsPublished={!!rewardsPublished}
           onCancel={() => {
             setConsentOpen(false);
+            // Token was already spent pre-modal; require a fresh check.
+            captchaVerifiedRef.current = false;
+            resetChallenge();
             setStatus("idle");
           }}
           onAccept={(version) => {

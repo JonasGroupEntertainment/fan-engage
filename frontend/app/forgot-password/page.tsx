@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { APP_URL } from "@/lib/app-url";
@@ -31,8 +31,34 @@ export default function ForgotPasswordPage() {
     setTurnstileKey((k) => k + 1);
   }, []);
 
+  // Parity with login/signup: resending overwrites the previous reset link.
+  const RESEND_COOLDOWN_SECONDS = 45;
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    };
+  }, []);
+
+  function startResendCooldown() {
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+    cooldownInterval.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownInterval.current) clearInterval(cooldownInterval.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (resendCooldown > 0) return;
     if (!email) {
       setStatus("error");
       setMessage("Enter your email first.");
@@ -56,7 +82,10 @@ export default function ForgotPasswordPage() {
       });
       if (error) throw error;
       setStatus("sent");
-      setMessage("Check your email for a link to reset your password.");
+      setMessage(
+        "Check your email for a link to reset your password. Use the newest link — requesting another one invalidates the previous one.",
+      );
+      startResendCooldown();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send reset link.");
@@ -103,10 +132,16 @@ export default function ForgotPasswordPage() {
 
           <button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === "loading" || resendCooldown > 0}
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
-            {status === "loading" ? "Sending…" : "Send reset link"}
+            {resendCooldown > 0
+              ? `Resend reset link in ${resendCooldown}s`
+              : status === "loading"
+                ? "Sending…"
+                : status === "sent"
+                  ? "Resend reset link"
+                  : "Send reset link"}
           </button>
         </form>
 

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useSyncExternalStore, useState } from "react";
 import { usePathname } from "next/navigation";
 
-const STORAGE_KEY = "fanengage_cookie_consent";
+export const COOKIE_CONSENT_STORAGE_KEY = "fanengage_cookie_consent";
+export const COOKIE_CONSENT_EVENT = "fanengage-cookie-consent";
 
 // Read-only external store: any tab can dismiss via the button below; we
 // return the stored string (or null) and let the component decide what to
@@ -14,13 +15,24 @@ function subscribe() {
 }
 function getSnapshot(): string | null {
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    return window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
   } catch {
     return null;
   }
 }
 function getServerSnapshot(): string | null {
   return null;
+}
+
+export function hasAcceptedCookieConsent(): boolean {
+  try {
+    const raw = window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { choice?: string };
+    return parsed.choice === "accept";
+  } catch {
+    return false;
+  }
 }
 
 export default function CookieBanner() {
@@ -38,15 +50,17 @@ export default function CookieBanner() {
 
   const shown = stored === null && !dismissed && !hiddenForRoute;
 
-  function save(choice: "accept" | "decline") {
+  function accept() {
     try {
       window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ choice, at: new Date().toISOString() }),
+        COOKIE_CONSENT_STORAGE_KEY,
+        JSON.stringify({ choice: "accept", at: new Date().toISOString() }),
       );
     } catch {
       /* ignore */
     }
+    // Notify invite/ref helpers so fanengage_ref can be set after Accept.
+    window.dispatchEvent(new Event(COOKIE_CONSENT_EVENT));
     setDismissed(true);
   }
 
@@ -55,7 +69,9 @@ export default function CookieBanner() {
   return (
     <div className="fixed inset-x-4 bottom-4 z-50 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-xl backdrop-blur md:inset-x-auto md:right-4 md:max-w-sm">
       <p className="text-sm text-white/90">
-        Fan Engage uses cookies for sign-in and basic platform features. See our{" "}
+        Fan Engage uses essential cookies for sign-in and basic platform features.
+        If you arrive via an invite link, we also set a referral cookie after you
+        accept so we can credit your inviter. See our{" "}
         <Link href="/cookie-policy" className="text-aurora underline">
           Cookie Policy
         </Link>{" "}
@@ -67,13 +83,7 @@ export default function CookieBanner() {
       </p>
       <div className="mt-3 flex items-center justify-end gap-2">
         <button
-          onClick={() => save("decline")}
-          className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/70 hover:bg-white/10"
-        >
-          Decline
-        </button>
-        <button
-          onClick={() => save("accept")}
+          onClick={accept}
           className="rounded-full bg-gradient-to-r from-aurora to-ember px-3 py-1 text-xs font-semibold text-white"
         >
           Accept
