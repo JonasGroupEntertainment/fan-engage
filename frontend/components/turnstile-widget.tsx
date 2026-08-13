@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  TURNSTILE_CHALLENGE_ID,
+  type TurnstileLoadState,
+} from "@/lib/turnstile-ux";
+
+export type { TurnstileLoadState };
 
 declare global {
   interface Window {
@@ -16,12 +22,15 @@ declare global {
 interface TurnstileOptions {
   sitekey: string;
   theme?: "light" | "dark" | "auto";
+  size?: "normal" | "compact" | "flexible";
+  appearance?: "always" | "execute" | "interaction-only";
   callback?: (token: string) => void;
   "error-callback"?: () => void;
   "expired-callback"?: () => void;
+  "timeout-callback"?: () => void;
+  "unsupported-callback"?: () => void;
+  "before-interactive-callback"?: () => void;
 }
-
-export type TurnstileLoadState = "loading" | "ready" | "error";
 
 interface Props {
   onSuccess: (token: string) => void;
@@ -58,6 +67,19 @@ export function isTurnstileConfigured(): boolean {
 export function resetTurnstileScriptLoader() {
   scriptRequested = false;
   document.getElementById(SCRIPT_ID)?.remove();
+}
+
+/**
+ * Warm the Cloudflare script so the widget isn't a blank box on first paint
+ * when the user later opens the magic-link path.
+ */
+export function prefetchTurnstileScript() {
+  if (!SITE_KEY || typeof window === "undefined") return;
+  if (window.turnstile || scriptRequested) return;
+  scriptRequested = true;
+  injectTurnstileScript(0, () => {
+    scriptRequested = false;
+  });
 }
 
 // Retries with a cache-busting param: during a Cloudflare outage the browser
@@ -102,6 +124,12 @@ export function TurnstileWidget({
     [onLoadStateChange],
   );
 
+  const markReadyIfIframe = useCallback(() => {
+    if (!containerRef.current?.querySelector("iframe")) return false;
+    setState("ready");
+    return true;
+  }, [setState]);
+
   const renderWidget = useCallback(() => {
     if (!containerRef.current || !window.turnstile || !SITE_KEY) return false;
     if (widgetIdRef.current) return true;
@@ -112,9 +140,14 @@ export function TurnstileWidget({
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: SITE_KEY,
         theme,
+        size: "normal",
+        appearance: "always",
         callback: (token: string) => {
           setState("ready");
           onSuccess(token);
+        },
+        "before-interactive-callback": () => {
+          setState("ready");
         },
         "error-callback": () => {
           setState("error");
@@ -123,8 +156,18 @@ export function TurnstileWidget({
         "expired-callback": () => {
           onExpire?.();
         },
+        "timeout-callback": () => {
+          setState("error");
+          onError?.();
+        },
+        "unsupported-callback": () => {
+          setState("error");
+          onError?.();
+        },
       });
-      setState("ready");
+      // Do NOT flip to "ready" here — render() returns before the iframe
+      // paints, which is how #11 still left a blank white box.
+      markReadyIfIframe();
       return true;
     } catch (err) {
       console.warn("[turnstile] render failed", err);
@@ -132,13 +175,12 @@ export function TurnstileWidget({
       onError?.();
       return false;
     }
-  }, [onSuccess, onError, onExpire, theme, setState]);
+  }, [onSuccess, onError, onExpire, theme, setState, markReadyIfIframe]);
 
   useEffect(() => {
     if (!SITE_KEY) return;
 
     let cancelled = false;
-    setState("loading");
 
     const tryRender = () => {
       if (cancelled) return;
@@ -149,6 +191,14 @@ export function TurnstileWidget({
     window.onTurnstileLoad = () => {
       notifyTurnstileLoaded();
     };
+
+    const container = containerRef.current;
+    const observer = new MutationObserver(() => {
+      if (!cancelled) markReadyIfIframe();
+    });
+    if (container) {
+      observer.observe(container, { childList: true, subtree: true });
+    }
 
     if (window.turnstile) {
       tryRender();
@@ -164,7 +214,7 @@ export function TurnstileWidget({
 
     const timeout = window.setTimeout(() => {
       if (cancelled) return;
-      if (!widgetIdRef.current) {
+      if (!widgetIdRef.current || !containerRef.current?.querySelector("iframe")) {
         console.warn("[turnstile] load timed out — widget never rendered");
         setState("error");
         onError?.();
@@ -173,6 +223,7 @@ export function TurnstileWidget({
 
     return () => {
       cancelled = true;
+      observer.disconnect();
       loadListeners.delete(tryRender);
       window.clearTimeout(timeout);
       if (widgetIdRef.current && window.turnstile) {
@@ -184,7 +235,7 @@ export function TurnstileWidget({
         widgetIdRef.current = null;
       }
     };
-  }, [renderWidget, setState, onError, retryNonce]);
+  }, [renderWidget, setState, onError, retryNonce, markReadyIfIframe]);
 
   function handleRetry() {
     resetTurnstileScriptLoader();
@@ -198,11 +249,37 @@ export function TurnstileWidget({
   if (!SITE_KEY) return null;
 
   return (
-    <div className="space-y-2">
-      <div ref={containerRef} className="mt-2 min-h-[65px]" />
-      {loadState === "loading" && (
-        <p className="text-xs text-white/40">Loading security check…</p>
-      )}
+    <div
+      id={TURNSTILE_CHALLENGE_ID}
+      tabIndex={-1}
+      className="space-y-2 outline-none"
+    >
+      {/*
+        color-scheme: light is required: :root { color-scheme: dark } makes
+        Cloudflare's iframe paint as an empty white rectangle. theme="dark"
+        still styles the challenge itself.
+      */}
+      <div
+        className="relative w-full max-w-[300px]"
+        style={{ colorScheme: "light", minHeight: 65 }}
+      >
+        {loadState === "loading" && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col justify-center gap-2 rounded-lg border border-white/15 bg-black/70 px-3 py-2"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="h-3 w-2/3 animate-pulse rounded bg-white/20" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+            <p className="text-xs text-white/70">Security check loading…</p>
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          className={loadState === "error" ? "hidden" : "min-h-[65px] w-full"}
+          style={{ colorScheme: "light" }}
+        />
+      </div>
       {loadState === "error" && (
         <div className="space-y-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2">
           <p className="text-xs text-rose-200">

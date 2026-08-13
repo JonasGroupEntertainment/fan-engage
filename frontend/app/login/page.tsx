@@ -8,10 +8,17 @@ import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
+  prefetchTurnstileScript,
   turnstileFailureMessage,
   verifyTurnstileToken,
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
+import {
+  magicLinkButtonLabel,
+  magicLinkGateMessage,
+  nextMagicLinkGate,
+  scrollToTurnstileChallenge,
+} from "@/lib/turnstile-ux";
 
 export default function LoginPage() {
   return (
@@ -53,6 +60,11 @@ function LoginForm() {
   const [turnstileLoadState, setTurnstileLoadState] =
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
+  // Don't mount Turnstile until the fan chooses magic-link — keeps the
+  // password door above the fold and avoids a blank check on first paint.
+  const [magicLinkOpen, setMagicLinkOpen] = useState(false);
+  const pendingMagicSend = useRef(false);
+
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileError(false);
@@ -84,6 +96,16 @@ function LoginForm() {
     };
   }, []);
 
+  useEffect(() => {
+    if (turnstileConfigured) prefetchTurnstileScript();
+  }, [turnstileConfigured]);
+
+  useEffect(() => {
+    if (!magicLinkOpen) return;
+    const id = window.requestAnimationFrame(() => scrollToTurnstileChallenge());
+    return () => window.cancelAnimationFrame(id);
+  }, [magicLinkOpen]);
+
   function startMagicLinkCooldown() {
     setMagicLinkCooldown(MAGIC_LINK_COOLDOWN_SECONDS);
     if (cooldownInterval.current) clearInterval(cooldownInterval.current);
@@ -101,6 +123,7 @@ function LoginForm() {
   // Primary door: email + password. No Turnstile — least-confused path.
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault();
+    pendingMagicSend.current = false;
     setStatus("loading");
     setMessage("");
     try {
@@ -115,27 +138,24 @@ function LoginForm() {
     }
   }
 
-  // Secondary door: magic link. Turnstile only on this path.
-  async function handleMagicLink() {
-    if (magicLinkCooldown > 0) return;
-    if (!email) {
-      setStatus("error");
-      setMessage("Enter an email first.");
-      return;
-    }
-    if (turnstileConfigured && !turnstileToken) {
-      setStatus("error");
-      setMessage("Complete the security check below, then send a magic link.");
-      return;
-    }
+  const magicGate = nextMagicLinkGate({
+    configured: turnstileConfigured,
+    revealed: magicLinkOpen,
+    token: turnstileToken,
+    loadState: turnstileLoadState,
+  });
+
+  async function sendMagicLink(token: string | null) {
     setStatus("loading");
     setMessage("");
 
-    const captcha = await verifyTurnstileToken(turnstileToken);
+    const captcha = await verifyTurnstileToken(token);
     resetChallenge();
     if (!captcha.success) {
+      pendingMagicSend.current = false;
       setStatus("error");
       setMessage(turnstileFailureMessage(captcha.error));
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
       return;
     }
     try {
@@ -147,21 +167,59 @@ function LoginForm() {
         },
       });
       if (error) throw error;
+      pendingMagicSend.current = false;
       setStatus("magic-sent");
       setMessage(
         "Magic link sent. Check your email — use the newest link; requesting another one invalidates the previous one.",
       );
       startMagicLinkCooldown();
     } catch (err) {
+      pendingMagicSend.current = false;
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send magic link.");
     }
   }
 
-  const magicLinkDisabled =
-    status === "loading" ||
-    magicLinkCooldown > 0 ||
-    (turnstileConfigured && !turnstileToken);
+  // Secondary door: magic link. Turnstile only on this path.
+  async function handleMagicLink() {
+    if (magicLinkCooldown > 0 || status === "loading") return;
+    if (!email) {
+      setStatus("error");
+      setMessage("Enter an email first.");
+      return;
+    }
+
+    if (magicGate === "reveal") {
+      pendingMagicSend.current = true;
+      setMagicLinkOpen(true);
+      setStatus("idle");
+      setMessage(magicLinkGateMessage("reveal") ?? "");
+      return;
+    }
+
+    if (magicGate !== "send") {
+      pendingMagicSend.current = true;
+      setStatus("error");
+      setMessage(magicLinkGateMessage(magicGate) ?? "");
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return;
+    }
+
+    pendingMagicSend.current = false;
+    await sendMagicLink(turnstileToken);
+  }
+
+  // Completing the check after the first tap should send without a second click.
+  useEffect(() => {
+    if (!pendingMagicSend.current || !turnstileToken || magicLinkCooldown > 0) return;
+    if (status === "loading") return;
+    pendingMagicSend.current = false;
+    void sendMagicLink(turnstileToken);
+    // sendMagicLink is recreated each render; token is the trigger we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnstileToken]);
+
+  const magicLinkDisabled = status === "loading" || magicLinkCooldown > 0;
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
@@ -227,12 +285,14 @@ function LoginForm() {
         <div className="space-y-3 border-t border-white/10 pt-5">
           <p className="text-xs text-white/50">
             Prefer a passwordless email link? We&apos;ll send it to the{" "}
-            <span className="text-white/70">Email address above</span>. Complete the
-            security check, then send. Use the newest link — each request invalidates
-            the previous one.
+            <span className="text-white/70">Email address above</span>
+            {magicLinkOpen
+              ? ". Complete the security check, then send."
+              : "."}{" "}
+            Use the newest link — each request invalidates the previous one.
           </p>
 
-          {turnstileConfigured && (
+          {turnstileConfigured && magicLinkOpen && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-white/45">Security check</p>
               <TurnstileWidget
@@ -263,21 +323,15 @@ function LoginForm() {
 
           <button
             type="button"
-            onClick={handleMagicLink}
+            onClick={() => void handleMagicLink()}
             disabled={magicLinkDisabled}
             className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm font-medium text-white/70 hover:bg-white/5 disabled:opacity-50"
           >
-            {magicLinkCooldown > 0
-              ? `Resend magic link in ${magicLinkCooldown}s`
-              : status === "magic-sent"
-                ? "Resend magic link"
-                : turnstileConfigured && turnstileLoadState === "loading"
-                  ? "Security check loading…"
-                  : turnstileConfigured && turnstileLoadState === "error"
-                    ? "Use password sign-in — security check unavailable"
-                    : turnstileConfigured && !turnstileToken
-                      ? "Complete security check above, then email magic link"
-                      : "Email me a magic link instead"}
+            {magicLinkButtonLabel({
+              cooldown: magicLinkCooldown,
+              status,
+              gate: magicGate,
+            })}
           </button>
         </div>
 
