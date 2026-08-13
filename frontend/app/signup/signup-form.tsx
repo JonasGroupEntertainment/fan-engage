@@ -7,9 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
+  isTurnstileConfigured,
+  prefetchTurnstileScript,
   turnstileFailureMessage,
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
+import { scrollToTurnstileChallenge } from "@/lib/turnstile-ux";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
@@ -69,6 +72,7 @@ export function SignupForm({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "confirm">("idle");
   const [message, setMessage] = useState("");
+  const turnstileConfigured = isTurnstileConfigured();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileKey, setTurnstileKey] = useState(0);
@@ -104,6 +108,10 @@ export function SignupForm({
       if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (turnstileConfigured) prefetchTurnstileScript();
+  }, [turnstileConfigured]);
 
   // Invite deep-links: write fanengage_ref after cookie Accept (same gate as
   // /invite/[code]), so attribution survives invite → signup without Accept.
@@ -168,6 +176,13 @@ export function SignupForm({
     // Verify Turnstile *before* the consent modal. Tokens are single-use and
     // ~5min TTL; reading ToS behind the modal would otherwise race the
     // widget (which sits under the overlay and can't be refreshed).
+    if (turnstileConfigured && !turnstileToken) {
+      captchaVerifiedRef.current = false;
+      setStatus("error");
+      setMessage(turnstileFailureMessage("missing_token"));
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return;
+    }
     setStatus("loading");
     setMessage("");
     const captcha = await verifyTurnstileToken(turnstileToken);
@@ -176,6 +191,7 @@ export function SignupForm({
       captchaVerifiedRef.current = false;
       setStatus("error");
       setMessage(turnstileFailureMessage(captcha.error));
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
       return;
     }
     captchaVerifiedRef.current = true;
@@ -198,11 +214,18 @@ export function SignupForm({
     // createAccount is reached without that one-shot (shouldn't happen in
     // the normal consent path, but keeps the no-docs path safe on retry).
     if (!captchaVerifiedRef.current) {
+      if (turnstileConfigured && !turnstileToken) {
+        setStatus("error");
+        setMessage(turnstileFailureMessage("missing_token"));
+        requestAnimationFrame(() => scrollToTurnstileChallenge());
+        return;
+      }
       const captcha = await verifyTurnstileToken(turnstileToken);
       resetChallenge();
       if (!captcha.success) {
         setStatus("error");
         setMessage(turnstileFailureMessage(captcha.error));
+        requestAnimationFrame(() => scrollToTurnstileChallenge());
         return;
       }
       captchaVerifiedRef.current = true;
@@ -442,7 +465,9 @@ export function SignupForm({
             theme="dark"
           />
           {turnstileError && (
-            <p className="text-xs text-rose-300">Security check failed. Please refresh and try again.</p>
+            <p className="text-xs text-rose-300">
+              Security check failed. Tap Retry above, or try again.
+            </p>
           )}
 
           <button

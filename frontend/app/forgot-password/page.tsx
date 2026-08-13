@@ -7,10 +7,12 @@ import { APP_URL } from "@/lib/app-url";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
+  prefetchTurnstileScript,
   turnstileFailureMessage,
   verifyTurnstileToken,
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
+import { scrollToTurnstileChallenge } from "@/lib/turnstile-ux";
 
 export default function ForgotPasswordPage() {
   const turnstileConfigured = isTurnstileConfigured();
@@ -51,6 +53,10 @@ export default function ForgotPasswordPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (turnstileConfigured) prefetchTurnstileScript();
+  }, [turnstileConfigured]);
+
   function startResendCooldown() {
     setResendCooldown(RESEND_COOLDOWN_SECONDS);
     if (cooldownInterval.current) clearInterval(cooldownInterval.current);
@@ -73,6 +79,18 @@ export default function ForgotPasswordPage() {
       setMessage("Enter your email first.");
       return;
     }
+    if (turnstileConfigured && !turnstileToken) {
+      setStatus("error");
+      setMessage(
+        turnstileLoadState === "loading"
+          ? "Security check is still loading. Hang on a moment, then try again."
+          : turnstileLoadState === "error"
+            ? "Security check didn't load. Tap Retry, then send the link."
+            : "Complete the security check, then send the link.",
+      );
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return;
+    }
     setStatus("loading");
     setMessage("");
 
@@ -81,6 +99,7 @@ export default function ForgotPasswordPage() {
     if (!captcha.success) {
       setStatus("error");
       setMessage(turnstileFailureMessage(captcha.error));
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
       return;
     }
 
@@ -155,11 +174,7 @@ export default function ForgotPasswordPage() {
 
           <button
             type="submit"
-            disabled={
-              status === "loading" ||
-              resendCooldown > 0 ||
-              (turnstileConfigured && !turnstileToken)
-            }
+            disabled={status === "loading" || resendCooldown > 0}
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
             {resendCooldown > 0
