@@ -3,6 +3,10 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import {
+  isStripeEventReplay,
+  stripeEventCompletionPatch,
+} from "@/lib/stripe-webhook-processed";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +16,8 @@ export const dynamic = "force-dynamic";
  *
  * Stripe delivery endpoint. Every request is verified against
  * STRIPE_WEBHOOK_SECRET. Every event_id is recorded in stripe_events
- * for idempotency — replays are no-ops. Handled events:
+ * for idempotency — successful deliveries are replay no-ops.
+ * Failed handlers leave processed_at null so Stripe retries re-run.
  *
  *   customer.subscription.created  → flip membership to 'premium',
  *                                    assign founder slot if applicable,
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
     .eq("id", event.id)
     .maybeSingle();
 
-  if (existing?.processed_at) {
+  if (isStripeEventReplay(existing?.processed_at)) {
     return NextResponse.json({ ok: true, replay: true });
   }
 
@@ -122,12 +127,12 @@ export async function POST(request: Request) {
     console.error(`stripe/webhook: ${event.type} handler failed`, processError);
   }
 
+  // Only stamp processed_at after a successful handler. A 500 with
+  // processed_at set would make Stripe's retry a replay no-op and leave
+  // a paying fan on free (A-P0-1).
   await admin
     .from("stripe_events")
-    .update({
-      processed_at: new Date().toISOString(),
-      error: processError,
-    })
+    .update(stripeEventCompletionPatch(processError))
     .eq("id", event.id);
 
   if (processError) {

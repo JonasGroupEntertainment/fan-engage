@@ -6,7 +6,7 @@ Launch path to test first: `https://fanengagepro.com/signup?ref=raelynn`
 
 **Product frame:** Fan Engage Pro = SUPERFAN artist–fan site — **not** Brand Engage. Soft-launch artist = RaeLynn.
 
-Companion review: `docs/GUEST_AND_CODE_REVIEW.md` (post-**#11** / `93a9a2b`).
+Companion review: `docs/GUEST_AND_CODE_REVIEW.md` (post-**#14** / `236eeec`; payments/RLS P0s A-P0-1 / A-P0-2 / A-P0-3 shipped — apply migration **0050** on prod).
 
 ## Soft-launch auth & merch (shipped — still smoke)
 
@@ -58,7 +58,7 @@ Do **not** send fans to Shopify as a parallel shop. Do **not** put a hard calend
 ## Raymond Checks
 
 - [ ] Confirm Stripe test products/prices match the visible monthly and annual Premium offers.
-- [ ] Confirm webhooks flip the fan to Premium after checkout (watch A-P0-1 retry bug before paid traffic).
+- [ ] Confirm webhooks flip the fan to Premium after checkout (A-P0-1 shipped — failed events stay retryable; apply migration 0050 so any already-poisoned `stripe_events` rows are unstuck).
 - [ ] Confirm refund/cancel/downgrade handling is clear enough for support.
 - [ ] Confirm Supabase production data for RaeLynn is correct: active community, pricing, founder cap, hero focal point, events, rewards.
 - [ ] Confirm Turnstile hostname allowlist includes `fanengagepro.com`.
@@ -98,4 +98,4 @@ Do **not** send fans to Shopify as a parallel shop. Do **not** put a hard calend
 - [ ] Any visible test post that weakens the RaeLynn launch impression.
 - [ ] Any unclear Premium promise that RaeLynn or the team has not approved.
 - [ ] Any live-charge risk while testing.
-- [ ] Payment/RLS P0s from `GUEST_AND_CODE_REVIEW.md` (A-P0-1 / A-P0-2 / A-P0-3) before paid traffic.
+- [x] Payment/RLS P0s from `GUEST_AND_CODE_REVIEW.md` (A-P0-1 / A-P0-2 / A-P0-3) — **shipped**; apply migration 0050 on prod before paid traffic.

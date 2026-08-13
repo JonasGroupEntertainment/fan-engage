@@ -2,7 +2,7 @@
 
 **Repo:** `JonasGroupEntertainment/fan-engage`  
 **Production:** https://fanengagepro.com  
-**Reviewed at:** `93a9a2b` (merge of PR **#11** — auth P0/UX + marketplace Coming soon; builds on PR **#7** password-primary auth)  
+**Reviewed at:** `236eeec` (PR **#14** marketplace/Turnstile polish). Payments/RLS P0s (A-P0-1 / A-P0-2 / A-P0-3) ship in the marketing-integrity follow-up.  
 **Scope:** Soft launch for first-time fans (RaeLynn). No OAuth re-enable. No large refactors. Findings verified against this repo (not invented metrics).
 
 ### Product framing (binding)
@@ -19,9 +19,9 @@ Guest-facing language should read as: join an artist’s fan experience → earn
 
 ## Verdict
 
-**Conditional soft launch — guest auth / merch Coming soon P0s from Guide are shipped (#7 + #11). Still not a hard “go” until payment/entitlement P0s and remaining guest polish below are closed.**
+**Conditional soft launch — guest auth / merch Coming soon P0s from Guide are shipped (#7 + #11 + #13 + #14). Payments/RLS P0s (A-P0-1 / A-P0-2 / A-P0-3) are shipped in code; apply migration 0050 on prod before paid traffic.**
 
-Auth UX is coherent for returning fans: **password primary (no Turnstile)**, magic-link secondary with Turnstile load/error/**Retry**, OAuth gated with guest-facing “coming soon” copy. Marketplace dual Shopify CTAs removed; Coming soon wall is live. Remaining soft-launch risk is concentrated in: (1) Stripe webhook idempotency that can permanently drop premium unlocks, (2) RLS/RPC holes that let clients self-grant premium or spend another fan’s points, and (3) open guest P1/P2 polish (Premium dual counters, Community nav label, CTA vocabulary, cookie/hero).
+Auth UX is coherent for returning fans: **password primary (no Turnstile)**, magic-link secondary with Turnstile load/error/**Retry**, OAuth gated with guest-facing “coming soon” copy. Marketplace dual Shopify CTAs removed; Coming soon wall is live. Remaining soft-launch risk is concentrated in guest P1/P2 polish (Premium dual counters, Community nav label, CTA vocabulary, cookie/hero) and ops confirmation (live Stripe prices + webhook endpoint).
 
 ---
 
@@ -134,20 +134,20 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 
 ### P0 — fix before paid / soft-launch traffic
 
-#### A-P0-1. Stripe webhook marks failed events as processed (retries become no-ops)
-- **Paths:** `frontend/app/api/stripe/webhook/route.ts` (~62–138)
-- **Why:** On handler failure the route still writes `processed_at`, returns 500 for Stripe retry, then on retry hits `if (existing?.processed_at) return { replay: true }` and **never re-runs** the handler. A transient DB/RPC error leaves a paying fan on `free`.
-- **Fix:** Only set `processed_at` on success. On failure leave `processed_at` null (keep `error`), or clear it when returning 500. Treat “error set + not successfully processed” as retryable.
+#### A-P0-1. Stripe webhook marks failed events as processed (retries become no-ops) — **shipped**
+- **Paths:** `frontend/app/api/stripe/webhook/route.ts`; `frontend/lib/stripe-webhook-processed.ts`
+- **Why:** On handler failure the route still wrote `processed_at`, returned 500 for Stripe retry, then on retry hit `if (existing?.processed_at) return { replay: true }` and **never re-ran** the handler. A transient DB/RPC error left a paying fan on `free`.
+- **Shipped:** Only set `processed_at` on success. Failures keep `processed_at` null (store `error`) so Stripe retries re-run. Migration 0050 also clears already-poisoned `stripe_events` rows (`error` set + `processed_at` set).
 
-#### A-P0-2. `redeem_reward` SECURITY DEFINER has no `auth.uid()` check (IDOR)
-- **Paths:** `supabase/migrations/0021_rewards_redemption.sql`; callers `frontend/lib/data/rewards.ts`, `frontend/app/artists/[slug]/rewards/actions.ts`
-- **Why:** RPC takes arbitrary `p_fan_id`. App action passes the caller’s id, but any client with the anon key can call the RPC and spend another fan’s points / create redemptions. No revoke-from-anon in migrations.
-- **Fix:** At start of function: `if auth.uid() is distinct from p_fan_id then raise …`. Optionally `revoke execute … from anon`; grant only `authenticated`. Ship as a new migration (do not edit applied 0021 in place on prod without a follow-up migration).
+#### A-P0-2. `redeem_reward` SECURITY DEFINER has no `auth.uid()` check (IDOR) — **shipped**
+- **Paths:** `supabase/migrations/0050_lock_redeem_and_membership_economy.sql`; callers `frontend/lib/data/rewards.ts`, `frontend/app/artists/[slug]/rewards/actions.ts`
+- **Why:** RPC took arbitrary `p_fan_id`. App action passed the caller’s id, but any client with the anon key could call the RPC and spend another fan’s points / create redemptions.
+- **Shipped:** Authenticated JWT must redeem as `auth.uid()`; `service_role` / postgres may still pass another id for ops; `anon` execute revoked. Client redeem path uses the session user only (no caller-supplied fan id).
 
-#### A-P0-3. Fans can UPDATE own membership rows without column restriction (premium self-grant)
-- **Path:** `supabase/migrations/0011_multi_tenant.sql` (`memberships_own_update`)
-- **Why:** Policy is `auth.uid() = fan_id` with no column narrowing. Authenticated clients can likely set `subscription_tier` to `premium`/`comped`, `is_founder`, credits, etc., bypassing Stripe.
-- **Fix:** Drop broad update policy; allow only safe leave/status changes via a SECURITY DEFINER RPC, or column privileges / trigger that rejects billing-field changes unless `auth.role() = 'service_role'`.
+#### A-P0-3. Fans can UPDATE own membership rows without column restriction (premium self-grant) — **shipped**
+- **Path:** `supabase/migrations/0011_multi_tenant.sql` (`memberships_own_update`); lock in `0050_lock_redeem_and_membership_economy.sql`
+- **Why:** Policy is `auth.uid() = fan_id` with no column narrowing. Authenticated clients could set `subscription_tier` to `premium`/`comped`, `is_founder`, credits, or inflate `total_points` / `current_tier` on `fans` and `fan_community_memberships`.
+- **Shipped:** Column GRANTs revoke client UPDATE on economy/billing columns; BEFORE trigger rejects those changes when `current_user` is `authenticated`/`anon`. Service role and SECURITY DEFINER (check-in, ledger, redeem, webhook, `bump_membership_points`) still run as `postgres`/`service_role` and keep working. `memberships_own_update` remains for safe status/leave updates.
 
 ### P1 — high risk for guests, admins, or launch ops
 
@@ -225,12 +225,12 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 | Area | Status in code |
 |------|----------------|
 | Checkout | `frontend/app/premium/actions.ts` — session + metadata; unsigned → signup |
-| Webhook | Signature + idempotency present; **P0 retry bug** (A-P0-1) |
+| Webhook | Signature + idempotency; **A-P0-1 shipped** (processed_at only on success) |
 | Connect Express | Retired; MoR + manual artist payout reporting |
 | Portal | `frontend/app/account/billing/actions.ts` |
 | Founder race | Advisory pick at checkout, atomic `claim_founder_slot` at webhook |
 | Seed | `/admin/stripe/seed` + `/api/admin/stripe-seed` |
-| Soft-launch blocker | Fix A-P0-1 + A-P0-3 before paid traffic; confirm live prices seeded per active community |
+| Soft-launch blocker | **A-P0-1 / A-P0-2 / A-P0-3 shipped** — apply migration 0050 on prod; confirm live prices seeded per active community |
 
 ---
 
@@ -434,9 +434,9 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 ### Conditional checklist
 
 **Must before any paid traffic (hard):**
-- [ ] Fix Stripe webhook `processed_at` on error (A-P0-1)
-- [ ] Lock membership update RLS / billing columns (A-P0-3)
-- [ ] Lock `redeem_reward` to `auth.uid()` (A-P0-2)
+- [x] Fix Stripe webhook `processed_at` on error (A-P0-1)
+- [x] Lock membership update RLS / billing columns (A-P0-3)
+- [x] Lock `redeem_reward` to `auth.uid()` (A-P0-2)
 - [ ] Confirm Stripe live/test prices + webhook endpoint on `fanengagepro.com`
 - [ ] Confirm Supabase email confirm template preserves `/auth/callback?next=…` (B-P0-2)
 
@@ -497,8 +497,8 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 | [#9](https://github.com/JonasGroupEntertainment/fan-engage/pull/9) Guest funnel P0/P1 | Rebase; keep invite/reset/cookie/paywall; drop overlap already in #11 |
 | [#10](https://github.com/JonasGroupEntertainment/fan-engage/pull/10) Literal apostrophe | **Close** — superseded by #11 |
 | Premium/Community P1 (not yet opened) | Unify founder counters (B-P1-13); Community nav label (B-P1-14); optional CTA glossary (B-P2-12) |
-| Payments/RLS P0 (not yet opened) | Webhook processed_at; `redeem_reward` auth check; membership update lockdown |
+| Payments/RLS P0 | **Shipped** — webhook `processed_at` on success only; `redeem_reward` bound to caller; membership/fan economy column lock (migration 0050) |
 
 ---
 
-*Updated against repository at `93a9a2b` (post-#11) + Guide logged-out walk. Re-smoke `fanengagepro.com` after deploy of #11.*
+*Updated against repository at `236eeec` (post-#14) + payments/RLS P0 ship (A-P0-1 / A-P0-2 / A-P0-3, migration 0050). Apply 0050 on prod before paid traffic.*
