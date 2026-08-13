@@ -14,10 +14,13 @@ import {
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
 import {
+  emailReadyForMagicLink,
   magicLinkButtonLabel,
-  magicLinkGateMessage,
+  magicLinkClickAction,
+  magicLinkPersistentHelper,
   nextMagicLinkGate,
   scrollToTurnstileChallenge,
+  shouldShowParentChallengeError,
 } from "@/lib/turnstile-ux";
 
 export default function LoginPage() {
@@ -73,6 +76,11 @@ function LoginForm() {
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
     setTurnstileLoadState(state);
+    // Retry remounts into loading while challengeFailed was still true —
+    // clear it so "Security check failed…" cannot flash under the skeleton.
+    if (state === "loading" || state === "ready") {
+      setTurnstileError(false);
+    }
   }, []);
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
@@ -140,9 +148,18 @@ function LoginForm() {
 
   const magicGate = nextMagicLinkGate({
     configured: turnstileConfigured,
-    revealed: magicLinkOpen,
+    revealed: magicLinkOpen && emailReadyForMagicLink(email),
     token: turnstileToken,
     loadState: turnstileLoadState,
+  });
+  const persistentHelper = magicLinkPersistentHelper({
+    gate: magicGate,
+    loadState: turnstileLoadState,
+    challengeFailed: turnstileError,
+  });
+  const showParentChallengeError = shouldShowParentChallengeError({
+    loadState: turnstileLoadState,
+    challengeFailed: turnstileError,
   });
 
   async function sendMagicLink(token: string | null) {
@@ -183,24 +200,31 @@ function LoginForm() {
   // Secondary door: magic link. Turnstile only on this path.
   async function handleMagicLink() {
     if (magicLinkCooldown > 0 || status === "loading") return;
-    if (!email) {
+    const action = magicLinkClickAction({
+      email,
+      configured: turnstileConfigured,
+      revealed: magicLinkOpen,
+      token: turnstileToken,
+      loadState: turnstileLoadState,
+    });
+    if (action === "need-email") {
       setStatus("error");
       setMessage("Enter an email first.");
       return;
     }
 
-    if (magicGate === "reveal") {
+    if (action === "reveal") {
       pendingMagicSend.current = true;
       setMagicLinkOpen(true);
       setStatus("idle");
-      setMessage(magicLinkGateMessage("reveal") ?? "");
+      setMessage("");
       return;
     }
 
-    if (magicGate !== "send") {
+    if (action !== "send") {
       pendingMagicSend.current = true;
-      setStatus("error");
-      setMessage(magicLinkGateMessage(magicGate) ?? "");
+      // Widget / helper / button label already explain wait, retry, and
+      // complete-check — don't stack a second error line on the page.
       requestAnimationFrame(() => scrollToTurnstileChallenge());
       return;
     }
@@ -286,13 +310,13 @@ function LoginForm() {
           <p className="text-xs text-white/50">
             Prefer a passwordless email link? We&apos;ll send it to the{" "}
             <span className="text-white/70">Email address above</span>
-            {magicLinkOpen
+            {magicLinkOpen && turnstileLoadState !== "error" && !turnstileError
               ? ". Complete the security check, then send."
               : "."}{" "}
             Use the newest link — each request invalidates the previous one.
           </p>
 
-          {turnstileConfigured && magicLinkOpen && (
+          {turnstileConfigured && magicLinkOpen && emailReadyForMagicLink(email) && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-white/45">Security check</p>
               <TurnstileWidget
@@ -303,17 +327,7 @@ function LoginForm() {
                 onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
               />
-              {turnstileLoadState === "error" && (
-                <p className="text-xs text-rose-200">
-                  Security check didn&apos;t load. Tap <span className="font-medium">Retry</span>{" "}
-                  above, or use <span className="font-medium">password sign-in</span> /{" "}
-                  <Link href="/forgot-password" className="underline hover:text-white">
-                    Forgot password
-                  </Link>
-                  .
-                </p>
-              )}
-              {turnstileError && turnstileLoadState !== "error" && (
+              {showParentChallengeError && (
                 <p className="text-xs text-rose-300">
                   Security check failed. Retry above, or sign in with your password.
                 </p>
@@ -335,6 +349,9 @@ function LoginForm() {
           </button>
         </div>
 
+        {persistentHelper && status !== "error" && status !== "magic-sent" && (
+          <p className="text-sm text-emerald-300">{persistentHelper}</p>
+        )}
         {message && (
           <p
             className={`text-sm ${

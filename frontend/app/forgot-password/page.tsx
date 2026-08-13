@@ -12,7 +12,7 @@ import {
   verifyTurnstileToken,
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
-import { scrollToTurnstileChallenge } from "@/lib/turnstile-ux";
+import { scrollToTurnstileChallenge, shouldShowParentChallengeError } from "@/lib/turnstile-ux";
 
 export default function ForgotPasswordPage() {
   const turnstileConfigured = isTurnstileConfigured();
@@ -33,6 +33,9 @@ export default function ForgotPasswordPage() {
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
     setTurnstileLoadState(state);
+    if (state === "loading" || state === "ready") {
+      setTurnstileError(false);
+    }
   }, []);
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
@@ -158,13 +161,10 @@ export default function ForgotPasswordPage() {
                 onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
               />
-              {turnstileLoadState === "error" && (
-                <p className="text-xs text-rose-200">
-                  Security check didn&apos;t load. Tap Retry above, wait a moment, or
-                  try again from a different network.
-                </p>
-              )}
-              {turnstileError && turnstileLoadState !== "error" && (
+              {shouldShowParentChallengeError({
+                loadState: turnstileLoadState,
+                challengeFailed: turnstileError,
+              }) && (
                 <p className="text-xs text-rose-300">
                   Security check failed. Please retry and try again.
                 </p>
