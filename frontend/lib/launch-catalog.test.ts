@@ -140,6 +140,10 @@ describe("guest signed-out copy does not leak held items", () => {
     assert.doesNotMatch(guestSurfaces.rewards, /VIP soundcheck/i);
     assert.doesNotMatch(guestSurfaces.rewards, /presale tickets/i);
     assert.doesNotMatch(guestSurfaces.rewards, /meet & greet/i);
+    assert.doesNotMatch(guestSurfaces.premium, /early ticket/i);
+    assert.doesNotMatch(guestSurfaces.premium, /tour tickets/i);
+    assert.doesNotMatch(guestSurfaces.premium, /vinyl/i);
+    assert.doesNotMatch(guestSurfaces.premium, /meet & greet/i);
     assert.doesNotMatch(guestSurfaces.homepage, /VIP Moment Raffle/);
     assert.doesNotMatch(migrationSql, /named date|June|July 1/i);
     assert.match(

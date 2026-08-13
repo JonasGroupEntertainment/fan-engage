@@ -85,7 +85,7 @@ export default async function PremiumPage({
 
   const perks = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
-    { icon: "🎟️", title: "Early ticket access", body: "First crack at tour tickets, limited by venue capacity." },
+    { icon: "✨", title: "Priority digital access", body: "Premium-only polls, challenges, and in-app unlocks as soon as they drop." },
     { icon: "🎁", title: "Exclusive drops", body: "Premium-only digital unlocks inside the app." },
     { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist — ask anything." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },

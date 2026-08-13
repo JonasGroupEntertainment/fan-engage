@@ -162,4 +162,7 @@ export const GUEST_FORBIDDEN_PHRASES = [
   "presale",
   "meet & greet",
   "meet-and-greet",
+  "early ticket",
+  "tour tickets",
+  "vinyl",
 ] as const;
