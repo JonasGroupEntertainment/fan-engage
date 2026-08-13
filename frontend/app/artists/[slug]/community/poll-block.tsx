@@ -65,11 +65,11 @@ export default function PollBlock({
         })}
       </div>
       {!currentUserId && (
-        <p className="text-xs text-white/50">Sign in to vote (+1 pt).</p>
+        <p className="text-xs text-white/50">Sign in to vote (+10 pts).</p>
       )}
       {currentUserId && !hasVoted && (
         <p className="text-xs text-white/50">
-          Tap an option to cast your vote (+1 pt).
+          Tap an option to cast your vote (+10 pts).
         </p>
       )}
       {currentUserId && hasVoted && (

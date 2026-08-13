@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { awardPoints } from "@/lib/points/award";
+import { REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
 
 export const runtime = "nodejs";
 
 const POINTS_SIGNUP_BONUS = 100;
-const POINTS_REFERRAL_AWARD = 150;
 
 type OnboardPayload = {
   firstName?: string;
@@ -170,24 +170,38 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
 
         if (referrer && referrer.id !== user.id) {
+          // Referrer +150 already fires here on verified join. Friend +50
+          // is awarded by referrals_award_friend_points — do not also
+          // credit 150 from SQL.
           await admin.from("referrals").upsert(
             {
               referrer_id: referrer.id,
               referred_id: user.id,
               referred_email: user.email ?? null,
               status: "verified",
-              points_awarded: POINTS_REFERRAL_AWARD,
+              points_awarded: REFERRAL_JOIN_POINTS.referrer,
               verified_at: new Date().toISOString(),
+              ...(communityJoined ? { community_id: communityJoined } : {}),
             },
             { onConflict: "referred_id" },
           );
-          await awardPoints(admin, {
-            fanId: referrer.id,
-            delta: POINTS_REFERRAL_AWARD,
-            source: "referral",
-            sourceRef: user.id,
-            note: `Referred by ${user.email}`,
-          });
+          const referralRef = user.id;
+          const { data: existingReferralAward } = await admin
+            .from("points_ledger")
+            .select("id")
+            .eq("source", "referral")
+            .eq("source_ref", referralRef)
+            .maybeSingle();
+          if (!existingReferralAward) {
+            await awardPoints(admin, {
+              fanId: referrer.id,
+              delta: REFERRAL_JOIN_POINTS.referrer,
+              source: "referral",
+              sourceRef: referralRef,
+              note: `Referred by ${user.email}`,
+              ...(communityJoined ? { communityId: communityJoined } : {}),
+            });
+          }
           await admin
             .from("fans")
             .update({ referred_by: referrer.id })
@@ -225,24 +239,21 @@ export async function POST(request: NextRequest) {
       // non-fatal — profile save still succeeded
     }
 
-    // 4. Founding-fan badge — auto-awarded to anyone who completes
-    //    onboarding before the founding window closes (2026-07-15). The
-    //    `award_badge` Supabase function handles dedupe + in-app
-    //    notification; the wider try/catch ensures onboarding still
-    //    succeeds even if the badge insert errors.
-    const FOUNDING_CUTOFF = new Date("2026-07-16T00:00:00Z");
-    if (new Date() < FOUNDING_CUTOFF) {
+    // 4. Founding Fan — first 100 fans who complete onboarding in this
+    //    community. Persists founding_fan_number + founder-fan badge.
+    //    Separate from paid Founding Fan pricing (claim_founder_slot).
+    if (communityJoined) {
       try {
         const admin = createAdminClient();
-        const { error: badgeErr } = await admin.rpc("award_badge", {
+        const { error: foundingErr } = await admin.rpc("claim_founding_fan_status", {
           p_fan_id: user.id,
-          p_slug: "founder-fan",
+          p_community_id: communityJoined,
         });
-        if (badgeErr) {
-          console.warn("onboard: founder-fan award_badge rpc failed", badgeErr);
+        if (foundingErr) {
+          console.warn("onboard: claim_founding_fan_status failed", foundingErr);
         }
       } catch (err) {
-        console.warn("onboard: founder-fan badge award failed", err);
+        console.warn("onboard: founding fan claim failed", err);
       }
     }
 

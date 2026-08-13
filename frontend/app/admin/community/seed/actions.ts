@@ -76,7 +76,7 @@ const SEED_CONTENT: Record<string, SeedPost[]> = {
       body: "What kind of content do you want most from Bailee in this community?",
       pinned: false,
       visibility: "public",
-      poll_options: ["Behind-the-scenes studio content", "Early access to new music", "Q&As and live chats", "Exclusive merch drops"],
+      poll_options: ["Behind-the-scenes studio content", "Early access to new music", "Q&As and live chats", "Exclusive digital drops"],
     },
     {
       kind: "challenge",

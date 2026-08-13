@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isMisplacedNelliesOffer, isReservedRewardTitle } from "@/lib/launch-catalog";
 import type { Offer } from "./types";
 
 /**
@@ -17,7 +18,12 @@ export async function getActiveOffers(): Promise<Offer[]> {
       .or(`ends_at.is.null,ends_at.gte.${now}`)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []) as Offer[];
+    return ((data ?? []) as Offer[]).filter(
+      (o) =>
+        o.category !== "merch" &&
+        !isReservedRewardTitle(o.title) &&
+        !isMisplacedNelliesOffer(o.title),
+    );
   } catch {
     return [];
   }

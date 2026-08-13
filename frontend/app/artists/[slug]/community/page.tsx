@@ -99,7 +99,7 @@ export default async function ArtistCommunityPage({
               {artist.name} community
             </h1>
             <p className="mt-3 text-sm text-white/75">
-              Posts +5 pts · comments +2 pts · poll votes +1 pt · challenge
+              Posts +5 pts · comments +10 pts · poll votes +10 pts · challenge
               entries +3 pts.
             </p>
           </div>
@@ -163,8 +163,8 @@ export default async function ArtistCommunityPage({
                   feature="This post"
                   description={
                     post.title
-                      ? `"${post.title}" — Premium fans see every backstage post, voice note, and work-in-progress.`
-                      : "Premium fans see every backstage post, voice note, and work-in-progress."
+                      ? `"${post.title}" — Premium fans see every backstage post and work-in-progress.`
+                      : "Premium fans see every backstage post and work-in-progress."
                   }
                   communityId={slug}
                   accentFrom={artist.accentFrom}

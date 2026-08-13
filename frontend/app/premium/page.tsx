@@ -84,14 +84,13 @@ export default async function PremiumPage({
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
 
   const perks = [
-    { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments, works-in-progress, voice notes." },
+    { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
     { icon: "🎟️", title: "Early ticket access", body: "First crack at tour tickets, limited by venue capacity." },
-    { icon: "🎁", title: "Exclusive drops", body: "Premium-only signed merch, vinyl, limited runs." },
+    { icon: "🎁", title: "Exclusive drops", body: "Premium-only digital unlocks inside the app." },
     { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist — ask anything." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
-    { icon: "💸", title: "$5/mo store credit", body: "Refreshed monthly — spend on merch, events, or bank it up." },
-    { icon: "🎧", title: "VIP parties", body: "Listening parties and soundchecks reserved for Premium." },
+    { icon: "🎧", title: "Listening parties", body: "Capacity-limited listening parties reserved for Premium." },
   ];
 
   return (
