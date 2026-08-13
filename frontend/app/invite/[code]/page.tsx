@@ -62,7 +62,7 @@ export default async function InvitePage({
         <p className="mt-4 text-sm text-white/75">
           {artist
             ? `Join in under a minute to follow ${artist.name}, earn your first 100 points, and get closer to drops, events, and rewards. ${inviterName} earns 150 points after you finish joining.`
-            : `Join in under a minute — rewards, early drops, VIP experiences, and 100 bonus points for you. ${inviterName} earns 150 points after you finish joining.`}
+            : `Join in under a minute — rewards, early digital drops, and 100 bonus points for you. ${inviterName} earns 150 points after you finish joining.`}
         </p>
         {artist && (
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-5">

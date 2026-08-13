@@ -50,7 +50,7 @@ const TRIGGER_FIELDS: Array<{
   {
     key: "notify_drops",
     label: "Limited-time drops & sales",
-    description: "Time-boxed rewards, exclusive merch.",
+    description: "Time-boxed rewards, exclusive digital drops.",
   },
   {
     key: "notify_rsvp_confirmation",

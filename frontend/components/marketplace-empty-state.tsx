@@ -32,23 +32,22 @@ export function MarketplaceEmptyState({
           {headline}
         </h2>
         <p className="mt-3 text-white/70 leading-relaxed">
-          We&apos;re loading the shelves. Tour merch, signed memorabilia, and
-          backstage experiences will land here first — before the public
-          store. Founding members get priority drops and tier-locked offers.
+          We&apos;re loading the shelves. In-app digital drops land here
+          first. Founding fans get priority unlocks and tier-locked offers.
         </p>
 
         <ul className="mt-5 space-y-2 text-sm text-white/70">
           <li className="flex items-center gap-2">
-            <span aria-hidden>·</span> Limited tour merch
+            <span aria-hidden>·</span> Phone and lyric wallpapers
           </li>
           <li className="flex items-center gap-2">
-            <span aria-hidden>·</span> Signed CDs, vinyl, posters
+            <span aria-hidden>·</span> Behind-the-song clips when ready
           </li>
           <li className="flex items-center gap-2">
-            <span aria-hidden>·</span> VIP soundcheck + meet-and-greet
+            <span aria-hidden>·</span> Fan Spotlight in the app
           </li>
           <li className="flex items-center gap-2">
-            <span aria-hidden>·</span> Member-exclusive vinyl variants
+            <span aria-hidden>·</span> Point redemptions for digital unlocks
           </li>
         </ul>
 

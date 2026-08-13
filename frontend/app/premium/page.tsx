@@ -85,12 +85,13 @@ export default async function PremiumPage({
 
   const perks = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
-    { icon: "✨", title: "Priority digital access", body: "Premium-only polls, challenges, and in-app unlocks as soon as they drop." },
-    { icon: "🎁", title: "Exclusive drops", body: "Premium-only digital unlocks inside the app." },
+    { icon: "🎁", title: "Exclusive digital drops", body: "Premium-only digital unlocks inside the app." },
+    { icon: "🎬", title: "Behind-the-song clips", body: "In-app clips when a track is ready — digital only." },
+    { icon: "📱", title: "Phone & lyric wallpapers", body: "Exclusive wallpapers you redeem with points inside the app." },
     { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist — ask anything." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
-    { icon: "🎧", title: "Listening parties", body: "Capacity-limited listening parties reserved for Premium." },
+    { icon: "🏅", title: "Founding Fan status", body: "First 100 fans lock a numbered Founding Fan badge on their profile." },
   ];
 
   return (

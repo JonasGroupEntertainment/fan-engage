@@ -163,6 +163,11 @@ export const GUEST_FORBIDDEN_PHRASES = [
   "meet & greet",
   "meet-and-greet",
   "early ticket",
+  "early ticket access",
   "tour tickets",
   "vinyl",
+  "signed merch",
+  "pre-sale",
+  "vip parties",
+  "$5/mo store credit",
 ] as const;

@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     "artist community",
     "fan rewards",
     "fan-only events",
-    "VIP access",
+    "digital drops",
   ],
   manifest: "/manifest.json",
   alternates: { canonical: "/" },

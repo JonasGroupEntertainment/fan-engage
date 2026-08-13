@@ -112,6 +112,14 @@ update public.community_poll_options
    set label = 'Exclusive digital drops'
  where label ilike '%merch drop%';
 
+-- Guest-visible announcement: do not promise ticket pre-sale / Gold-Platinum codes.
+-- Match on title/body (not only the live uuid) so staging/re-seeds get the same rewrite.
+update public.community_posts
+   set body = '2026 summer run — 12 cities across the South + Midwest. Dates and details in the community feed.'
+ where title ilike 'Tour dates just dropped'
+    or body ilike '%Fan club pre-sale opens next Friday%'
+    or body ilike '%Gold & Platinum get early code%';
+
 
 -- ─── 3. Upsert RaeLynn launch SKUs (do not expand the set) ────────────────
 

@@ -33,6 +33,11 @@ const guestSurfaces = {
   community: readRepo("../app/artists/[slug]/community/page.tsx"),
   poll: readRepo("../app/artists/[slug]/community/poll-block.tsx"),
   seed: readRepo("../app/admin/community/seed/actions.ts"),
+  invite: readRepo("../app/invite/[code]/page.tsx"),
+  onboarding: readRepo("../app/onboarding/page.tsx"),
+  layout: readRepo("../app/layout.tsx"),
+  emptyState: readRepo("../components/marketplace-empty-state.tsx"),
+  signup: readRepo("../app/signup/signup-form.tsx"),
 };
 
 describe("launch catalog listing", () => {
@@ -144,6 +149,12 @@ describe("guest signed-out copy does not leak held items", () => {
     assert.doesNotMatch(guestSurfaces.premium, /tour tickets/i);
     assert.doesNotMatch(guestSurfaces.premium, /vinyl/i);
     assert.doesNotMatch(guestSurfaces.premium, /meet & greet/i);
+    assert.doesNotMatch(guestSurfaces.premium, /Early ticket access/);
+    assert.doesNotMatch(guestSurfaces.premium, /First crack at tour tickets/);
+    assert.doesNotMatch(guestSurfaces.premium, /signed merch, vinyl/i);
+    assert.doesNotMatch(guestSurfaces.premium, /\$5\/mo store credit/);
+    assert.doesNotMatch(guestSurfaces.premium, /VIP parties/);
+    assert.doesNotMatch(guestSurfaces.premium, /Listening parties and soundchecks/);
     assert.doesNotMatch(guestSurfaces.homepage, /VIP Moment Raffle/);
     assert.doesNotMatch(migrationSql, /named date|June|July 1/i);
     assert.match(
@@ -155,6 +166,12 @@ describe("guest signed-out copy does not leak held items", () => {
       /next available show/,
     );
     assert.doesNotMatch(guestSurfaces.seed, /signed vinyl|merch prizes/i);
+    assert.doesNotMatch(
+      guestSurfaces.seed,
+      /Fan club pre-sale|early code in email/i,
+    );
+    assert.match(migrationSql, /Tour dates just dropped/);
+    assert.match(migrationSql, /2026 summer run/);
   });
 });
 
