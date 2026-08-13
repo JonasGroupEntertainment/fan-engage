@@ -77,7 +77,9 @@ export function prefetchTurnstileScript() {
   if (!SITE_KEY || typeof window === "undefined") return;
   if (window.turnstile || scriptRequested) return;
   scriptRequested = true;
-  injectTurnstileScript(0);
+  injectTurnstileScript(0, () => {
+    scriptRequested = false;
+  });
 }
 
 // Retries with a cache-busting param: during a Cloudflare outage the browser
