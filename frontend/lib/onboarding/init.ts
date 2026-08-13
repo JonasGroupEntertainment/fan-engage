@@ -26,10 +26,10 @@ const DEFAULT_REWARDS: Array<{
   kind: string;
   sort_order: number;
 }> = [
-  { title: "Early Album Access",  description: "Get first access to new releases before they drop publicly", point_cost: 1000,  kind: "early_access",   sort_order: 0 },
-  { title: "Personal Voice Note", description: "A personalized 30-second voice note just for you",           point_cost: 5000,  kind: "voice_note",     sort_order: 1 },
-  { title: "Merch Discount Code", description: "25% off an exclusive merch drop",                            point_cost: 2500,  kind: "merch_discount", sort_order: 2 },
-  { title: "Video Shoutout",      description: "A personal video shoutout to you and your friends",          point_cost: 25000, kind: "video_shoutout", sort_order: 3 },
+  { title: "Phone Wallpaper", description: "Exclusive phone wallpaper for community members.", point_cost: 250, kind: "custom", sort_order: 0 },
+  { title: "Lyric Wallpaper", description: "Exclusive lyric wallpaper for community members.", point_cost: 500, kind: "custom", sort_order: 1 },
+  { title: "Fan Spotlight", description: "Get featured in the in-app fan feed.", point_cost: 1000, kind: "custom", sort_order: 3 },
+  { title: "VIP Moment Raffle", description: "Enter a raffle for a VIP moment at the next available show.", point_cost: 5000, kind: "experience", sort_order: 4 },
 ];
 
 export interface InitializeResult {
@@ -137,6 +137,7 @@ export async function initializeCommunityFromApplication(
           ...r,
           community_id: slug,
           active: true,
+          in_app_only: r.title === "Fan Spotlight",
         }));
         const { error } = await admin.from("rewards_catalog").insert(rows);
         if (error) {

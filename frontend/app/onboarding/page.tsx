@@ -109,8 +109,8 @@ const checklist = [
 ];
 
 const experiences = [
-  { title: "Supernova Weekend", detail: "3-day VIP itinerary + challenge roadmap" },
-  { title: "Marketplace Passport", detail: "Auto grants Bronze badge + merch credits" },
+  { title: "Supernova Weekend", detail: "3-day challenge roadmap + in-app drops" },
+  { title: "Marketplace Passport", detail: "Auto grants Bronze badge + bonus points" },
   { title: "Text-to-stage", detail: "SMS prompts that turn into instant point bursts" },
 ];
 

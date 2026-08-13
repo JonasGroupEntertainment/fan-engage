@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { shouldListLaunchReward } from "@/lib/launch-catalog";
 
 export interface RewardRow {
   id: string;
@@ -16,6 +17,8 @@ export interface RewardRow {
   is_drop: boolean;
   drops_at: string | null;
   expires_at: string | null;
+  clip_url: string | null;
+  in_app_only: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +55,10 @@ export async function listRewardsForCommunity(communityId: string): Promise<Rewa
       .eq("active", true)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
-    return (data ?? []) as RewardRow[];
+    const rows = (data ?? []) as RewardRow[];
+    return rows.filter((row) =>
+      shouldListLaunchReward(row, { signedIn: true }),
+    );
   } catch {
     return [];
   }

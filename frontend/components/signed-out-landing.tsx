@@ -185,14 +185,14 @@ export default function SignedOutLanding({
             icon="ticket"
           />
           <ProofTile
-            label="Founding members inducted"
+            label="Founding fans claimed"
             value={stats.foundingFans}
             icon="medal"
           />
           {!stats.foundingClosed && (
             <ProofTile
-              label="Days to claim founding"
-              value={stats.daysUntilFoundingCloses}
+              label="Founding spots left"
+              value={stats.foundingSpotsRemaining}
               icon="hourglass"
             />
           )}
@@ -227,7 +227,7 @@ export default function SignedOutLanding({
             {
               n: "03",
               title: "Unlock real drops + access",
-              body: "Signed vinyl, backstage soundchecks, VIP listening parties, limited merch. Points cash in for the real thing.",
+              body: "Show up, earn points, and redeem in-app drops once you join. Shop stays Coming soon.",
               icon: "gift" as IconName,
             },
           ].map((step) => (
@@ -283,12 +283,12 @@ export default function SignedOutLanding({
                 },
                 {
                   title: "Event RSVPs",
-                  body: "Capacity-limited listening parties, soundchecks, meet-ups. Reminders included.",
+                  body: "Capacity-limited listening parties and fan meet-ups. Reminders included.",
                   icon: "ticket" as IconName,
                 },
                 {
                   title: "Rewards Marketplace",
-                  body: "Earn points now — RaeLynn merch & redemptions open soon (not live at soft launch).",
+                  body: "Earn points now — RaeLynn redemptions open to signed-in fans. Shop stays Coming soon.",
                   icon: "gift" as IconName,
                 },
               ].map((f) => (

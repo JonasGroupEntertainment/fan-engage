@@ -6,6 +6,7 @@ import Image from "next/image";
 import { RedeemForm } from "./redeem-form";
 import InlineShareButton from "@/components/inline-share-button";
 import type { RewardRow } from "@/lib/data/rewards";
+import { isInAppOnlyLaunchReward } from "@/lib/launch-catalog";
 
 interface RewardCardProps {
   reward: RewardRow;
@@ -86,15 +87,17 @@ export default function RewardCardWithForm({
             </p>
           </div>
         )}
-        <div className="mt-2 flex justify-end">
-          <InlineShareButton
-            title={reward.title}
-            text={`Check out this drop on Fan Engage: ${reward.title} for ${reward.point_cost.toLocaleString()} pts.`}
-            url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/artists/${artistSlug}/rewards`}
-            label="↗ Share drop"
-            className="text-xs text-white/50 hover:text-white/70 transition"
-          />
-        </div>
+        {!isInAppOnlyLaunchReward(reward.title) && (
+          <div className="mt-2 flex justify-end">
+            <InlineShareButton
+              title={reward.title}
+              text={`Check out this drop on Fan Engage: ${reward.title} for ${reward.point_cost.toLocaleString()} pts.`}
+              url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/artists/${artistSlug}/rewards`}
+              label="↗ Share drop"
+              className="text-xs text-white/50 hover:text-white/70 transition"
+            />
+          </div>
+        )}
       </div>
 
       {showForm && (

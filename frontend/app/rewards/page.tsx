@@ -45,7 +45,7 @@ const previewCategories = [
   { label: "Listening quests", value: "4,200 pts" },
   { label: "Referrals", value: "2,800 pts" },
   { label: "Events & travel", value: "3,400 pts" },
-  { label: "Merch", value: "1,050 pts" },
+  { label: "Community", value: "1,050 pts" },
 ];
 
 function formatPts(n: number | null | undefined) {
@@ -112,7 +112,7 @@ export default async function RewardsPage() {
               bullets={[
                 "Real points the moment you sign up — no minimum to start",
                 "Badges that climb tiers and unlock fan-only perks",
-                "First access to drops, presales, and event RSVPs",
+                "First access to drops and event RSVPs",
               ]}
               primaryCta="Sign up free →"
               nextPath="/rewards"
@@ -131,7 +131,7 @@ export default async function RewardsPage() {
             </h1>
             <p className="mt-4 text-sm text-white/70">
               Keep stacking points to unlock {nextTier?.display_name ?? "more"}-only experiences.
-              Silver unlocks priority drops + 2× leaderboard multiplier. Gold adds VIP soundcheck + presale tickets. Platinum gives all access + meet & greet windows.
+              Silver unlocks priority digital drops + a leaderboard boost. Gold adds exclusive digital unlocks. Platinum opens the full digital catalog.
             </p>
             <div className="mt-8 space-y-4">
               <div className="flex items-center justify-between text-sm text-white/70">

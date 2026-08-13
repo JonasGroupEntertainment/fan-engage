@@ -24,11 +24,9 @@ const TAB_CATEGORIES: Record<Tab, OfferCategory[] | null> = {
 // Static preview content used when Supabase has no offers yet — only when
 // marketplace is live (NEXT_PUBLIC_MARKETPLACE_LIVE=true).
 const fallbackProducts = [
-  { title: "Signed World Tour Hoodie", tier: "Silver", pts: "3,400 pts", category: "Merch" as Tab, badge: "Limited" },
-  { title: "Backstage Polaroid Pack", tier: "Gold", pts: "5,200 pts", category: "Featured" as Tab, badge: "Drop" },
-  { title: "VIP Soundcheck + Meet", tier: "Platinum", pts: "9,800 pts", category: "Experiences" as Tab, badge: "New" },
-  { title: "Handwritten Lyric Sheet", tier: "Gold", pts: "4,750 pts", category: "Collectibles" as Tab, badge: "1/50" },
-  { title: "Fan-Exclusive Vinyl Variant", tier: "All tiers", pts: "$45", category: "Fan-Exclusive" as Tab, badge: "Preorder" },
+  { title: "Phone Wallpaper", tier: "All tiers", pts: "250 pts", category: "Fan-Exclusive" as Tab, badge: "Digital" },
+  { title: "Lyric Wallpaper", tier: "All tiers", pts: "500 pts", category: "Fan-Exclusive" as Tab, badge: "Digital" },
+  { title: "Behind-the-Song Video", tier: "All tiers", pts: "1,500 pts", category: "Fan-Exclusive" as Tab, badge: "Clip" },
 ];
 
 function formatPrice(o: Offer): string {
@@ -122,9 +120,9 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
             <PreviewSignupBanner
               eyebrow="🎟️ Preview"
               headline="Sign up to redeem these drops"
-              body="Fans earn points by showing up — events, posts, referrals — then trade them for the merch, experiences, and collectibles below. Drops are tier-locked so the people who care the most get first crack."
+              body="Fans earn points by showing up — events, posts, referrals — then trade them for digital drops below. Drops are tier-locked so the people who care the most get first crack."
               bullets={[
-                "Real merch + experiences from your favorite artists",
+                "Digital unlocks from your favorite artists",
                 "Points-only or fan-priority pricing",
                 "Tier-locked so casual visitors don't outbid fans",
               ]}
@@ -140,7 +138,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
               Drops tailored to your tier
             </h1>
             <p className="mt-4 text-sm text-white/70">
-              Redeem points or purchase exclusive merch, experiences, and collectibles before they hit the public store.
+              Redeem points for exclusive digital drops inside the app.
             </p>
             <nav className="mt-6 flex flex-wrap gap-3" aria-label="Filter by category">
               {TABS.map((tab) => {

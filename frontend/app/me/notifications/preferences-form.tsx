@@ -54,7 +54,7 @@ const TYPE_ROWS: Array<{
     key: "notify_drops",
     emoji: "🎁",
     title: "Drops & releases",
-    body: "Limited-edition merch, vinyl drops, and surprise releases.",
+    body: "In-app digital drops and surprise releases.",
   },
   {
     key: "notify_predictions",

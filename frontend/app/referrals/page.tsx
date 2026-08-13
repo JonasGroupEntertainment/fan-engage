@@ -14,9 +14,9 @@ import PreviewSignupBanner from "@/components/preview-signup-banner";
 
 const ladder = [
   { level: "1 referral", reward: "+150 pts" },
-  { level: "3 referrals", reward: "Signed postcard" },
-  { level: "5 referrals", reward: "Exclusive merch" },
-  { level: "10 referrals", reward: "VIP livestream" },
+  { level: "3 referrals", reward: "Recruiter badge" },
+  { level: "5 referrals", reward: "Connector badge" },
+  { level: "10 referrals", reward: "Ambassador badge" },
 ];
 
 async function buildInviteUrl(code: string | null | undefined): Promise<string> {
@@ -83,7 +83,7 @@ export default async function ReferralsPage() {
               bullets={[
                 "Invite friends into specific artist hubs",
                 "Both fans get a clear reason to join and keep going",
-                "Milestones unlock merch, livestreams, and status moments",
+                "Milestones unlock badges and bonus points",
               ]}
               primaryCta="Sign up free →"
               nextPath="/referrals"

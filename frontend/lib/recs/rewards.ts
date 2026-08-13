@@ -14,6 +14,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { shouldListLaunchReward } from "@/lib/launch-catalog";
 
 export interface RecommendedReward {
   reward_id: string;
@@ -59,8 +60,19 @@ export async function recommendReward(opts: {
     match_count: number;
   }>;
 
-  if (rows.length > 0) {
-    const r = rows[0];
+  const listed = rows.filter((row) =>
+    shouldListLaunchReward(
+      {
+        title: row.title,
+        community_id: opts.communityId,
+        active: true,
+      },
+      { signedIn: true },
+    ),
+  );
+
+  if (listed.length > 0) {
+    const r = listed[0];
     return {
       reward_id: r.reward_id,
       title: r.title,
@@ -113,7 +125,7 @@ async function coldStartReward(
   const { data: rewards } = await admin
     .from("rewards_catalog")
     .select(
-      "id, title, description, image_url, point_cost, requires_tier, sort_order",
+      "id, title, description, image_url, point_cost, requires_tier, sort_order, clip_url, in_app_only, active, community_id",
     )
     .eq("community_id", communityId)
     .eq("active", true)
@@ -128,7 +140,12 @@ async function coldStartReward(
     point_cost: number;
     requires_tier: string | null;
     sort_order: number;
+    clip_url: string | null;
+    in_app_only: boolean;
+    active: boolean;
+    community_id: string | null;
   }>).filter((r) => {
+    if (!shouldListLaunchReward(r, { signedIn: true })) return false;
     if (!r.requires_tier) return true;
     if (r.requires_tier === "premium") return isPremium;
     if (r.requires_tier === "founder-only") return isFounder;

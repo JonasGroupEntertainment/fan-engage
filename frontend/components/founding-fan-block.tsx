@@ -3,12 +3,8 @@ import type { LandingStats } from "@/lib/data/landing-stats";
 
 /**
  * Founding-fan urgency block shown to anonymous visitors below the hero.
- * Pitches the limited "first 500 fans get permanent founding status"
- * incentive, with a live progress bar and days-remaining counter.
- *
- * Auto-hides once the founding window closes (2026-07-15) — at that point
- * the rollout is past the marketing window for this lever and the block
- * just becomes noise.
+ * First 100 fans who complete onboarding get a persisted Founding Fan
+ * badge + membership number. Separate from paid Founding Fan pricing.
  */
 export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
   if (stats.foundingClosed || stats.foundingSpotsRemaining === 0) {
@@ -27,7 +23,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
         <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-aurora/40 bg-aurora/10 px-3 py-1 text-xs uppercase tracking-widest text-aurora">
-              🏅 Founding Window
+              🏅 Founding Fan
             </p>
             <h2
               className="mt-4 text-3xl font-semibold leading-tight md:text-4xl"
@@ -36,14 +32,13 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               First {stats.foundingTarget} fans get permanent
               <br />
               <span className="text-aurora">
-                Founding Member status.
+                Founding Fan status.
               </span>
             </h2>
             <p className="mt-4 text-sm text-white/75">
-              Locked-in early access to drops, the 🏅 Founding Member badge in
-              your profile forever, and bragging rights you can&apos;t earn
-              after July 15. (Separate from paid Founding Fan pricing slots —
-              this one&apos;s free.)
+              Join now to lock a numbered Founding Fan badge on your profile.
+              Separate from paid Founding Fan pricing slots — this one is free
+              for the first {stats.foundingTarget}.
             </p>
           </div>
 
@@ -59,11 +54,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               />
             </div>
             <p className="mt-3 text-xs text-white/55">
-              {stats.daysUntilFoundingCloses === 0
-                ? "Closes today"
-                : stats.daysUntilFoundingCloses === 1
-                ? "1 day left"
-                : `${stats.daysUntilFoundingCloses} days left — closes July 15`}
+              Status persists on your account — not a restyle-only badge.
             </p>
             <Link
               href="/signup?ref=raelynn"

@@ -3,9 +3,9 @@ import type { Tier, TierSlug } from "./types";
 
 const FALLBACK: Tier[] = [
   { slug: "bronze",   display_name: "Bronze",    min_points: 0,     perks: ["Welcome badge", "Access to fan home"], sort_order: 1 },
-  { slug: "silver",   display_name: "Silver",    min_points: 2500,  perks: ["Priority merch drops", "Monthly livestream"], sort_order: 2 },
-  { slug: "gold",     display_name: "Gold",      min_points: 10000, perks: ["VIP soundcheck access", "Signed merch eligibility"], sort_order: 3 },
-  { slug: "platinum", display_name: "Platinum",  min_points: 25000, perks: ["Backstage experiences", "Meet & greet slots"], sort_order: 4 },
+  { slug: "silver",   display_name: "Silver",    min_points: 750,   perks: ["Priority digital drops", "Leaderboard boost"], sort_order: 2 },
+  { slug: "gold",     display_name: "Gold",      min_points: 3500,  perks: ["Exclusive digital unlocks", "Early event RSVPs"], sort_order: 3 },
+  { slug: "platinum", display_name: "Platinum",  min_points: 8000,  perks: ["All-access digital catalog", "Priority event RSVPs"], sort_order: 4 },
 ];
 
 /**

@@ -49,7 +49,7 @@ export const ARTISTS: Record<string, Artist> = {
       { title: "Nashville Listening Party", detail: "Fan Engage members only", date: "Coming soon" },
     ],
     merch: [
-      { title: "Signed Vinyl Variant", tier: "Silver Priority", points: "3,200 pts" },
+      { title: "Phone Wallpaper Pack", tier: "Silver Priority", points: "3,200 pts" },
       { title: "Tour Hoodie", tier: "Bronze+", points: "2,400 pts" },
     ],
     social: [{ label: "Instagram", href: "https://instagram.com/raelynn" }],

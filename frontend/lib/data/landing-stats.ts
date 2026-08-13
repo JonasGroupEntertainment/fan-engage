@@ -5,12 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * <FoundingFanBlock> countdown and the small "proof" tiles row above
  * the existing How-it-works section.
  *
- * All counts come from the admin client so RLS doesn't filter them.
- * Errors return zeros instead of crashing the marketing page.
+ * First 100 Founding Fan is a persisted membership number, not a date
+ * window and not paid Founding Fan pricing.
  */
 
-export const FOUNDING_TARGET = 500;
-export const FOUNDING_CLOSE = new Date("2026-07-16T00:00:00Z");
+export const FOUNDING_TARGET = 100;
 
 export type LandingStats = {
   activeArtists: number;
@@ -19,7 +18,6 @@ export type LandingStats = {
   foundingSpotsRemaining: number;
   foundingTarget: number;
   foundingPctClaimed: number;
-  daysUntilFoundingCloses: number;
   foundingClosed: boolean;
 };
 
@@ -31,7 +29,6 @@ export async function getLandingStats(): Promise<LandingStats> {
     foundingSpotsRemaining: FOUNDING_TARGET,
     foundingTarget: FOUNDING_TARGET,
     foundingPctClaimed: 0,
-    daysUntilFoundingCloses: 0,
     foundingClosed: false,
   };
 
@@ -47,18 +44,13 @@ export async function getLandingStats(): Promise<LandingStats> {
         .select("id", { count: "exact", head: true })
         .eq("active", true),
       admin
-        .from("fan_badges")
+        .from("fan_community_memberships")
         .select("fan_id", { count: "exact", head: true })
-        .eq("badge_slug", "founder-fan"),
+        .eq("community_id", "raelynn")
+        .not("founding_fan_number", "is", null),
     ]);
 
     const foundingFans = foundersRes.count ?? 0;
-    const now = new Date();
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const daysUntilFoundingCloses = Math.max(
-      0,
-      Math.ceil((FOUNDING_CLOSE.getTime() - now.getTime()) / msPerDay),
-    );
     const foundingSpotsRemaining = Math.max(0, FOUNDING_TARGET - foundingFans);
     const foundingPctClaimed = Math.min(
       100,
@@ -72,8 +64,7 @@ export async function getLandingStats(): Promise<LandingStats> {
       foundingSpotsRemaining,
       foundingTarget: FOUNDING_TARGET,
       foundingPctClaimed,
-      daysUntilFoundingCloses,
-      foundingClosed: now >= FOUNDING_CLOSE,
+      foundingClosed: foundingSpotsRemaining === 0,
     };
   } catch (err) {
     console.warn("getLandingStats failed", err);
