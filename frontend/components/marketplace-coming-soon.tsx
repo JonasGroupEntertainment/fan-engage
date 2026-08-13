@@ -39,8 +39,14 @@ export default function MarketplaceComingSoon({
       </ul>
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Link
-          href="/artists/raelynn"
+          href="/signup?ref=raelynn"
           className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-2.5 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
+        >
+          Create account
+        </Link>
+        <Link
+          href="/artists/raelynn"
+          className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-2.5 text-sm font-medium text-white/80 hover:bg-white/5"
         >
           Back to {artistName}
         </Link>
@@ -49,12 +55,6 @@ export default function MarketplaceComingSoon({
           className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-2.5 text-sm font-medium text-white/80 hover:bg-white/5"
         >
           View rewards &amp; tiers
-        </Link>
-        <Link
-          href="/signup?ref=raelynn"
-          className="text-sm text-white/60 underline-offset-2 hover:text-white hover:underline"
-        >
-          Create account →
         </Link>
       </div>
     </section>

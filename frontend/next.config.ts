@@ -98,6 +98,16 @@ const nextConfig: NextConfig = {
         destination: "/blake-richardson",
         permanent: false,
       },
+      {
+        source: "/shop",
+        destination: "/marketplace",
+        permanent: false,
+      },
+      {
+        source: "/shop/:path*",
+        destination: "/marketplace",
+        permanent: false,
+      },
     ];
   },
 };

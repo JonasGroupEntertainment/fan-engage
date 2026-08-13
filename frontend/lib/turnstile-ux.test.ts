@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  TURNSTILE_LOAD_TIMEOUT_MS,
+  TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
+  TURNSTILE_SLOW_LOAD_HINT_MS,
+  TURNSTILE_WIDGET_ERROR_COPY,
+  emailReadyForMagicLink,
   magicLinkButtonLabel,
+  magicLinkClickAction,
   magicLinkGateMessage,
+  magicLinkPersistentHelper,
   nextMagicLinkGate,
+  shouldShowParentChallengeError,
+  turnstileSlowLoadHint,
 } from "./turnstile-ux.ts";
 
 describe("nextMagicLinkGate", () => {
@@ -80,6 +89,112 @@ describe("nextMagicLinkGate", () => {
   });
 });
 
+describe("empty email before expand (Hana NIT)", () => {
+  it("treats blank and whitespace as not ready", () => {
+    assert.equal(emailReadyForMagicLink(""), false);
+    assert.equal(emailReadyForMagicLink("   "), false);
+    assert.equal(emailReadyForMagicLink("fan@example.com"), true);
+  });
+
+  it("does not reveal Turnstile when email is empty", () => {
+    assert.equal(
+      magicLinkClickAction({
+        email: "",
+        configured: true,
+        revealed: false,
+        token: null,
+        loadState: "loading",
+      }),
+      "need-email",
+    );
+    assert.equal(
+      magicLinkClickAction({
+        email: "  ",
+        configured: true,
+        revealed: false,
+        token: null,
+        loadState: "loading",
+      }),
+      "need-email",
+    );
+  });
+
+  it("reveals only after an email is present", () => {
+    assert.equal(
+      magicLinkClickAction({
+        email: "fan@example.com",
+        configured: true,
+        revealed: false,
+        token: null,
+        loadState: "loading",
+      }),
+      "reveal",
+    );
+  });
+});
+
+describe("fail / loading copy (one message at a time)", () => {
+  it("hides the green helper while failed or loading", () => {
+    assert.equal(
+      magicLinkPersistentHelper({
+        gate: "complete-check",
+        loadState: "error",
+        challengeFailed: false,
+      }),
+      null,
+    );
+    assert.equal(
+      magicLinkPersistentHelper({
+        gate: "wait-load",
+        loadState: "loading",
+        challengeFailed: false,
+      }),
+      null,
+    );
+    assert.equal(
+      magicLinkPersistentHelper({
+        gate: "complete-check",
+        loadState: "ready",
+        challengeFailed: true,
+      }),
+      null,
+    );
+  });
+
+  it("shows the complete-check helper only when the widget is ready", () => {
+    assert.equal(
+      magicLinkPersistentHelper({
+        gate: "complete-check",
+        loadState: "ready",
+        challengeFailed: false,
+      }),
+      "Complete the security check, then send a magic link.",
+    );
+  });
+
+  it("does not flash a parent error under the retry skeleton", () => {
+    assert.equal(
+      shouldShowParentChallengeError({
+        loadState: "loading",
+        challengeFailed: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldShowParentChallengeError({
+        loadState: "error",
+        challengeFailed: true,
+      }),
+      false,
+    );
+  });
+
+  it("keeps widget fail copy as a single coherent line", () => {
+    assert.match(TURNSTILE_WIDGET_ERROR_COPY, /couldn't load/i);
+    assert.doesNotMatch(TURNSTILE_WIDGET_ERROR_COPY, /Security check failed/i);
+  });
+});
+
 describe("magic-link copy", () => {
   it("keeps the first CTA as a choice, not a disabled trap", () => {
     assert.equal(
@@ -90,7 +205,7 @@ describe("magic-link copy", () => {
       }),
       "Email me a magic link instead",
     );
-    assert.equal(magicLinkGateMessage("reveal"), "Complete the security check, then send a magic link.");
+    assert.equal(magicLinkGateMessage("reveal"), null);
   });
 
   it("explains loading, retry, and complete-check states", () => {
@@ -106,5 +221,27 @@ describe("magic-link copy", () => {
       magicLinkButtonLabel({ cooldown: 0, status: "idle", gate: "complete-check" }),
       /Complete security check above/,
     );
+  });
+});
+
+describe("timeout alignment", () => {
+  it("keeps a 12s hang timeout and a 6s still-loading hint", () => {
+    assert.equal(TURNSTILE_LOAD_TIMEOUT_MS, 12_000);
+    assert.equal(TURNSTILE_SLOW_LOAD_HINT_MS, 6_000);
+    assert.ok(TURNSTILE_SLOW_LOAD_HINT_MS < TURNSTILE_LOAD_TIMEOUT_MS);
+  });
+
+  it("does not give up on script retries at ~6s", () => {
+    const sum = TURNSTILE_SCRIPT_RETRY_DELAYS_MS.reduce((a, b) => a + b, 0);
+    assert.ok(
+      sum >= 8_000,
+      `script retry backoff should span most of the 12s window, got ${sum}ms`,
+    );
+    assert.ok(sum <= TURNSTILE_LOAD_TIMEOUT_MS);
+  });
+
+  it("updates skeleton copy after the slow-load hint", () => {
+    assert.equal(turnstileSlowLoadHint(false), "Security check loading…");
+    assert.match(turnstileSlowLoadHint(true), /12 seconds/);
   });
 });

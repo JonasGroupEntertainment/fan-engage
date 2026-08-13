@@ -3,6 +3,11 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import {
   TURNSTILE_CHALLENGE_ID,
+  TURNSTILE_LOAD_TIMEOUT_MS,
+  TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
+  TURNSTILE_SLOW_LOAD_HINT_MS,
+  TURNSTILE_WIDGET_ERROR_COPY,
+  turnstileSlowLoadHint,
   type TurnstileLoadState,
 } from "@/lib/turnstile-ux";
 
@@ -42,8 +47,7 @@ interface Props {
 
 const SCRIPT_ID = "cf-turnstile-script";
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
-const MAX_SCRIPT_RETRIES = 3;
-const LOAD_TIMEOUT_MS = 12_000;
+const MAX_SCRIPT_RETRIES = TURNSTILE_SCRIPT_RETRY_DELAYS_MS.length;
 
 let scriptRequested = false;
 const loadListeners = new Set<() => void>();
@@ -96,7 +100,8 @@ function injectTurnstileScript(attempt = 0, onGiveUp?: () => void) {
   script.defer = true;
   script.onerror = () => {
     if (attempt < MAX_SCRIPT_RETRIES) {
-      setTimeout(() => injectTurnstileScript(attempt + 1, onGiveUp), 1000 * (attempt + 1));
+      const delay = TURNSTILE_SCRIPT_RETRY_DELAYS_MS[attempt] ?? 4_000;
+      setTimeout(() => injectTurnstileScript(attempt + 1, onGiveUp), delay);
     } else {
       onGiveUp?.();
     }
@@ -115,6 +120,7 @@ export function TurnstileWidget({
   const widgetIdRef = useRef<string | null>(null);
   const [loadState, setLoadState] = useState<TurnstileLoadState>("loading");
   const [retryNonce, setRetryNonce] = useState(0);
+  const [slowLoad, setSlowLoad] = useState(false);
 
   const setState = useCallback(
     (state: TurnstileLoadState) => {
@@ -219,7 +225,7 @@ export function TurnstileWidget({
         setState("error");
         onError?.();
       }
-    }, LOAD_TIMEOUT_MS);
+    }, TURNSTILE_LOAD_TIMEOUT_MS);
 
     return () => {
       cancelled = true;
@@ -237,10 +243,20 @@ export function TurnstileWidget({
     };
   }, [renderWidget, setState, onError, retryNonce, markReadyIfIframe]);
 
+  useEffect(() => {
+    if (loadState !== "loading") {
+      setSlowLoad(false);
+      return;
+    }
+    const id = window.setTimeout(() => setSlowLoad(true), TURNSTILE_SLOW_LOAD_HINT_MS);
+    return () => window.clearTimeout(id);
+  }, [loadState, retryNonce]);
+
   function handleRetry() {
     resetTurnstileScriptLoader();
     widgetIdRef.current = null;
     if (containerRef.current) containerRef.current.innerHTML = "";
+    setSlowLoad(false);
     setState("loading");
     setRetryNonce((n) => n + 1);
   }
@@ -258,9 +274,16 @@ export function TurnstileWidget({
         color-scheme: light is required: :root { color-scheme: dark } makes
         Cloudflare's iframe paint as an empty white rectangle. theme="dark"
         still styles the challenge itself.
+        Failed state: hide the widget slot (display:none) so we don't leave a
+        ~65px hole between the SECURITY CHECK label and the error card.
+        Keep the node mounted so Retry can clear/re-render the same container.
       */}
       <div
-        className="relative w-full max-w-[300px]"
+        className={
+          loadState === "error"
+            ? "hidden"
+            : "relative w-full max-w-[300px]"
+        }
         style={{ colorScheme: "light", minHeight: 65 }}
       >
         {loadState === "loading" && (
@@ -271,21 +294,18 @@ export function TurnstileWidget({
           >
             <div className="h-3 w-2/3 animate-pulse rounded bg-white/20" />
             <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
-            <p className="text-xs text-white/70">Security check loading…</p>
+            <p className="text-xs text-white/70">{turnstileSlowLoadHint(slowLoad)}</p>
           </div>
         )}
         <div
           ref={containerRef}
-          className={loadState === "error" ? "hidden" : "min-h-[65px] w-full"}
+          className="min-h-[65px] w-full"
           style={{ colorScheme: "light" }}
         />
       </div>
       {loadState === "error" && (
         <div className="space-y-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2">
-          <p className="text-xs text-rose-200">
-            Security check couldn&apos;t load. Check your connection, then retry —
-            or use password sign-in instead.
-          </p>
+          <p className="text-xs text-rose-200">{TURNSTILE_WIDGET_ERROR_COPY}</p>
           <button
             type="button"
             onClick={handleRetry}

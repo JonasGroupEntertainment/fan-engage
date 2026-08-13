@@ -12,7 +12,11 @@ import {
   turnstileFailureMessage,
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
-import { scrollToTurnstileChallenge } from "@/lib/turnstile-ux";
+import {
+  scrollToTurnstileChallenge,
+  shouldShowParentChallengeError,
+  type TurnstileLoadState,
+} from "@/lib/turnstile-ux";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
@@ -75,6 +79,8 @@ export function SignupForm({
   const turnstileConfigured = isTurnstileConfigured();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
+  const [turnstileLoadState, setTurnstileLoadState] =
+    useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentOpen, setConsentOpen] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
@@ -88,10 +94,17 @@ export function SignupForm({
   }, []);
   const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
+    setTurnstileLoadState(state);
+    if (state === "loading" || state === "ready") {
+      setTurnstileError(false);
+    }
+  }, []);
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
   const resetChallenge = useCallback(() => {
     setTurnstileToken(null);
+    setTurnstileLoadState("loading");
     setTurnstileKey((k) => k + 1);
   }, []);
 
@@ -462,9 +475,13 @@ export function SignupForm({
             onSuccess={handleTurnstileSuccess}
             onError={handleTurnstileError}
             onExpire={handleTurnstileExpire}
+            onLoadStateChange={handleTurnstileLoadState}
             theme="dark"
           />
-          {turnstileError && (
+          {shouldShowParentChallengeError({
+            loadState: turnstileLoadState,
+            challengeFailed: turnstileError,
+          }) && (
             <p className="text-xs text-rose-300">
               Security check failed. Tap Retry above, or try again.
             </p>
