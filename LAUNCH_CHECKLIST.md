@@ -65,6 +65,7 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | 0047 | `0047_rewards_terms_policy.sql` | Rewards terms policy | ✅ applied |
 | 0048 | `0048_music_artist_rewards_expansion.sql` | Music/artist rewards expansion | ✅ applied |
 | 0049 | `0049_secure_financial_and_leaderboard_tables.sql` | Secures financial + leaderboard tables (renamed from duplicate `0040`, see note above) | ✅ applied |
+| 0050 | `0050_lock_redeem_and_membership_economy.sql` | A-P0-2/A-P0-3: bind `redeem_reward` to caller; lock fan/membership economy columns; unstick poisoned Stripe webhook rows | ⏳ apply on prod before paid traffic |
 | — | `20260620195030_stamp_cards.sql` | Stamp cards | ✅ applied (backfilled) |
 | — | `20260620195039_checkins.sql` | Check-ins | ✅ applied (backfilled) |
 | — | `20260704054542_create_community_goals.sql` | Community goals | ✅ applied (backfilled) |

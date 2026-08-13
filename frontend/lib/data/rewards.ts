@@ -142,22 +142,28 @@ export async function countPendingRedemptions(communityId: string): Promise<numb
 }
 
 /**
- * Invoke the redeem_reward RPC.
+ * Invoke the redeem_reward RPC as the signed-in session user only.
+ * Callers cannot supply another fan id (A-P0-2).
  * Returns { ok, redemptionId?, error? }
  */
 export async function redeemReward({
-  fanId,
   rewardId,
   deliveryDetails,
 }: {
-  fanId: string;
   rewardId: string;
   deliveryDetails?: string;
 }): Promise<{ ok: boolean; redemptionId?: string; error?: string }> {
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, error: "Not signed in" };
+    }
+
     const { data, error } = await supabase.rpc("redeem_reward", {
-      p_fan_id: fanId,
+      p_fan_id: user.id,
       p_reward_id: rewardId,
       p_delivery_details: deliveryDetails ?? null,
     });
