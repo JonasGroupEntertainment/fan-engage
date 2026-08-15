@@ -15,9 +15,12 @@ export default async function EditProfilePage() {
 
   const { data: fan } = await supabase
     .from("fans")
-    .select("first_name, city, avatar_url")
+    .select("first_name, last_name, city, phone, interest, music_outlet, socials, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
+
+  const instagramOrTiktok =
+    (fan?.socials as { instagram_or_tiktok?: string | null } | null)?.instagram_or_tiktok ?? "";
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
@@ -29,18 +32,29 @@ export default async function EditProfilePage() {
           Edit profile
         </h1>
         <p className="mt-3 text-white/70">
-          Update your display name, city, and avatar.
+          Update your name, contact info, interests, and avatar.
         </p>
       </header>
 
       <form action={updateProfileAction} className="space-y-5">
         <label className="block text-sm text-white/80">
-          <span>Display name</span>
+          <span>First name</span>
           <input
             type="text"
             name="firstName"
             defaultValue={fan?.first_name ?? ""}
-            placeholder="Your name"
+            placeholder="Your first name"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+          />
+        </label>
+
+        <label className="block text-sm text-white/80">
+          <span>Last name</span>
+          <input
+            type="text"
+            name="lastName"
+            defaultValue={fan?.last_name ?? ""}
+            placeholder="Your last name"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
           />
         </label>
@@ -52,6 +66,53 @@ export default async function EditProfilePage() {
             name="city"
             defaultValue={fan?.city ?? ""}
             placeholder="Austin, TX"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+          />
+        </label>
+
+        <label className="block text-sm text-white/80">
+          <span>Phone number</span>
+          <input
+            type="tel"
+            name="phone"
+            defaultValue={fan?.phone ?? ""}
+            placeholder="+1 (615) 555-0123"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+          />
+          <span className="mt-1 block text-xs text-white/50">
+            Recommended — unlocks SMS perks for artist drops, events, and rewards.
+          </span>
+        </label>
+
+        <label className="block text-sm text-white/80">
+          <span>What are your areas of interest?</span>
+          <input
+            type="text"
+            name="interest"
+            defaultValue={fan?.interest ?? ""}
+            placeholder="Rewards, VIP, Marketplace"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+          />
+        </label>
+
+        <label className="block text-sm text-white/80">
+          <span>Where do you listen to music most?</span>
+          <input
+            type="text"
+            name="musicOutlet"
+            defaultValue={fan?.music_outlet ?? ""}
+            placeholder="Spotify, Apple Music, TikTok…"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+          />
+        </label>
+
+        <label className="block text-sm text-white/80">
+          <span>TikTok or Instagram handle</span>
+          <input
+            type="text"
+            name="instagramOrTiktok"
+            defaultValue={instagramOrTiktok}
+            placeholder="@fanexperience"
             className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
           />
         </label>
