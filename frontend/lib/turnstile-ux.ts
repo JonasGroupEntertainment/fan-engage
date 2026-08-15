@@ -144,3 +144,45 @@ export function scrollToTurnstileChallenge() {
   );
   (focusable ?? el).focus({ preventScroll: true });
 }
+
+/**
+ * Password signup Turnstile gate. A failed / unavailable widget must not
+ * trap Create account — fail-open so ConsentModal can still open.
+ */
+export type SignupTurnstileGate =
+  | "not-configured"
+  | "wait-load"
+  | "complete-check"
+  | "fail-open"
+  | "ready";
+
+export function nextSignupTurnstileGate(opts: {
+  configured: boolean;
+  token: string | null;
+  loadState: TurnstileLoadState;
+}): SignupTurnstileGate {
+  if (!opts.configured) return "not-configured";
+  if (opts.token) return "ready";
+  if (opts.loadState === "loading") return "wait-load";
+  if (opts.loadState === "error") return "fail-open";
+  return "complete-check";
+}
+
+export function signupAllowsSubmit(gate: SignupTurnstileGate): boolean {
+  return gate === "not-configured" || gate === "ready" || gate === "fail-open";
+}
+
+export function signupTurnstileButtonLabel(opts: {
+  cooldown: number;
+  status: "idle" | "loading" | "error" | "confirm";
+  gate: SignupTurnstileGate;
+}): string {
+  if (opts.cooldown > 0) return `Resend confirmation email in ${opts.cooldown}s`;
+  if (opts.status === "loading") return "Creating account…";
+  if (opts.status === "confirm") return "Resend confirmation email";
+  if (opts.gate === "wait-load") return "Security check loading…";
+  if (opts.gate === "complete-check") {
+    return "Complete security check, then create account";
+  }
+  return "Create account";
+}

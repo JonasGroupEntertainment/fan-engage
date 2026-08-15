@@ -11,7 +11,10 @@ import {
   magicLinkGateMessage,
   magicLinkPersistentHelper,
   nextMagicLinkGate,
+  nextSignupTurnstileGate,
   shouldShowParentChallengeError,
+  signupAllowsSubmit,
+  signupTurnstileButtonLabel,
   turnstileSlowLoadHint,
 } from "./turnstile-ux.ts";
 
@@ -220,6 +223,81 @@ describe("magic-link copy", () => {
     assert.match(
       magicLinkButtonLabel({ cooldown: 0, status: "idle", gate: "complete-check" }),
       /Complete security check above/,
+    );
+  });
+});
+
+describe("signup Turnstile gate", () => {
+  it("does not block when Turnstile is not configured", () => {
+    const gate = nextSignupTurnstileGate({
+      configured: false,
+      token: null,
+      loadState: "loading",
+    });
+    assert.equal(gate, "not-configured");
+    assert.equal(signupAllowsSubmit(gate), true);
+  });
+
+  it("disables Create account while the widget is loading", () => {
+    const gate = nextSignupTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "loading",
+    });
+    assert.equal(gate, "wait-load");
+    assert.equal(signupAllowsSubmit(gate), false);
+    assert.equal(
+      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      "Security check loading…",
+    );
+  });
+
+  it("disables Create account until a visible check is completed", () => {
+    const gate = nextSignupTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "ready",
+    });
+    assert.equal(gate, "complete-check");
+    assert.equal(signupAllowsSubmit(gate), false);
+    assert.match(
+      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      /Complete security check/,
+    );
+  });
+
+  it("fail-opens Create account when the widget never loads", () => {
+    const gate = nextSignupTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "error",
+    });
+    assert.equal(gate, "fail-open");
+    assert.equal(signupAllowsSubmit(gate), true);
+    assert.equal(
+      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      "Create account",
+    );
+  });
+
+  it("allows submit once a token exists", () => {
+    const gate = nextSignupTurnstileGate({
+      configured: true,
+      token: "tok",
+      loadState: "ready",
+    });
+    assert.equal(gate, "ready");
+    assert.equal(signupAllowsSubmit(gate), true);
+  });
+
+  it("keeps confirmation resend copy even if the widget remounted", () => {
+    assert.equal(
+      signupTurnstileButtonLabel({
+        cooldown: 0,
+        status: "confirm",
+        gate: "wait-load",
+      }),
+      "Resend confirmation email",
     );
   });
 });

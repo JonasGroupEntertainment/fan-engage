@@ -42,6 +42,8 @@ interface Props {
   onError?: () => void;
   onExpire?: () => void;
   onLoadStateChange?: (state: TurnstileLoadState) => void;
+  /** Parent remounts the widget (bump `key`) so Retry is a full reset. */
+  onRetry?: () => void;
   theme?: "light" | "dark" | "auto";
 }
 
@@ -114,6 +116,7 @@ export function TurnstileWidget({
   onError,
   onExpire,
   onLoadStateChange,
+  onRetry,
   theme = "dark",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -258,6 +261,10 @@ export function TurnstileWidget({
     if (containerRef.current) containerRef.current.innerHTML = "";
     setSlowLoad(false);
     setState("loading");
+    if (onRetry) {
+      onRetry();
+      return;
+    }
     setRetryNonce((n) => n + 1);
   }
 
