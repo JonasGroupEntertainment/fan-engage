@@ -13,8 +13,11 @@ import {
   verifyTurnstileToken,
 } from "@/components/turnstile-widget";
 import {
+  nextSignupTurnstileGate,
   scrollToTurnstileChallenge,
   shouldShowParentChallengeError,
+  signupAllowsSubmit,
+  signupTurnstileButtonLabel,
   type TurnstileLoadState,
 } from "@/lib/turnstile-ux";
 import {
@@ -169,6 +172,51 @@ export function SignupForm({
     return null;
   }
 
+  const turnstileGate = nextSignupTurnstileGate({
+    configured: turnstileConfigured,
+    token: turnstileToken,
+    loadState: turnstileLoadState,
+  });
+  const canSubmitSignup = signupAllowsSubmit(turnstileGate);
+
+  async function ensureCaptcha(): Promise<boolean> {
+    if (captchaVerifiedRef.current) return true;
+    const gate = nextSignupTurnstileGate({
+      configured: turnstileConfigured,
+      token: turnstileToken,
+      loadState: turnstileLoadState,
+    });
+    if (gate === "wait-load") {
+      setStatus("error");
+      setMessage("Security check is still loading. Hang on a moment, then try again.");
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return false;
+    }
+    if (gate === "complete-check") {
+      setStatus("error");
+      setMessage("Complete the security check, then try again.");
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return false;
+    }
+    // Widget failed / unavailable, or keys unset (preview/dev): do not block
+    // account create on a missing token — ConsentModal can still open.
+    if (gate === "fail-open" || gate === "not-configured") {
+      captchaVerifiedRef.current = true;
+      return true;
+    }
+    const captcha = await verifyTurnstileToken(turnstileToken);
+    resetChallenge();
+    if (!captcha.success) {
+      captchaVerifiedRef.current = false;
+      setStatus("error");
+      setMessage(turnstileFailureMessage(captcha.error));
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return false;
+    }
+    captchaVerifiedRef.current = true;
+    return true;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (confirmCooldown > 0) return;
@@ -186,35 +234,25 @@ export function SignupForm({
       return;
     }
 
-    // Verify Turnstile *before* the consent modal. Tokens are single-use and
-    // ~5min TTL; reading ToS behind the modal would otherwise race the
-    // widget (which sits under the overlay and can't be refreshed).
-    if (turnstileConfigured && !turnstileToken) {
-      captchaVerifiedRef.current = false;
-      setStatus("error");
-      setMessage(turnstileFailureMessage("missing_token"));
-      requestAnimationFrame(() => scrollToTurnstileChallenge());
-      return;
-    }
-    setStatus("loading");
-    setMessage("");
-    const captcha = await verifyTurnstileToken(turnstileToken);
-    resetChallenge();
-    if (!captcha.success) {
-      captchaVerifiedRef.current = false;
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      requestAnimationFrame(() => scrollToTurnstileChallenge());
-      return;
-    }
-    captchaVerifiedRef.current = true;
+    // Confirmation resend already passed the gate — don't re-trap on a
+    // remounted / failed widget.
+    const resending = status === "confirm";
+    if (!resending) {
+      // Verify Turnstile *before* the consent modal. Tokens are single-use and
+      // ~5min TTL; reading ToS behind the modal would otherwise race the
+      // widget (which sits under the overlay and can't be refreshed).
+      setStatus("loading");
+      setMessage("");
+      const ok = await ensureCaptcha();
+      if (!ok) return;
 
-    // Explicit, logged consent is required before an account is created.
-    // Hold here and let the scroll-to-accept modal drive the actual submit.
-    if (hasConsentDocs) {
-      setStatus("idle");
-      setConsentOpen(true);
-      return;
+      // Explicit, logged consent is required before an account is created.
+      // Hold here and let the consent modal drive the actual submit.
+      if (hasConsentDocs) {
+        setStatus("idle");
+        setConsentOpen(true);
+        return;
+      }
     }
     await createAccount();
   }
@@ -226,23 +264,8 @@ export function SignupForm({
     // Prefer the pre-consent verification; fall back to a live verify when
     // createAccount is reached without that one-shot (shouldn't happen in
     // the normal consent path, but keeps the no-docs path safe on retry).
-    if (!captchaVerifiedRef.current) {
-      if (turnstileConfigured && !turnstileToken) {
-        setStatus("error");
-        setMessage(turnstileFailureMessage("missing_token"));
-        requestAnimationFrame(() => scrollToTurnstileChallenge());
-        return;
-      }
-      const captcha = await verifyTurnstileToken(turnstileToken);
-      resetChallenge();
-      if (!captcha.success) {
-        setStatus("error");
-        setMessage(turnstileFailureMessage(captcha.error));
-        requestAnimationFrame(() => scrollToTurnstileChallenge());
-        return;
-      }
-      captchaVerifiedRef.current = true;
-    }
+    // Skip on confirmation resend — the account already exists.
+    if (status !== "confirm" && !(await ensureCaptcha())) return;
     captchaVerifiedRef.current = false;
 
     try {
@@ -470,35 +493,48 @@ export function SignupForm({
             })()}
           </label>
 
-          <TurnstileWidget
-            key={turnstileKey}
-            onSuccess={handleTurnstileSuccess}
-            onError={handleTurnstileError}
-            onExpire={handleTurnstileExpire}
-            onLoadStateChange={handleTurnstileLoadState}
-            theme="dark"
-          />
-          {shouldShowParentChallengeError({
-            loadState: turnstileLoadState,
-            challengeFailed: turnstileError,
-          }) && (
-            <p className="text-xs text-rose-300">
-              Security check failed. Tap Retry above, or try again.
-            </p>
+          {turnstileConfigured && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-white/45">Security check</p>
+              <TurnstileWidget
+                key={turnstileKey}
+                onSuccess={handleTurnstileSuccess}
+                onError={handleTurnstileError}
+                onExpire={handleTurnstileExpire}
+                onLoadStateChange={handleTurnstileLoadState}
+                onRetry={resetChallenge}
+                theme="dark"
+              />
+              {shouldShowParentChallengeError({
+                loadState: turnstileLoadState,
+                challengeFailed: turnstileError,
+              }) && (
+                <p className="text-xs text-rose-300">
+                  Security check failed. Tap Retry above, or try again.
+                </p>
+              )}
+              {turnstileGate === "fail-open" && (
+                <p className="text-xs text-white/55">
+                  Security check is unavailable. You can still create an account.
+                </p>
+              )}
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={status === "loading" || confirmCooldown > 0}
+            disabled={
+              status === "loading" ||
+              confirmCooldown > 0 ||
+              (status !== "confirm" && !canSubmitSignup)
+            }
             className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
           >
-            {confirmCooldown > 0
-              ? `Resend confirmation email in ${confirmCooldown}s`
-              : status === "loading"
-                ? "Creating account…"
-                : status === "confirm"
-                  ? "Resend confirmation email"
-                  : "Create account"}
+            {signupTurnstileButtonLabel({
+              cooldown: confirmCooldown,
+              status,
+              gate: turnstileGate,
+            })}
           </button>
         </form>
 
