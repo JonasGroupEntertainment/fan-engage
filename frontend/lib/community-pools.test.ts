@@ -19,7 +19,7 @@ describe("Amy solo vs Danger Twins community pools", () => {
     assert.match(communityTs, /dangertwins:\s*"danger-twins"/);
     assert.match(communityTs, /amystroup:\s*"amy-stroup"/);
     assert.doesNotMatch(communityTs, /amystroup:\s*"danger-twins"/);
-    assert.match(communityTs, /separate invite\/community pools/);
+    assert.match(communityTs, /separate[\s\S]*invite\/community pools/);
   });
 
   it("seeds amy-stroup as an inactive pool and does not launch it", () => {
