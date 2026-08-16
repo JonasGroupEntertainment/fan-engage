@@ -39,12 +39,12 @@ export const DEFAULT_COMMUNITY_ID = "raelynn";
 
 /** Subdomain → community_slug map. MUST stay in sync with the
  *  communities.subdomain column in the DB. When adding a new community,
- *  update both places. `amystroup` is an alias for `danger-twins` per the
- *  Phase 4 architecture doc. */
+ *  update both places. `amystroup` and `dangertwins` are separate
+ *  invite/community pools, not one list. */
 export const COMMUNITY_BY_SUBDOMAIN: Record<string, string> = {
   raelynn: "raelynn",
   dangertwins: "danger-twins",
-  amystroup: "danger-twins", // alias, Danger Twins is the primary brand
+  amystroup: "amy-stroup", // separate pool from Danger Twins — not an alias
   danmarshall: "dan-marshall",
   hunterhawkins: "hunter-hawkins",
   streetteam: "street-team",

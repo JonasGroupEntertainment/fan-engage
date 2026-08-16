@@ -138,7 +138,7 @@ const SEED_CONTENT: Record<string, SeedPost[]> = {
     {
       kind: "announcement",
       title: "Welcome to the Danger Twins community",
-      body: "Amy Stroup and Gabe Dixon built something rare — two artists, one sound that's completely its own. This is the space for the fans who found it. Say hi, tell us how you discovered Danger Twins, and let's build the community together.",
+      body: "Amy Stroup and Andrew Bissell built something rare — two artists, one sound that's completely its own. This is the space for the fans who found it. Say hi, tell us how you discovered Danger Twins, and let's build the community together.",
       pinned: true,
       visibility: "public",
     },
@@ -148,7 +148,7 @@ const SEED_CONTENT: Record<string, SeedPost[]> = {
       body: "What drew you to Danger Twins first?",
       pinned: false,
       visibility: "public",
-      poll_options: ["Amy Stroup's solo work", "Gabe Dixon's music", "A Danger Twins track that found me", "Heard them live"],
+      poll_options: ["Amy Stroup's solo work", "Andrew Bissell's music", "A Danger Twins track that found me", "Heard them live"],
     },
     {
       kind: "challenge",
