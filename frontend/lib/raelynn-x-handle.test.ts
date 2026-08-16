@@ -62,7 +62,7 @@ describe("RaeLynn official X handle", () => {
     const sql = readFileSync(join(repoRoot, migrationRel), "utf8");
     assert.match(sql, /slug = 'raelynn'/);
     assert.match(sql, /https:\/\/x\.com\/RaeLynn/);
-    assert.match(sql, /\(x\|twitter\)\.com\/@\?raelynnofficial/);
+    assert.match(sql, /\(x\|twitter\)\\\.com\/@\?raelynnofficial/);
     assert.match(sql, /Instagram \/ TikTok \/ Facebook/);
     assert.doesNotMatch(sql, /instagram\.com\/raelynnofficial/);
     assert.doesNotMatch(sql, /tiktok\.com\/@raelynnofficial/);
