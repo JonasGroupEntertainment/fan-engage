@@ -6,6 +6,9 @@
  *   2. "https://instagram.com/raelynnofficial"              (bare URL — auto-label)
  *   3. "instagram.com/raelynnofficial"                      (no protocol — assumes https://)
  *
+ * Instagram / TikTok / Facebook raelynnofficial are correct. Official X is
+ * https://x.com/RaeLynn (@RaeLynn) — do not use raelynnofficial on X.
+ *
  * For bare URLs, the domain is matched against KNOWN_PLATFORMS to derive a
  * canonical label (so "Instagram" renders the official Instagram icon on the
  * public page). Unknown domains fall back to the hostname (e.g. "myband.com")

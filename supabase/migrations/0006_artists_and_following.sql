@@ -56,7 +56,10 @@ create trigger artists_set_updated_at
 
 -- ─── Seed artists from hardcoded data (upsert; safe to re-run) ────────────
 insert into public.artists (slug, name, tagline, bio, accent_from, accent_to, genres, social, sort_order) values
-  ('raelynn', 'RaeLynn', 'Country, heart-first.',             'Placeholder bio — awaiting final copy from marketing.', '#f43f5e', '#fbbf24', '{"Country","Americana"}', '[{"label":"Instagram","href":"https://instagram.com/raelynn"}]'::jsonb, 1),
+  -- Official X is https://x.com/RaeLynn (@RaeLynn). Do not put raelynnofficial
+  -- on X — that handle is not her account. Instagram/TikTok/Facebook
+  -- raelynnofficial stay as-is (those platforms are correct).
+  ('raelynn', 'RaeLynn', 'Country, heart-first.',             'Placeholder bio — awaiting final copy from marketing.', '#f43f5e', '#fbbf24', '{"Country","Americana"}', '[{"label":"Instagram","href":"https://instagram.com/raelynn"},{"label":"X","href":"https://x.com/RaeLynn"}]'::jsonb, 1),
   ('bailee',  'Bailee',  'Rising voice, no ceiling.',         'Placeholder bio — awaiting assets from Box drop.',       '#8b5cf6', '#e879f9', '{"Pop"}',                 '[]'::jsonb, 2),
   ('blake',   'Blake',   'Studio-raw, stadium-ready.',        'Placeholder bio — awaiting assets from Box drop.',       '#0ea5e9', '#34d399', '{"Country","Rock"}',      '[]'::jsonb, 3),
   ('konnor',  'Konnor',  'New-school songwriting.',           'Placeholder bio — awaiting assets from Box drop.',       '#f59e0b', '#fb923c', '{"Pop","Indie"}',         '[]'::jsonb, 4),
@@ -68,7 +71,9 @@ on conflict (slug) do update set
   accent_from = excluded.accent_from,
   accent_to   = excluded.accent_to,
   genres      = excluded.genres,
-  social      = excluded.social,
+  -- Preserve CMS/live socials on re-seed. Overwriting would wipe TikTok /
+  -- Facebook / Spotify / site links and could put a stub X handle back.
+  -- X correction is 20260816194300_raelynn_official_x_handle.sql.
   sort_order  = excluded.sort_order;
 
 -- Seed one placeholder event per artist (only if they have zero events yet)
