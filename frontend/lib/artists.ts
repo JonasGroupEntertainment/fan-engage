@@ -137,7 +137,7 @@ export const ARTISTS: Record<string, Artist> = {
   "danger-twins": {
     slug: "danger-twins",
     name: "Danger Twins",
-    tagline: "Amy Stroup + Gabe Dixon. Two voices, one frequency.",
+    tagline: "Amy Stroup + Andrew Bissell. Two voices, one frequency.",
     bio: "Placeholder bio — awaiting final copy from marketing.",
     heroImage: null,
     accentFrom: "#ec4899",
@@ -180,5 +180,7 @@ export function getArtist(slug: string): Artist | null {
 }
 
 export function listArtists(): Artist[] {
+  // amy-stroup is an inactive invite/community pool only — keep it out of
+  // this hardcoded map so /artists/amy-stroup is not generated or listed.
   return Object.values(ARTISTS);
 }
