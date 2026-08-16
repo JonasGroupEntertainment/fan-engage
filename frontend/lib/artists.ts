@@ -52,7 +52,11 @@ export const ARTISTS: Record<string, Artist> = {
       { title: "Phone Wallpaper Pack", tier: "Silver Priority", points: "3,200 pts" },
       { title: "Tour Hoodie", tier: "Bronze+", points: "2,400 pts" },
     ],
-    social: [{ label: "Instagram", href: "https://instagram.com/raelynn" }],
+    social: [
+      { label: "Instagram", href: "https://instagram.com/raelynn" },
+      // Official X is @RaeLynn. Do not use raelynnofficial on X (wrong account).
+      { label: "X", href: "https://x.com/RaeLynn" },
+    ],
   },
   bailee: {
     slug: "bailee",
