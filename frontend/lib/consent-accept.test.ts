@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canAcceptConsent, isScrollAtBottom } from "./consent-accept.ts";
+import {
+  CONSENT_COPY,
+  canAcceptConsent,
+  consentAcceptLabel,
+  consentProgressLabel,
+  isScrollAtBottom,
+  reviewedConsentCount,
+  shouldShowKeepScrollingCue,
+} from "./consent-accept.ts";
 
 describe("isScrollAtBottom", () => {
   it("is true when content does not overflow", () => {
@@ -68,5 +76,46 @@ describe("canAcceptConsent", () => {
       }),
       true,
     );
+  });
+});
+
+describe("consent modal copy and progress", () => {
+  it("locks Dash-approved keep-scrolling / accept / checkbox strings", () => {
+    assert.equal(
+      CONSENT_COPY.keepScrollingCue,
+      "Keep scrolling, or check the box below to accept.",
+    );
+    assert.equal(CONSENT_COPY.lockedAccept, "Keep scrolling or check the box");
+    assert.equal(CONSENT_COPY.unlockedAccept, "I agree — create my account");
+    assert.equal(
+      CONSENT_COPY.checkboxLabel,
+      "I have read the Terms of Use and Privacy Policy.",
+    );
+  });
+
+  it("counts reviewed docs and formats progress", () => {
+    assert.equal(reviewedConsentCount(2, { 0: true }), 1);
+    assert.equal(consentProgressLabel(1, 2), "1 of 2 reviewed");
+    assert.equal(consentProgressLabel(0, 1), "0 of 1 reviewed");
+  });
+
+  it("shows the keep-scrolling cue until this doc is done or the box is checked", () => {
+    assert.equal(
+      shouldShowKeepScrollingCue({ currentDocReviewed: false, acknowledged: false }),
+      true,
+    );
+    assert.equal(
+      shouldShowKeepScrollingCue({ currentDocReviewed: true, acknowledged: false }),
+      false,
+    );
+    assert.equal(
+      shouldShowKeepScrollingCue({ currentDocReviewed: false, acknowledged: true }),
+      false,
+    );
+  });
+
+  it("uses instructional locked Accept copy and the unlocked create-account label", () => {
+    assert.equal(consentAcceptLabel(false), CONSENT_COPY.lockedAccept);
+    assert.equal(consentAcceptLabel(true), CONSENT_COPY.unlockedAccept);
   });
 });

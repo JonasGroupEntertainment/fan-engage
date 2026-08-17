@@ -248,7 +248,7 @@ describe("signup Turnstile gate", () => {
     assert.equal(signupAllowsSubmit(gate), false);
     assert.equal(
       signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
-      "Security check loading…",
+      "Create account",
     );
   });
 
@@ -260,9 +260,9 @@ describe("signup Turnstile gate", () => {
     });
     assert.equal(gate, "complete-check");
     assert.equal(signupAllowsSubmit(gate), false);
-    assert.match(
+    assert.equal(
       signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
-      /Complete security check/,
+      "Create account",
     );
   });
 
@@ -278,6 +278,15 @@ describe("signup Turnstile gate", () => {
       signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
       "Create account",
     );
+  });
+
+  it("never puts security-check loading copy on Create account", () => {
+    for (const gate of ["wait-load", "complete-check", "fail-open", "ready", "not-configured"] as const) {
+      assert.equal(
+        signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+        "Create account",
+      );
+    }
   });
 
   it("allows submit once a token exists", () => {
