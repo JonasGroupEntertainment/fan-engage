@@ -180,9 +180,6 @@ export function signupTurnstileButtonLabel(opts: {
   if (opts.cooldown > 0) return `Resend confirmation email in ${opts.cooldown}s`;
   if (opts.status === "loading") return "Creating account…";
   if (opts.status === "confirm") return "Resend confirmation email";
-  if (opts.gate === "wait-load") return "Security check loading…";
-  if (opts.gate === "complete-check") {
-    return "Complete security check, then create account";
-  }
+  // Loading / fail / retry copy lives on the Turnstile block, not this CTA.
   return "Create account";
 }
