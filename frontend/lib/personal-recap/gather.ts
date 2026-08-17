@@ -180,7 +180,6 @@ export async function gatherWeeklyRecap(fanId: string): Promise<WeeklyRecap> {
       hasActivity: true,
     };
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.warn("gatherWeeklyRecap failed (non-blocking):", err);
     return EMPTY_RECAP;
   }

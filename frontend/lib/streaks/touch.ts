@@ -247,7 +247,6 @@ export async function touchStreak(
     };
   } catch (err) {
     // Streak is non-essential — never let it crash Fan Home.
-    // eslint-disable-next-line no-console
     console.warn("touchStreak failed (non-blocking):", err);
     return benign;
   }
