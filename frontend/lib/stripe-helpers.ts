@@ -49,10 +49,10 @@ export interface FounderState {
 }
 
 /**
- * Count memberships flagged `is_founder` (set at signup once the first N
- * subscribers claim founder pricing). Matches the same flag used by the
- * founders wall (`/artists/[slug]/founders`) so the count shown here can't
- * drift from the count shown there.
+ * Paid Premium founder-pricing eligibility (checkout / webhook).
+ * Counts `is_founder` — a different flag from public Founding Fan
+ * numbers 1–100. Guest counters on homepage, /artists/[slug], and
+ * /premium MUST use `getFoundingFanClaimState`, not this helper.
  */
 export async function getFounderState(communityId: string): Promise<FounderState> {
   const admin = createAdminClient();

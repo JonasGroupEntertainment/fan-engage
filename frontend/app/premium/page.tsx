@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
-import { getFounderState, fmtPrice } from "@/lib/stripe-helpers";
+import { fmtPrice } from "@/lib/stripe-helpers";
+import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
@@ -71,7 +72,7 @@ export default async function PremiumPage({
   const isPremium =
     tier === "premium" || tier === "past_due" || tier === "comped";
 
-  const founder = await getFounderState(communityId);
+  const founder = await getFoundingFanClaimState(communityId);
 
   const monthly = community.monthly_price_cents;
   const annual = community.annual_price_cents;
@@ -145,7 +146,7 @@ export default async function PremiumPage({
         </p>
 
         {/* Founder banner */}
-        {!founder.isFull && (
+        {!founder.closed && (
           <div
             className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-gradient-to-r from-aurora/20 to-ember/20 px-4 py-2 text-xs font-medium text-white"
             style={{
@@ -153,10 +154,10 @@ export default async function PremiumPage({
             }}
           >
             <span aria-hidden>🌟</span>
-            Founding Fan pricing — {founder.slotsRemaining.toLocaleString("en-US")} {founder.slotsRemaining === 1 ? "spot" : "spots"} remaining of {founder.founderCap.toLocaleString("en-US")}.
+            Founding Fan pricing — {founder.remaining.toLocaleString("en-US")} {founder.remaining === 1 ? "spot" : "spots"} remaining of {founder.cap.toLocaleString("en-US")}.
           </div>
         )}
-        {founder.isFull && (
+        {founder.closed && (
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/55">
             Founding Fan spots are full. Standard pricing applies — future
             price increases won&apos;t affect existing subscribers on either
@@ -165,7 +166,7 @@ export default async function PremiumPage({
         )}
 
         {/* Founder wall link */}
-        {founder.founderCap > 0 && (
+        {founder.cap > 0 && (
           <div className="mt-3">
             <Link
               href={`/artists/${communityId}/founders`}
@@ -177,10 +178,10 @@ export default async function PremiumPage({
         )}
 
         {/* Real-time slot counter */}
-        {!founder.isFull && founder.founderCap > 0 && (
+        {!founder.closed && founder.cap > 0 && (
           <FounderSlotsCounter
-            initialFilled={founder.founderCount}
-            total={founder.founderCap}
+            initialFilled={founder.claimed}
+            total={founder.cap}
           />
         )}
 

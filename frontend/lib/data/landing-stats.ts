@@ -1,4 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
+import {
+  FOUNDING_FAN_CAP,
+  getFoundingFanClaimState,
+} from "@/lib/data/founding-fans";
 
 /**
  * Live stats shown on the signed-out landing — used by the
@@ -6,10 +11,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * the existing How-it-works section.
  *
  * First 100 Founding Fan is a persisted membership number, not a date
- * window and not paid Founding Fan pricing.
+ * window and not paid Founding Fan pricing. Claimed/remaining/cap come
+ * from `getFoundingFanClaimState` — same helper as /artists/raelynn and
+ * /premium.
  */
 
-export const FOUNDING_TARGET = 100;
+export const FOUNDING_TARGET = FOUNDING_FAN_CAP;
 
 export type LandingNextEvent = {
   title: string;
@@ -43,7 +50,7 @@ export async function getLandingStats(): Promise<LandingStats> {
   try {
     const admin = createAdminClient();
     const nowIso = new Date().toISOString();
-    const [artistsRes, eventsRes, foundersRes, nextEventRes] = await Promise.all([
+    const [artistsRes, eventsRes, founding, nextEventRes] = await Promise.all([
       admin
         .from("artists")
         .select("slug", { count: "exact", head: true })
@@ -53,27 +60,23 @@ export async function getLandingStats(): Promise<LandingStats> {
         .select("id", { count: "exact", head: true })
         .eq("active", true)
         .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`),
-      admin
-        .from("fan_community_memberships")
-        .select("fan_id", { count: "exact", head: true })
-        .eq("community_id", "raelynn")
-        .not("founding_fan_number", "is", null),
+      getFoundingFanClaimState(LAUNCH_COMMUNITY_ID),
       admin
         .from("artist_events")
         .select("title, event_date, location, starts_at")
         .eq("active", true)
-        .eq("artist_slug", "raelynn")
+        .eq("artist_slug", LAUNCH_COMMUNITY_ID)
         .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`)
         .order("starts_at", { ascending: true, nullsFirst: false })
         .limit(1)
         .maybeSingle(),
     ]);
 
-    const foundingFans = foundersRes.count ?? 0;
-    const foundingSpotsRemaining = Math.max(0, FOUNDING_TARGET - foundingFans);
+    const foundingFans = founding.claimed;
+    const foundingSpotsRemaining = founding.remaining;
     const foundingPctClaimed = Math.min(
       100,
-      Math.round((foundingFans / FOUNDING_TARGET) * 100),
+      Math.round((foundingFans / founding.cap) * 100),
     );
     const nextRow = nextEventRes.data as {
       title: string;
@@ -87,9 +90,9 @@ export async function getLandingStats(): Promise<LandingStats> {
       activeEvents: eventsRes.count ?? 0,
       foundingFans,
       foundingSpotsRemaining,
-      foundingTarget: FOUNDING_TARGET,
+      foundingTarget: founding.cap,
       foundingPctClaimed,
-      foundingClosed: foundingSpotsRemaining === 0,
+      foundingClosed: founding.closed,
       nextEvent: nextRow
         ? {
             title: nextRow.title,

@@ -13,7 +13,6 @@ import {
 import { getRsvpMetaForEvents } from "@/lib/data/events";
 import { getCurrentFan } from "@/lib/data/fan";
 import { canAccess, getViewerEntitlement } from "@/lib/entitlements";
-import { createAdminClient } from "@/lib/supabase/admin";
 import PremiumPaywall from "@/components/premium-paywall";
 import SocialIcon from "@/components/social-icon";
 import FollowButton from "./follow-button";
@@ -55,32 +54,6 @@ export async function generateMetadata(
   };
 }
 
-async function getFounderCount(communitySlug: string): Promise<{ count: number; cap: number } | null> {
-  try {
-    const admin = createAdminClient();
-    const { data: community, error: communityError } = await admin
-      .from("communities")
-      .select("founder_cap")
-      .eq("slug", communitySlug)
-      .maybeSingle();
-    if (communityError || !community) return null;
-
-    const { count, error: countError } = await admin
-      .from("fan_community_memberships")
-      .select("*", { count: "exact", head: true })
-      .eq("community_id", communitySlug)
-      .eq("is_founder", true);
-    if (countError || count === null) return null;
-
-    return {
-      count,
-      cap: (community.founder_cap as number) ?? 100,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export default async function ArtistPage({
   params,
   searchParams,
@@ -90,12 +63,11 @@ export default async function ArtistPage({
 }) {
   const { slug } = await params;
   const { welcome } = await searchParams;
-  const [artist, fan, isFollowing, entitlement, founderData] = await Promise.all([
+  const [artist, fan, isFollowing, entitlement] = await Promise.all([
     getArtistFromDb(slug),
     getCurrentFan(),
     doesFanFollowArtist(slug),
     getViewerEntitlement(slug),
-    getFounderCount(slug),
   ]);
   if (!artist) notFound();
   const isSignedIn = fan !== null;
@@ -154,11 +126,10 @@ export default async function ArtistPage({
 
   const totalRsvps = Array.from(rsvpCounts.values()).reduce((a, b) => a + b, 0);
 
-  // Campaign goals are admin-configured rows in community_goals; live
-  // founder/RSVP counts are passed in so metric rows resolve without
-  // duplicate queries. Empty array → section hidden entirely.
+  // Campaign goals are admin-configured rows in community_goals.
+  // founder_count uses getFoundingFanClaimState (same helper as homepage
+  // and /premium). Empty array → section hidden entirely.
   const campaignGoals = await getCampaignGoals(slug, {
-    founderCount: founderData?.count ?? 0,
     rsvpTotal: totalRsvps,
   });
 

@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { getCurrentCommunityId } from "@/lib/community";
-import { getFounderState } from "@/lib/stripe-helpers";
+import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const communityId = await getCurrentCommunityId();
-    const state = await getFounderState(communityId);
+    const state = await getFoundingFanClaimState(communityId);
     return NextResponse.json({
-      filled: state.founderCount,
-      total: state.founderCap,
-      remaining: state.slotsRemaining,
+      filled: state.claimed,
+      total: state.cap,
+      remaining: state.remaining,
     });
   } catch (err) {
     console.error("[founder-slots] error", err);
