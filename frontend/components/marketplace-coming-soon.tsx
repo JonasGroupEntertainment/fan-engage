@@ -6,8 +6,10 @@ import Link from "next/link";
  */
 export default function MarketplaceComingSoon({
   artistName = "RaeLynn",
+  signedIn = false,
 }: {
   artistName?: string;
+  signedIn?: boolean;
 }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/15 via-slate-900/80 to-ember/15 p-8 shadow-glass sm:p-10">
@@ -16,12 +18,13 @@ export default function MarketplaceComingSoon({
         className="mt-3 text-3xl font-semibold leading-tight md:text-4xl"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        {artistName} drops — coming soon
+        {artistName} merch — coming soon
       </h1>
       <p className="mt-4 max-w-xl text-sm text-white/75 leading-relaxed">
-        The marketplace isn&apos;t open for soft launch yet — you&apos;ll see Coming
-        soon here. Create your fan profile and earn points so you&apos;re ready when{" "}
-        {artistName}&apos;s merch and drops go live.
+        Physical merch and signed gear stay Coming soon.{" "}
+        {signedIn
+          ? "Digital in-app unlocks are live below — spend the points you already earned."
+          : "Create a fan profile to redeem digital unlocks. Merch is a separate shop that is not open yet."}
       </p>
       <ul className="mt-5 space-y-2 text-sm text-white/70">
         <li className="flex items-start gap-2">

@@ -89,25 +89,25 @@ export default function SignedOutLanding({
             </p>
           </div>
 
-          {/* Hero visual — stylized preview card stack */}
+          {/* Hero visual — live hub data, or an explicitly labeled sample */}
           <div className="relative hidden lg:block">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative h-[440px] w-[360px]">
-                {/* Back card */}
                 <div className="absolute left-8 top-12 h-[380px] w-[320px] rotate-3 rounded-3xl border border-white/10 bg-gradient-to-br from-ember/25 via-slate-900 to-aurora/25 shadow-glass">
                   <div className="p-6 text-white/70">
                     <p className="text-xs uppercase tracking-widest">
-                      Next Event
+                      {stats.nextEvent ? "Next show" : "Sample preview"}
                     </p>
                     <p className="mt-2 text-sm font-semibold text-white">
-                      Nashville Listening Party
+                      {stats.nextEvent?.title ?? "Tour date — coming soon"}
                     </p>
                     <p className="mt-1 text-xs text-white/60">
-                      Thu · 8pm · +25 pts for RSVP
+                      {stats.nextEvent
+                        ? [stats.nextEvent.date, stats.nextEvent.location].filter(Boolean).join(" · ")
+                        : "No dated show on the hub yet"}
                     </p>
                   </div>
                 </div>
-                {/* Front card */}
                 <div className="absolute left-0 top-0 h-[380px] w-[320px] -rotate-2 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/40 via-slate-900 to-black p-6 shadow-glass">
                   <video
                     aria-hidden
@@ -123,37 +123,39 @@ export default function SignedOutLanding({
                   <div className="relative">
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-widest text-white/60">
-                        Fan Profile
+                        {stats.foundingFans > 0 ? "Founding Fan" : "Sample preview"}
                       </p>
                       <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
-                        Gold tier
+                        Bronze start
                       </span>
                     </div>
                     <p
                       className="mt-6 text-4xl font-semibold text-white"
                       style={{ fontFamily: "var(--font-display)" }}
                     >
-                      11,420
+                      {stats.foundingSpotsRemaining.toLocaleString("en-US")}
                     </p>
-                    <p className="text-xs text-white/50">total points</p>
+                    <p className="text-xs text-white/50">
+                      founding spots left of {stats.foundingTarget}
+                    </p>
                     <div className="mt-6 space-y-2">
                       <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
                         <span className="flex items-center gap-2">
-                          <Icon name="trophy" size={16} /> Challenge crasher
+                          <Icon name="trophy" size={16} /> Phone Wallpaper
                         </span>
-                        <span className="text-emerald-300">+250</span>
+                        <span className="text-emerald-300">250 pts</span>
                       </div>
                       <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
                         <span className="flex items-center gap-2">
-                          <Icon name="ticket" size={16} /> Austin Listening Party
+                          <Icon name="ticket" size={16} /> Lyric Wallpaper
                         </span>
-                        <span className="text-emerald-300">+25</span>
+                        <span className="text-emerald-300">500 pts</span>
                       </div>
                       <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
                         <span className="flex items-center gap-2">
-                          <Icon name="handshake" size={16} /> Invited 3 friends
+                          <Icon name="handshake" size={16} /> Fan Spotlight
                         </span>
-                        <span className="text-emerald-300">+450</span>
+                        <span className="text-emerald-300">1,000 pts</span>
                       </div>
                     </div>
                   </div>

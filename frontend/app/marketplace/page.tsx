@@ -6,6 +6,8 @@ import { getCurrentFan, getPrimaryCommunityId } from "@/lib/data/fan";
 import type { Offer, OfferCategory } from "@/lib/data/types";
 import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-empty-state";
 import PreviewSignupBanner from "@/components/preview-signup-banner";
+import { listRewardsForCommunity } from "@/lib/data/rewards";
+import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +59,40 @@ interface PageProps {
 }
 
 export default async function MarketplacePage({ searchParams }: PageProps) {
-  // Soft launch: marketplace not open (provider issues). Always Coming soon
-  // until NEXT_PUBLIC_MARKETPLACE_LIVE=true.
+  // Physical merch stays Coming soon. Signed-in fans can still redeem
+  // digital launch SKUs — that is the only live marketplace surface.
   if (!isMarketplaceLive()) {
+    const fan = await getCurrentFan();
+    const digital = fan
+      ? await listRewardsForCommunity(LAUNCH_COMMUNITY_ID)
+      : [];
     return (
       <div className="min-h-screen bg-midnight">
-        <main className="mx-auto max-w-3xl px-6 py-12">
-          <MarketplaceComingSoon artistName="RaeLynn" />
+        <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
+          <MarketplaceComingSoon artistName="RaeLynn" signedIn={fan !== null} />
+          {fan && digital.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold">Digital unlocks</h2>
+              <p className="text-sm text-white/60">
+                In-app items only. Physical merch stays Coming soon.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {digital.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/artists/${LAUNCH_COMMUNITY_ID}/rewards`}
+                    className="rounded-2xl border border-white/10 bg-black/30 p-5 hover:border-white/25"
+                  >
+                    <p className="text-xs uppercase tracking-wide text-white/50">
+                      Digital
+                    </p>
+                    <p className="mt-1 font-semibold">{r.title}</p>
+                    <p className="mt-3 text-emerald-300">{r.point_cost.toLocaleString()} pts</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
         </main>
       </div>
     );

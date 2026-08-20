@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
+import { isPublicLeaderboardHonest } from "@/lib/leaderboard/honesty";
 import LeaderboardPodium from "@/components/leaderboard-podium";
 import LeaderboardList from "@/components/leaderboard-list";
 import ShareButton from "@/components/share-button";
@@ -72,12 +73,13 @@ export default async function LeaderboardPage({
         </p>
       </header>
 
-      {board.top.length === 0 ? (
+      {!isPublicLeaderboardHonest(board) ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-          <p className="text-base font-medium text-white">No activity yet</p>
+          <p className="text-base font-medium text-white">Leaderboard warming up</p>
           <p className="mt-1 text-sm text-white/55">
-            Be the first to top the chart — react to a post, RSVP an event, or
-            redeem a reward.
+            We hide a near-empty board instead of showing one quiet score as
+            social proof. React, comment, or RSVP and it will open when the
+            room has real activity.
           </p>
         </div>
       ) : (

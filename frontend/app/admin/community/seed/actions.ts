@@ -17,25 +17,22 @@ const SEED_CONTENT: Record<string, SeedPost[]> = {
   raelynn: [
     {
       kind: "announcement",
-      title: "Welcome to the RaeLynn community",
-      body: "Hey everyone — this is your space. Share what RaeLynn's music means to you, swap setlist predictions, post your fan moments, and connect with other fans who get it. Drop a hello below and tell us where you're tuning in from.",
+      title: "[Placeholder / draft] Team note",
+      body: "Draft placeholder from the Fan Engage team. Kevin will replace this with RaeLynn-approved copy. This is not from RaeLynn.",
       pinned: true,
       visibility: "public",
     },
     {
       kind: "poll",
-      title: null,
-      body: "Which era of RaeLynn are you most into right now?",
-      pinned: false,
+      title: "[Placeholder / draft] Room poll",
+      body: "Placeholder poll for the room. Kevin will replace the question and options with RaeLynn-approved copy. This is not from RaeLynn.",
+      pinned: true,
       visibility: "public",
-      poll_options: ["God Made Girls / Wildhorse era", "WildHorse album deep cuts", "BYE FELICIA", "Whatever she drops next"],
-    },
-    {
-      kind: "challenge",
-      title: "Show us your RaeLynn moment",
-      body: "Post a photo or video from a RaeLynn show, a fan meet, or any memory tied to her music. Tag where it was taken and we'll feature the best ones. Top 3 get 500 bonus points.",
-      pinned: false,
-      visibility: "public",
+      poll_options: [
+        "[Placeholder] Option A — Kevin will replace",
+        "[Placeholder] Option B — Kevin will replace",
+        "[Placeholder] Option C — Kevin will replace",
+      ],
     },
   ],
   "bailee-madison": [

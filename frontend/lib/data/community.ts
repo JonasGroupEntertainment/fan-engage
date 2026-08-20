@@ -117,7 +117,10 @@ export async function getPostsByArtist(
           comment_count: commentCountsByPost.get(p.id as string) ?? 0,
           thread_summary: ((p as { thread_summary?: string | null }).thread_summary) ?? null,
           thread_summary_count: ((p as { thread_summary_count?: number | null }).thread_summary_count) ?? null,
-      tags: ((p as { tags?: string[] }).tags as string[] | undefined) ?? [],
+          tags: ((p as { tags?: string[] }).tags as string[] | undefined) ?? [],
+          image_alt: null,
+          moderation_status: null,
+          moderation_user_message: null,
         }) as CommunityPost,
     );
   } catch {

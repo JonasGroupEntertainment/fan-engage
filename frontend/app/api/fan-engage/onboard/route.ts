@@ -213,7 +213,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Award signup bonus — idempotent via source_ref = `signup:${userId}`.
+    // 3. Founding Fan first so the welcome award hits the 1.5× writer.
+    if (communityJoined) {
+      try {
+        const admin = createAdminClient();
+        const { error: foundingErr } = await admin.rpc("claim_founding_fan_status", {
+          p_fan_id: user.id,
+          p_community_id: communityJoined,
+        });
+        if (foundingErr) {
+          console.warn("onboard: claim_founding_fan_status failed", foundingErr);
+        }
+      } catch (err) {
+        console.warn("onboard: founding fan claim failed", err);
+      }
+    }
+
+    // 4. Award signup bonus — idempotent via source_ref = `signup:${userId}`.
     try {
       const admin = createAdminClient();
       const sourceRef = `signup:${user.id}`;
@@ -237,24 +253,6 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.warn("onboard: signup bonus failed", err);
       // non-fatal — profile save still succeeded
-    }
-
-    // 4. Founding Fan — first 100 fans who complete onboarding in this
-    //    community. Persists founding_fan_number + founder-fan badge.
-    //    Separate from paid Founding Fan pricing (claim_founder_slot).
-    if (communityJoined) {
-      try {
-        const admin = createAdminClient();
-        const { error: foundingErr } = await admin.rpc("claim_founding_fan_status", {
-          p_fan_id: user.id,
-          p_community_id: communityJoined,
-        });
-        if (foundingErr) {
-          console.warn("onboard: claim_founding_fan_status failed", foundingErr);
-        }
-      } catch (err) {
-        console.warn("onboard: founding fan claim failed", err);
-      }
     }
 
     return NextResponse.json({ success: true, fan, communityJoined });

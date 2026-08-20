@@ -6,6 +6,10 @@
  * (`active = false`). Do not expand this set without a Dash decision.
  */
 
+import { isDigitallyRedeemableTitle } from "./points/economy.ts";
+
+export { FOUNDING_FAN_CAP } from "./points/economy.ts";
+
 export const LAUNCH_COMMUNITY_ID = "raelynn";
 
 export const ACTIVITY_POINTS = {
@@ -21,8 +25,6 @@ export const REFERRAL_JOIN_POINTS = {
   referrer: 150,
   friend: 50,
 } as const;
-
-export const FOUNDING_FAN_CAP = 100;
 
 /** Exact launch titles after the 0051 rename/upsert. */
 export const LAUNCH_REWARD_TITLES = [
@@ -137,8 +139,19 @@ export function shouldListLaunchReward(
     if (!clip) return false;
   }
   if (title === "Fan Spotlight" && !opts.signedIn) return false;
+  if (title === "VIP Moment Raffle") {
+    // SKU may exist; do not sell until a show date exists.
+    return false;
+  }
   if (!opts.signedIn) return false;
-  return true;
+  return isDigitallyRedeemableTitle(row.title, {
+    active: row.active,
+    clipUrl: row.clip_url,
+  });
+}
+
+export function isHeldLaunchReward(title: string): boolean {
+  return canonicalLaunchTitle(title) === "VIP Moment Raffle";
 }
 
 export function isInAppOnlyLaunchReward(title: string): boolean {

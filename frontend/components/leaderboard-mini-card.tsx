@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
+import { isPublicLeaderboardHonest } from "@/lib/leaderboard/honesty";
 
 /**
  * Compact leaderboard preview for the artist profile page. Renders the
@@ -32,7 +33,7 @@ export default async function LeaderboardMiniCard({
     viewerFanId: user?.id ?? null,
     topN: 3,
   });
-  if (!board || board.top.length === 0) return null;
+  if (!isPublicLeaderboardHonest(board)) return null;
 
   return (
     <Link

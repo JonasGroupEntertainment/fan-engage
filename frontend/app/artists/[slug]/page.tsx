@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LeaderboardMiniCard from "@/components/leaderboard-mini-card";
 import { LatestStrip } from "@/components/latest-strip";
+import ArtistHubRoom from "@/components/artist-hub-room";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -329,6 +330,8 @@ export default async function ArtistPage({
         </section>
       )}
 
+      <ArtistHubRoom artistSlug={slug} artistName={artist.name} />
+
       {/* About */}
       <LatestStrip slug={slug} />
 
@@ -474,8 +477,8 @@ export default async function ArtistPage({
             </h2>
             {!marketplaceLive ? (
               <p className="mt-2 max-w-xl text-sm text-white/65">
-                Official merch and point redemptions aren&apos;t open for soft launch yet.
-                Join the fan club and earn points so you&apos;re ready when the shop opens.
+                Physical merch and signed gear stay Coming soon. Signed-in fans
+                can already spend points on digital unlocks.
               </p>
             ) : null}
           </div>
@@ -509,16 +512,24 @@ export default async function ArtistPage({
             ))}
           </div>
         ) : (
-          <ul className="mt-5 space-y-2 text-sm text-white/65">
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-              Tour merch &amp; signed items (when live)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-              Point redemptions &amp; fan-priority drops
-            </li>
-          </ul>
+          <>
+            <ul className="mt-5 space-y-2 text-sm text-white/65">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                Tour merch &amp; signed items — Coming soon
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                Digital unlocks (wallpaper, in-app spotlight) — live for signed-in fans
+              </li>
+            </ul>
+            <Link
+              href={`/artists/${slug}/rewards`}
+              className="mt-4 inline-flex rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 hover:border-white/40"
+            >
+              Redeem digital unlocks →
+            </Link>
+          </>
         )}
       </section>
     </main>
