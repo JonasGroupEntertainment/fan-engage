@@ -11,6 +11,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const FOUNDING_TARGET = 100;
 
+export type LandingNextEvent = {
+  title: string;
+  date: string;
+  location: string | null;
+};
+
 export type LandingStats = {
   activeArtists: number;
   activeEvents: number;
@@ -19,6 +25,7 @@ export type LandingStats = {
   foundingTarget: number;
   foundingPctClaimed: number;
   foundingClosed: boolean;
+  nextEvent: LandingNextEvent | null;
 };
 
 export async function getLandingStats(): Promise<LandingStats> {
@@ -30,11 +37,13 @@ export async function getLandingStats(): Promise<LandingStats> {
     foundingTarget: FOUNDING_TARGET,
     foundingPctClaimed: 0,
     foundingClosed: false,
+    nextEvent: null,
   };
 
   try {
     const admin = createAdminClient();
-    const [artistsRes, eventsRes, foundersRes] = await Promise.all([
+    const nowIso = new Date().toISOString();
+    const [artistsRes, eventsRes, foundersRes, nextEventRes] = await Promise.all([
       admin
         .from("artists")
         .select("slug", { count: "exact", head: true })
@@ -42,12 +51,22 @@ export async function getLandingStats(): Promise<LandingStats> {
       admin
         .from("artist_events")
         .select("id", { count: "exact", head: true })
-        .eq("active", true),
+        .eq("active", true)
+        .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`),
       admin
         .from("fan_community_memberships")
         .select("fan_id", { count: "exact", head: true })
         .eq("community_id", "raelynn")
         .not("founding_fan_number", "is", null),
+      admin
+        .from("artist_events")
+        .select("title, event_date, location, starts_at")
+        .eq("active", true)
+        .eq("artist_slug", "raelynn")
+        .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`)
+        .order("starts_at", { ascending: true, nullsFirst: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const foundingFans = foundersRes.count ?? 0;
@@ -56,6 +75,12 @@ export async function getLandingStats(): Promise<LandingStats> {
       100,
       Math.round((foundingFans / FOUNDING_TARGET) * 100),
     );
+    const nextRow = nextEventRes.data as {
+      title: string;
+      event_date: string | null;
+      location: string | null;
+      starts_at: string | null;
+    } | null;
 
     return {
       activeArtists: artistsRes.count ?? 0,
@@ -65,6 +90,13 @@ export async function getLandingStats(): Promise<LandingStats> {
       foundingTarget: FOUNDING_TARGET,
       foundingPctClaimed,
       foundingClosed: foundingSpotsRemaining === 0,
+      nextEvent: nextRow
+        ? {
+            title: nextRow.title,
+            date: nextRow.event_date ?? nextRow.starts_at ?? "Date TBA",
+            location: nextRow.location,
+          }
+        : null,
     };
   } catch (err) {
     console.warn("getLandingStats failed", err);

@@ -18,6 +18,15 @@ const webhookTs = readFileSync(
 const migrationSql = readFileSync(
   fileURLToPath(
     new URL(
+      "../../../supabase/migrations/0053_superfan_loop.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const lockSql = readFileSync(
+  fileURLToPath(
+    new URL(
       "../../../supabase/migrations/0050_lock_redeem_and_membership_economy.sql",
       import.meta.url,
     ),
@@ -43,6 +52,8 @@ describe("A-P0-2 redeem path uses session user only", () => {
       migrationSql,
       /revoke all on function public\.redeem_reward\(uuid, uuid, text\) from public, anon/,
     );
+    assert.match(migrationSql, /fan_ledger_balance/);
+    assert.match(lockSql, /auth\.uid\(\) is distinct from p_fan_id/);
   });
 });
 
@@ -59,9 +70,9 @@ describe("A-P0-1 webhook completion", () => {
 
 describe("A-P0-3 membership economy lock", () => {
   it("migration revokes client UPDATE on billing and points columns", () => {
-    assert.match(migrationSql, /revoke update \(/);
-    assert.match(migrationSql, /subscription_tier/);
-    assert.match(migrationSql, /on public\.fan_community_memberships/);
-    assert.match(migrationSql, /reject_client_economy_column_changes/);
+    assert.match(lockSql, /revoke update \(/);
+    assert.match(lockSql, /subscription_tier/);
+    assert.match(lockSql, /on public\.fan_community_memberships/);
+    assert.match(lockSql, /reject_client_economy_column_changes/);
   });
 });

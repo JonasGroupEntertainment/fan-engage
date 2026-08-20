@@ -213,7 +213,8 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
 
     const communityId = await getCurrentCommunityId();
 
-    const [membership, referralsRes, badgesRes, tiers] = await Promise.all([
+    const admin = createAdminClient();
+    const [membership, referralsRes, badgesRes, tiers, ledgerRes] = await Promise.all([
       getCurrentMembership(communityId),
       supabase
         .from("referrals")
@@ -226,9 +227,13 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
         .eq("fan_id", user.id)
         .eq("community_id", communityId),
       getTiers(),
+      admin.rpc("fan_ledger_balance", { p_fan_id: user.id }),
     ]);
 
-    const total_points = membership?.total_points ?? 0;
+    const total_points =
+      typeof ledgerRes.data === "number"
+        ? ledgerRes.data
+        : membership?.total_points ?? 0;
     const referral_count = referralsRes.count ?? 0;
     const badge_count = badgesRes.count ?? 0;
 

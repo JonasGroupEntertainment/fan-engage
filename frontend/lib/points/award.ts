@@ -4,13 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Award points to a fan — the single authoritative function for all
  * point grants in the platform.
  *
- * Writes to three places atomically (best-effort):
- *   1. points_ledger          — immutable audit trail, one row per event
- *   2. fans.total_points      — legacy denormalised total (still read by
- *                               some admin/analytics queries)
- *   3. fan_community_memberships.total_points — the UI source of truth
- *                               read by getCurrentFanKpis() and shown on
- *                               Fan Home, Rewards, and tier progress
+ * Delegates to apply_points_award(): ledger is the source of truth,
+ * Founding Fan 1.5× is applied there, and denorm totals are synced.
  *
  * Pass the admin client so this works in server actions, API routes, and
  * cron jobs alike.
@@ -52,42 +47,18 @@ export async function awardPoints(
         : "raelynn";
   }
 
-  // 1. Ledger entry (audit trail)
-  await admin.from("points_ledger").insert({
-    fan_id: fanId,
-    delta,
-    source,
-    community_id: communityId,
-    ...(sourceRef ? { source_ref: sourceRef } : {}),
-    ...(note ? { note } : {}),
+  // Single SQL writer: ledger insert + Founding Fan 1.5× + denorm sync.
+  // Clients cannot call this RPC (service_role only).
+  const { error } = await admin.rpc("apply_points_award", {
+    p_fan_id: fanId,
+    p_base_delta: delta,
+    p_source: source,
+    p_source_ref: sourceRef ?? null,
+    p_community_id: communityId,
+    p_note: note ?? null,
   });
 
-  // 2. fans.total_points (legacy denormalised column)
-  const { data: fanRow } = await admin
-    .from("fans")
-    .select("total_points")
-    .eq("id", fanId)
-    .maybeSingle();
-  await admin
-    .from("fans")
-    .update({ total_points: ((fanRow?.total_points as number) ?? 0) + delta })
-    .eq("id", fanId);
-
-  // 3. fan_community_memberships.total_points (UI source of truth)
-  const { data: membership } = await admin
-    .from("fan_community_memberships")
-    .select("total_points")
-    .eq("fan_id", fanId)
-    .eq("community_id", communityId)
-    .maybeSingle();
-
-  if (membership) {
-    await admin
-      .from("fan_community_memberships")
-      .update({
-        total_points: ((membership.total_points as number) ?? 0) + delta,
-      })
-      .eq("fan_id", fanId)
-      .eq("community_id", communityId);
+  if (error) {
+    throw new Error(`apply_points_award failed: ${error.message}`);
   }
 }

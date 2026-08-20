@@ -116,6 +116,13 @@ describe("launch catalog listing", () => {
       ),
       true,
     );
+    assert.equal(
+      shouldListLaunchReward(
+        { title: "VIP Moment Raffle", community_id: "raelynn", active: true },
+        { signedIn: true },
+      ),
+      false,
+    );
     assert.equal(canonicalLaunchTitle("Exclusive Phone Wallpaper Pack"), "Phone Wallpaper");
   });
 
@@ -156,6 +163,10 @@ describe("guest signed-out copy does not leak held items", () => {
     assert.doesNotMatch(guestSurfaces.premium, /VIP parties/);
     assert.doesNotMatch(guestSurfaces.premium, /Listening parties and soundchecks/);
     assert.doesNotMatch(guestSurfaces.homepage, /VIP Moment Raffle/);
+    assert.doesNotMatch(guestSurfaces.homepage, /11,420/);
+    assert.doesNotMatch(guestSurfaces.homepage, /Nashville Listening Party/);
+    assert.doesNotMatch(guestSurfaces.homepage, /Gold tier/);
+    assert.match(guestSurfaces.homepage, /Sample preview|Next show/);
     assert.doesNotMatch(migrationSql, /named date|June|July 1/i);
     assert.match(
       migrationSql,

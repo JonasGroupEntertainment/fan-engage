@@ -13,15 +13,17 @@ import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-e
 
 export const dynamic = "force-dynamic";
 
-async function getFanPoints(userId: string, communityId: string): Promise<number> {
+async function getFanPoints(userId: string, _communityId: string): Promise<number> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("fan_community_memberships")
-    .select("total_points")
-    .eq("fan_id", userId)
-    .eq("community_id", communityId)
-    .maybeSingle();
-  return (data?.total_points as number | null) ?? 0;
+  const { data, error } = await admin.rpc("fan_ledger_balance", {
+    p_fan_id: userId,
+  });
+  if (!error && typeof data === "number") return data;
+  const { data: rows } = await admin
+    .from("points_ledger")
+    .select("delta")
+    .eq("fan_id", userId);
+  return (rows ?? []).reduce((sum, r) => sum + ((r.delta as number) ?? 0), 0);
 }
 
 async function FanPoints({ userId, communityId }: { userId: string; communityId: string }) {
