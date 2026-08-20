@@ -21,4 +21,6 @@ regexes = [
   # Supabase placeholder (empty assignments are not secrets)
   '''NEXT_PUBLIC_SUPABASE_ANON_KEY=$''',
   '''SUPABASE_SERVICE_ROLE_KEY=$''',
+  # Seed fan id used as the room-placeholder author in 0053 — not an API key
+  '''bf02e0cf-b740-407a-9436-222becfc3c49''',
 ]

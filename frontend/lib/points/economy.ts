@@ -28,6 +28,34 @@ export function isFoundingFanNumber(n: number | null | undefined): boolean {
   return typeof n === "number" && n >= 1 && n <= FOUNDING_FAN_CAP;
 }
 
+export type FoundingFanClaimState = {
+  claimed: number;
+  remaining: number;
+  cap: number;
+  closed: boolean;
+};
+
+/** Remaining is always cap − claimed. Never an independent leftover. */
+export function foundingClaimStateFromCount(
+  claimed: number,
+): FoundingFanClaimState {
+  const safeClaimed = Number.isFinite(claimed) ? Math.max(0, claimed) : 0;
+  const remaining = Math.max(0, FOUNDING_FAN_CAP - safeClaimed);
+  return {
+    claimed: safeClaimed,
+    remaining,
+    cap: FOUNDING_FAN_CAP,
+    closed: remaining === 0,
+  };
+}
+
+/** Same 1–100 filter as `isFoundingFanNumber` / the points writer. */
+export function countFoundingFanNumbers(
+  numbers: Array<number | null | undefined>,
+): number {
+  return numbers.filter((n) => isFoundingFanNumber(n)).length;
+}
+
 /** Writer rule: Founding Fan #1–100 gets 1.5×. Not stacked with premium. */
 export function applyFoundingMultiplier(
   baseDelta: number,

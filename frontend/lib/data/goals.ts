@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 
 /**
  * Campaign goals — admin-configurable rows in public.community_goals that
@@ -7,7 +8,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * 250" can be launched from the database without a deploy.
  *
  * `current` is computed per metric:
- *   founder_count → passed in by the caller (page already fetches it)
+ *   founder_count → `getFoundingFanClaimState` (1–100 founding numbers).
+ *                   Cap is FOUNDING_FAN_CAP, not the goal row target and
+ *                   not paid `is_founder` slots.
  *   rsvp_total    → passed in by the caller (page already fetches it)
  *   ledger_count  → count of points_ledger rows where source = metric_ref
  *                   (e.g. one row per pre-save with source 'presave_american_made')
@@ -40,7 +43,7 @@ interface GoalRow {
 
 export async function getCampaignGoals(
   communityId: string,
-  live: { founderCount: number; rsvpTotal: number },
+  live: { rsvpTotal: number },
 ): Promise<CampaignGoal[]> {
   try {
     const admin = createAdminClient();
@@ -62,11 +65,19 @@ export async function getCampaignGoals(
       return true;
     });
 
+    const needsFounding = inWindow.some((r) => r.metric === "founder_count");
+    const founding = needsFounding
+      ? await getFoundingFanClaimState(communityId)
+      : null;
+
     return Promise.all(
       inWindow.map(async (r): Promise<CampaignGoal> => {
         let current = 0;
-        if (r.metric === "founder_count") current = live.founderCount;
-        else if (r.metric === "rsvp_total") current = live.rsvpTotal;
+        let target = r.target;
+        if (r.metric === "founder_count" && founding) {
+          current = founding.claimed;
+          target = founding.cap;
+        } else if (r.metric === "rsvp_total") current = live.rsvpTotal;
         else if (r.metric === "manual") current = r.manual_current;
         else if (r.metric === "ledger_count" && r.metric_ref) {
           const { count } = await admin
@@ -79,7 +90,7 @@ export async function getCampaignGoals(
           id: r.id,
           emoji: r.emoji,
           label: r.label,
-          target: r.target,
+          target,
           current,
           linkHref: r.link_href,
           linkLabel: r.link_label,

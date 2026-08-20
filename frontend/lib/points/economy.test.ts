@@ -4,6 +4,9 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   applyFoundingMultiplier,
+  countFoundingFanNumbers,
+  FOUNDING_FAN_CAP,
+  foundingClaimStateFromCount,
   isDigitallyRedeemableTitle,
   ledgerBalance,
   simulateSerializedSpendRace,
@@ -20,6 +23,37 @@ const migrationSql = readRepo(
 );
 const awardTs = readRepo("./award.ts");
 const onboardTs = readRepo("../../app/api/fan-engage/onboard/route.ts");
+
+describe("founding claim remaining is cap minus claimed", () => {
+  it("never treats remaining as an independent leftover", () => {
+    const seven = foundingClaimStateFromCount(7);
+    assert.equal(seven.cap, FOUNDING_FAN_CAP);
+    assert.equal(seven.claimed, 7);
+    assert.equal(seven.remaining, FOUNDING_FAN_CAP - 7);
+    assert.equal(seven.closed, false);
+
+    const empty = foundingClaimStateFromCount(0);
+    assert.equal(empty.remaining, FOUNDING_FAN_CAP);
+    assert.equal(empty.closed, false);
+
+    const full = foundingClaimStateFromCount(FOUNDING_FAN_CAP);
+    assert.equal(full.remaining, 0);
+    assert.equal(full.closed, true);
+
+    const over = foundingClaimStateFromCount(FOUNDING_FAN_CAP + 4);
+    assert.equal(over.remaining, 0);
+    assert.equal(over.closed, true);
+  });
+
+  it("counts only founding numbers 1–100", () => {
+    assert.equal(
+      countFoundingFanNumbers([1, 50, 99, 100, null, 0, 101, undefined, -4]),
+      4,
+    );
+    assert.equal(countFoundingFanNumbers([]), 0);
+    assert.equal(countFoundingFanNumbers([50]), 1);
+  });
+});
 
 describe("Founding Fan 1.5× writer contract", () => {
   it("applies 1.5× for founding numbers 1–100 and not for 101", () => {
