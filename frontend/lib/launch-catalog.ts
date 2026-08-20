@@ -6,9 +6,9 @@
  * (`active = false`). Do not expand this set without a Dash decision.
  */
 
-import { isDigitallyRedeemableTitle } from "./points/economy.ts";
+import { isDigitallyRedeemableTitle } from "./points/economy";
 
-export { FOUNDING_FAN_CAP } from "./points/economy.ts";
+export { FOUNDING_FAN_CAP } from "./points/economy";
 
 export const LAUNCH_COMMUNITY_ID = "raelynn";
 

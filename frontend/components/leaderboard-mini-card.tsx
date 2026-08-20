@@ -33,7 +33,7 @@ export default async function LeaderboardMiniCard({
     viewerFanId: user?.id ?? null,
     topN: 3,
   });
-  if (!isPublicLeaderboardHonest(board)) return null;
+  if (!board || !isPublicLeaderboardHonest(board)) return null;
 
   return (
     <Link

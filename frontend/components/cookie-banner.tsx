@@ -52,8 +52,7 @@ function CookieBannerInner() {
   // anchored at the bottom of the viewport on mobile (full-width, ~140-180px
   // tall) and was covering Submit / Turnstile. Suppress on these routes
   // including /signup?invite= — attribution still writes after Accept on
-  // /invite. ConsentModal is z-[70] so this z-50 banner cannot eat modal
-  // clicks or scroll if it is visible on other pages.
+  // /invite.
   const HIDE_ON = [
     "/for-artists/apply",
     "/signup",

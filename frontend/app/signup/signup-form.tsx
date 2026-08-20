@@ -24,7 +24,14 @@ import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
 } from "@/components/cookie-banner";
-import { ConsentModal, type ConsentDoc } from "@/components/consent-modal";
+
+export type ConsentDoc = {
+  slug: string;
+  title: string;
+  content_md: string;
+};
+
+const CONSENT_VERSION = "2026-08-01.v1";
 
 export type ReferrerArtist = {
   slug: string;
@@ -85,7 +92,7 @@ export function SignupForm({
   const [turnstileLoadState, setTurnstileLoadState] =
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
-  const [consentOpen, setConsentOpen] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   // One-shot: Turnstile is verified before the consent modal opens so the
   // ~5min token can't expire while the user scrolls ToS. createAccount
@@ -177,7 +184,8 @@ export function SignupForm({
     token: turnstileToken,
     loadState: turnstileLoadState,
   });
-  const canSubmitSignup = signupAllowsSubmit(turnstileGate);
+  const canSubmitSignup =
+    signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
 
   async function ensureCaptcha(): Promise<boolean> {
     if (captchaVerifiedRef.current) return true;
@@ -199,7 +207,7 @@ export function SignupForm({
       return false;
     }
     // Widget failed / unavailable, or keys unset (preview/dev): do not block
-    // account create on a missing token — ConsentModal can still open.
+    // account creation on a missing token.
     if (gate === "fail-open" || gate === "not-configured") {
       captchaVerifiedRef.current = true;
       return true;
@@ -234,27 +242,22 @@ export function SignupForm({
       return;
     }
 
+    if (hasConsentDocs && !consentChecked) {
+      setStatus("error");
+      setMessage("Please agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
+
     // Confirmation resend already passed the gate — don't re-trap on a
     // remounted / failed widget.
     const resending = status === "confirm";
     if (!resending) {
-      // Verify Turnstile *before* the consent modal. Tokens are single-use and
-      // ~5min TTL; reading ToS behind the modal would otherwise race the
-      // widget (which sits under the overlay and can't be refreshed).
       setStatus("loading");
       setMessage("");
       const ok = await ensureCaptcha();
       if (!ok) return;
-
-      // Explicit, logged consent is required before an account is created.
-      // Hold here and let the consent modal drive the actual submit.
-      if (hasConsentDocs) {
-        setStatus("idle");
-        setConsentOpen(true);
-        return;
-      }
     }
-    await createAccount();
+    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined);
   }
 
   async function createAccount(consentVersion?: string) {
@@ -572,18 +575,60 @@ export function SignupForm({
           </p>
         )}
 
-        <p className="text-center text-xs text-white/55">
-          By creating an account, you agree to our{" "}
-          <Link href="/terms" className="text-white/80 underline underline-offset-4 hover:text-white">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">
-            Privacy Policy
-          </Link>
-          . We may email a weekly fan digest and product updates — you can
-          manage email preferences anytime after signup.
-        </p>
+        {hasConsentDocs ? (
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(e) => {
+                setConsentChecked(e.target.checked);
+                if (status === "error") {
+                  setStatus("idle");
+                  setMessage("");
+                }
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+            />
+            <span>
+              I agree to the{" "}
+              <Link
+                href="/terms"
+                target="_blank"
+                className="text-white/85 underline underline-offset-4 hover:text-white"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="text-white/85 underline underline-offset-4 hover:text-white"
+              >
+                Privacy Policy
+              </Link>
+              {!rewardsPublished && (
+                <>
+                  , including the Rewards Program Terms once published
+                </>
+              )}
+              . We may email a weekly fan digest and product updates — you can
+              manage email preferences anytime after signup.
+            </span>
+          </label>
+        ) : (
+          <p className="text-center text-xs text-white/55">
+            By creating an account, you agree to our{" "}
+            <Link href="/terms" className="text-white/80 underline underline-offset-4 hover:text-white">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">
+              Privacy Policy
+            </Link>
+            . We may email a weekly fan digest and product updates — you can
+            manage email preferences anytime after signup.
+          </p>
+        )}
         <p className="text-center text-sm text-white/60">
           Already have an account?{" "}
           <Link href={loginHref} className="text-white underline-offset-4 hover:underline">
@@ -600,25 +645,6 @@ export function SignupForm({
           </Link>
         </p>
       </div>
-
-      {hasConsentDocs && (
-        <ConsentModal
-          open={consentOpen}
-          docs={consentDocs!}
-          rewardsPublished={!!rewardsPublished}
-          onCancel={() => {
-            setConsentOpen(false);
-            // Token was already spent pre-modal; require a fresh check.
-            captchaVerifiedRef.current = false;
-            resetChallenge();
-            setStatus("idle");
-          }}
-          onAccept={(version) => {
-            setConsentOpen(false);
-            void createAccount(version);
-          }}
-        />
-      )}
     </main>
   );
 }

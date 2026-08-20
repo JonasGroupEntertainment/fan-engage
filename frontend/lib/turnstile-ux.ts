@@ -147,7 +147,7 @@ export function scrollToTurnstileChallenge() {
 
 /**
  * Password signup Turnstile gate. A failed / unavailable widget must not
- * trap Create account — fail-open so ConsentModal can still open.
+ * trap Create account — fail-open so signup can still proceed.
  */
 export type SignupTurnstileGate =
   | "not-configured"
