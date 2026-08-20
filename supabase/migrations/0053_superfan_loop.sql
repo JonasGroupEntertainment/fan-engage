@@ -276,7 +276,11 @@ declare
   v_row record;
   v_tier tier_slug;
 begin
-  select public.fan_ledger_balance(p_fan_id) into v_total;
+  -- Inline sum — do not call fan_ledger_balance (that RPC is JWT-scoped).
+  select coalesce(sum(delta), 0)::integer
+    into v_total
+    from public.points_ledger
+   where fan_id = p_fan_id;
 
   update public.fans
      set total_points = v_total
@@ -678,7 +682,7 @@ begin
 
   v_title := btrim(v_reward.title);
 
-  if v_title = 'VIP Moment Raffle' then
+  if v_title in ('VIP Moment Raffle', 'RaeLynn VIP Moment Raffle') then
     raise exception 'VIP Moment Raffle is on hold until a show date exists';
   end if;
 
