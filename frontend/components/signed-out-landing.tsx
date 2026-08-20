@@ -169,6 +169,17 @@ export default function SignedOutLanding({
       {/* ─── Founding-fan urgency ─────────────────────────────────────────── */}
       <FoundingFanBlock stats={stats} />
 
+      {/* ─── Overview video ─────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-3xl px-6 py-12">
+        <video
+          className="w-full rounded-2xl border border-white/10 shadow-glass"
+          controls
+          preload="metadata"
+        >
+          <source src="/videos/fan-experience-overview.mp4" type="video/mp4" />
+        </video>
+      </section>
+
       {/* ─── Live proof tiles ─────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div
