@@ -100,7 +100,8 @@ export default async function ArtistCommunityPage({
             </h1>
             <p className="mt-3 text-sm text-white/75">
               Posts +5 pts · comments +10 pts · poll votes +10 pts · challenge
-              entries +3 pts. Founding Fans (first 100) earn 1.5× in the writer.
+              entries +3 pts. Founding Fans #1–100 earn 1.5× points — not a
+              paid subscription, and not just a badge.
             </p>
           </div>
           <Link

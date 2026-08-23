@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import type { Badge, FanProfile } from "./types";
 
 export interface FanHomeFollowedArtist {
@@ -428,7 +429,8 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     );
   }
 
-  const recentActivity: FanHomeActivityPost[] = ((activityRes.data ?? []) as Array<{
+  const recentActivity: FanHomeActivityPost[] = rejectPlaceholderDraftPosts(
+    (activityRes.data ?? []) as Array<{
     id: string;
     artist_slug: string;
     kind: string;
@@ -438,7 +440,8 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     pinned: boolean;
     created_at: string;
     visibility: "public" | "premium" | "founder-only" | null;
-  }>).map((p) => ({
+  }>,
+  ).map((p) => ({
     id: p.id,
     artist_slug: p.artist_slug,
     artist_name: artistNameBySlug.get(p.artist_slug) ?? null,

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
@@ -29,6 +29,9 @@ export default async function LeaderboardPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Soft launch: do not send guests to an empty/warming-up board.
+  if (!user) redirect(`/artists/${slug}`);
 
   const board = await gatherArtistLeaderboard({
     artistSlug: slug,

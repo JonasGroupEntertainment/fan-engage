@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
 import { relativeTime } from "@/lib/format/relative-time";
 
 type CardKind = "post" | "event" | "drop" | "prediction";
@@ -143,6 +144,7 @@ async function collect(slug: string): Promise<LatestCard[]> {
         is_prediction: boolean | null;
         pinned: boolean | null;
       }>) {
+        if (isPlaceholderDraftPost(p)) continue;
         const kind: CardKind = p.is_prediction ? "prediction" : "post";
         cards.push({
           kind,
