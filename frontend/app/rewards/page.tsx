@@ -11,14 +11,6 @@ import { getTiers, tierIcon } from "@/lib/data/tiers";
 import type { Badge, BadgeCategory, TierSlug } from "@/lib/data/types";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 
-// ─── Static preview content ────────────────────────────────────────────────
-const fallbackBadges: Badge[] = [
-  { slug: "welcome",       name: "Welcome aboard",     description: "Created your fan profile.",              icon: "👋",  point_value: 25,  category: "welcome",   threshold: null, sort_order: 1,  earned: true,  earned_at: null, progress: null },
-  { slug: "first-post",    name: "First post",          description: "Shared your first community post.",     icon: "✍️",  point_value: 25,  category: "welcome",   threshold: 1,    sort_order: 2,  earned: false, earned_at: null, progress: null },
-  { slug: "referral-1",    name: "Recruiter",           description: "Referred your first fan.",              icon: "🎯",  point_value: 50,  category: "referral",  threshold: 1,    sort_order: 4,  earned: false, earned_at: null, progress: null },
-  { slug: "tier-bronze",   name: "Bronze tier",         description: "Welcome to the Bronze circle.",         icon: "🥉",  point_value: 0,   category: "tier",      threshold: null, sort_order: 10, earned: true,  earned_at: null, progress: null },
-];
-
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   welcome:   "Getting started",
   community: "Community",
@@ -40,14 +32,6 @@ const earnMore: EarnMore[] = [
     : { title: "Merch — coming soon", detail: "Shop opens after soft launch", reward: "—", href: "/marketplace" },
 ];
 
-// Static preview breakdown shown only to signed-out visitors.
-const previewCategories = [
-  { label: "Listening quests", value: "4,200 pts" },
-  { label: "Referrals", value: "2,800 pts" },
-  { label: "Events & travel", value: "3,400 pts" },
-  { label: "Community", value: "1,050 pts" },
-];
-
 function formatPts(n: number | null | undefined) {
   if (n == null) return "—";
   return new Intl.NumberFormat("en-US").format(n) + " pts";
@@ -65,9 +49,9 @@ export default async function RewardsPage() {
   ]);
 
   // Signed-in users see their real badges (empty until earned).
-  // Anonymous visitors see a preview grid so the page isn't blank.
+  // Guests get no fake Bronze/Gold progress chrome or preview numbers.
   const isSignedIn = fan !== null;
-  const badges: Badge[] = isSignedIn ? dbBadges : fallbackBadges;
+  const badges: Badge[] = isSignedIn ? dbBadges : [];
   const earnedCount = badges.filter((b) => b.earned).length;
   const totalBadges = badges.length;
 
@@ -80,16 +64,10 @@ export default async function RewardsPage() {
     badgesByCategory.set(cat, arr);
   }
 
-  // Tier progress — real if signed in, fallback if preview.
-  const previewTotalPoints = 1200;
   const currentSlug = (fan?.current_tier ?? "bronze") as TierSlug;
   const currentTier = tiers.find((t) => t.slug === currentSlug);
-  const totalPoints = kpis?.total_points ?? previewTotalPoints;
-  const previewNextTier =
-    tiers
-      .filter((t) => t.min_points > totalPoints)
-      .sort((a, b) => a.min_points - b.min_points)[0] ?? null;
-  const nextTier = kpis?.next_tier ?? (!isSignedIn ? previewNextTier : null);
+  const totalPoints = kpis?.total_points ?? 0;
+  const nextTier = isSignedIn ? (kpis?.next_tier ?? null) : null;
   const toNext =
     kpis?.points_to_next_tier ??
     (nextTier ? Math.max(0, nextTier.min_points - totalPoints) : 0);
@@ -106,9 +84,9 @@ export default async function RewardsPage() {
         <div className="flex-1 space-y-6">
           {!isSignedIn && (
             <PreviewSignupBanner
-              eyebrow="🎟️ Preview"
+              eyebrow="🎟️ Join to earn"
               headline="Sign up to start earning real points + climbing real tiers"
-              body="The badges, points, and tier progress below are a preview of what fans see once they join. Fans earn points by showing up — RSVPs, posts, referrals — and trade them for drops the casual crowd never gets."
+              body="Fans earn points by showing up — RSVPs, posts, referrals — and trade them for drops the casual crowd never gets. Your points, badges, and tier progress appear here after you join."
               bullets={[
                 "Real points the moment you sign up — no minimum to start",
                 "Badges that climb tiers and unlock fan-only perks",
@@ -122,41 +100,54 @@ export default async function RewardsPage() {
 
           <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-purple-800/30 via-slate-900 to-midnight p-6 shadow-glass">
             <p className="text-sm uppercase tracking-wide text-white/60">Rewards & Tiers</p>
-            <h1 className="mt-2 text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-              {nextTier
-                ? `${formatPts(toNext)} away from ${nextTier.display_name}`
-                : isSignedIn
-                  ? "You're at max tier"
-                  : "Preview the fan tier journey"}
-            </h1>
-            <p className="mt-4 text-sm text-white/70">
-              Keep stacking points to unlock {nextTier?.display_name ?? "more"}-only experiences.
-              Silver unlocks priority digital drops + a leaderboard boost. Gold adds exclusive digital unlocks. Platinum opens the full digital catalog.
-            </p>
-            <div className="mt-8 space-y-4">
-              <div className="flex items-center justify-between text-sm text-white/70">
-                <span>{currentTier?.display_name ?? "Bronze"}</span>
-                <span>{formatPts(totalPoints)} / {formatPts(nextThreshold)}</span>
-              </div>
-              <div className="h-3 rounded-full bg-black/40">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-300 to-rose-400"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="flex items-center gap-4 text-xs uppercase tracking-wide text-white/50">
-                {tiers.map((t) => (
-                  <span
-                    key={t.slug}
-                    className={`flex items-center gap-2 text-sm ${
-                      t.slug === currentSlug ? "text-white" : "text-white/60"
-                    }`}
-                  >
-                    <span>{tierIcon(t.slug)}</span> {t.display_name}
-                  </span>
-                ))}
-              </div>
-            </div>
+            {isSignedIn ? (
+              <>
+                <h1 className="mt-2 text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+                  {nextTier
+                    ? `${formatPts(toNext)} away from ${nextTier.display_name}`
+                    : "You're at max tier"}
+                </h1>
+                <p className="mt-4 text-sm text-white/70">
+                  Keep stacking points to unlock {nextTier?.display_name ?? "more"}-only experiences.
+                  Silver unlocks priority digital drops + a leaderboard boost. Gold adds exclusive digital unlocks. Platinum opens the full digital catalog.
+                </p>
+                <div className="mt-8 space-y-4">
+                  <div className="flex items-center justify-between text-sm text-white/70">
+                    <span>{currentTier?.display_name ?? "Bronze"}</span>
+                    <span>{formatPts(totalPoints)} / {formatPts(nextThreshold)}</span>
+                  </div>
+                  <div className="h-3 rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-300 to-rose-400"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-4 text-xs uppercase tracking-wide text-white/50">
+                    {tiers.map((t) => (
+                      <span
+                        key={t.slug}
+                        className={`flex items-center gap-2 text-sm ${
+                          t.slug === currentSlug ? "text-white" : "text-white/60"
+                        }`}
+                      >
+                        <span>{tierIcon(t.slug)}</span> {t.display_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="mt-2 text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+                  Earn points by showing up
+                </h1>
+                <p className="mt-4 text-sm text-white/70">
+                  Sign up to start earning. Your real points, badges, and tier
+                  progress land here after you join — we do not preview a
+                  fake climb.
+                </p>
+              </>
+            )}
           </section>
 
           <section className="glass-card p-6">
@@ -164,17 +155,27 @@ export default async function RewardsPage() {
               <div>
                 <p className="text-sm uppercase tracking-wide text-white/60">Badge gallery</p>
                 <h2 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-                  {earnedCount} / {totalBadges} unlocked
+                  {isSignedIn ? `${earnedCount} / ${totalBadges} unlocked` : "Your badges after you join"}
                 </h2>
               </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-wide text-white/50">Progress</p>
-                <p className="text-sm font-semibold text-emerald-300">
-                  {totalBadges > 0 ? Math.round((earnedCount / totalBadges) * 100) : 0}%
+              {isSignedIn && (
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Progress</p>
+                  <p className="text-sm font-semibold text-emerald-300">
+                    {totalBadges > 0 ? Math.round((earnedCount / totalBadges) * 100) : 0}%
+                  </p>
+                </div>
+              )}
+            </div>
+            {!isSignedIn ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-black/20 p-8 text-center">
+                <p className="text-sm font-semibold">Sign up to unlock badges</p>
+                <p className="mt-2 text-xs text-white/60">
+                  Post, refer friends, and show up — badges appear on your
+                  account, not as a guest preview.
                 </p>
               </div>
-            </div>
-            {badges.length === 0 ? (
+            ) : badges.length === 0 ? (
               <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-black/20 p-8 text-center">
                 <p className="text-sm font-semibold">No badges yet</p>
                 <p className="mt-2 text-xs text-white/60">
@@ -320,16 +321,9 @@ export default async function RewardsPage() {
                 </div>
               )
             ) : (
-              <div className="mt-4 space-y-3">
-                {previewCategories.map((cat) => (
-                  <div
-                    key={cat.label}
-                    className="flex items-center justify-between text-sm text-white/70"
-                  >
-                    <span>{cat.label}</span>
-                    <span className="font-semibold text-white">{cat.value}</span>
-                  </div>
-                ))}
+              <div className="mt-4 rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-center text-xs text-white/60">
+                Sign up to see your real point breakdown. We do not show
+                sample totals to guests.
               </div>
             )}
           </section>

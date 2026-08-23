@@ -8,8 +8,8 @@ import { getCurrentFan } from "@/lib/data/fan";
 import PostCard from "@/app/artists/[slug]/community/post-card";
 
 /**
- * RaeLynn hub room: posts + at least one poll for signed-in fans.
- * Placeholder draft rows are seeded in 0053 and marked as such.
+ * Artist hub room: posts + polls for signed-in fans.
+ * Draft/placeholder seed rows are filtered in getPostsByArtist.
  */
 export default async function ArtistHubRoom({
   artistSlug,
@@ -58,8 +58,7 @@ export default async function ArtistHubRoom({
           <p className="text-xs uppercase tracking-[0.25em] text-white/55">Room</p>
           <h2 className="mt-1 text-xl font-semibold">{artistName} community</h2>
           <p className="mt-1 text-sm text-white/60">
-            Posts and polls. Draft placeholders are labeled until Kevin
-            replaces them — not artist voice.
+            Posts and polls from the {artistName} room.
           </p>
         </div>
         <Link
@@ -89,7 +88,7 @@ export default async function ArtistHubRoom({
           ))}
           {!hasPoll && (
             <p className="text-xs text-white/50">
-              A draft poll is being seeded for this room.
+              Polls show up here when the room has one.
             </p>
           )}
         </div>

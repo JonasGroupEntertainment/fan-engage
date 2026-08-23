@@ -17,6 +17,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
 
 const LOOKBACK_DAYS = 60;
 const CANDIDATE_LIMIT = 60;
@@ -90,7 +91,9 @@ export async function getPickedForYou(args: {
     .limit(CANDIDATE_LIMIT);
 
   const candidates = (candidatesData ?? []) as CandidateRow[];
-  const eligible = candidates.filter((c) => !commentedPostIds.has(c.id));
+  const eligible = candidates.filter(
+    (c) => !commentedPostIds.has(c.id) && !isPlaceholderDraftPost(c),
+  );
   if (eligible.length === 0) return [];
 
   // 3. Score each eligible candidate.

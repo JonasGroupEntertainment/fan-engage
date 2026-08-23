@@ -18,6 +18,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
 import { embedText, pgvectorLiteral, slugToSourceId, EmbeddingError } from "@/lib/embeddings";
 import { cachedEmbedQuery } from "./embed-cache";
 import type {
@@ -299,6 +300,7 @@ async function fetchAllSourceRows(
           // Defensive: filter out auto_hide posts in case the embedding
           // exists but moderation flagged the row after.
           if (row.moderation_status === "auto_hide") continue;
+          if (isPlaceholderDraftPost(row)) continue;
           out.community_posts.set(row.id, {
             kind: "post",
             id: row.id,

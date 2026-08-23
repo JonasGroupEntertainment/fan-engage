@@ -1,5 +1,4 @@
 import Link from "next/link";
-import LeaderboardMiniCard from "@/components/leaderboard-mini-card";
 import { LatestStrip } from "@/components/latest-strip";
 import ArtistHubRoom from "@/components/artist-hub-room";
 import { headers } from "next/headers";
@@ -430,8 +429,7 @@ export default async function ArtistPage({
         </ExpandableEventGrid>
       </section>
 
-      {/* Top fans leaderboard preview */}
-      <LeaderboardMiniCard artistSlug={slug} />
+      {/* Soft launch: leaderboard unlinked from guest/artist surfaces. */}
 
       {/* Merch — soft launch: Coming soon (not a live shop / not Shopify) */}
       <section className="glass-card p-8">

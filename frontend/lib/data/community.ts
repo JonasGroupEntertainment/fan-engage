@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import type {
   ChallengeEntry,
   CommunityComment,
@@ -31,7 +32,7 @@ export async function getPostsByArtist(
       .eq("artist_slug", artistSlug)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .limit(limit + 20);
 
     // Phase 5 #5: optional ?tag=foo filter from the community-feed URL.
     // Uses pgvector-style array contains via Supabase's .contains().
@@ -95,7 +96,7 @@ export async function getPostsByArtist(
       commentCountsByPost.set(pid, (commentCountsByPost.get(pid) ?? 0) + 1);
     }
 
-    return posts.map(
+    const mapped = posts.map(
       (p) =>
         ({
           id: p.id as string,
@@ -123,6 +124,8 @@ export async function getPostsByArtist(
           moderation_user_message: null,
         }) as CommunityPost,
     );
+    // Public + signed-in fan feeds share this loader — drafts stay in DB.
+    return rejectPlaceholderDraftPosts(mapped).slice(0, limit);
   } catch {
     return [];
   }
@@ -285,10 +288,15 @@ export async function getTopTagsForArtist(
       p_limit: limit,
     });
     if (error) throw error;
-    return ((data ?? []) as Array<{ tag: string; post_count: number | string }>).map((r) => ({
-      tag: String(r.tag),
-      post_count: Number(r.post_count),
-    }));
+    return ((data ?? []) as Array<{ tag: string; post_count: number | string }>)
+      .map((r) => ({
+        tag: String(r.tag),
+        post_count: Number(r.post_count),
+      }))
+      .filter((r) => {
+        const tag = r.tag.toLowerCase();
+        return tag !== "placeholder" && tag !== "draft";
+      });
   } catch (err) {
     console.warn("getTopTagsForArtist failed:", err instanceof Error ? err.message : err);
     return [];
