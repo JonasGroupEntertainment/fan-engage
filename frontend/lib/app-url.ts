@@ -1,14 +1,16 @@
 /**
  * Canonical public origin for auth redirects and emails.
  *
- * Production magic links must land on https://www.fanengagepro.com.
- * The Vercel production alias (fan-engage-pearl.vercel.app) is still live
- * and must never be emitted as APP_URL / emailRedirectTo — GoTrue falls
- * back to its Site URL when the requested redirect is not allow-listed,
- * which is how pearl leaked into /verify redirect_to.
+ * Production email redirect_to must be https://www.fanengagepro.com.
+ * Never $VERCEL_URL, never fan-engage-pearl.vercel.app, never apex.
+ * GoTrue falls back to its Site URL when the requested redirect is not
+ * allow-listed, which is how pearl leaked into /verify redirect_to.
  *
  * Preview deployments may keep their *.vercel.app host. The production
  * alias is never treated as a preview host.
+ *
+ * Host 308s live in `canonical-host.ts` (next.config + middleware).
+ * Keep this origin string identical to CANONICAL_PRODUCTION_ORIGIN.
  */
 
 export const CANONICAL_PRODUCTION_APP_URL = "https://www.fanengagepro.com";
@@ -60,7 +62,15 @@ function isDisallowedProductionHost(host: string): boolean {
   return host === PRODUCTION_VERCEL_ALIAS_HOST || host.endsWith(".vercel.app");
 }
 
-export function resolveAppUrl(env: AppUrlEnv = process.env): string {
+export function resolveAppUrl(
+  env: AppUrlEnv = {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+  },
+): string {
   const configured = firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.NEXT_PUBLIC_SITE_URL);
   const vercelOrigin = env.VERCEL_URL ? toOrigin(env.VERCEL_URL) : null;
 
@@ -102,10 +112,4 @@ export function authEmailRedirectTo(
   return `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
-export const APP_URL = resolveAppUrl({
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-  VERCEL_URL: process.env.VERCEL_URL,
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
-});
+export const APP_URL = resolveAppUrl();

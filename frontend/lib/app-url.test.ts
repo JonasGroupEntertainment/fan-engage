@@ -8,6 +8,7 @@ import {
   authEmailRedirectTo,
   resolveAppUrl,
 } from "./app-url.ts";
+import { CANONICAL_PRODUCTION_ORIGIN } from "./canonical-host.ts";
 
 const PEARL = "https://fan-engage-pearl.vercel.app";
 const PREVIEW_HOST = "fan-engage-git-fix-auth-jonas-group.vercel.app";
@@ -17,6 +18,11 @@ function readRepo(relFromLib: string): string {
 }
 
 describe("resolveAppUrl — production must not emit pearl / VERCEL_URL", () => {
+  it("APP_URL origin matches the www host-redirect origin", () => {
+    assert.equal(CANONICAL_PRODUCTION_APP_URL, CANONICAL_PRODUCTION_ORIGIN);
+    assert.equal(CANONICAL_PRODUCTION_APP_URL, "https://www.fanengagepro.com");
+  });
+
   const productionCases: Array<{ name: string; env: Parameters<typeof resolveAppUrl>[0] }> = [
     { name: "unset env", env: { VERCEL_ENV: "production" } },
     {
@@ -62,6 +68,11 @@ describe("resolveAppUrl — production must not emit pearl / VERCEL_URL", () => 
     assert.doesNotMatch(APP_URL, /fan-engage-pearl\.vercel\.app/);
     assert.doesNotMatch(authEmailRedirectTo("/"), /fan-engage-pearl\.vercel\.app/);
   });
+
+  it("does not default resolveAppUrl to process.env (Next production tsc rejects that)", () => {
+    const src = readRepo("./app-url.ts");
+    assert.doesNotMatch(src, /env:\s*AppUrlEnv\s*=\s*process\.env/);
+  });
 });
 
 describe("resolveAppUrl — preview may keep Vercel preview host", () => {
@@ -95,7 +106,7 @@ describe("authEmailRedirectTo", () => {
 describe("auth call sites use authEmailRedirectTo / APP_URL", () => {
   it("login, signup, forgot-password, and callback do not hardcode pearl", () => {
     const files = {
-      login: readRepo("../app/login/page.tsx"),
+      login: readRepo("../app/login/login-form.tsx"),
       signup: readRepo("../app/signup/signup-form.tsx"),
       forgot: readRepo("../app/forgot-password/page.tsx"),
       callback: readRepo("../app/auth/callback/route.ts"),
@@ -110,7 +121,7 @@ describe("auth call sites use authEmailRedirectTo / APP_URL", () => {
   });
 
   it("password login stays Turnstile-free", () => {
-    const login = readRepo("../app/login/page.tsx");
+    const login = readRepo("../app/login/login-form.tsx");
     const passwordFn = login.slice(
       login.indexOf("async function handlePassword"),
       login.indexOf("const magicGate"),

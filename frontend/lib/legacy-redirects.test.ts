@@ -17,10 +17,8 @@ describe("legacy /shop alias", () => {
 });
 
 describe("production host canonicalization", () => {
-  it("sends the Vercel production alias and apex to https://www.fanengagepro.com", () => {
-    assert.match(nextConfig, /value:\s*"fan-engage-pearl\.vercel\.app"/);
-    assert.match(nextConfig, /value:\s*"fanengagepro\.com"/);
-    assert.match(nextConfig, /destination:\s*"https:\/\/www\.fanengagepro\.com\/"/);
-    assert.match(nextConfig, /destination:\s*"https:\/\/www\.fanengagepro\.com\/:path\*"/);
+  it("sends the Vercel production alias and apex to https://www.fanengagepro.com via shared rules", () => {
+    assert.match(nextConfig, /productionHostRedirectRules\(\)/);
+    assert.doesNotMatch(nextConfig, /destination:\s*"https:\/\/fanengagepro\.com/);
   });
 });
