@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { APP_URL } from "@/lib/app-url";
+import { authEmailRedirectTo } from "@/lib/app-url";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
@@ -109,7 +109,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${APP_URL}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
+        redirectTo: authEmailRedirectTo("/reset-password"),
       });
       if (error) throw error;
       setStatus("sent");

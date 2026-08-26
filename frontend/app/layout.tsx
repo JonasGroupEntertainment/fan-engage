@@ -18,6 +18,7 @@ import { getEntitlement } from "@/lib/entitlements";
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
+import { APP_URL } from "@/lib/app-url";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 const spaceGrotesk = Space_Grotesk({
@@ -26,8 +27,7 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-display",
 });
 
-const appUrl =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
+const appUrl = APP_URL;
 
 export const viewport: Viewport = {
   themeColor: "#7c3aed",
