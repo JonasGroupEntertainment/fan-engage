@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { productionHostRedirectRules } from "./lib/canonical-host";
 
 const authSensitiveHeaders = [
   { key: "Cache-Control", value: "private, no-store, no-cache, max-age=0, must-revalidate, no-transform" },
@@ -93,30 +94,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      {
-        source: "/",
-        has: [{ type: "host", value: "fan-engage-pearl.vercel.app" }],
-        destination: "https://www.fanengagepro.com/",
-        permanent: true,
-      },
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "fan-engage-pearl.vercel.app" }],
-        destination: "https://www.fanengagepro.com/:path*",
-        permanent: true,
-      },
-      {
-        source: "/",
-        has: [{ type: "host", value: "fanengagepro.com" }],
-        destination: "https://www.fanengagepro.com/",
-        permanent: true,
-      },
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "fanengagepro.com" }],
-        destination: "https://www.fanengagepro.com/:path*",
-        permanent: true,
-      },
+      ...productionHostRedirectRules(),
       {
         source: "/blakerichardson",
         destination: "/blake-richardson",

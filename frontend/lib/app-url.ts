@@ -1,14 +1,16 @@
 /**
  * Canonical public origin for auth redirects and emails.
  *
- * Production magic links must land on https://www.fanengagepro.com.
- * The Vercel production alias (fan-engage-pearl.vercel.app) is still live
- * and must never be emitted as APP_URL / emailRedirectTo — GoTrue falls
- * back to its Site URL when the requested redirect is not allow-listed,
- * which is how pearl leaked into /verify redirect_to.
+ * Production email redirect_to must be https://www.fanengagepro.com.
+ * Never $VERCEL_URL, never fan-engage-pearl.vercel.app, never apex.
+ * GoTrue falls back to its Site URL when the requested redirect is not
+ * allow-listed, which is how pearl leaked into /verify redirect_to.
  *
  * Preview deployments may keep their *.vercel.app host. The production
  * alias is never treated as a preview host.
+ *
+ * Host 308s live in `canonical-host.ts` (next.config + middleware).
+ * Keep this origin string identical to CANONICAL_PRODUCTION_ORIGIN.
  */
 
 export const CANONICAL_PRODUCTION_APP_URL = "https://www.fanengagepro.com";

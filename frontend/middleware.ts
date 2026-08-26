@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { resolveCommunityFromHost } from "@/lib/community";
+import { productionHostRedirect, requestHostname } from "@/lib/canonical-host";
 
 /**
  * Routes a signed-in user must be able to reach.
@@ -55,6 +56,17 @@ function enforceAdminBasicAuth(request: NextRequest): NextResponse | null {
  * so previews of non-protected routes still work end-to-end.
  */
 export async function middleware(request: NextRequest) {
+  // Layer -1: pin production to www. next.config host rules did not fire
+  // on live Vercel (pearl + apex still 200 on 2026-08-26). Same-path 308.
+  const hostRedirect = productionHostRedirect(
+    requestHostname(request.headers),
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+  );
+  if (hostRedirect) {
+    return NextResponse.redirect(hostRedirect, 308);
+  }
+
   // Layer 0: optional HTTP Basic Auth on /admin/*
   const basicAuthBlock = enforceAdminBasicAuth(request);
   if (basicAuthBlock) return basicAuthBlock;
