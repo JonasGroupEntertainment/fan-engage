@@ -98,7 +98,7 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | `STRIPE_SECRET_KEY` | Stripe server-side API key (test mode until launch) | ✅ set |
 | `STRIPE_SEED_SECRET` | Bearer token for `/api/admin/stripe-seed` bootstrap endpoint | ✅ set |
 | `STRIPE_WEBHOOK_SECRET` | Verifies signatures on `/api/stripe/webhook` — copy from Stripe dashboard → Developers → Webhooks → endpoint → Signing secret | ✅ set |
-| **`NEXT_PUBLIC_APP_URL`** | Used in email unsubscribe links (defaults to `fan-engage-pearl.vercel.app` if unset) | **⏳ set before custom domain** |
+| **`NEXT_PUBLIC_APP_URL`** | Public origin baked into auth `emailRedirectTo`. Production must be `https://www.fanengagepro.com`. Do not set to `VERCEL_URL` or `fan-engage-pearl.vercel.app`. | **⏳ set to www + redeploy** |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (widget). Used on **signup**, **magic-link**, and **forgot-password** only — **password sign-in has no Turnstile**. | ⏳ set before soft-launch if bot protection desired |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret for `/api/turnstile/verify`. When unset, verify allows through (dev). | ⏳ set with site key |
 | `TURNSTILE_FAIL_OPEN` | Optional. Default fail-open on Cloudflare upstream/network outages so auth isn't hard-blocked. Set `0`/`false`/`off` to fail-closed on outages. Missing tokens + real challenge failures still fail-closed when keys are set. | optional (default: fail-open) |
@@ -206,7 +206,7 @@ import ModerationButton from "@/app/admin/community/moderation-button";
 ## 🌐 Domain + production polish
 
 - [ ] **Custom domain** — point a real domain (e.g. `fanengage.app`) at the Vercel project; add DNS records; set as primary
-- [ ] **Update Supabase Site URL + redirect URLs** to the custom domain so auth magic links point to the right place
+- [ ] **Update Supabase Site URL + redirect URLs** to `https://www.fanengagepro.com` (Site URL) and allow `https://www.fanengagepro.com/**` plus `https://fanengagepro.com/**`. Keep preview `*.vercel.app` redirects if needed. Until this is set, GoTrue rewrites `emailRedirectTo` to the Site URL (`fan-engage-pearl.vercel.app`).
 - [ ] **Update Mailchimp campaign from-domain** to match
 - [ ] **Set `NEXT_PUBLIC_APP_URL`** to the custom domain so unsubscribe links use it
 - [ ] **Favicon + OG image** — polish the social preview when someone shares a Fan Engage link

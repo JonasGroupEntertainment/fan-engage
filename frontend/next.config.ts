@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Access-Control-Allow-Origin",
-            value: process.env.NEXT_PUBLIC_SITE_URL ?? "https://fanengagepro.com",
+            value: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.fanengagepro.com",
           },
           {
             key: "Access-Control-Allow-Methods",
@@ -93,6 +93,30 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: "/",
+        has: [{ type: "host", value: "fan-engage-pearl.vercel.app" }],
+        destination: "https://www.fanengagepro.com/",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "fan-engage-pearl.vercel.app" }],
+        destination: "https://www.fanengagepro.com/:path*",
+        permanent: true,
+      },
+      {
+        source: "/",
+        has: [{ type: "host", value: "fanengagepro.com" }],
+        destination: "https://www.fanengagepro.com/",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "fanengagepro.com" }],
+        destination: "https://www.fanengagepro.com/:path*",
+        permanent: true,
+      },
       {
         source: "/blakerichardson",
         destination: "/blake-richardson",
