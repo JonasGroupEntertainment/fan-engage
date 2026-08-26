@@ -68,6 +68,11 @@ describe("resolveAppUrl — production must not emit pearl / VERCEL_URL", () => 
     assert.doesNotMatch(APP_URL, /fan-engage-pearl\.vercel\.app/);
     assert.doesNotMatch(authEmailRedirectTo("/"), /fan-engage-pearl\.vercel\.app/);
   });
+
+  it("does not default resolveAppUrl to process.env (Next production tsc rejects that)", () => {
+    const src = readRepo("./app-url.ts");
+    assert.doesNotMatch(src, /env:\s*AppUrlEnv\s*=\s*process\.env/);
+  });
 });
 
 describe("resolveAppUrl — preview may keep Vercel preview host", () => {

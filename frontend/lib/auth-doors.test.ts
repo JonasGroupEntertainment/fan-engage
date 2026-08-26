@@ -36,6 +36,11 @@ describe("isMagicLinkEnabled", () => {
     assert.equal(isMagicLinkEnabled({ VERCEL_ENV: "development" }), true);
     assert.equal(isMagicLinkEnabled({}), true);
   });
+
+  it("does not default isMagicLinkEnabled to process.env (Next production tsc rejects that)", () => {
+    const src = readRepo("./auth-doors.ts");
+    assert.doesNotMatch(src, /env:\s*AuthDoorsEnv\s*=\s*process\.env/);
+  });
 });
 
 describe("login / signup doors", () => {

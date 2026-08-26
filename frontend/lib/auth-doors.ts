@@ -17,7 +17,13 @@ function vercelEnvOf(env: AuthDoorsEnv): string | undefined {
   return env.NEXT_PUBLIC_VERCEL_ENV || env.VERCEL_ENV;
 }
 
-export function isMagicLinkEnabled(env: AuthDoorsEnv = process.env): boolean {
+export function isMagicLinkEnabled(
+  env: AuthDoorsEnv = {
+    NEXT_PUBLIC_MAGIC_LINK_ENABLED: process.env.NEXT_PUBLIC_MAGIC_LINK_ENABLED,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  },
+): boolean {
   const explicit = env.NEXT_PUBLIC_MAGIC_LINK_ENABLED?.trim().toLowerCase();
   if (explicit === "true" || explicit === "1") return true;
   if (explicit === "false" || explicit === "0") return false;

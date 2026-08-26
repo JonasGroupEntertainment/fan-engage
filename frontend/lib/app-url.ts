@@ -62,7 +62,15 @@ function isDisallowedProductionHost(host: string): boolean {
   return host === PRODUCTION_VERCEL_ALIAS_HOST || host.endsWith(".vercel.app");
 }
 
-export function resolveAppUrl(env: AppUrlEnv = process.env): string {
+export function resolveAppUrl(
+  env: AppUrlEnv = {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+  },
+): string {
   const configured = firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.NEXT_PUBLIC_SITE_URL);
   const vercelOrigin = env.VERCEL_URL ? toOrigin(env.VERCEL_URL) : null;
 
@@ -104,10 +112,4 @@ export function authEmailRedirectTo(
   return `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
-export const APP_URL = resolveAppUrl({
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-  VERCEL_URL: process.env.VERCEL_URL,
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
-});
+export const APP_URL = resolveAppUrl();
