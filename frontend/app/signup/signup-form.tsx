@@ -84,7 +84,7 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "confirm">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "error" | "need-signin">("idle");
   const [message, setMessage] = useState("");
   const turnstileConfigured = isTurnstileConfigured();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -118,20 +118,6 @@ export function SignupForm({
     setTurnstileKey((k) => k + 1);
   }, []);
 
-  // Resubmitting signUp() for the same address silently resends the
-  // confirmation email and regenerates its token, invalidating whatever
-  // link is already in the inbox. Lock the button after a successful send
-  // so a double-click or impatient retry can't do that.
-  const CONFIRM_COOLDOWN_SECONDS = 45;
-  const [confirmCooldown, setConfirmCooldown] = useState(0);
-  const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (cooldownInterval.current) clearInterval(cooldownInterval.current);
-    };
-  }, []);
-
   useEffect(() => {
     if (turnstileConfigured) prefetchTurnstileScript();
   }, [turnstileConfigured]);
@@ -150,20 +136,6 @@ export function SignupForm({
     window.addEventListener(COOKIE_CONSENT_EVENT, writeRefCookie);
     return () => window.removeEventListener(COOKIE_CONSENT_EVENT, writeRefCookie);
   }, [inviteCode]);
-
-  function startConfirmCooldown() {
-    setConfirmCooldown(CONFIRM_COOLDOWN_SECONDS);
-    if (cooldownInterval.current) clearInterval(cooldownInterval.current);
-    cooldownInterval.current = setInterval(() => {
-      setConfirmCooldown((s) => {
-        if (s <= 1) {
-          if (cooldownInterval.current) clearInterval(cooldownInterval.current);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-  }
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -227,7 +199,7 @@ export function SignupForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (confirmCooldown > 0) return;
+    if (status === "need-signin") return;
 
     // Inline validation BEFORE we hit Supabase. Surface field-specific
     // errors so a 6-character password isn't silently rejected as a
@@ -248,15 +220,10 @@ export function SignupForm({
       return;
     }
 
-    // Confirmation resend already passed the gate — don't re-trap on a
-    // remounted / failed widget.
-    const resending = status === "confirm";
-    if (!resending) {
-      setStatus("loading");
-      setMessage("");
-      const ok = await ensureCaptcha();
-      if (!ok) return;
-    }
+    setStatus("loading");
+    setMessage("");
+    const ok = await ensureCaptcha();
+    if (!ok) return;
     await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined);
   }
 
@@ -267,8 +234,7 @@ export function SignupForm({
     // Prefer the pre-consent verification; fall back to a live verify when
     // createAccount is reached without that one-shot (shouldn't happen in
     // the normal consent path, but keeps the no-docs path safe on retry).
-    // Skip on confirmation resend — the account already exists.
-    if (status !== "confirm" && !(await ensureCaptcha())) return;
+    if (!(await ensureCaptcha())) return;
     captchaVerifiedRef.current = false;
 
     try {
@@ -288,18 +254,21 @@ export function SignupForm({
       });
       if (error) throw error;
 
-      // If email confirmation is OFF in Supabase, Supabase returns a session here
-      // and we can push straight into onboarding.
-      if (data.session) {
-        router.push(onboardingHref);
-        router.refresh();
-        return;
+      // Password-first: if signUp already returned a session, continue.
+      // If confirmation is still on, do not send fans to the PKCE confirm
+      // email — immediately sign in with the password they just set.
+      if (!data.session) {
+        const { data: signedIn, error: signInError } =
+          await supabase.auth.signInWithPassword({ email, password });
+        if (signInError || !signedIn.session) {
+          setStatus("need-signin");
+          setMessage("Sign in with the password you just created.");
+          return;
+        }
       }
 
-      // Otherwise Supabase emailed a confirmation link — prompt them to check it.
-      setStatus("confirm");
-      setMessage("Check your email to confirm and finish signing up.");
-      startConfirmCooldown();
+      router.push(onboardingHref);
+      router.refresh();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to create account.");
@@ -411,7 +380,7 @@ export function SignupForm({
           <div className="rounded-2xl border border-aurora/30 bg-aurora/10 px-4 py-3 text-sm text-white/85">
             <p className="font-medium text-white">Create your fan account first</p>
             <p className="mt-1 text-xs text-white/70">
-              Nothing&apos;s lost — after you confirm your email you&apos;ll finish your
+              Nothing&apos;s lost — after you sign in you&apos;ll finish your
               profile (about a minute), then jump into the artist experience with your
               signup points.
             </p>
@@ -524,48 +493,35 @@ export function SignupForm({
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={
-              status === "loading" ||
-              confirmCooldown > 0 ||
-              (status !== "confirm" && !canSubmitSignup)
-            }
-            className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
-          >
-            {signupTurnstileButtonLabel({
-              cooldown: confirmCooldown,
-              status,
-              gate: turnstileGate,
-            })}
-          </button>
+          {status === "need-signin" ? (
+            <Link
+              href={loginHref}
+              className="block w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-center text-sm font-semibold text-white shadow-glass"
+            >
+              Sign in with the password you just created
+            </Link>
+          ) : (
+            <button
+              type="submit"
+              disabled={status === "loading" || !canSubmitSignup}
+              className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
+            >
+              {signupTurnstileButtonLabel({
+                status,
+                gate: turnstileGate,
+              })}
+            </button>
+          )}
         </form>
 
-        {status === "confirm" && (
+        {status === "need-signin" && (
           <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
             <p className="text-sm font-semibold text-emerald-200">
-              Almost there — what happens next:
+              Sign in with the password you just created.
             </p>
-            <ol className="mt-3 space-y-2 text-xs text-emerald-100/90">
-              <li className="flex gap-2">
-                <span className="font-mono text-emerald-300/70">1.</span>
-                <span>
-                  Check your email and click the confirmation link we just sent — use the
-                  newest one, since requesting another invalidates it.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-mono text-emerald-300/70">2.</span>
-                <span>Set up your fan profile — 60 seconds, no credit card.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-mono text-emerald-300/70">3.</span>
-                <span>Earn your first 100 fan points and start unlocking rewards.</span>
-              </li>
-            </ol>
           </div>
         )}
-        {message && status !== "confirm" && (
+        {message && status !== "need-signin" && (
           <p
             className={`text-sm ${
               status === "error" ? "text-red-300" : "text-emerald-300"

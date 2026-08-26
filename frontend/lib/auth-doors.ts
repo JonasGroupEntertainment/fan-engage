@@ -1,14 +1,16 @@
 /**
  * Auth doors that are not yet proven in production.
  *
- * Password + forgot-password stay. Magic-link / email-OTP is PKCE and was
- * proven broken on 2026-08-26 (same-browser verify →
- * "PKCE code verifier not found in storage"). Hide that CTA in production
- * until an explicit enable flag is set after PKCE actually works.
+ * Password signup + password sign-in stay. Magic-link / email-OTP and
+ * forgot-password email recovery are PKCE and were proven broken on
+ * 2026-08-26 (same-browser verify → "PKCE code verifier not found in
+ * storage"). Hide those CTAs in production until an explicit enable
+ * flag is set after PKCE actually works.
  */
 
 export type AuthDoorsEnv = {
   NEXT_PUBLIC_MAGIC_LINK_ENABLED?: string;
+  NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED?: string;
   NEXT_PUBLIC_VERCEL_ENV?: string;
   VERCEL_ENV?: string;
 };
@@ -28,5 +30,21 @@ export function isMagicLinkEnabled(
   if (explicit === "true" || explicit === "1") return true;
   if (explicit === "false" || explicit === "0") return false;
   // Production stays password-first until PKCE is proven.
+  return vercelEnvOf(env) !== "production";
+}
+
+export function isForgotPasswordEnabled(
+  env: AuthDoorsEnv = {
+    NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED:
+      process.env.NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  },
+): boolean {
+  const explicit = env.NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED?.trim().toLowerCase();
+  if (explicit === "true" || explicit === "1") return true;
+  if (explicit === "false" || explicit === "0") return false;
+  // Recovery email is PKCE — keep it off the first-fan login path in
+  // production until that flow is proven.
   return vercelEnvOf(env) !== "production";
 }
