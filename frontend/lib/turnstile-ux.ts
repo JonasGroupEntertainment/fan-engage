@@ -173,13 +173,13 @@ export function signupAllowsSubmit(gate: SignupTurnstileGate): boolean {
 }
 
 export function signupTurnstileButtonLabel(opts: {
-  cooldown: number;
-  status: "idle" | "loading" | "error" | "confirm";
+  status: "idle" | "loading" | "error" | "need-signin";
   gate: SignupTurnstileGate;
 }): string {
-  if (opts.cooldown > 0) return `Resend confirmation email in ${opts.cooldown}s`;
   if (opts.status === "loading") return "Creating account…";
-  if (opts.status === "confirm") return "Resend confirmation email";
+  if (opts.status === "need-signin") {
+    return "Sign in with the password you just created";
+  }
   // Loading / fail / retry copy lives on the Turnstile block, not this CTA.
   return "Create account";
 }

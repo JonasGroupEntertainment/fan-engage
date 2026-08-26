@@ -31,7 +31,13 @@ export function LoginFallback() {
   );
 }
 
-export function LoginForm({ magicLinkEnabled }: { magicLinkEnabled: boolean }) {
+export function LoginForm({
+  magicLinkEnabled,
+  forgotPasswordEnabled,
+}: {
+  magicLinkEnabled: boolean;
+  forgotPasswordEnabled: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Only allow same-origin relative paths ("//host" is protocol-relative).
@@ -281,11 +287,13 @@ export function LoginForm({ magicLinkEnabled }: { magicLinkEnabled: boolean }) {
             />
           </label>
 
-          <div className="flex justify-end">
-            <Link href="/forgot-password" className="text-xs text-white/60 hover:text-white hover:underline">
-              Forgot password?
-            </Link>
-          </div>
+          {forgotPasswordEnabled && (
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-xs text-white/60 hover:text-white hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+          )}
 
           <button
             type="submit"

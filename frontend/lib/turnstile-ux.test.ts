@@ -247,7 +247,7 @@ describe("signup Turnstile gate", () => {
     assert.equal(gate, "wait-load");
     assert.equal(signupAllowsSubmit(gate), false);
     assert.equal(
-      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      signupTurnstileButtonLabel({ status: "idle", gate }),
       "Create account",
     );
   });
@@ -261,7 +261,7 @@ describe("signup Turnstile gate", () => {
     assert.equal(gate, "complete-check");
     assert.equal(signupAllowsSubmit(gate), false);
     assert.equal(
-      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      signupTurnstileButtonLabel({ status: "idle", gate }),
       "Create account",
     );
   });
@@ -275,7 +275,7 @@ describe("signup Turnstile gate", () => {
     assert.equal(gate, "fail-open");
     assert.equal(signupAllowsSubmit(gate), true);
     assert.equal(
-      signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+      signupTurnstileButtonLabel({ status: "idle", gate }),
       "Create account",
     );
   });
@@ -283,7 +283,7 @@ describe("signup Turnstile gate", () => {
   it("never puts security-check loading copy on Create account", () => {
     for (const gate of ["wait-load", "complete-check", "fail-open", "ready", "not-configured"] as const) {
       assert.equal(
-        signupTurnstileButtonLabel({ cooldown: 0, status: "idle", gate }),
+        signupTurnstileButtonLabel({ status: "idle", gate }),
         "Create account",
       );
     }
@@ -299,14 +299,20 @@ describe("signup Turnstile gate", () => {
     assert.equal(signupAllowsSubmit(gate), true);
   });
 
-  it("keeps confirmation resend copy even if the widget remounted", () => {
-    assert.equal(
-      signupTurnstileButtonLabel({
-        cooldown: 0,
-        status: "confirm",
-        gate: "wait-load",
-      }),
-      "Resend confirmation email",
+  it("never uses confirmation-email resend as the signup CTA", () => {
+    const label = signupTurnstileButtonLabel({
+      status: "need-signin",
+      gate: "wait-load",
+    });
+    assert.equal(label, "Sign in with the password you just created");
+    assert.doesNotMatch(label, /confirmation email/i);
+    assert.doesNotMatch(
+      signupTurnstileButtonLabel({ status: "idle", gate: "ready" }),
+      /confirmation email/i,
+    );
+    assert.doesNotMatch(
+      signupTurnstileButtonLabel({ status: "loading", gate: "ready" }),
+      /confirmation email/i,
     );
   });
 });
