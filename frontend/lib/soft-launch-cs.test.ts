@@ -43,7 +43,7 @@ describe("soft-launch CS: guest copy and honesty", () => {
     assert.doesNotMatch(guestSurfaces.rewards, /1,050 pts/);
     assert.doesNotMatch(guestSurfaces.rewards, /Preview the fan tier journey/);
     assert.match(guestSurfaces.rewards, /Earn points by showing up/);
-    assert.match(guestSurfaces.rewards, /do not preview a\s+fake climb/);
+    assert.match(guestSurfaces.rewards, /digital unlocks/);
     // Gold copy stays on the signed-in branch only.
     const guestIntro = guestSurfaces.rewards.slice(
       guestSurfaces.rewards.indexOf("Earn points by showing up"),

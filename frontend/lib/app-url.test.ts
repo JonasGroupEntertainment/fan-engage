@@ -108,7 +108,7 @@ describe("auth call sites use authEmailRedirectTo / APP_URL", () => {
     const files = {
       login: readRepo("../app/login/login-form.tsx"),
       signup: readRepo("../app/signup/signup-form.tsx"),
-      forgot: readRepo("../app/forgot-password/page.tsx"),
+      forgot: readRepo("../app/forgot-password/forgot-password-form.tsx"),
       callback: readRepo("../app/auth/callback/route.ts"),
     };
     for (const [name, src] of Object.entries(files)) {

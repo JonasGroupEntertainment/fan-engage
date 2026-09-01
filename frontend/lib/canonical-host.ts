@@ -6,6 +6,10 @@
  * both still 200 (next.config host rules did not fire on Vercel).
  * Middleware enforces the same 308 so pearl / apex cannot stay live origins.
  *
+ * Also pin known production Vercel project aliases (fan-engage.vercel.app,
+ * fanengagepro.vercel.app) the same way. If a host still 200s after deploy,
+ * it is a different Vercel project — add a dashboard alias/redirect there.
+ *
  * Never redirect www → apex. Never treat a preview *.vercel.app host as
  * the production alias.
  */
@@ -13,10 +17,14 @@
 export const CANONICAL_PRODUCTION_HOST = "www.fanengagepro.com";
 export const CANONICAL_PRODUCTION_ORIGIN = "https://www.fanengagepro.com";
 export const PRODUCTION_VERCEL_ALIAS_HOST = "fan-engage-pearl.vercel.app";
+export const PRODUCTION_VERCEL_PROJECT_HOST = "fan-engage.vercel.app";
+export const PRODUCTION_VERCEL_NAME_HOST = "fanengagepro.vercel.app";
 export const PRODUCTION_APEX_HOST = "fanengagepro.com";
 
 export const PRODUCTION_REDIRECT_SOURCE_HOSTS = [
   PRODUCTION_VERCEL_ALIAS_HOST,
+  PRODUCTION_VERCEL_PROJECT_HOST,
+  PRODUCTION_VERCEL_NAME_HOST,
   PRODUCTION_APEX_HOST,
 ] as const;
 
@@ -68,7 +76,7 @@ export function productionHostRedirect(
   return `${CANONICAL_PRODUCTION_ORIGIN}${path}${qs}`;
 }
 
-/** next.config `redirects()` entries: pearl + apex → same path on www (308). */
+/** next.config `redirects()` entries: known prod aliases + apex → www (308). */
 export function productionHostRedirectRules(): NextHostRedirect[] {
   return PRODUCTION_REDIRECT_SOURCE_HOSTS.flatMap((host) => [
     {

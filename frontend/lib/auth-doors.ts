@@ -44,7 +44,7 @@ export function isForgotPasswordEnabled(
   const explicit = env.NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED?.trim().toLowerCase();
   if (explicit === "true" || explicit === "1") return true;
   if (explicit === "false" || explicit === "0") return false;
-  // Recovery email is PKCE — keep it off the first-fan login path in
-  // production until that flow is proven.
-  return vercelEnvOf(env) !== "production";
+  // HOLD: recovery email is PKCE. Do not leave a public /forgot-password
+  // form on production or preview unless the flag is explicitly on.
+  return false;
 }

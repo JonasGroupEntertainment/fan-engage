@@ -37,6 +37,9 @@ const guestSurfaces = {
   onboarding: readRepo("../app/onboarding/page.tsx"),
   layout: readRepo("../app/layout.tsx"),
   emptyState: readRepo("../components/marketplace-empty-state.tsx"),
+  comingSoon: readRepo("../components/marketplace-coming-soon.tsx"),
+  marketplace: readRepo("../app/marketplace/page.tsx"),
+  foundersWall: readRepo("../app/artists/[slug]/founders/page.tsx"),
   signup: readRepo("../app/signup/signup-form.tsx"),
 };
 
@@ -167,6 +170,8 @@ describe("guest signed-out copy does not leak held items", () => {
     assert.doesNotMatch(guestSurfaces.homepage, /Nashville Listening Party/);
     assert.doesNotMatch(guestSurfaces.homepage, /Gold tier/);
     assert.match(guestSurfaces.homepage, /Sample preview|Next show/);
+    assert.doesNotMatch(guestSurfaces.foundersWall, /paying fans/i);
+    assert.doesNotMatch(guestSurfaces.foundersWall, /locked-in pricing/i);
     assert.doesNotMatch(migrationSql, /named date|June|July 1/i);
     assert.match(
       migrationSql,

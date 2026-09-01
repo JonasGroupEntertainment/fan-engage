@@ -27,9 +27,15 @@ type EarnMore = {
 };
 const earnMore: EarnMore[] = [
   { title: "Share referral link", detail: "Every verified signup", reward: "+150 pts", href: "/referrals" },
+  {
+    title: "Redeem digital unlocks",
+    detail: "Wallpapers and in-app drops",
+    reward: "—",
+    href: "/artists/raelynn/rewards",
+  },
   isMarketplaceLive()
     ? { title: "Browse marketplace", detail: "Redeem points for drops", reward: "—", href: "/marketplace" }
-    : { title: "Merch — coming soon", detail: "Shop opens after soft launch", reward: "—", href: "/marketplace" },
+    : { title: "Merch — coming soon", detail: "Physical merch stays closed — digital path is above", reward: "—", href: "/marketplace" },
 ];
 
 function formatPts(n: number | null | undefined) {
@@ -142,9 +148,9 @@ export default async function RewardsPage() {
                   Earn points by showing up
                 </h1>
                 <p className="mt-4 text-sm text-white/70">
-                  Sign up to start earning. Your real points, badges, and tier
-                  progress land here after you join — we do not preview a
-                  fake climb.
+                  Sign up to start earning. Your points, badges, and tier
+                  progress land here after you join — plus digital unlocks
+                  like wallpapers you can redeem.
                 </p>
               </>
             )}
