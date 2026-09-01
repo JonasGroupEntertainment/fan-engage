@@ -12,6 +12,11 @@ describe("sticky-flow: forgot-password HOLD", () => {
     const page = readRepo("../app/forgot-password/page.tsx");
     assert.match(page, /if\s*\(\s*!isForgotPasswordEnabled\(\)\s*\)\s*notFound\(\)/);
     assert.doesNotMatch(page, /"use client"/);
+    const doors = readRepo("./auth-doors.ts");
+    assert.match(
+      doors,
+      /HOLD: recovery email is PKCE[\s\S]*return false;/,
+    );
   });
 
   it("does not add a /magic-link page", () => {

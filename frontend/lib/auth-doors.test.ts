@@ -66,10 +66,10 @@ describe("isForgotPasswordEnabled", () => {
     );
   });
 
-  it("stays available on preview/dev so recovery can be proven", () => {
-    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "preview" }), true);
-    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "development" }), true);
-    assert.equal(isForgotPasswordEnabled({}), true);
+  it("stays off on preview/dev unless the flag is explicit (HOLD)", () => {
+    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "preview" }), false);
+    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "development" }), false);
+    assert.equal(isForgotPasswordEnabled({}), false);
   });
 });
 
