@@ -22,3 +22,11 @@ describe("production host canonicalization", () => {
     assert.doesNotMatch(nextConfig, /destination:\s*"https:\/\/fanengagepro\.com/);
   });
 });
+
+describe("pricing / plans aliases", () => {
+  it("redirects /pricing and /plans to /premium", () => {
+    assert.match(nextConfig, /source:\s*"\/pricing"/);
+    assert.match(nextConfig, /source:\s*"\/plans"/);
+    assert.match(nextConfig, /destination:\s*"\/premium"/);
+  });
+});

@@ -110,6 +110,26 @@ const nextConfig: NextConfig = {
         destination: "/marketplace",
         permanent: false,
       },
+      {
+        source: "/pricing",
+        destination: "/premium",
+        permanent: false,
+      },
+      {
+        source: "/pricing/:path*",
+        destination: "/premium",
+        permanent: false,
+      },
+      {
+        source: "/plans",
+        destination: "/premium",
+        permanent: false,
+      },
+      {
+        source: "/plans/:path*",
+        destination: "/premium",
+        permanent: false,
+      },
     ];
   },
 };

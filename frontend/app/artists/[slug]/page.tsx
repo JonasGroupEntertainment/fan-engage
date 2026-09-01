@@ -419,7 +419,12 @@ export default async function ArtistPage({
                           ? `${origin}/invite/${fan.referral_code}?artist=${encodeURIComponent(artist.slug)}&event=${encodeURIComponent(eventId)}`
                           : `${origin}/artists/${artist.slug}`
                       }
-                      label="Bring friends ↗"
+                      href={
+                        isSignedIn
+                          ? undefined
+                          : `/signup?ref=${encodeURIComponent(artist.slug)}&next=${encodeURIComponent(`/artists/${artist.slug}`)}`
+                      }
+                      label={isSignedIn ? "Bring friends ↗" : "Join to bring friends ↗"}
                     />
                   </div>
                 )}

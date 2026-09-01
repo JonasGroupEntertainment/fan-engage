@@ -66,10 +66,41 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
     const digital = fan
       ? await listRewardsForCommunity(LAUNCH_COMMUNITY_ID)
       : [];
+    const guestDigitalTeasers = [
+      { title: "Phone Wallpaper", pts: "250 pts" },
+      { title: "Lyric Wallpaper", pts: "500 pts" },
+    ];
+    const redeemHref = `/artists/${LAUNCH_COMMUNITY_ID}/rewards`;
+    const guestRedeemHref = `/signup?ref=raelynn&next=${encodeURIComponent(redeemHref)}`;
     return (
       <div className="min-h-screen bg-midnight">
         <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
           <MarketplaceComingSoon artistName="RaeLynn" signedIn={fan !== null} />
+          {!fan && (
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold">Digital unlocks</h2>
+              <p className="text-sm text-white/60">
+                Same in-app rewards the homepage lists. Join to redeem —
+                physical merch stays Coming soon.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {guestDigitalTeasers.map((r) => (
+                  <Link
+                    key={r.title}
+                    href={guestRedeemHref}
+                    className="rounded-2xl border border-white/10 bg-black/30 p-5 hover:border-white/25"
+                  >
+                    <p className="text-xs uppercase tracking-wide text-white/50">
+                      Digital
+                    </p>
+                    <p className="mt-1 font-semibold">{r.title}</p>
+                    <p className="mt-3 text-emerald-300">{r.pts}</p>
+                    <p className="mt-3 text-xs text-white/60">Join to redeem →</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           {fan && digital.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-lg font-semibold">Digital unlocks</h2>

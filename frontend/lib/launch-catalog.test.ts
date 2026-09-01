@@ -37,6 +37,8 @@ const guestSurfaces = {
   onboarding: readRepo("../app/onboarding/page.tsx"),
   layout: readRepo("../app/layout.tsx"),
   emptyState: readRepo("../components/marketplace-empty-state.tsx"),
+  comingSoon: readRepo("../components/marketplace-coming-soon.tsx"),
+  marketplace: readRepo("../app/marketplace/page.tsx"),
   signup: readRepo("../app/signup/signup-form.tsx"),
 };
 

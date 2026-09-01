@@ -86,6 +86,22 @@ describe("login / signup doors", () => {
     assert.doesNotMatch(form, /fan-engage-pearl\.vercel\.app/);
   });
 
+  it("production /forgot-password is not a public reset form", () => {
+    const page = readRepo("../app/forgot-password/page.tsx");
+    assert.match(page, /isForgotPasswordEnabled\(\)/);
+    assert.match(page, /notFound\(\)/);
+    assert.doesNotMatch(page, /resetPasswordForEmail/);
+    assert.doesNotMatch(page, /TurnstileWidget/);
+    const form = readRepo("../app/forgot-password/forgot-password-form.tsx");
+    assert.match(form, /resetPasswordForEmail/);
+  });
+
+  it("no public /magic-link route", () => {
+    const login = readRepo("../app/login/page.tsx");
+    assert.match(login, /isMagicLinkEnabled\(\)/);
+    assert.doesNotMatch(readRepo("../app/login/login-form.tsx"), /href="\/magic-link"/);
+  });
+
   it("production login hides the forgot-password link", () => {
     const page = readRepo("../app/login/page.tsx");
     const form = readRepo("../app/login/login-form.tsx");

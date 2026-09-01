@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { resolveCommunityFromHost } from "@/lib/community";
 import { productionHostRedirect, requestHostname } from "@/lib/canonical-host";
+import { guestSignupHref, isOnboardingPath } from "@/lib/guest-signup";
 
 /**
  * Routes a signed-in user must be able to reach.
@@ -123,6 +124,17 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Guests must not sit on /onboarding "Loading…". Signup first; keep
+  // ref/next when present (default ref=raelynn).
+  if (!user && isOnboardingPath(pathname)) {
+    const signup = guestSignupHref({
+      ref: request.nextUrl.searchParams.get("ref"),
+      next: request.nextUrl.searchParams.get("next"),
+      fallbackNext: pathname,
+    });
+    return NextResponse.redirect(new URL(signup, request.url));
   }
 
   return response;

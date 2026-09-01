@@ -6,6 +6,8 @@ import {
   CANONICAL_PRODUCTION_ORIGIN,
   PRODUCTION_APEX_HOST,
   PRODUCTION_VERCEL_ALIAS_HOST,
+  PRODUCTION_VERCEL_NAME_HOST,
+  PRODUCTION_VERCEL_PROJECT_HOST,
   hostnameFromHostHeader,
   productionHostRedirect,
   productionHostRedirectRules,
@@ -38,6 +40,16 @@ describe("productionHostRedirect — pearl and apex 308 to the same path on www"
       host: PRODUCTION_APEX_HOST,
       path: "/login",
       dest: `${CANONICAL_PRODUCTION_ORIGIN}/login`,
+    },
+    {
+      host: PRODUCTION_VERCEL_PROJECT_HOST,
+      path: "/login",
+      dest: `${CANONICAL_PRODUCTION_ORIGIN}/login`,
+    },
+    {
+      host: PRODUCTION_VERCEL_NAME_HOST,
+      path: "/",
+      dest: `${CANONICAL_PRODUCTION_ORIGIN}/`,
     },
     {
       host: PRODUCTION_VERCEL_ALIAS_HOST,
@@ -99,17 +111,19 @@ describe("requestHostname prefers x-forwarded-host", () => {
 });
 
 describe("productionHostRedirectRules for next.config", () => {
-  it("308s pearl and apex to www, never www to apex", () => {
+  it("308s pearl, project aliases, and apex to www, never www to apex", () => {
     const rules = productionHostRedirectRules();
-    assert.equal(rules.length, 4);
+    assert.equal(rules.length, 8);
+    const hosts = new Set(rules.map((r) => r.has[0].value));
+    assert.ok(hosts.has(PRODUCTION_VERCEL_ALIAS_HOST));
+    assert.ok(hosts.has(PRODUCTION_VERCEL_PROJECT_HOST));
+    assert.ok(hosts.has(PRODUCTION_VERCEL_NAME_HOST));
+    assert.ok(hosts.has(PRODUCTION_APEX_HOST));
     for (const rule of rules) {
       assert.equal(rule.permanent, true);
       assert.match(rule.destination, /^https:\/\/www\.fanengagepro\.com\//);
       assert.doesNotMatch(rule.destination, /fan-engage-pearl\.vercel\.app/);
-      assert.ok(
-        rule.has[0].value === PRODUCTION_VERCEL_ALIAS_HOST ||
-          rule.has[0].value === PRODUCTION_APEX_HOST,
-      );
+      assert.doesNotMatch(rule.destination, /fan-engage\.vercel\.app/);
       assert.notEqual(rule.has[0].value, "www.fanengagepro.com");
     }
   });
