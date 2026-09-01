@@ -23,6 +23,12 @@ describe("sticky-flow: forgot-password HOLD", () => {
     const magic = fileURLToPath(new URL("../app/magic-link/page.tsx", import.meta.url));
     assert.equal(existsSync(magic), false);
   });
+
+  it("production /reset-password is not a public set-password form", () => {
+    const page = readRepo("../app/reset-password/page.tsx");
+    assert.match(page, /if\s*\(\s*!isForgotPasswordEnabled\(\)\s*\)\s*notFound\(\)/);
+    assert.doesNotMatch(page, /"use client"/);
+  });
 });
 
 describe("sticky-flow: marketplace guest digital path", () => {

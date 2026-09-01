@@ -92,7 +92,7 @@ export default async function PremiumPage({
     { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist — ask anything." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
-    { icon: "🏅", title: "Founding Fan status", body: "First 100 fans lock a numbered Founding Fan badge on their profile." },
+    { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points — not a Premium purchase." },
   ];
 
   return (
@@ -145,7 +145,7 @@ export default async function PremiumPage({
           below, no ads, no gimmicks.
         </p>
 
-        {/* Founder banner */}
+        {/* Founding Fan is a free first-100 badge — not a paid Premium slot. */}
         {!founder.closed && (
           <div
             className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-gradient-to-r from-aurora/20 to-ember/20 px-4 py-2 text-xs font-medium text-white"
@@ -153,15 +153,14 @@ export default async function PremiumPage({
               borderColor: `${community.accent_from}66`,
             }}
           >
-            <span aria-hidden>🌟</span>
-            Founding Fan pricing — {founder.remaining.toLocaleString("en-US")} {founder.remaining === 1 ? "spot" : "spots"} remaining of {founder.cap.toLocaleString("en-US")}.
+            <span aria-hidden>🏅</span>
+            Free Founding Fan badge — {founder.claimed.toLocaleString("en-US")} of {founder.cap.toLocaleString("en-US")} claimed, {founder.remaining.toLocaleString("en-US")} left. Premium is a separate paid plan.
           </div>
         )}
         {founder.closed && (
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/55">
-            Founding Fan spots are full. Standard pricing applies — future
-            price increases won&apos;t affect existing subscribers on either
-            plan.
+            Free Founding Fan badges (first 100 joins) are all claimed. Premium
+            is still available as a separate paid plan.
           </div>
         )}
 

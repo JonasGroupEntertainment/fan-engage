@@ -11,7 +11,7 @@ import {
  * the existing How-it-works section.
  *
  * First 100 Founding Fan is a persisted membership number, not a date
- * window and not paid Founding Fan pricing. Claimed/remaining/cap come
+ * window and not paid Premium. Claimed/remaining/cap come
  * from `getFoundingFanClaimState` — same helper as /artists/raelynn and
  * /premium.
  */

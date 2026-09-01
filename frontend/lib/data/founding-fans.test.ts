@@ -15,6 +15,7 @@ const premiumPageSrc = readRepo("../../app/premium/page.tsx");
 const founderSlotsApiSrc = readRepo("../../app/api/founder-slots/route.ts");
 const checkoutSrc = readRepo("../../app/premium/actions.ts");
 const founderSlotsUiSrc = readRepo("../../app/premium/founder-slots-counter.tsx");
+const foundersWallSrc = readRepo("../../app/artists/[slug]/founders/page.tsx");
 
 describe("guest founding counters share one source", () => {
   it("helper query is founding_fan_number 1 through FOUNDING_FAN_CAP", () => {
@@ -23,8 +24,9 @@ describe("guest founding counters share one source", () => {
     );
     assert.match(helperSrc, /foundingClaimStateFromCount/);
     assert.match(queryFn, /founding_fan_number/);
-    assert.match(queryFn, /gte\("founding_fan_number", 1\)/);
-    assert.match(queryFn, /lte\("founding_fan_number", FOUNDING_FAN_CAP\)/);
+    assert.match(queryFn, /gte\("founding_fan_number"/);
+    assert.match(queryFn, /lte\("founding_fan_number"/);
+    assert.match(helperSrc, /listFoundingFans/);
     assert.doesNotMatch(queryFn, /is_founder/);
     assert.doesNotMatch(queryFn, /founder_cap/);
   });
@@ -35,6 +37,14 @@ describe("guest founding counters share one source", () => {
     assert.match(artistPageSrc, /getCampaignGoals/);
     assert.match(premiumPageSrc, /getFoundingFanClaimState/);
     assert.match(founderSlotsApiSrc, /getFoundingFanClaimState/);
+    assert.match(foundersWallSrc, /getFoundingFanClaimState/);
+    assert.match(foundersWallSrc, /listFoundingFans/);
+    assert.doesNotMatch(foundersWallSrc, /is_founder/);
+    assert.doesNotMatch(foundersWallSrc, /getFounderState/);
+    assert.match(premiumPageSrc, /Free Founding Fan badge/);
+    assert.match(premiumPageSrc, /Premium is a separate paid plan/);
+    assert.doesNotMatch(premiumPageSrc, /Founding Fan pricing/);
+    assert.doesNotMatch(founderSlotsUiSrc, /founding pricing/);
 
     assert.doesNotMatch(landingStatsSrc, /is_founder/);
     assert.doesNotMatch(landingStatsSrc, /\.not\("founding_fan_number"/);
@@ -55,5 +65,14 @@ describe("guest founding counters share one source", () => {
 
   it("checkout still uses paid is_founder eligibility separately", () => {
     assert.match(checkoutSrc, /getFounderState/);
+  });
+
+  it("founders wall never calls free joiners paying fans or locked-in pricing", () => {
+    assert.doesNotMatch(foundersWallSrc, /paying fans/i);
+    assert.doesNotMatch(foundersWallSrc, /locked-in pricing/i);
+    assert.doesNotMatch(foundersWallSrc, /premium founders/i);
+    assert.match(foundersWallSrc, /Free badge for the first/);
+    assert.match(foundersWallSrc, /Not a paid purchase/);
+    assert.match(foundersWallSrc, /Premium \(\$10\/mo or \$99\/yr\) is a\s+separate plan/);
   });
 });

@@ -148,9 +148,9 @@ export default async function RewardsPage() {
                   Earn points by showing up
                 </h1>
                 <p className="mt-4 text-sm text-white/70">
-                  Sign up to start earning. Your real points, badges, and tier
-                  progress land here after you join — we do not preview a
-                  fake climb.
+                  Sign up to start earning. Your points, badges, and tier
+                  progress land here after you join — plus digital unlocks
+                  like wallpapers you can redeem.
                 </p>
               </>
             )}

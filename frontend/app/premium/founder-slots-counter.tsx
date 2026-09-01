@@ -49,7 +49,7 @@ export function FounderSlotsCounter({ initialFilled, total }: Props) {
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
       {/* Progress bar */}
       <div className="flex items-center justify-between text-xs text-white/60 mb-2">
-        <span>Founding Fan slots</span>
+        <span>Free Founding Fan badges</span>
         <span>
           {filled} / {cap} claimed
         </span>
@@ -64,7 +64,8 @@ export function FounderSlotsCounter({ initialFilled, total }: Props) {
       {/* Remaining count */}
       <p className="mt-3 text-sm text-white/80">
         <span className="font-semibold text-white">{remaining}</span>{" "}
-        {remaining === 1 ? "spot" : "spots"} remaining at founding pricing.
+        {remaining === 1 ? "free badge" : "free badges"} left — first 100 joins,
+        not a paid plan.
       </p>
 
       {/* Urgency badge — remaining <= 5 */}

@@ -100,7 +100,7 @@ export default function PremiumPaywall({
           <div>
             <p className="text-sm font-semibold text-white/90">
               {reason === "needs-founder"
-                ? "Founders only — the first 100 paying fans"
+                ? "Paid Premium only — separate from the free Founding Fan badge"
                 : reason === "signed-out"
                   ? "Join to unlock Premium"
                   : "Upgrade to Premium"}

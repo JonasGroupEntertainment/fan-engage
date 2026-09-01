@@ -25,6 +25,19 @@ export type { FoundingFanClaimState };
  * Count memberships whose founding number is 1–100.
  * Single query used by every guest-facing founding counter.
  */
+export type FoundingFanRow = {
+  fan_id: string;
+  founding_fan_number: number;
+  first_name: string | null;
+  avatar_url: string | null;
+  joined_at: string;
+};
+
+const foundingNumberFilter = {
+  gte: 1,
+  lte: FOUNDING_FAN_CAP,
+} as const;
+
 export async function getFoundingFanClaimState(
   communityId: string,
 ): Promise<FoundingFanClaimState> {
@@ -34,8 +47,8 @@ export async function getFoundingFanClaimState(
       .from("fan_community_memberships")
       .select("fan_id", { count: "exact", head: true })
       .eq("community_id", communityId)
-      .gte("founding_fan_number", 1)
-      .lte("founding_fan_number", FOUNDING_FAN_CAP);
+      .gte("founding_fan_number", foundingNumberFilter.gte)
+      .lte("founding_fan_number", foundingNumberFilter.lte);
     if (error) {
       console.warn("getFoundingFanClaimState failed", error);
       return foundingClaimStateFromCount(0);
@@ -44,5 +57,52 @@ export async function getFoundingFanClaimState(
   } catch (err) {
     console.warn("getFoundingFanClaimState failed", err);
     return foundingClaimStateFromCount(0);
+  }
+}
+
+/** Same 1–100 set as the public counter — for the founders wall list. */
+export async function listFoundingFans(
+  communityId: string,
+): Promise<FoundingFanRow[]> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("fan_community_memberships")
+      .select(
+        `
+        fan_id,
+        founding_fan_number,
+        joined_at,
+        fans:fans (
+          id,
+          first_name,
+          avatar_url
+        )
+      `,
+      )
+      .eq("community_id", communityId)
+      .gte("founding_fan_number", foundingNumberFilter.gte)
+      .lte("founding_fan_number", foundingNumberFilter.lte)
+      .order("founding_fan_number", { ascending: true });
+    if (error || !data) {
+      console.warn("listFoundingFans failed", error);
+      return [];
+    }
+    return data
+      .map((row: Record<string, unknown>) => {
+        const fan = Array.isArray(row.fans) ? row.fans[0] : row.fans || {};
+        const n = Number(row.founding_fan_number);
+        return {
+          fan_id: String(row.fan_id ?? ""),
+          founding_fan_number: n,
+          first_name: (fan as { first_name?: string | null }).first_name ?? null,
+          avatar_url: (fan as { avatar_url?: string | null }).avatar_url ?? null,
+          joined_at: String(row.joined_at ?? ""),
+        };
+      })
+      .filter((f) => f.founding_fan_number >= 1 && f.founding_fan_number <= FOUNDING_FAN_CAP);
+  } catch (err) {
+    console.warn("listFoundingFans failed", err);
+    return [];
   }
 }

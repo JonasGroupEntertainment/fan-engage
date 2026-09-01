@@ -4,7 +4,7 @@ import type { LandingStats } from "@/lib/data/landing-stats";
 /**
  * Founding-fan urgency block shown to anonymous visitors below the hero.
  * First 100 fans who complete onboarding get a persisted Founding Fan
- * badge + membership number. Separate from paid Founding Fan pricing.
+ * badge + membership number. Free first-100 join badge — not Premium.
  */
 export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
   if (stats.foundingClosed || stats.foundingSpotsRemaining === 0) {
