@@ -675,8 +675,7 @@ export default function OnboardingWizard({
             </div>
             {finishStatus === "error" && (
               <p className="text-sm text-rose-300">
-                Could not save your profile. Are you still signed in? Try{" "}
-                <a href="/login" className="underline">signing in</a> and retrying.
+                Could not save your profile. Refresh this page and try again.
               </p>
             )}
           </div>
