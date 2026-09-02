@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { FIRST_72H_BODY, FIRST_72H_TITLE } from "@/lib/first-72h";
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
@@ -152,11 +153,11 @@ export default function MissionPage() {
       <div className="w-full max-w-lg flex flex-col gap-6">
         <div className="text-center flex flex-col gap-2">
           <p className="text-xs tracking-widest uppercase text-white/50">
-            You&apos;re in
+            {FIRST_72H_TITLE}
           </p>
           <h1 className="text-3xl font-bold">Complete your first missions</h1>
           <p className="text-white/50 text-sm">
-            Three quick steps to unlock the full experience.
+            {FIRST_72H_BODY}
           </p>
         </div>
 

@@ -12,6 +12,10 @@
  */
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import {
+  filterCommunityTagsForMarketplace,
+  isMarketplaceLive,
+} from "@/lib/marketplace-live";
 
 interface TagOption {
   tag: string;
@@ -28,8 +32,9 @@ export default function TagFilterChips({ tags, activeTag }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const visibleTags = filterCommunityTagsForMarketplace(tags, isMarketplaceLive());
 
-  if (tags.length === 0) return null;
+  if (visibleTags.length === 0) return null;
 
   function setTag(tag: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -53,7 +58,7 @@ export default function TagFilterChips({ tags, activeTag }: Props) {
         active={activeTag === null}
         onClick={() => setTag(null)}
       />
-      {tags.map((t) => (
+      {visibleTags.map((t) => (
         <Chip
           key={t.tag}
           label={prettyTag(t.tag)}

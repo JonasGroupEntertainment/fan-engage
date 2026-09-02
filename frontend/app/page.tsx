@@ -15,6 +15,8 @@ import type { TierSlug } from "@/lib/data/types";
 import { touchStreak } from "@/lib/streaks/touch";
 import { gatherWeeklyRecap } from "@/lib/personal-recap/gather";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
+import { first72hFromFanState } from "@/lib/first-72h";
+import FirstSessionChecklist from "@/components/first-session-checklist";
 // ─── Signed-in dashboard content ──────────────────────────────────────────
 // Signed-out visitors render <SignedOutLanding/> earlier and never see any
 // of this.
@@ -122,6 +124,13 @@ export default async function Home({
 
   // Show a "Finish profile" nudge when signed-in users have no first_name yet.
   const needsProfile = !fan.first_name;
+  const first72h = first72hFromFanState({
+    hasProfile: Boolean(fan.first_name),
+    followCount: fanHome?.followedArtists.length ?? 0,
+    badgeCount: kpis?.badge_count ?? fanHome?.totalEarnedBadges ?? 0,
+    referralCount: kpis?.referral_count ?? 0,
+    joinedCommunity: (fanHome?.followedArtists.length ?? 0) > 0,
+  });
 
   // Featured offers: DB only — no more fallback/lie content now that this
   // branch is signed-in-only.
@@ -151,22 +160,7 @@ export default async function Home({
     <div className="min-h-screen bg-midnight">
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-12 lg:flex-row">
         <div className="flex-1 space-y-6">
-          {needsProfile && (
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-aurora/40 bg-gradient-to-r from-aurora/20 via-slate-900 to-ember/20 px-5 py-4">
-              <div>
-                <p className="text-sm font-semibold">Finish setting up your profile</p>
-                <p className="text-xs text-white/70">
-                  Takes less than a minute — unlocks your referral code, SMS alerts, and a signup bonus.
-                </p>
-              </div>
-              <Link
-                href="/onboarding"
-                className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
-              >
-                Complete profile
-              </Link>
-            </section>
-          )}
+          <FirstSessionChecklist progress={first72h} />
           {/* Personalized Fan Home dashboard — only for fans past
               onboarding. Still signed-in, so the marketing landing never
               appears here. */}
