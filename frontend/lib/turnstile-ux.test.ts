@@ -269,11 +269,35 @@ describe("signup Turnstile gate", () => {
     );
   });
 
-  it("fail-opens Create account when the widget never loads", () => {
+  it("blocks Create account while error copy is showing without a fail-open grant", () => {
     const gate = nextSignupTurnstileGate({
       configured: true,
       token: null,
       loadState: "error",
+      failOpenGranted: false,
+    });
+    assert.equal(gate, "retry-required");
+    assert.equal(signupAllowsSubmit(gate), false);
+    assert.equal(
+      signupTurnstileButtonLabel({ status: "idle", gate }),
+      "Create account",
+    );
+  });
+
+  it("fail-opens Create account only after stall/retry grant, not on raw error", () => {
+    const blocked = nextSignupTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "error",
+    });
+    assert.equal(blocked, "retry-required");
+    assert.equal(signupAllowsSubmit(blocked), false);
+
+    const gate = nextSignupTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "error",
+      failOpenGranted: true,
     });
     assert.equal(gate, "fail-open");
     assert.equal(signupAllowsSubmit(gate), true);
@@ -284,7 +308,7 @@ describe("signup Turnstile gate", () => {
   });
 
   it("never puts security-check loading copy on Create account", () => {
-    for (const gate of ["wait-load", "complete-check", "fail-open", "ready", "not-configured"] as const) {
+    for (const gate of ["wait-load", "complete-check", "retry-required", "fail-open", "ready", "not-configured"] as const) {
       assert.equal(
         signupTurnstileButtonLabel({ status: "idle", gate }),
         "Create account",

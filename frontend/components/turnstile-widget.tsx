@@ -41,10 +41,14 @@ interface TurnstileOptions {
 interface Props {
   onSuccess: (token: string) => void;
   onError?: () => void;
+  /** Documented stall: iframe painted but no token. Parent may fail-open. */
+  onStall?: () => void;
   onExpire?: () => void;
   onLoadStateChange?: (state: TurnstileLoadState) => void;
   /** Parent remounts the widget (bump `key`) so Retry is a full reset. */
   onRetry?: () => void;
+  /** When true, hide rose "couldn't load" copy — fail-open helper lives on parent. */
+  failOpen?: boolean;
   theme?: "light" | "dark" | "auto";
 }
 
@@ -115,9 +119,11 @@ function injectTurnstileScript(attempt = 0, onGiveUp?: () => void) {
 export function TurnstileWidget({
   onSuccess,
   onError,
+  onStall,
   onExpire,
   onLoadStateChange,
   onRetry,
+  failOpen = false,
   theme = "dark",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -241,7 +247,7 @@ export function TurnstileWidget({
       if (cancelled || tokenReceivedRef.current) return;
       console.warn("[turnstile] challenge stalled — no token after render");
       setState("error");
-      onError?.();
+      onStall?.();
     }, TURNSTILE_CHALLENGE_STALL_MS);
 
     return () => {
@@ -259,7 +265,7 @@ export function TurnstileWidget({
         widgetIdRef.current = null;
       }
     };
-  }, [renderWidget, setState, onError, retryNonce, markReadyIfIframe]);
+  }, [renderWidget, setState, onError, onStall, retryNonce, markReadyIfIframe]);
 
   useEffect(() => {
     if (loadState !== "loading") {
@@ -326,7 +332,7 @@ export function TurnstileWidget({
           style={{ colorScheme: "light" }}
         />
       </div>
-      {loadState === "error" && (
+      {loadState === "error" && !failOpen && (
         <div className="space-y-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2">
           <p className="text-xs text-rose-200">{TURNSTILE_WIDGET_ERROR_COPY}</p>
           <button
@@ -337,6 +343,15 @@ export function TurnstileWidget({
             Retry security check
           </button>
         </div>
+      )}
+      {loadState === "error" && failOpen && (
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/10"
+        >
+          Retry security check
+        </button>
       )}
     </div>
   );

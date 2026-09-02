@@ -7,6 +7,7 @@ import { ArrowRight, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { first72hFromFanState } from "@/lib/first-72h";
+import { onboardingClientGate } from "@/lib/session-presence";
 
 type Field = {
   label: string;
@@ -105,15 +106,18 @@ const steps: { title: string; description: string; fields: Field[] }[] = [
 
 export default function OnboardingWizard({
   initialEmail = "",
+  sessionConfirmed = false,
 }: {
   initialEmail?: string;
+  sessionConfirmed?: boolean;
 }) {
   const router = useRouter();
   // Server page already confirmed a session and passed the email. Starting
   // at "ready" with that email avoids the Loading… → wizard swap that
   // caused SSR/client hydration flakes.
+  const serverConfirmed = sessionConfirmed || Boolean(initialEmail);
   const [authGate, setAuthGate] = useState<"checking" | "signed-out" | "ready">(
-    initialEmail ? "ready" : "checking",
+    serverConfirmed ? "ready" : "checking",
   );
   const [signupHref, setSignupHref] = useState("/signup?ref=raelynn&next=%2Fonboarding");
   const [loginHref, setLoginHref] = useState("/login?next=/onboarding");
@@ -160,17 +164,18 @@ export default function OnboardingWizard({
 
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        setAuthGate("signed-out");
-        return;
-      }
-      if (user.email) {
+      if (user?.email) {
         setFormState((prev) => ({ ...prev, email: user.email ?? "" }));
         setEmailAutoFilled(true);
       }
-      setAuthGate("ready");
+      setAuthGate(
+        onboardingClientGate({
+          serverConfirmed,
+          clientUser: user,
+        }),
+      );
     });
-  }, [initialEmail]);
+  }, [initialEmail, serverConfirmed]);
 
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));

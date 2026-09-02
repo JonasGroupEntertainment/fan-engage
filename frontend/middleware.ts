@@ -4,6 +4,7 @@ import { resolveCommunityFromHost } from "@/lib/community";
 import { productionHostRedirect, requestHostname } from "@/lib/canonical-host";
 import { guestSignupHref, isOnboardingPath } from "@/lib/guest-signup";
 import { isSignOutPath } from "@/lib/auth-signout";
+import { shouldRedirectGuestFromOnboarding } from "@/lib/session-presence";
 
 /**
  * Routes a signed-in user must be able to reach.
@@ -134,8 +135,16 @@ export async function middleware(request: NextRequest) {
   }
 
   // Guests must not sit on /onboarding "Loading…". Signup first; keep
-  // ref/next when present (default ref=raelynn).
-  if (!user && isOnboardingPath(pathname)) {
+  // ref/next when present (default ref=raelynn). Auth cookies mean the
+  // header may still show signed-in while getUser() is briefly null —
+  // do not bounce that session to signup/login.
+  if (
+    isOnboardingPath(pathname) &&
+    shouldRedirectGuestFromOnboarding({
+      user,
+      cookies: request.cookies.getAll(),
+    })
+  ) {
     const signup = guestSignupHref({
       ref: request.nextUrl.searchParams.get("ref"),
       next: request.nextUrl.searchParams.get("next"),

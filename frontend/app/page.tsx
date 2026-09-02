@@ -7,6 +7,7 @@ import SignedOutLanding from "@/components/signed-out-landing";
 import { listArtistsFromDb } from "@/lib/data/artists";
 import { getLandingStats } from "@/lib/data/landing-stats";
 import { getCurrentFan, getCurrentFanKpis } from "@/lib/data/fan";
+import { createClient } from "@/lib/supabase/server";
 import { getFanHomeData } from "@/lib/data/fan-home";
 import { getFeaturedOffers } from "@/lib/data/offers";
 import { getTiers, tierIcon } from "@/lib/data/tiers";
@@ -66,7 +67,21 @@ export default async function Home({
 
   // First pass: just fetch the fan. If signed-out, render the marketing
   // landing and skip all the signed-in data queries (they're noise here).
+  // A valid session with a missing fan row must stay in the signed-in
+  // path (onboarding) — never the marketing landing while the header
+  // shows signed-in.
   const fan = await getCurrentFan();
+  if (!fan) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) redirect("/onboarding");
+    } catch {
+      /* unconfigured supabase — fall through to marketing */
+    }
+  }
   const isSignedIn = fan !== null;
 
   if (!isSignedIn) {
