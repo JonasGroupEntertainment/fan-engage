@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo } from "@/lib/app-url";
+import { signedInLoginRedirectPath } from "@/lib/session-presence";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
@@ -101,6 +102,34 @@ export function LoginForm({
       if (cooldownInterval.current) clearInterval(cooldownInterval.current);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ) {
+      return;
+    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled) return;
+      const dest = signedInLoginRedirectPath({
+        user,
+        cookies: document.cookie.split(";").map((part) => ({
+          name: part.split("=")[0]?.trim() ?? "",
+        })),
+        nextPath: next,
+      });
+      if (dest) {
+        router.replace(dest);
+        router.refresh();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [next, router]);
 
   useEffect(() => {
     if (!magicLinkEnabled || !turnstileConfigured) return;
