@@ -81,6 +81,7 @@ describe("Founding Fan 1.5× writer contract", () => {
     assert.match(migrationSql, /create or replace function public\.apply_points_award/);
     assert.match(awardTs, /apply_points_award/);
     assert.match(onboardTs, /claim_founding_fan_status/);
+    assert.match(onboardTs, /resolveOnboardCommunityId/);
     assert.match(migrationSql, /create or replace function public\.claim_founding_fan_status/);
     assert.match(migrationSql, /perform public\.try_award_comment_points\(new\.id\)/);
     assert.match(migrationSql, /perform public\.try_award_poll_points\(new\.post_id, new\.fan_id\)/);

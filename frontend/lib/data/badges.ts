@@ -1,7 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCommunityId } from "@/lib/community";
-import { foundingFanBadgeEarned } from "@/lib/founding-fan-badge";
-import type { Badge } from "./types";
+import { foundingFanBadgeEarned, isFoundingFanBadgeSlug } from "@/lib/founding-fan-badge";
+import { publicFoundingFanDescription } from "@/lib/founding-fan-rule";
+import { TIER_MIN_POINTS, tierBadgeDescription } from "@/lib/tier-thresholds";
+import type { Badge, TierSlug } from "./types";
+
+function publicBadgeDescription(slug: string, raw: string | null): string | null {
+  if (isFoundingFanBadgeSlug(slug)) return publicFoundingFanDescription(raw);
+  const tierSlug = slug.replace(/^tier-/, "") as TierSlug;
+  if (tierSlug in TIER_MIN_POINTS) {
+    return tierBadgeDescription(slug, TIER_MIN_POINTS[tierSlug]) ?? raw;
+  }
+  return raw;
+}
 
 /**
  * Full badge list, joined with the current user's earned status + progress
@@ -26,7 +37,13 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
     if (!user) {
       return badges.map(
         (b) =>
-          ({ ...b, earned: false, earned_at: null, progress: null }) as Badge,
+          ({
+            ...b,
+            description: publicBadgeDescription(b.slug, b.description as string | null),
+            earned: false,
+            earned_at: null,
+            progress: null,
+          }) as Badge,
       );
     }
 
@@ -104,6 +121,7 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
       });
       return {
         ...b,
+        description: publicBadgeDescription(b.slug, b.description as string | null),
         earned,
         earned_at: earnedMap.get(b.slug) ?? null,
         progress: progressBySlug[b.slug] ?? null,

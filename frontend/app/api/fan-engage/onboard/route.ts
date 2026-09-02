@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { awardPoints } from "@/lib/points/award";
-import { REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
+import { LAUNCH_COMMUNITY_ID, REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
+import { resolveOnboardCommunityId } from "@/lib/onboard-community";
 
 export const runtime = "nodejs";
 
@@ -117,46 +118,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2a. Join the community the fan arrived through. The artist-page Join
-    //     CTA passes ?ref=<artist-slug>, which the wizard forwards as both
-    //     communitySlug and referralCode (invite links reuse the same param
-    //     for fan referral codes). Resolve against the communities table —
-    //     a miss just means the ref was a fan code, not a community.
-    //     Without this row, awardPoints' membership update is a silent
-    //     no-op and the fan's community total never moves.
+    // 2a. Always join a community so the founding claim can assign
+    //     a number. Artist-page Join passes ?ref=<artist-slug>; invite
+    //     links reuse that param for fan codes. A miss (empty ref, fan
+    //     code, lookup failure) still joins RaeLynn — without this row
+    //     founding claim is a silent no-op and the counter stays frozen.
     let communityJoined: string | null = null;
-    const candidateSlug = (payload.communitySlug ?? payload.referralCode ?? "")
-      .trim()
-      .toLowerCase();
-    if (/^[a-z0-9-]+$/.test(candidateSlug)) {
-      try {
-        const admin = createAdminClient();
-        const { data: community } = await admin
-          .from("communities")
-          .select("slug")
-          .eq("slug", candidateSlug)
-          .maybeSingle();
-        if (community) {
-          await admin.from("fan_community_memberships").upsert(
-            {
-              fan_id: user.id,
-              community_id: community.slug,
-              total_points: 0,
-              current_tier: "bronze",
-              status: "active",
-              joined_at: new Date().toISOString(),
-            },
-            { onConflict: "fan_id,community_id", ignoreDuplicates: true },
-          );
-          await admin.from("fan_artist_following").upsert(
-            { fan_id: user.id, artist_slug: community.slug },
-            { onConflict: "fan_id,artist_slug" },
-          );
-          communityJoined = community.slug;
-        }
-      } catch (err) {
-        console.warn("onboard: community join failed", err);
+    try {
+      const admin = createAdminClient();
+      const requested = resolveOnboardCommunityId({
+        communitySlug: payload.communitySlug,
+        referralCode: payload.referralCode,
+      });
+      const { data: community } = await admin
+        .from("communities")
+        .select("slug")
+        .eq("slug", requested)
+        .maybeSingle();
+      const joinSlug = community?.slug ?? LAUNCH_COMMUNITY_ID;
+      const { error: joinErr } = await admin.from("fan_community_memberships").upsert(
+        {
+          fan_id: user.id,
+          community_id: joinSlug,
+          total_points: 0,
+          current_tier: "bronze",
+          status: "active",
+          joined_at: new Date().toISOString(),
+        },
+        { onConflict: "fan_id,community_id", ignoreDuplicates: true },
+      );
+      if (joinErr) {
+        console.warn("onboard: community join failed", joinErr);
+      } else {
+        await admin.from("fan_artist_following").upsert(
+          { fan_id: user.id, artist_slug: joinSlug },
+          { onConflict: "fan_id,artist_slug" },
+        );
+        communityJoined = joinSlug;
       }
+    } catch (err) {
+      console.warn("onboard: community join failed", err);
     }
 
     // 2. Handle referral code — service-role so we can look up the referrer.

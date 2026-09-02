@@ -269,12 +269,11 @@ describe("signup Turnstile gate", () => {
     );
   });
 
-  it("blocks Create account while error copy is showing without a fail-open grant", () => {
+  it("keeps Create account disabled when the widget errors — no fail-open grant", () => {
     const gate = nextSignupTurnstileGate({
       configured: true,
       token: null,
       loadState: "error",
-      failOpenGranted: false,
     });
     assert.equal(gate, "retry-required");
     assert.equal(signupAllowsSubmit(gate), false);
@@ -284,31 +283,19 @@ describe("signup Turnstile gate", () => {
     );
   });
 
-  it("fail-opens Create account only after stall/retry grant, not on raw error", () => {
-    const blocked = nextSignupTurnstileGate({
+  it("never fail-opens Create account after a stall or retry", () => {
+    const stalled = nextSignupTurnstileGate({
       configured: true,
       token: null,
       loadState: "error",
     });
-    assert.equal(blocked, "retry-required");
-    assert.equal(signupAllowsSubmit(blocked), false);
-
-    const gate = nextSignupTurnstileGate({
-      configured: true,
-      token: null,
-      loadState: "error",
-      failOpenGranted: true,
-    });
-    assert.equal(gate, "fail-open");
-    assert.equal(signupAllowsSubmit(gate), true);
-    assert.equal(
-      signupTurnstileButtonLabel({ status: "idle", gate }),
-      "Create account",
-    );
+    assert.equal(stalled, "retry-required");
+    assert.equal(signupAllowsSubmit(stalled), false);
+    assert.equal(signupAllowsSubmit("fail-open" as never), false);
   });
 
   it("never puts security-check loading copy on Create account", () => {
-    for (const gate of ["wait-load", "complete-check", "retry-required", "fail-open", "ready", "not-configured"] as const) {
+    for (const gate of ["wait-load", "complete-check", "retry-required", "ready", "not-configured"] as const) {
       assert.equal(
         signupTurnstileButtonLabel({ status: "idle", gate }),
         "Create account",
@@ -368,15 +355,21 @@ describe("timeout alignment", () => {
   });
 });
 
-describe("signup Turnstile never permanently greys Create account", () => {
-  it("widget fail-opens after a token stall and exposes Retry", () => {
+describe("signup Turnstile stays closed until a token exists", () => {
+  it("widget stall shows Retry and does not enable Create without a token", () => {
     const widget = readFileSync(
       fileURLToPath(new URL("../components/turnstile-widget.tsx", import.meta.url)),
+      "utf8",
+    );
+    const signup = readFileSync(
+      fileURLToPath(new URL("../app/signup/signup-form.tsx", import.meta.url)),
       "utf8",
     );
     assert.match(widget, /TURNSTILE_CHALLENGE_STALL_MS/);
     assert.match(widget, /challenge stalled/);
     assert.match(widget, /Retry security check/);
+    assert.doesNotMatch(signup, /You can still create an account/);
+    assert.doesNotMatch(signup, /failOpenGranted/);
   });
 
   it("puts Terms consent above Create account so the checkbox is not a hidden disable", () => {

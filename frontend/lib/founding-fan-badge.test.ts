@@ -97,6 +97,7 @@ describe("award path matches free founding_fan_number counters", () => {
     assert.match(onboard, /claim_founding_fan_status/);
     assert.match(onboard, /award_community_badge/);
     assert.match(onboard, /founding-fan/);
+    assert.match(onboard, /resolveOnboardCommunityId/);
   });
 
   it("badge gallery unlocks Founding Fan from founding_fan_number", () => {

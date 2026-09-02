@@ -96,8 +96,6 @@ export function SignupForm({
   const [turnstileLoadState, setTurnstileLoadState] =
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
-  const [failOpenGranted, setFailOpenGranted] = useState(false);
-  const retriedTurnstileRef = useRef(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   // One-shot: Turnstile is verified before the consent modal opens so the
@@ -110,11 +108,9 @@ export function SignupForm({
   }, []);
   const handleTurnstileError = useCallback(() => {
     setTurnstileError(true);
-    if (retriedTurnstileRef.current) setFailOpenGranted(true);
   }, []);
   const handleTurnstileStall = useCallback(() => {
     setTurnstileError(true);
-    setFailOpenGranted(true);
   }, []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
@@ -126,7 +122,6 @@ export function SignupForm({
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
   const resetChallenge = useCallback(() => {
-    retriedTurnstileRef.current = true;
     setTurnstileToken(null);
     setTurnstileLoadState("loading");
     setTurnstileKey((k) => k + 1);
@@ -169,7 +164,6 @@ export function SignupForm({
     configured: turnstileConfigured,
     token: turnstileToken,
     loadState: turnstileLoadState,
-    failOpenGranted,
   });
   const canSubmitSignup =
     signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
@@ -180,7 +174,6 @@ export function SignupForm({
       configured: turnstileConfigured,
       token: turnstileToken,
       loadState: turnstileLoadState,
-      failOpenGranted,
     });
     if (gate === "wait-load") {
       setStatus("error");
@@ -198,12 +191,12 @@ export function SignupForm({
       requestAnimationFrame(() => scrollToTurnstileChallenge());
       return false;
     }
-    // Documented fail-open (stall / Retry exhausted) or keys unset.
-    if (gate === "fail-open" || gate === "not-configured") {
+    // Keys unset (preview/dev): no widget, no token required.
+    if (gate === "not-configured") {
       captchaVerifiedRef.current = true;
       return true;
     }
-    const captcha = await verifyTurnstileToken(turnstileToken);
+    const captcha = await verifyTurnstileToken(turnstileToken, { failClosed: true });
     resetChallenge();
     if (!captcha.success) {
       captchaVerifiedRef.current = false;
@@ -503,7 +496,6 @@ export function SignupForm({
                 onExpire={handleTurnstileExpire}
                 onLoadStateChange={handleTurnstileLoadState}
                 onRetry={resetChallenge}
-                failOpen={turnstileGate === "fail-open"}
                 theme="dark"
               />
               {shouldShowParentChallengeError({
@@ -514,15 +506,16 @@ export function SignupForm({
                   Security check failed. Tap Retry above, or try again.
                 </p>
               )}
-              {turnstileGate === "fail-open" && (
+              {turnstileGate === "retry-required" && (
                 <p className="text-xs text-white/55">
-                  Security check is unavailable. You can still create an account.
+                  Security check is unavailable. Tap Retry — Create account
+                  stays disabled until the check succeeds.
                 </p>
               )}
               {turnstileGate === "complete-check" && (
                 <p className="text-xs text-white/55">
                   Complete the security check to enable Create account. If it
-                  never finishes, use Retry — you will not be stuck.
+                  never finishes, use Retry.
                 </p>
               )}
             </div>
@@ -605,10 +598,12 @@ export function SignupForm({
               {status !== "loading" && !canSubmitSignup && (
                 <p className="text-center text-xs text-white/50">
                   {turnstileGate === "wait-load"
-                    ? "Security check is loading. Create account enables when it finishes — or after Retry if it fails."
+                    ? "Security check is loading. Create account enables when it succeeds."
                     : turnstileGate === "complete-check"
                       ? "Complete the security check above to enable Create account."
-                      : "Agree to the Terms of Service to enable Create account."}
+                      : turnstileGate === "retry-required"
+                        ? "Tap Retry above. Create account stays disabled until the security check succeeds."
+                        : "Agree to the Terms of Service to enable Create account."}
                 </p>
               )}
             </div>

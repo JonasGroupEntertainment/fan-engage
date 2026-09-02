@@ -41,7 +41,7 @@ interface TurnstileOptions {
 interface Props {
   onSuccess: (token: string) => void;
   onError?: () => void;
-  /** Documented stall: iframe painted but no token. Parent may fail-open. */
+  /** Documented stall: iframe painted but no token. Parent shows Retry. */
   onStall?: () => void;
   onExpire?: () => void;
   onLoadStateChange?: (state: TurnstileLoadState) => void;
@@ -371,18 +371,23 @@ export interface TurnstileVerifyResult {
 // remount the TurnstileWidget (bump its `key`) to get a fresh one before
 // the next attempt.
 //
-// Upstream/network failures fail-open (logged server-side) so a Cloudflare
-// outage doesn't hard-block auth. Missing tokens and real challenge failures
-// stay fail-closed when keys are configured.
-export async function verifyTurnstileToken(token: string | null): Promise<TurnstileVerifyResult> {
+// Signup passes failClosed so a missing/invalid token or Cloudflare outage
+// cannot create an account. Magic-link / forgot may still honor server
+// fail-open on upstream/network errors when not in production.
+export async function verifyTurnstileToken(
+  token: string | null,
+  opts?: { failClosed?: boolean },
+): Promise<TurnstileVerifyResult> {
   if (!SITE_KEY) return { success: true }; // not configured — allow through
   if (!token) return { success: false, error: "missing_token" };
+
+  const failClosed = opts?.failClosed === true;
 
   try {
     const res = await fetch("/api/turnstile/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, failClosed }),
     });
     if (res.status === 429) return { success: false, error: "rate_limited" };
     const data = (await res.json()) as {
@@ -390,12 +395,11 @@ export async function verifyTurnstileToken(token: string | null): Promise<Turnst
       error?: string;
       failedOpen?: boolean;
     };
-    if (data.success === true) {
-      return { success: true, failedOpen: data.failedOpen };
+    if (data.success === true && !data.failedOpen) {
+      return { success: true };
     }
-    // Honor server fail-closed: only treat upstream/network as success when
-    // the API explicitly failed open (TURNSTILE_FAIL_OPEN enabled).
     if (
+      !failClosed &&
       data.failedOpen === true &&
       (data.error === "upstream_error" || data.error === "network_error")
     ) {
@@ -404,8 +408,10 @@ export async function verifyTurnstileToken(token: string | null): Promise<Turnst
     }
     return { success: false, error: data.error ?? "challenge_failed" };
   } catch (err) {
-    // Transport failure — cannot reach our verify API. Fail open so a brief
-    // outage doesn't hard-block signup/magic-link.
+    if (failClosed) {
+      console.warn("[turnstile] network_error calling verify API — failing closed", err);
+      return { success: false, error: "network_error" };
+    }
     console.warn("[turnstile] network_error calling verify API — failing open", err);
     return { success: true, failedOpen: true, error: "network_error" };
   }

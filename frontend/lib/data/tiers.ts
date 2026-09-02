@@ -1,16 +1,10 @@
+import { FALLBACK_TIERS } from "@/lib/tier-thresholds";
 import { createClient } from "@/lib/supabase/server";
 import type { Tier, TierSlug } from "./types";
 
-const FALLBACK: Tier[] = [
-  { slug: "bronze",   display_name: "Bronze",    min_points: 0,     perks: ["Welcome badge", "Access to fan home"], sort_order: 1 },
-  { slug: "silver",   display_name: "Silver",    min_points: 750,   perks: ["Priority digital drops", "Leaderboard boost"], sort_order: 2 },
-  { slug: "gold",     display_name: "Gold",      min_points: 3500,  perks: ["Exclusive digital unlocks", "Early event RSVPs"], sort_order: 3 },
-  { slug: "platinum", display_name: "Platinum",  min_points: 8000,  perks: ["All-access digital catalog", "Priority event RSVPs"], sort_order: 4 },
-];
-
 /**
- * Tier list. Falls back to the seeded reference data if Supabase isn't
- * reachable — safe because those values are committed in 0001_init.sql.
+ * Tier list. Falls back to TIER_MIN_POINTS (750 / 3,500 / 8,000) when
+ * Supabase isn't reachable — same ladder as the badge gallery.
  */
 export async function getTiers(): Promise<Tier[]> {
   try {
@@ -20,10 +14,10 @@ export async function getTiers(): Promise<Tier[]> {
       .select("*")
       .order("sort_order");
     if (error) throw error;
-    if (!data || data.length === 0) return FALLBACK;
+    if (!data || data.length === 0) return FALLBACK_TIERS;
     return data as Tier[];
   } catch {
-    return FALLBACK;
+    return FALLBACK_TIERS;
   }
 }
 
