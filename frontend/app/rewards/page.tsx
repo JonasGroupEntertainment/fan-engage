@@ -11,6 +11,7 @@ import { getTiers, tierIcon } from "@/lib/data/tiers";
 import type { Badge, BadgeCategory, TierSlug } from "@/lib/data/types";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { FOUNDING_FAN_RULE } from "@/lib/founding-fan-rule";
+import { tierBadgeEarned, tierJourneyState } from "@/lib/tier-thresholds";
 
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   welcome:   "Getting started",
@@ -58,7 +59,17 @@ export default async function RewardsPage() {
   // Signed-in users see their real badges (empty until earned).
   // Guests get no fake Bronze/Gold progress chrome or preview numbers.
   const isSignedIn = fan !== null;
-  const badges: Badge[] = isSignedIn ? dbBadges : [];
+  const totalPoints = kpis?.total_points ?? 0;
+  const badges: Badge[] = isSignedIn
+    ? dbBadges.map((b) => ({
+        ...b,
+        earned: tierBadgeEarned({
+          slug: b.slug,
+          alreadyEarned: b.earned,
+          totalPoints,
+        }) || b.earned,
+      }))
+    : [];
   const earnedCount = badges.filter((b) => b.earned).length;
   const totalBadges = badges.length;
 
@@ -71,9 +82,13 @@ export default async function RewardsPage() {
     badgesByCategory.set(cat, arr);
   }
 
-  const currentSlug = (fan?.current_tier ?? "bronze") as TierSlug;
+  const journey = isSignedIn
+    ? tierJourneyState(kpis == null ? null : kpis.total_points, tiers, (fan?.current_tier ?? "bronze") as TierSlug)
+    : [];
+  const currentSlug =
+    journey.find((t) => t.isCurrent)?.slug ??
+    ((fan?.current_tier ?? "bronze") as TierSlug);
   const currentTier = tiers.find((t) => t.slug === currentSlug);
-  const totalPoints = kpis?.total_points ?? 0;
   const nextTier = isSignedIn ? (kpis?.next_tier ?? null) : null;
   const toNext =
     kpis?.points_to_next_tier ??
@@ -130,14 +145,17 @@ export default async function RewardsPage() {
                     />
                   </div>
                   <div className="flex items-center gap-4 text-xs uppercase tracking-wide text-white/50">
-                    {tiers.map((t) => (
+                    {journey.map((t) => (
                       <span
                         key={t.slug}
                         className={`flex items-center gap-2 text-sm ${
-                          t.slug === currentSlug ? "text-white" : "text-white/60"
+                          t.isCurrent ? "text-white" : "text-white/60"
                         }`}
                       >
                         <span>{tierIcon(t.slug)}</span> {t.display_name}
+                        <span className="normal-case tracking-normal text-white/45">
+                          {t.lockLabel}
+                        </span>
                       </span>
                     ))}
                   </div>
