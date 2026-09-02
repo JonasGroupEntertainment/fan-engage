@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentCommunityId } from "@/lib/community";
+import { foundingFanBadgeEarned } from "@/lib/founding-fan-badge";
 import type { Badge } from "./types";
 
 /**
@@ -30,8 +32,9 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
 
     // Parallel fetch: what's earned + each count-based progress metric.
     // Only count-based badges (community, referral) need a running total.
+    const communityId = await getCurrentCommunityId();
     const [earnedRes, postCountRes, commentCountRes, pollVoteCountRes,
-           challengeEntryCountRes, referralVerifiedCountRes] = await Promise.all([
+           challengeEntryCountRes, referralVerifiedCountRes, membershipRes] = await Promise.all([
       supabase
         .from("fan_badges")
         .select("badge_slug,earned_at")
@@ -58,6 +61,12 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
         .select("id", { count: "exact", head: true })
         .eq("referrer_id", user.id)
         .eq("status", "verified"),
+      supabase
+        .from("fan_community_memberships")
+        .select("founding_fan_number")
+        .eq("fan_id", user.id)
+        .eq("community_id", communityId)
+        .maybeSingle(),
     ]);
 
     const earnedMap = new Map(
@@ -82,12 +91,24 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
       "referral-10": referralCount,
     };
 
-    return badges.map((b) => ({
-      ...b,
-      earned: earnedMap.has(b.slug),
-      earned_at: earnedMap.get(b.slug) ?? null,
-      progress: progressBySlug[b.slug] ?? null,
-    })) as Badge[];
+    const foundingFanNumber =
+      (membershipRes.data?.founding_fan_number as number | null | undefined) ??
+      null;
+
+    return badges.map((b) => {
+      const alreadyEarned = earnedMap.has(b.slug);
+      const earned = foundingFanBadgeEarned({
+        slug: b.slug,
+        alreadyEarned,
+        foundingFanNumber,
+      });
+      return {
+        ...b,
+        earned,
+        earned_at: earnedMap.get(b.slug) ?? null,
+        progress: progressBySlug[b.slug] ?? null,
+      };
+    }) as Badge[];
   } catch {
     return [];
   }

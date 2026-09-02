@@ -21,6 +21,10 @@ import {
   type TurnstileLoadState,
 } from "@/lib/turnstile-ux";
 import {
+  SIGNUP_NOT_CREATED_MESSAGE,
+  interpretSignupCreate,
+} from "@/lib/signup-outcome";
+import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
 } from "@/components/cookie-banner";
@@ -92,6 +96,8 @@ export function SignupForm({
   const [turnstileLoadState, setTurnstileLoadState] =
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
+  const [failOpenGranted, setFailOpenGranted] = useState(false);
+  const retriedTurnstileRef = useRef(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   // One-shot: Turnstile is verified before the consent modal opens so the
@@ -102,7 +108,14 @@ export function SignupForm({
     setTurnstileToken(token);
     setTurnstileError(false);
   }, []);
-  const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileError(true);
+    if (retriedTurnstileRef.current) setFailOpenGranted(true);
+  }, []);
+  const handleTurnstileStall = useCallback(() => {
+    setTurnstileError(true);
+    setFailOpenGranted(true);
+  }, []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
     setTurnstileLoadState(state);
@@ -113,6 +126,7 @@ export function SignupForm({
   // Tokens are single-use: once verified (pass or fail) the widget must be
   // remounted to issue a fresh one, or every retry fails with a stale token.
   const resetChallenge = useCallback(() => {
+    retriedTurnstileRef.current = true;
     setTurnstileToken(null);
     setTurnstileLoadState("loading");
     setTurnstileKey((k) => k + 1);
@@ -155,6 +169,7 @@ export function SignupForm({
     configured: turnstileConfigured,
     token: turnstileToken,
     loadState: turnstileLoadState,
+    failOpenGranted,
   });
   const canSubmitSignup =
     signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
@@ -165,6 +180,7 @@ export function SignupForm({
       configured: turnstileConfigured,
       token: turnstileToken,
       loadState: turnstileLoadState,
+      failOpenGranted,
     });
     if (gate === "wait-load") {
       setStatus("error");
@@ -172,14 +188,17 @@ export function SignupForm({
       requestAnimationFrame(() => scrollToTurnstileChallenge());
       return false;
     }
-    if (gate === "complete-check") {
+    if (gate === "complete-check" || gate === "retry-required") {
       setStatus("error");
-      setMessage("Complete the security check, then try again.");
+      setMessage(
+        gate === "retry-required"
+          ? "Security check couldn't load. Tap Retry, then try again."
+          : "Complete the security check, then try again.",
+      );
       requestAnimationFrame(() => scrollToTurnstileChallenge());
       return false;
     }
-    // Widget failed / unavailable, or keys unset (preview/dev): do not block
-    // account creation on a missing token.
+    // Documented fail-open (stall / Retry exhausted) or keys unset.
     if (gate === "fail-open" || gate === "not-configured") {
       captchaVerifiedRef.current = true;
       return true;
@@ -252,26 +271,34 @@ export function SignupForm({
             : undefined,
         },
       });
-      if (error) throw error;
 
-      // Password-first: if signUp already returned a session, continue.
-      // If confirmation is still on, do not send fans to the PKCE confirm
-      // email — immediately sign in with the password they just set.
-      if (!data.session) {
-        const { data: signedIn, error: signInError } =
+      let signInError: string | null = null;
+      let signInSession: unknown | null = null;
+      if (!error && !data.session) {
+        const { data: signedIn, error: passwordError } =
           await supabase.auth.signInWithPassword({ email, password });
-        if (signInError || !signedIn.session) {
-          setStatus("need-signin");
-          setMessage("Sign in with the password you just created.");
-          return;
-        }
+        signInError = passwordError?.message ?? null;
+        signInSession = signedIn.session ?? null;
+      }
+
+      const decision = interpretSignupCreate({
+        signUpError: error?.message ?? null,
+        user: data.user,
+        session: data.session,
+        signInError,
+        signInSession,
+      });
+      if (decision.action === "stay-error") {
+        setStatus("error");
+        setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
+        return;
       }
 
       router.push(onboardingHref);
       router.refresh();
     } catch (err) {
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Unable to create account.");
+      setMessage(err instanceof Error ? err.message : SIGNUP_NOT_CREATED_MESSAGE);
     }
   }
 
@@ -472,9 +499,11 @@ export function SignupForm({
                 key={turnstileKey}
                 onSuccess={handleTurnstileSuccess}
                 onError={handleTurnstileError}
+                onStall={handleTurnstileStall}
                 onExpire={handleTurnstileExpire}
                 onLoadStateChange={handleTurnstileLoadState}
                 onRetry={resetChallenge}
+                failOpen={turnstileGate === "fail-open"}
                 theme="dark"
               />
               {shouldShowParentChallengeError({

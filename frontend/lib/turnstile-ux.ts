@@ -160,6 +160,7 @@ export type SignupTurnstileGate =
   | "not-configured"
   | "wait-load"
   | "complete-check"
+  | "retry-required"
   | "fail-open"
   | "ready";
 
@@ -167,11 +168,15 @@ export function nextSignupTurnstileGate(opts: {
   configured: boolean;
   token: string | null;
   loadState: TurnstileLoadState;
+  /** Set only after documented stall timeout or an explicit Retry that still failed. */
+  failOpenGranted?: boolean;
 }): SignupTurnstileGate {
   if (!opts.configured) return "not-configured";
   if (opts.token) return "ready";
   if (opts.loadState === "loading") return "wait-load";
-  if (opts.loadState === "error") return "fail-open";
+  if (opts.loadState === "error") {
+    return opts.failOpenGranted ? "fail-open" : "retry-required";
+  }
   return "complete-check";
 }
 

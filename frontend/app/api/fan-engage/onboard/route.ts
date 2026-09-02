@@ -214,15 +214,32 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Founding Fan first so the welcome award hits the 1.5× writer.
+    // Free first-100 join — award the gallery badge here, not only on Premium.
     if (communityJoined) {
       try {
         const admin = createAdminClient();
-        const { error: foundingErr } = await admin.rpc("claim_founding_fan_status", {
-          p_fan_id: user.id,
-          p_community_id: communityJoined,
-        });
+        const { data: foundingNumber, error: foundingErr } = await admin.rpc(
+          "claim_founding_fan_status",
+          {
+            p_fan_id: user.id,
+            p_community_id: communityJoined,
+          },
+        );
         if (foundingErr) {
           console.warn("onboard: claim_founding_fan_status failed", foundingErr);
+        } else if (
+          typeof foundingNumber === "number" &&
+          foundingNumber >= 1 &&
+          foundingNumber <= 100
+        ) {
+          const { error: awardErr } = await admin.rpc("award_community_badge", {
+            p_fan_id: user.id,
+            p_slug: "founding-fan",
+            p_community_id: communityJoined,
+          });
+          if (awardErr) {
+            console.warn("onboard: founding-fan badge award failed", awardErr);
+          }
         }
       } catch (err) {
         console.warn("onboard: founding fan claim failed", err);
