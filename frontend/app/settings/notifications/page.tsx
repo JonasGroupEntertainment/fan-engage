@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPreferences } from "@/lib/notifications/preferences";
 import NotificationPreferencesForm from "@/components/notification-preferences-form";
+import { pointsToGold } from "@/lib/tier-thresholds";
 
 const TIER_RANK: Record<string, number> = {
   bronze: 0,
@@ -52,7 +53,7 @@ export default async function NotificationSettingsPage() {
         smsCopy={
           smsAllowed
             ? undefined
-            : `Reach Gold tier (${10000 - (Number(fan?.total_points) || 0)} pts to go) to unlock SMS alerts.`
+            : `Reach Gold tier (${pointsToGold(Number(fan?.total_points) || 0)} pts to go) to unlock SMS alerts.`
         }
       />
     </div>

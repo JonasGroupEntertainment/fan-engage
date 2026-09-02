@@ -10,6 +10,7 @@ import {
 import { getTiers, tierIcon } from "@/lib/data/tiers";
 import type { Badge, BadgeCategory, TierSlug } from "@/lib/data/types";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
+import { FOUNDING_FAN_RULE } from "@/lib/founding-fan-rule";
 
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   welcome:   "Getting started",
@@ -157,6 +158,14 @@ export default async function RewardsPage() {
           </section>
 
           <section className="glass-card p-6">
+            <p className="text-sm uppercase tracking-wide text-white/60">Founding Fan</p>
+            <h2 className="mt-1 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              First 100 joins
+            </h2>
+            <p className="mt-2 text-sm text-white/70">{FOUNDING_FAN_RULE}</p>
+          </section>
+
+          <section className="glass-card p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm uppercase tracking-wide text-white/60">Badge gallery</p>
@@ -229,7 +238,7 @@ export default async function RewardsPage() {
                                   <p className="text-sm font-semibold leading-tight">{badge.name}</p>
                                   <p className="mt-0.5 text-xs text-white/60">
                                     {badge.earned ? "Unlocked" : "Locked"}
-                                    {badge.point_value > 0 && ` · +${badge.point_value} pts`}
+                                    {badge.earned && badge.point_value > 0 && ` · +${badge.point_value} pts`}
                                   </p>
                                 </div>
                               </div>

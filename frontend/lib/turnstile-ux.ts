@@ -12,8 +12,8 @@ export const TURNSTILE_SLOW_LOAD_HINT_MS = 6_000;
 /**
  * Widget painted (iframe present) but never issued a token — invalid
  * hostname / site key, interactive checkbox ignored, or Cloudflare
- * error inside the iframe without error-callback. Fail-open + Retry
- * so Create account is never permanently grey.
+ * error inside the iframe without error-callback. Show Retry and keep
+ * Create account disabled until a token exists.
  */
 export const TURNSTILE_CHALLENGE_STALL_MS = 15_000;
 /** Backoff between script inject attempts (3 delays → 4 tries). Sum ≈ 11s. */
@@ -153,35 +153,31 @@ export function scrollToTurnstileChallenge() {
 }
 
 /**
- * Password signup Turnstile gate. A failed / unavailable widget must not
- * trap Create account — fail-open so signup can still proceed.
+ * Password signup Turnstile gate. Create stays disabled until a token
+ * exists (or Turnstile is not configured). Widget errors show Retry —
+ * never enable Create without a token.
  */
 export type SignupTurnstileGate =
   | "not-configured"
   | "wait-load"
   | "complete-check"
   | "retry-required"
-  | "fail-open"
   | "ready";
 
 export function nextSignupTurnstileGate(opts: {
   configured: boolean;
   token: string | null;
   loadState: TurnstileLoadState;
-  /** Set only after documented stall timeout or an explicit Retry that still failed. */
-  failOpenGranted?: boolean;
 }): SignupTurnstileGate {
   if (!opts.configured) return "not-configured";
   if (opts.token) return "ready";
   if (opts.loadState === "loading") return "wait-load";
-  if (opts.loadState === "error") {
-    return opts.failOpenGranted ? "fail-open" : "retry-required";
-  }
+  if (opts.loadState === "error") return "retry-required";
   return "complete-check";
 }
 
 export function signupAllowsSubmit(gate: SignupTurnstileGate): boolean {
-  return gate === "not-configured" || gate === "ready" || gate === "fail-open";
+  return gate === "not-configured" || gate === "ready";
 }
 
 export function signupTurnstileButtonLabel(opts: {
