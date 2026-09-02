@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/client";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { first72hFromFanState } from "@/lib/first-72h";
 import { onboardingClientGate } from "@/lib/session-presence";
+import {
+  EMPTY_PHONE_SMS_MESSAGE,
+  hasSendablePhone,
+  smsSendBlockedReason,
+} from "@/lib/sms-send-gate";
 
 type Field = {
   label: string;
@@ -126,7 +131,7 @@ export default function OnboardingWizard({
     initialEmail ? { email: initialEmail } : {},
   );
   const [smsStatus, setSmsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [smsMessage, setSmsMessage] = useState("Ready to send the confirmation text.");
+  const [smsMessage, setSmsMessage] = useState(EMPTY_PHONE_SMS_MESSAGE);
   const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
   const [tosConsent, setTosConsent] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -180,6 +185,13 @@ export default function OnboardingWizard({
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
     if (name === "phone" && !value.trim()) setSmsConsent(false);
+    if (name === "phone") {
+      setSmsMessage(
+        hasSendablePhone(value)
+          ? "Ready to send the confirmation text."
+          : EMPTY_PHONE_SMS_MESSAGE,
+      );
+    }
   };
 
   /**
@@ -230,9 +242,10 @@ export default function OnboardingWizard({
   const prevStep = () => setStepIndex((prev) => Math.max(prev - 1, 0));
 
   const handleSmsOptIn = async () => {
-    if (!formState.phone) {
+    const blocked = smsSendBlockedReason(formState.phone);
+    if (blocked) {
       setSmsStatus("error");
-      setSmsMessage("Add a phone number to trigger the confirmation message.");
+      setSmsMessage(blocked);
       return;
     }
 
@@ -336,7 +349,7 @@ export default function OnboardingWizard({
           interest: formState.interest,
           referralCode: refCode,
           communitySlug: refFromUrl || "raelynn",
-          smsOptedIn: Boolean(formState.phone) && smsConsent,
+          smsOptedIn: hasSendablePhone(formState.phone) && smsConsent,
           emailOptedIn: Boolean(formState.email),
           consentAcceptedAt: new Date().toISOString(),
           consentVersion: "2026-04-22.v1",
@@ -365,7 +378,7 @@ export default function OnboardingWizard({
         }).catch((err) => console.warn("Mailchimp subscribe did not complete:", err));
       }
 
-      if (formState.phone) {
+      if (hasSendablePhone(formState.phone)) {
         fetch("/api/fan-engage/sms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -618,11 +631,16 @@ export default function OnboardingWizard({
               <Star className="text-amber-300" size={18} />
               <p>SMS double opt-in</p>
             </div>
-            <p className="mt-3 text-sm text-white/60">{smsMessage}</p>
+            <p className="mt-3 text-sm text-white/60">
+              {hasSendablePhone(formState.phone)
+                ? smsMessage
+                : EMPTY_PHONE_SMS_MESSAGE}
+            </p>
             <button
               onClick={handleSmsOptIn}
-              className="mt-4 rounded-full border border-white/30 px-4 py-2 text-sm text-white/80 disabled:opacity-40"
-              disabled={smsStatus === "loading"}
+              className="mt-4 rounded-full border border-white/30 px-4 py-2 text-sm text-white/80 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={smsStatus === "loading" || !hasSendablePhone(formState.phone)}
+              aria-disabled={smsStatus === "loading" || !hasSendablePhone(formState.phone)}
             >
               {smsStatus === "loading" ? "Sending..." : "Send confirmation text"}
             </button>
@@ -650,7 +668,7 @@ export default function OnboardingWizard({
                     disabled={
                       finishStatus === "saving" ||
                       !tosConsent ||
-                      (Boolean(formState.phone) && !smsConsent)
+                      (hasSendablePhone(formState.phone) && !smsConsent)
                     }
                     className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110 disabled:opacity-50"
                   >

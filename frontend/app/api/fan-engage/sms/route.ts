@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import twilio from "twilio";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSmsPhone } from "@/lib/sms-send-gate";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { phone, firstName, interest } = (await request.json()) as SmsPayload;
+    const { phone: rawPhone, firstName, interest } = (await request.json()) as SmsPayload;
+    const phone = normalizeSmsPhone(rawPhone);
 
     if (!phone) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });

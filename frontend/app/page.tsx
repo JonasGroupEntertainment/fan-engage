@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getFanHomeData } from "@/lib/data/fan-home";
 import { getFeaturedOffers } from "@/lib/data/offers";
 import { getTiers, tierIcon } from "@/lib/data/tiers";
+import { tierJourneyState } from "@/lib/tier-thresholds";
 import type { TierSlug } from "@/lib/data/types";
 
 import { touchStreak } from "@/lib/streaks/touch";
@@ -157,8 +158,13 @@ export default async function Home({
     imageUrl: o.image_url,
   }));
 
-  // Tier journey card — use real tier + fan's current status if available.
+  // Tier journey — lock/unlock from the same points ladder as /rewards.
   const currentTier = (fan?.current_tier ?? "bronze") as TierSlug;
+  const journey = tierJourneyState(
+    kpis == null ? null : kpis.total_points,
+    tiers,
+    currentTier,
+  );
 
   // Build the invite URL for signed-in fans (used by the QR card).
   const headerList = await headers();
@@ -296,21 +302,17 @@ export default async function Home({
             <p className="text-sm uppercase tracking-wide text-white/70">Tier Journey</p>
             <h3 className="mt-2 text-xl font-semibold">
               {kpis?.next_tier
-                ? `${tiers.find((t) => t.slug === currentTier)?.display_name ?? "Bronze"} · ${formatPts(
+                ? `${journey.find((t) => t.isCurrent)?.display_name ?? "Bronze"} · ${formatPts(
                     kpis.points_to_next_tier,
                   )} to ${kpis.next_tier.display_name}`
                 : "Your tier at a glance"}
             </h3>
             <div className="mt-6 space-y-3">
-              {tiers.map((tier) => {
-                const unlocked =
-                  kpis != null && kpis.total_points >= tier.min_points;
-                const isCurrent = tier.slug === currentTier;
-                return (
+              {journey.map((tier) => (
                   <div
                     key={tier.slug}
                     className={`flex items-center justify-between rounded-2xl px-5 py-4 ${
-                      isCurrent
+                      tier.isCurrent
                         ? "bg-white/15 ring-1 ring-white/25"
                         : "bg-black/30"
                     }`}
@@ -322,11 +324,10 @@ export default async function Home({
                       {tier.display_name}
                     </span>
                     <span className="text-sm uppercase tracking-wide text-white/60">
-                      {unlocked ? "Unlocked" : `${formatPts(tier.min_points)}`}
+                      {tier.lockLabel}
                     </span>
                   </div>
-                );
-              })}
+              ))}
             </div>
           </section>
 

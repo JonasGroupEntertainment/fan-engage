@@ -1,10 +1,10 @@
-import { FALLBACK_TIERS } from "@/lib/tier-thresholds";
+import { FALLBACK_TIERS, withCanonicalThresholds } from "@/lib/tier-thresholds";
 import { createClient } from "@/lib/supabase/server";
 import type { Tier, TierSlug } from "./types";
 
 /**
- * Tier list. Falls back to TIER_MIN_POINTS (750 / 3,500 / 8,000) when
- * Supabase isn't reachable — same ladder as the badge gallery.
+ * Tier list. Always overlays TIER_MIN_POINTS (750 / 3,500 / 8,000) so
+ * Fan Home and /rewards cannot drift from a stale `tiers` row.
  */
 export async function getTiers(): Promise<Tier[]> {
   try {
@@ -15,7 +15,7 @@ export async function getTiers(): Promise<Tier[]> {
       .order("sort_order");
     if (error) throw error;
     if (!data || data.length === 0) return FALLBACK_TIERS;
-    return data as Tier[];
+    return withCanonicalThresholds(data as Tier[]);
   } catch {
     return FALLBACK_TIERS;
   }
