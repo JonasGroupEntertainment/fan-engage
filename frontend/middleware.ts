@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { resolveCommunityFromHost } from "@/lib/community";
 import { productionHostRedirect, requestHostname } from "@/lib/canonical-host";
 import { guestSignupHref, isOnboardingPath } from "@/lib/guest-signup";
+import { isSignOutPath } from "@/lib/auth-signout";
 
 /**
  * Routes a signed-in user must be able to reach.
@@ -87,6 +88,12 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  // Sign-out must be able to expire auth cookies. getUser() below refreshes
+  // the session and would write those cookies back onto the response.
+  if (isSignOutPath(request.nextUrl.pathname)) {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
 

@@ -167,7 +167,9 @@ export default async function ReferralsPage() {
                     className="rounded-2xl border border-white/10 bg-black/25 p-5"
                   >
                     <p className="text-xs uppercase tracking-wide text-white/50">
-                      {artist.genres.slice(0, 2).join(" · ") || "Fan Experience"}
+                      {(Array.isArray(artist.genres) ? artist.genres : [])
+                        .slice(0, 2)
+                        .join(" · ") || "Fan Experience"}
                     </p>
                     <h3 className="mt-2 text-lg font-semibold">{artist.name}</h3>
                     <p className="mt-1 min-h-[2.5rem] text-sm text-white/60">

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface UserMenuProps {
   fan: {
@@ -174,11 +175,37 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0 }: UserMenuProp
               </>
             )}
 
+            <Link
+              href="/me"
+              className="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+              role="menuitem"
+              onClick={() => setIsOpen(false)}
+            >
+              Account
+            </Link>
+
             {/* Divider before Sign out */}
             <div className="my-1 border-t border-white/10" />
 
-            {/* Sign out */}
-            <form action="/auth/signout" method="post">
+            {/* Sign out: clear the browser session, then hit /logout so
+                server cookies are expired too. A POST-only /auth/signout
+                left testers on GET /logout + /signout 404s, and middleware
+                session refresh could restore cookies on the same response. */}
+            <form
+              action="/logout"
+              method="post"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setIsOpen(false);
+                try {
+                  const supabase = createClient();
+                  await supabase.auth.signOut();
+                } catch {
+                  /* still navigate so the server route expires cookies */
+                }
+                window.location.assign("/logout");
+              }}
+            >
               <button
                 type="submit"
                 className="w-full px-4 py-2 text-left text-sm text-white/80 hover:bg-white/10 transition"

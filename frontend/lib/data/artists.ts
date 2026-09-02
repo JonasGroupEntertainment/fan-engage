@@ -65,8 +65,8 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
     heroFocalY: row.hero_focal_y ?? undefined,
     accentFrom: row.accent_from,
     accentTo: row.accent_to,
-    genres: row.genres ?? [],
-    social: row.social ?? [],
+    genres: Array.isArray(row.genres) ? row.genres : [],
+    social: Array.isArray(row.social) ? row.social : [],
     upcoming: events
       .filter((e) => e.active && !isPastEvent(e, Date.now()))
       .sort((a, b) => a.sort_order - b.sort_order)

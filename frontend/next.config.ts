@@ -9,6 +9,8 @@ const authSensitiveHeaders = [
 
 const authSensitiveRoutes = [
   "/auth/:path*",
+  "/logout",
+  "/signout",
   "/login",
   "/signup",
   "/forgot-password",
@@ -128,6 +130,11 @@ const nextConfig: NextConfig = {
       {
         source: "/plans/:path*",
         destination: "/premium",
+        permanent: false,
+      },
+      {
+        source: "/settings",
+        destination: "/me",
         permanent: false,
       },
     ];

@@ -490,7 +490,68 @@ export function SignupForm({
                   Security check is unavailable. You can still create an account.
                 </p>
               )}
+              {turnstileGate === "complete-check" && (
+                <p className="text-xs text-white/55">
+                  Complete the security check to enable Create account. If it
+                  never finishes, use Retry — you will not be stuck.
+                </p>
+              )}
             </div>
+          )}
+
+          {hasConsentDocs ? (
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(e) => {
+                  setConsentChecked(e.target.checked);
+                  if (status === "error") {
+                    setStatus("idle");
+                    setMessage("");
+                  }
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+              />
+              <span>
+                I agree to the{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-white/85 underline underline-offset-4 hover:text-white"
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  className="text-white/85 underline underline-offset-4 hover:text-white"
+                >
+                  Privacy Policy
+                </Link>
+                {!rewardsPublished && (
+                  <>
+                    , including the Rewards Program Terms once published
+                  </>
+                )}
+                . We may email a weekly fan digest and product updates — you can
+                manage email preferences anytime after signup.
+              </span>
+            </label>
+          ) : (
+            <p className="text-xs text-white/55">
+              By creating an account, you agree to our{" "}
+              <Link href="/terms" className="text-white/80 underline underline-offset-4 hover:text-white">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">
+                Privacy Policy
+              </Link>
+              . We may email a weekly fan digest and product updates — you can
+              manage email preferences anytime after signup.
+            </p>
           )}
 
           {status === "need-signin" ? (
@@ -501,16 +562,27 @@ export function SignupForm({
               Sign in with the password you just created
             </Link>
           ) : (
-            <button
-              type="submit"
-              disabled={status === "loading" || !canSubmitSignup}
-              className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
-            >
-              {signupTurnstileButtonLabel({
-                status,
-                gate: turnstileGate,
-              })}
-            </button>
+            <div className="space-y-2">
+              <button
+                type="submit"
+                disabled={status === "loading" || !canSubmitSignup}
+                className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
+              >
+                {signupTurnstileButtonLabel({
+                  status,
+                  gate: turnstileGate,
+                })}
+              </button>
+              {status !== "loading" && !canSubmitSignup && (
+                <p className="text-center text-xs text-white/50">
+                  {turnstileGate === "wait-load"
+                    ? "Security check is loading. Create account enables when it finishes — or after Retry if it fails."
+                    : turnstileGate === "complete-check"
+                      ? "Complete the security check above to enable Create account."
+                      : "Agree to the Terms of Service to enable Create account."}
+                </p>
+              )}
+            </div>
           )}
         </form>
 
@@ -528,61 +600,6 @@ export function SignupForm({
             }`}
           >
             {message}
-          </p>
-        )}
-
-        {hasConsentDocs ? (
-          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
-            <input
-              type="checkbox"
-              checked={consentChecked}
-              onChange={(e) => {
-                setConsentChecked(e.target.checked);
-                if (status === "error") {
-                  setStatus("idle");
-                  setMessage("");
-                }
-              }}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
-            />
-            <span>
-              I agree to the{" "}
-              <Link
-                href="/terms"
-                target="_blank"
-                className="text-white/85 underline underline-offset-4 hover:text-white"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                href="/privacy"
-                target="_blank"
-                className="text-white/85 underline underline-offset-4 hover:text-white"
-              >
-                Privacy Policy
-              </Link>
-              {!rewardsPublished && (
-                <>
-                  , including the Rewards Program Terms once published
-                </>
-              )}
-              . We may email a weekly fan digest and product updates — you can
-              manage email preferences anytime after signup.
-            </span>
-          </label>
-        ) : (
-          <p className="text-center text-xs text-white/55">
-            By creating an account, you agree to our{" "}
-            <Link href="/terms" className="text-white/80 underline underline-offset-4 hover:text-white">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">
-              Privacy Policy
-            </Link>
-            . We may email a weekly fan digest and product updates — you can
-            manage email preferences anytime after signup.
           </p>
         )}
         <p className="text-center text-sm text-white/60">

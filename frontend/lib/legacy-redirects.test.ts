@@ -30,3 +30,10 @@ describe("pricing / plans aliases", () => {
     assert.match(nextConfig, /destination:\s*"\/premium"/);
   });
 });
+
+describe("settings alias", () => {
+  it("redirects /settings to /me", () => {
+    assert.match(nextConfig, /source:\s*"\/settings"/);
+    assert.match(nextConfig, /destination:\s*"\/me"/);
+  });
+});

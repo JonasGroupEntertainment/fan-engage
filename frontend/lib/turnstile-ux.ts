@@ -9,6 +9,13 @@ export type TurnstileLoadState = "loading" | "ready" | "error";
  */
 export const TURNSTILE_LOAD_TIMEOUT_MS = 12_000;
 export const TURNSTILE_SLOW_LOAD_HINT_MS = 6_000;
+/**
+ * Widget painted (iframe present) but never issued a token — invalid
+ * hostname / site key, interactive checkbox ignored, or Cloudflare
+ * error inside the iframe without error-callback. Fail-open + Retry
+ * so Create account is never permanently grey.
+ */
+export const TURNSTILE_CHALLENGE_STALL_MS = 15_000;
 /** Backoff between script inject attempts (3 delays → 4 tries). Sum ≈ 11s. */
 export const TURNSTILE_SCRIPT_RETRY_DELAYS_MS = [3_000, 4_000, 4_000] as const;
 
