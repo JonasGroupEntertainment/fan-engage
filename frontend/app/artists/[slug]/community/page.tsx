@@ -14,6 +14,11 @@ import {
   getTopTagsForArtist,
 } from "@/lib/data/community";
 import { canAccess, getViewerEntitlement } from "@/lib/entitlements";
+import {
+  filterCommunityTagsForMarketplace,
+  isMarketplaceLive,
+  sanitizeCommunityTagFilter,
+} from "@/lib/marketplace-live";
 import PremiumPaywall from "@/components/premium-paywall";
 import FanCtaBlock from "./fan-cta-block";
 import NewPostForm from "./new-post-form";
@@ -45,7 +50,11 @@ export default async function ArtistCommunityPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const tagFilter = (sp.tag ?? "").trim() || null;
+  const marketplaceLive = isMarketplaceLive();
+  const tagFilter = sanitizeCommunityTagFilter(
+    (sp.tag ?? "").trim() || null,
+    marketplaceLive,
+  );
 
   const artist = await getArtistFromDb(slug);
   if (!artist) notFound();
@@ -58,6 +67,7 @@ export default async function ArtistCommunityPage({
     getViewerEntitlement(slug),
     getTopTagsForArtist(slug, 10),
   ]);
+  const visibleTags = filterCommunityTagsForMarketplace(topTags, marketplaceLive);
 
   // Parallel-fetch comments + poll data + challenge entries for every visible
   // post so the feed renders in one round-trip. Fine at MVP scale; when post
@@ -139,7 +149,7 @@ export default async function ArtistCommunityPage({
         </section>
       )}
 
-      <TagFilterChips tags={topTags} activeTag={tagFilter} />
+      <TagFilterChips tags={visibleTags} activeTag={tagFilter} />
 
       {posts.length === 0 ? (
         <section className="glass-card p-8 text-center">

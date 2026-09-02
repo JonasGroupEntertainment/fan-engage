@@ -11,13 +11,11 @@ import InviteQRCode from "@/components/invite-qr";
 import CopyLinkButton from "./copy-link-button";
 import NativeShareButton from "./native-share-button";
 import PreviewSignupBanner from "@/components/preview-signup-banner";
-
-const ladder = [
-  { level: "1 referral", reward: "+150 pts" },
-  { level: "3 referrals", reward: "Recruiter badge" },
-  { level: "5 referrals", reward: "Connector badge" },
-  { level: "10 referrals", reward: "Ambassador badge" },
-];
+import {
+  FIRST_72H_BODY,
+  FIRST_72H_TITLE,
+  REFERRAL_REWARD_LADDER,
+} from "@/lib/first-72h";
 
 async function buildInviteUrl(code: string | null | undefined): Promise<string> {
   const origin = await getAppOrigin();
@@ -198,8 +196,8 @@ export default async function ReferralsPage() {
           <section className="grid gap-4 md:grid-cols-3">
             {[
               {
-                title: "First 72 hours",
-                body: "Follow one artist, earn a first badge, then invite one friend while the experience is fresh.",
+                title: FIRST_72H_TITLE,
+                body: FIRST_72H_BODY,
               },
               {
                 title: "Bring friends to shows",
@@ -221,9 +219,8 @@ export default async function ReferralsPage() {
             <div className="glass-card p-6">
               <p className="text-sm uppercase tracking-wide text-white/60">Reward ladder</p>
               <div className="mt-4 space-y-4">
-                {ladder.map((step, i) => {
-                  const threshold = [1, 3, 5, 10][i];
-                  const unlocked = isSignedIn && myCount >= threshold;
+                {REFERRAL_REWARD_LADDER.map((step) => {
+                  const unlocked = isSignedIn && myCount >= step.threshold;
                   return (
                     <div
                       key={step.level}
