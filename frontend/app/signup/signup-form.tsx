@@ -23,6 +23,8 @@ import {
 import {
   SIGNUP_NOT_CREATED_MESSAGE,
   interpretSignupCreate,
+  reportSignupError,
+  sanitizeSignupError,
 } from "@/lib/signup-outcome";
 import {
   COOKIE_CONSENT_EVENT,
@@ -282,6 +284,14 @@ export function SignupForm({
         signInSession,
       });
       if (decision.action === "stay-error") {
+        if (error?.message || error?.code) {
+          reportSignupError({
+            message: error.message,
+            code: error.code,
+          });
+        } else if (signInError) {
+          reportSignupError({ message: signInError });
+        }
         setStatus("error");
         setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
         return;
@@ -290,8 +300,10 @@ export function SignupForm({
       router.push(onboardingHref);
       router.refresh();
     } catch (err) {
+      const raw = err instanceof Error ? err.message : null;
+      reportSignupError({ message: raw });
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : SIGNUP_NOT_CREATED_MESSAGE);
+      setMessage(sanitizeSignupError(raw));
     }
   }
 
