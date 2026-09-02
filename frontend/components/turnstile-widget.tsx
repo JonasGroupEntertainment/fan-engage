@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import {
   TURNSTILE_CHALLENGE_ID,
+  TURNSTILE_CHALLENGE_STALL_MS,
   TURNSTILE_LOAD_TIMEOUT_MS,
   TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
   TURNSTILE_SLOW_LOAD_HINT_MS,
@@ -121,6 +122,7 @@ export function TurnstileWidget({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const tokenReceivedRef = useRef(false);
   const [loadState, setLoadState] = useState<TurnstileLoadState>("loading");
   const [retryNonce, setRetryNonce] = useState(0);
   const [slowLoad, setSlowLoad] = useState(false);
@@ -152,6 +154,7 @@ export function TurnstileWidget({
         size: "normal",
         appearance: "always",
         callback: (token: string) => {
+          tokenReceivedRef.current = true;
           setState("ready");
           onSuccess(token);
         },
@@ -223,6 +226,7 @@ export function TurnstileWidget({
 
     const timeout = window.setTimeout(() => {
       if (cancelled) return;
+      if (tokenReceivedRef.current) return;
       if (!widgetIdRef.current || !containerRef.current?.querySelector("iframe")) {
         console.warn("[turnstile] load timed out — widget never rendered");
         setState("error");
@@ -230,11 +234,22 @@ export function TurnstileWidget({
       }
     }, TURNSTILE_LOAD_TIMEOUT_MS);
 
+    // Iframe can paint (loadState → ready) while the challenge never
+    // issues a token — invalid hostname, site-key mismatch, or a silent
+    // Cloudflare error. That used to leave Create account grey forever.
+    const stall = window.setTimeout(() => {
+      if (cancelled || tokenReceivedRef.current) return;
+      console.warn("[turnstile] challenge stalled — no token after render");
+      setState("error");
+      onError?.();
+    }, TURNSTILE_CHALLENGE_STALL_MS);
+
     return () => {
       cancelled = true;
       observer.disconnect();
       loadListeners.delete(tryRender);
       window.clearTimeout(timeout);
+      window.clearTimeout(stall);
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);
@@ -257,6 +272,7 @@ export function TurnstileWidget({
 
   function handleRetry() {
     resetTurnstileScriptLoader();
+    tokenReceivedRef.current = false;
     widgetIdRef.current = null;
     if (containerRef.current) containerRef.current.innerHTML = "";
     setSlowLoad(false);

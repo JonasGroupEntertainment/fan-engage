@@ -61,6 +61,7 @@ describe("middleware guest onboarding redirect", () => {
     assert.match(middleware, /guestSignupHref/);
     assert.match(middleware, /searchParams\.get\("ref"\)/);
     assert.match(middleware, /searchParams\.get\("next"\)/);
+    assert.match(middleware, /isSignOutPath/);
     assert.doesNotMatch(middleware, /jgos\.io/);
   });
 });

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
+  TURNSTILE_CHALLENGE_STALL_MS,
   TURNSTILE_LOAD_TIMEOUT_MS,
   TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
   TURNSTILE_SLOW_LOAD_HINT_MS,
@@ -318,10 +321,12 @@ describe("signup Turnstile gate", () => {
 });
 
 describe("timeout alignment", () => {
-  it("keeps a 12s hang timeout and a 6s still-loading hint", () => {
+  it("keeps a 12s hang timeout, a 6s still-loading hint, and a 15s token stall", () => {
     assert.equal(TURNSTILE_LOAD_TIMEOUT_MS, 12_000);
     assert.equal(TURNSTILE_SLOW_LOAD_HINT_MS, 6_000);
+    assert.equal(TURNSTILE_CHALLENGE_STALL_MS, 15_000);
     assert.ok(TURNSTILE_SLOW_LOAD_HINT_MS < TURNSTILE_LOAD_TIMEOUT_MS);
+    assert.ok(TURNSTILE_LOAD_TIMEOUT_MS <= TURNSTILE_CHALLENGE_STALL_MS);
   });
 
   it("does not give up on script retries at ~6s", () => {
@@ -336,5 +341,27 @@ describe("timeout alignment", () => {
   it("updates skeleton copy after the slow-load hint", () => {
     assert.equal(turnstileSlowLoadHint(false), "Security check loading…");
     assert.match(turnstileSlowLoadHint(true), /12 seconds/);
+  });
+});
+
+describe("signup Turnstile never permanently greys Create account", () => {
+  it("widget fail-opens after a token stall and exposes Retry", () => {
+    const widget = readFileSync(
+      fileURLToPath(new URL("../components/turnstile-widget.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(widget, /TURNSTILE_CHALLENGE_STALL_MS/);
+    assert.match(widget, /challenge stalled/);
+    assert.match(widget, /Retry security check/);
+  });
+
+  it("puts Terms consent above Create account so the checkbox is not a hidden disable", () => {
+    const signup = readFileSync(
+      fileURLToPath(new URL("../app/signup/signup-form.tsx", import.meta.url)),
+      "utf8",
+    );
+    const consentAt = signup.indexOf("I agree to the");
+    const submitAt = signup.indexOf('type="submit"');
+    assert.ok(consentAt > 0 && submitAt > consentAt);
   });
 });

@@ -18,7 +18,7 @@ function readRepo(relFromLib: string): string {
 
 const referrals = readRepo("../app/referrals/page.tsx");
 const home = readRepo("../app/page.tsx");
-const onboarding = readRepo("../app/onboarding/page.tsx");
+const onboarding = readRepo("../app/onboarding/onboarding-wizard.tsx");
 const checklist = readRepo("../components/first-session-checklist.tsx");
 const loginPage = readRepo("../app/login/page.tsx");
 const authDoors = readRepo("./auth-doors.ts");

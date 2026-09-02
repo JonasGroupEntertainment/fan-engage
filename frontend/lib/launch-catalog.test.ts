@@ -34,7 +34,7 @@ const guestSurfaces = {
   poll: readRepo("../app/artists/[slug]/community/poll-block.tsx"),
   seed: readRepo("../app/admin/community/seed/actions.ts"),
   invite: readRepo("../app/invite/[code]/page.tsx"),
-  onboarding: readRepo("../app/onboarding/page.tsx"),
+  onboarding: readRepo("../app/onboarding/onboarding-wizard.tsx"),
   layout: readRepo("../app/layout.tsx"),
   emptyState: readRepo("../components/marketplace-empty-state.tsx"),
   comingSoon: readRepo("../components/marketplace-coming-soon.tsx"),
