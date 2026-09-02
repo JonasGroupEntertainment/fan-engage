@@ -56,10 +56,18 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
     // Parallel fetch: what's earned + each count-based progress metric.
     // Only count-based badges (community, referral) need a running total.
     const communityId = await getCurrentCommunityId();
-    const admin = createAdminClient();
+    const ledgerBalance = async (): Promise<number> => {
+      try {
+        const admin = createAdminClient();
+        const { data } = await admin.rpc("fan_ledger_balance", { p_fan_id: user.id });
+        return typeof data === "number" ? data : 0;
+      } catch {
+        return 0;
+      }
+    };
     const [earnedRes, postCountRes, commentCountRes, pollVoteCountRes,
            challengeEntryCountRes, referralVerifiedCountRes, membershipRes,
-           ledgerRes] = await Promise.all([
+           ledgerPoints] = await Promise.all([
       supabase
         .from("fan_badges")
         .select("badge_slug,earned_at")
@@ -92,7 +100,7 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
         .eq("fan_id", user.id)
         .eq("community_id", communityId)
         .maybeSingle(),
-      admin.rpc("fan_ledger_balance", { p_fan_id: user.id }),
+      ledgerBalance(),
     ]);
 
     const earnedMap = new Map(
@@ -120,8 +128,7 @@ export async function getBadgesWithEarnedStatus(): Promise<Badge[]> {
     const foundingFanNumber =
       (membershipRes.data?.founding_fan_number as number | null | undefined) ??
       null;
-    const totalPoints =
-      typeof ledgerRes.data === "number" ? ledgerRes.data : 0;
+    const totalPoints = ledgerPoints;
 
     return badges.map((b) => {
       const alreadyEarned = earnedMap.has(b.slug);

@@ -349,7 +349,7 @@ export default function OnboardingWizard({
           interest: formState.interest,
           referralCode: refCode,
           communitySlug: refFromUrl || "raelynn",
-          smsOptedIn: Boolean(formState.phone) && smsConsent,
+          smsOptedIn: hasSendablePhone(formState.phone) && smsConsent,
           emailOptedIn: Boolean(formState.email),
           consentAcceptedAt: new Date().toISOString(),
           consentVersion: "2026-04-22.v1",
@@ -378,7 +378,7 @@ export default function OnboardingWizard({
         }).catch((err) => console.warn("Mailchimp subscribe did not complete:", err));
       }
 
-      if (formState.phone) {
+      if (hasSendablePhone(formState.phone)) {
         fetch("/api/fan-engage/sms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -668,7 +668,7 @@ export default function OnboardingWizard({
                     disabled={
                       finishStatus === "saving" ||
                       !tosConsent ||
-                      (Boolean(formState.phone) && !smsConsent)
+                      (hasSendablePhone(formState.phone) && !smsConsent)
                     }
                     className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110 disabled:opacity-50"
                   >
