@@ -110,7 +110,7 @@ git commit -m "fix: bind Turnstile token to Supabase signup"
 - Modify: `frontend/lib/rls-audit.test.ts`
 
 **Interfaces:**
-- Produces SQL RPC: `private.consume_rate_limit(p_scope text, p_identifier_hash text, p_limit integer, p_window_seconds integer) returns table(allowed boolean, remaining integer, reset_at timestamptz)`.
+- Produces SQL RPC: `public.consume_rate_limit(p_scope text, p_identifier_hash text, p_limit integer, p_window_seconds integer) returns table(allowed boolean, remaining integer, reset_at timestamptz)`, revoked from every API role except `service_role`.
 - Produces TypeScript: `checkSharedRateLimit(input, consume?): Promise<SharedRateLimitDecision>`.
 - The optional `consume` argument is a narrow test seam matching the RPC result; production defaults to the service-role Supabase call.
 
@@ -138,7 +138,7 @@ Expected: FAIL because the adapter does not exist.
 
 - [ ] **Step 3: Implement the minimal server-only adapter**
 
-Use `createHash("sha256")` over `salt + "\0" + identifier`, validate positive integer limits/windows, call the private RPC via `createAdminClient().schema("private").rpc(...)`, and return `{ allowed: false, reason: "backend_unavailable" }` for production-call errors.
+Use `createHash("sha256")` over `salt + "\0" + identifier`, validate positive integer limits/windows, call the service-role-only public RPC via `createAdminClient().rpc(...)`, and return `{ allowed: false, reason: "backend_unavailable" }` for production-call errors.
 
 - [ ] **Step 4: Run the adapter test and verify GREEN**
 

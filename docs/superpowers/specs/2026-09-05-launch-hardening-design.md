@@ -28,7 +28,7 @@ Production enforcement depends on enabling the matching Turnstile provider and s
 
 Security-sensitive API limits must be shared across Vercel instances. The current process-local `Map` resets on cold starts and differs between instances, so it cannot provide that guarantee.
 
-A migration will add a private rate-limit table and a single atomic `consume_rate_limit` database function. Only `service_role` may execute it. Server routes will use a small server-only adapter that calls the function with a hashed identifier, scope, request limit, and fixed window. Raw IP addresses will not be stored. Authentication endpoints will fail closed if the shared limiter cannot make a decision; non-security-sensitive endpoints may retain their existing availability behavior until migrated deliberately.
+A migration will add a private rate-limit table and a single atomic `public.consume_rate_limit` database function. The function remains in the exposed API schema because Supabase does not expose private-schema RPCs by default, but all access is revoked except `service_role`; its table and state remain private. Server routes will use a small server-only adapter that calls the function with a hashed identifier, scope, request limit, and fixed window. Raw IP addresses will not be stored. Authentication endpoints will fail closed if the shared limiter cannot make a decision; non-security-sensitive endpoints may retain their existing availability behavior until migrated deliberately.
 
 The first migration targets Turnstile verification and signup-error telemetry because they currently claim an authentication limit. Additional route migration will be listed explicitly rather than silently changing every API contract.
 
