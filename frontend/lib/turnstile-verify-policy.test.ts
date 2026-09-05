@@ -35,10 +35,10 @@ describe("Turnstile verify fail-open policy", () => {
     assert.match(route, /failClosed/);
   });
 
-  it("signup never treats fail-open as a create grant", () => {
+  it("signup binds the unconsumed token to Supabase Auth", () => {
     const signup = readRepo("../app/signup/signup-form.tsx");
-    assert.doesNotMatch(signup, /You can still create an account/);
-    assert.doesNotMatch(signup, /failOpenGranted/);
-    assert.doesNotMatch(signup, /gate === "fail-open"/);
+    assert.match(signup, /buildSignupAuthOptions/);
+    assert.match(signup, /turnstileToken,/);
+    assert.doesNotMatch(signup, /verifyTurnstileToken/);
   });
 });
