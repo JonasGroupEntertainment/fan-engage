@@ -38,19 +38,17 @@ const KIND_COLOR: Record<CardKind, string> = {
  * then BEP names (brand_events, etc.). Whichever returns rows wins.
  */
 export async function LatestStrip({ slug }: { slug: string }) {
-  const cards = await collect(slug);
+  const { cards, snapshotTime } = await collect(slug);
   if (cards.length === 0) return null;
 
   // Sort: future events first (closest first), then by recency.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const now = Date.now();
   const sorted = cards
     .slice()
     .sort((a, b) => {
       const at = new Date(a.ts).getTime();
       const bt = new Date(b.ts).getTime();
-      const aFuture = at >= now;
-      const bFuture = bt >= now;
+      const aFuture = at >= snapshotTime;
+      const bFuture = bt >= snapshotTime;
       if (aFuture && !bFuture) return -1;
       if (!aFuture && bFuture) return 1;
       if (aFuture && bFuture) return at - bt; // soonest future first
@@ -104,7 +102,10 @@ export async function LatestStrip({ slug }: { slug: string }) {
   );
 }
 
-async function collect(slug: string): Promise<LatestCard[]> {
+async function collect(
+  slug: string,
+): Promise<{ cards: LatestCard[]; snapshotTime: number }> {
+  const snapshotTime = Date.now();
   const supabase = await createClient();
   const cards: LatestCard[] = [];
 
@@ -224,7 +225,7 @@ async function collect(slug: string): Promise<LatestCard[]> {
     }
   }
 
-  return cards;
+  return { cards, snapshotTime };
 }
 
 // ─── tiny helpers (no external deps) ─────────────────────────────────

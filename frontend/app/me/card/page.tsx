@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentFan, getCurrentFanKpis } from "@/lib/data/fan";
 import { getTiers, tierIcon } from "@/lib/data/tiers";
@@ -148,12 +149,12 @@ export default async function FanCardPage() {
           variant="primary"
           label="Share my card"
         />
-        <a
+        <Link
           href="/"
           className="block w-full rounded-full border border-white/15 py-3 text-center text-sm font-medium text-white/70 hover:bg-white/5 transition"
         >
           Back to home
-        </a>
+        </Link>
       </div>
 
       <p className="text-center text-xs text-white/35">

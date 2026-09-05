@@ -25,11 +25,14 @@ export function WelcomeQuest({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    try {
-      if (!localStorage.getItem(storageKey)) setVisible(true);
-    } catch {
-      setVisible(true);
-    }
+    const id = window.setTimeout(() => {
+      try {
+        if (!localStorage.getItem(storageKey)) setVisible(true);
+      } catch {
+        setVisible(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [storageKey]);
 
   if (!visible) return null;
