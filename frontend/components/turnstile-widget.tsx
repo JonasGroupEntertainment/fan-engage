@@ -268,10 +268,7 @@ export function TurnstileWidget({
   }, [renderWidget, setState, onError, onStall, retryNonce, markReadyIfIframe]);
 
   useEffect(() => {
-    if (loadState !== "loading") {
-      setSlowLoad(false);
-      return;
-    }
+    if (loadState !== "loading") return;
     const id = window.setTimeout(() => setSlowLoad(true), TURNSTILE_SLOW_LOAD_HINT_MS);
     return () => window.clearTimeout(id);
   }, [loadState, retryNonce]);
@@ -323,7 +320,9 @@ export function TurnstileWidget({
           >
             <div className="h-3 w-2/3 animate-pulse rounded bg-white/20" />
             <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
-            <p className="text-xs text-white/70">{turnstileSlowLoadHint(slowLoad)}</p>
+            <p className="text-xs text-white/70">
+              {turnstileSlowLoadHint(loadState === "loading" && slowLoad)}
+            </p>
           </div>
         )}
         <div

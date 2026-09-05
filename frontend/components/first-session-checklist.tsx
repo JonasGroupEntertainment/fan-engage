@@ -28,12 +28,15 @@ export default function FirstSessionChecklist({
 
   useEffect(() => {
     if (variant === "onboarding") return;
-    try {
-      setDismissed(localStorage.getItem(FIRST_SESSION_DISMISS_KEY) === "1");
-    } catch {
-      setDismissed(false);
-    }
-    setReady(true);
+    const id = window.setTimeout(() => {
+      try {
+        setDismissed(localStorage.getItem(FIRST_SESSION_DISMISS_KEY) === "1");
+      } catch {
+        setDismissed(false);
+      }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [variant]);
 
   if (!ready) return null;
