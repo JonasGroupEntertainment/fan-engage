@@ -1,4 +1,5 @@
 type RateLimitEnvironment = {
+  [key: string]: string | undefined;
   RATE_LIMIT_HASH_SALT?: string;
   VERCEL_ENV?: string;
   NEXT_PUBLIC_VERCEL_ENV?: string;
