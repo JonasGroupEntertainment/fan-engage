@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,8 +9,6 @@ import {
   TurnstileWidget,
   isTurnstileConfigured,
   prefetchTurnstileScript,
-  turnstileFailureMessage,
-  verifyTurnstileToken,
 } from "@/components/turnstile-widget";
 import {
   nextSignupTurnstileGate,
@@ -26,6 +24,7 @@ import {
   reportSignupError,
   sanitizeSignupError,
 } from "@/lib/signup-outcome";
+import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
@@ -100,10 +99,6 @@ export function SignupForm({
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
-  // One-shot: Turnstile is verified before the consent modal opens so the
-  // ~5min token can't expire while the user scrolls ToS. createAccount
-  // consumes this flag instead of re-verifying after Accept.
-  const captchaVerifiedRef = useRef(false);
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
     setTurnstileError(false);
@@ -171,7 +166,6 @@ export function SignupForm({
     signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
 
   async function ensureCaptcha(): Promise<boolean> {
-    if (captchaVerifiedRef.current) return true;
     const gate = nextSignupTurnstileGate({
       configured: turnstileConfigured,
       token: turnstileToken,
@@ -194,20 +188,6 @@ export function SignupForm({
       return false;
     }
     // Keys unset (preview/dev): no widget, no token required.
-    if (gate === "not-configured") {
-      captchaVerifiedRef.current = true;
-      return true;
-    }
-    const captcha = await verifyTurnstileToken(turnstileToken, { failClosed: true });
-    resetChallenge();
-    if (!captcha.success) {
-      captchaVerifiedRef.current = false;
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      requestAnimationFrame(() => scrollToTurnstileChallenge());
-      return false;
-    }
-    captchaVerifiedRef.current = true;
     return true;
   }
 
@@ -245,27 +225,23 @@ export function SignupForm({
     setStatus("loading");
     setMessage("");
 
-    // Prefer the pre-consent verification; fall back to a live verify when
-    // createAccount is reached without that one-shot (shouldn't happen in
-    // the normal consent path, but keeps the no-docs path safe on retry).
+    // Keep the UI gate close to the Auth call. Supabase Auth consumes the
+    // token as part of signup so verification cannot be detached from use.
     if (!(await ensureCaptcha())) return;
-    captchaVerifiedRef.current = false;
 
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
+        options: buildSignupAuthOptions({
           emailRedirectTo: authEmailRedirectTo(onboardingHref),
-          data: consentVersion
-            ? {
-                consent_accepted_at: new Date().toISOString(),
-                consent_version: consentVersion,
-              }
-            : undefined,
-        },
+          turnstileConfigured,
+          turnstileToken,
+          consentVersion,
+        }),
       });
+      resetChallenge();
 
       let signInError: string | null = null;
       let signInSession: unknown | null = null;
@@ -300,6 +276,7 @@ export function SignupForm({
       router.push(onboardingHref);
       router.refresh();
     } catch (err) {
+      resetChallenge();
       const raw = err instanceof Error ? err.message : null;
       reportSignupError({ message: raw });
       setStatus("error");

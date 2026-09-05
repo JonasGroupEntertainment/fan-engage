@@ -14,6 +14,9 @@ const loopSql = readRepo("../../supabase/migrations/0053_superfan_loop.sql");
 const rpcLockSql = readRepo(
   "../../supabase/migrations/0054_revoke_anon_security_definer_rpcs.sql",
 );
+const sharedRateLimitSql = readRepo(
+  "../../supabase/migrations/0057_shared_auth_rate_limits.sql",
+);
 const displayTs = readRepo("./data/fan-profile.ts");
 
 describe("RLS audit — fans / points / rewards / redemptions / posts", () => {
@@ -112,6 +115,25 @@ describe("RLS audit — fans / points / rewards / redemptions / posts", () => {
     assert.match(
       loopSql,
       /grant execute on function public\.redeem_reward\(uuid, uuid, text\) to authenticated, service_role/,
+    );
+  });
+
+  it("0057 keeps shared rate-limit state private and service-role only", () => {
+    assert.match(sharedRateLimitSql, /create table if not exists private\.auth_rate_limits/);
+    assert.doesNotMatch(sharedRateLimitSql, /raw_identifier|client_ip|ip_address/);
+    assert.match(sharedRateLimitSql, /identifier_hash ~ '\^\[0-9a-f\]\{64\}\$'/);
+    assert.match(sharedRateLimitSql, /on conflict \(scope, identifier_hash\) do update/);
+    assert.match(sharedRateLimitSql, /delete from private\.auth_rate_limits/);
+    assert.match(sharedRateLimitSql, /window_started_at < v_now - interval '1 day'/);
+    assert.match(sharedRateLimitSql, /auth_rate_limits_window_started_at_idx/);
+    assert.match(sharedRateLimitSql, /security definer\s+set search_path = ''/);
+    assert.match(
+      sharedRateLimitSql,
+      /revoke all on function public\.consume_rate_limit[\s\S]*from public, anon, authenticated/,
+    );
+    assert.match(
+      sharedRateLimitSql,
+      /grant execute on function public\.consume_rate_limit[\s\S]*to service_role/,
     );
   });
 });

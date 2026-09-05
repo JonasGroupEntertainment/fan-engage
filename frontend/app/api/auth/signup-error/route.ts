@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { authRateLimitSalt } from "@/lib/auth-rate-limit-policy";
+import { getClientIp } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,8 +12,24 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request.headers);
-  const rl = authRateLimiter.check(ip ?? "unknown");
-  if (!rl.success) {
+  let rl;
+  try {
+    rl = await checkSharedRateLimit({
+      scope: "signup-error",
+      identifier: ip ?? "unknown",
+      salt: authRateLimitSalt(process.env),
+      limit: 10,
+      windowSeconds: 15 * 60,
+    });
+  } catch (error) {
+    console.error("[signup] rate limit unavailable", error);
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+
+  if (!rl.allowed) {
+    if (rl.reason === "backend_unavailable") {
+      return NextResponse.json({ ok: false }, { status: 503 });
+    }
     return NextResponse.json({ ok: false }, { status: 429 });
   }
 

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { authRateLimitSalt } from "@/lib/auth-rate-limit-policy";
+import { getClientIp } from "@/lib/rate-limit";
+import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 import { turnstileUpstreamFailOpen } from "@/lib/turnstile-verify-policy";
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -14,8 +16,30 @@ function failOpenResponse(reason: string, detail?: unknown) {
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request.headers);
-  const rl = authRateLimiter.check(ip ?? "unknown");
-  if (!rl.success) {
+  let rl;
+  try {
+    rl = await checkSharedRateLimit({
+      scope: "turnstile-verify",
+      identifier: ip ?? "unknown",
+      salt: authRateLimitSalt(process.env),
+      limit: 10,
+      windowSeconds: 15 * 60,
+    });
+  } catch (error) {
+    console.error("[turnstile] rate limit unavailable", error);
+    return NextResponse.json(
+      { success: false, error: "rate_limit_unavailable" },
+      { status: 503 },
+    );
+  }
+
+  if (!rl.allowed) {
+    if (rl.reason === "backend_unavailable") {
+      return NextResponse.json(
+        { success: false, error: "rate_limit_unavailable" },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ success: false, error: "rate_limited" }, { status: 429 });
   }
 
