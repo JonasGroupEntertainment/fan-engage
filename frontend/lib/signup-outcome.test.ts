@@ -169,6 +169,8 @@ describe("signup form stays on /signup after a failed create", () => {
     assert.match(route, /console\.error/);
     assert.match(route, /checkSharedRateLimit/);
     assert.match(route, /scope: "signup-error"/);
+    assert.match(route, /if \(!rl\.allowed\)/);
+    assert.match(route, /rl\.reason === "backend_unavailable"/);
     assert.doesNotMatch(route, /Database error saving new user/);
   });
 });

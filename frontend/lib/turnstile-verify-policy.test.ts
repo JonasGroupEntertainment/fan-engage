@@ -33,6 +33,9 @@ describe("Turnstile verify fail-open policy", () => {
     assert.match(route, /missing_token/);
     assert.match(route, /turnstileUpstreamFailOpen/);
     assert.match(route, /failClosed/);
+    assert.match(route, /if \(!rl\.allowed\)/);
+    assert.match(route, /rl\.reason === "backend_unavailable"/);
+    assert.doesNotMatch(route, /if \(!rl\.success\)/);
   });
 
   it("signup binds the unconsumed token to Supabase Auth", () => {

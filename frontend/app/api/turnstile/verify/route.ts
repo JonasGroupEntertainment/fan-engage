@@ -33,7 +33,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!rl.success) {
+  if (!rl.allowed) {
+    if (rl.reason === "backend_unavailable") {
+      return NextResponse.json(
+        { success: false, error: "rate_limit_unavailable" },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ success: false, error: "rate_limited" }, { status: 429 });
   }
 

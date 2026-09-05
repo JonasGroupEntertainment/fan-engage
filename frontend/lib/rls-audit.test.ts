@@ -123,6 +123,9 @@ describe("RLS audit — fans / points / rewards / redemptions / posts", () => {
     assert.doesNotMatch(sharedRateLimitSql, /raw_identifier|client_ip|ip_address/);
     assert.match(sharedRateLimitSql, /identifier_hash ~ '\^\[0-9a-f\]\{64\}\$'/);
     assert.match(sharedRateLimitSql, /on conflict \(scope, identifier_hash\) do update/);
+    assert.match(sharedRateLimitSql, /delete from private\.auth_rate_limits/);
+    assert.match(sharedRateLimitSql, /window_started_at < v_now - interval '1 day'/);
+    assert.match(sharedRateLimitSql, /auth_rate_limits_window_started_at_idx/);
     assert.match(sharedRateLimitSql, /security definer\s+set search_path = ''/);
     assert.match(
       sharedRateLimitSql,

@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 503 });
   }
 
-  if (!rl.success) {
+  if (!rl.allowed) {
+    if (rl.reason === "backend_unavailable") {
+      return NextResponse.json({ ok: false }, { status: 503 });
+    }
     return NextResponse.json({ ok: false }, { status: 429 });
   }
 

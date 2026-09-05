@@ -14,6 +14,9 @@ create table if not exists private.auth_rate_limits (
     check (identifier_hash ~ '^[0-9a-f]{64}$')
 );
 
+create index if not exists auth_rate_limits_window_started_at_idx
+  on private.auth_rate_limits (window_started_at);
+
 alter table private.auth_rate_limits enable row level security;
 revoke all on schema private from public, anon, authenticated;
 revoke all on table private.auth_rate_limits from public, anon, authenticated;
@@ -48,6 +51,11 @@ begin
   if p_window_seconds < 1 or p_window_seconds > 86400 then
     raise exception 'window must be between 1 and 86400 seconds';
   end if;
+
+  -- Bound storage and pseudonymous-identifier retention. The maximum accepted
+  -- window is one day, so anything older cannot still be active.
+  delete from private.auth_rate_limits
+  where window_started_at < v_now - interval '1 day';
 
   insert into private.auth_rate_limits as current_limit (
     scope,
