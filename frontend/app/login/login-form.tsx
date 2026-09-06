@@ -7,12 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo } from "@/lib/app-url";
 import { signedInLoginRedirectPath } from "@/lib/session-presence";
 import { buildPasswordAuthCredentials } from "@/lib/password-auth-credentials";
+import { buildMagicLinkAuthOptions } from "@/lib/magic-link-auth-options";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
   prefetchTurnstileScript,
-  turnstileFailureMessage,
-  verifyTurnstileToken,
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
 import {
@@ -203,23 +202,15 @@ export function LoginForm({
     if (!magicLinkEnabled) return;
     setStatus("loading");
     setMessage("");
-
-    const captcha = await verifyTurnstileToken(token);
-    resetChallenge();
-    if (!captcha.success) {
-      pendingMagicSend.current = false;
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      requestAnimationFrame(() => scrollToTurnstileChallenge());
-      return;
-    }
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
+        options: buildMagicLinkAuthOptions({
           emailRedirectTo: authEmailRedirectTo(next),
-        },
+          turnstileConfigured,
+          turnstileToken: token,
+        }),
       });
       if (error) throw error;
       pendingMagicSend.current = false;
@@ -232,10 +223,12 @@ export function LoginForm({
       pendingMagicSend.current = false;
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send magic link.");
+    } finally {
+      resetChallenge();
     }
   }
 
-  // Secondary door: magic link. Turnstile only on this path.
+  // Secondary door: magic link reuses the same unconsumed challenge token.
   async function handleMagicLink() {
     if (!magicLinkEnabled) return;
     if (magicLinkCooldown > 0 || status === "loading") return;
