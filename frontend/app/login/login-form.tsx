@@ -20,6 +20,9 @@ import {
   magicLinkClickAction,
   magicLinkPersistentHelper,
   nextMagicLinkGate,
+  nextPasswordTurnstileGate,
+  passwordLoginAllowsSubmit,
+  passwordLoginTurnstileHelper,
   scrollToTurnstileChallenge,
   shouldShowParentChallengeError,
 } from "@/lib/turnstile-ux";
@@ -71,10 +74,22 @@ export function LoginForm({
     setTurnstileToken(token);
     setTurnstileError(false);
   }, []);
-  const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileError(true);
+    setTurnstileToken(null);
+  }, []);
+  const handleTurnstileStall = useCallback(() => {
+    setTurnstileError(true);
+    setTurnstileToken(null);
+  }, []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
     setTurnstileLoadState(state);
+    // Load / challenge failure must drop any leftover token so #40's
+    // `!!turnstileToken` ready check cannot re-enable Sign in.
+    if (state === "error") {
+      setTurnstileToken(null);
+    }
     // Retry remounts into loading while challengeFailed was still true —
     // clear it so "Security check failed…" cannot flash under the skeleton.
     if (state === "loading" || state === "ready") {
@@ -160,6 +175,20 @@ export function LoginForm({
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault();
     pendingMagicSend.current = false;
+    const passwordGate = nextPasswordTurnstileGate({
+      configured: turnstileConfigured,
+      token: turnstileToken,
+      loadState: turnstileLoadState,
+    });
+    if (!passwordLoginAllowsSubmit(passwordGate)) {
+      setStatus("error");
+      setMessage(
+        passwordLoginTurnstileHelper(passwordGate) ??
+          "Complete the security check, then try again.",
+      );
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return;
+    }
     setStatus("loading");
     setMessage("");
     try {
@@ -277,7 +306,13 @@ export function LoginForm({
   }, [magicLinkEnabled, turnstileToken]);
 
   const magicLinkDisabled = status === "loading" || magicLinkCooldown > 0;
-  const passwordCaptchaReady = !turnstileConfigured || !!turnstileToken;
+  const passwordGate = nextPasswordTurnstileGate({
+    configured: turnstileConfigured,
+    token: turnstileToken,
+    loadState: turnstileLoadState,
+  });
+  const passwordCaptchaReady = passwordLoginAllowsSubmit(passwordGate);
+  const passwordHelper = passwordLoginTurnstileHelper(passwordGate);
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
@@ -334,6 +369,7 @@ export function LoginForm({
                 key={turnstileKey}
                 onSuccess={handleTurnstileSuccess}
                 onError={handleTurnstileError}
+                onStall={handleTurnstileStall}
                 onExpire={handleTurnstileExpire}
                 onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
@@ -346,13 +382,18 @@ export function LoginForm({
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={status === "loading" || !passwordCaptchaReady}
-            className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
-          >
-            {status === "loading" ? "Signing in…" : "Sign in"}
-          </button>
+          <div className="space-y-2">
+            <button
+              type="submit"
+              disabled={status === "loading" || !passwordCaptchaReady}
+              className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
+            >
+              {status === "loading" ? "Signing in…" : "Sign in"}
+            </button>
+            {status !== "loading" && !passwordCaptchaReady && passwordHelper && (
+              <p className="text-center text-xs text-white/50">{passwordHelper}</p>
+            )}
+          </div>
         </form>
 
         {/*
