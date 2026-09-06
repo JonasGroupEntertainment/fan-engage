@@ -93,6 +93,18 @@ describe("nextMagicLinkGate", () => {
       "send",
     );
   });
+
+  it("uses an already-solved shared challenge on the first magic-link click", () => {
+    assert.equal(
+      nextMagicLinkGate({
+        configured: true,
+        revealed: false,
+        token: "tok",
+        loadState: "ready",
+      }),
+      "send",
+    );
+  });
 });
 
 describe("empty email before expand (Hana NIT)", () => {

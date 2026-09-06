@@ -43,8 +43,8 @@ export function nextMagicLinkGate(opts: {
   loadState: TurnstileLoadState;
 }): MagicLinkGate {
   if (!opts.configured) return "send";
-  if (!opts.revealed) return "reveal";
   if (opts.token) return "send";
+  if (!opts.revealed) return "reveal";
   if (opts.loadState === "loading") return "wait-load";
   if (opts.loadState === "error") return "retry";
   return "complete-check";
