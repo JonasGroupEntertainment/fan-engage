@@ -120,14 +120,15 @@ describe("auth call sites use authEmailRedirectTo / APP_URL", () => {
     assert.match(files.callback, /APP_URL/);
   });
 
-  it("password login stays Turnstile-free", () => {
+  it("password login sends the Turnstile token with the Supabase Auth request", () => {
     const login = readRepo("../app/login/login-form.tsx");
     const passwordFn = login.slice(
       login.indexOf("async function handlePassword"),
       login.indexOf("const magicGate"),
     );
     assert.match(passwordFn, /signInWithPassword/);
-    assert.doesNotMatch(passwordFn, /turnstile|verifyTurnstileToken|Turnstile/i);
-    assert.match(login, /Primary door: email \+ password\. No Turnstile/);
+    assert.match(passwordFn, /buildPasswordAuthCredentials/);
+    assert.match(passwordFn, /turnstileToken/);
+    assert.match(login, /TurnstileWidget/);
   });
 });
