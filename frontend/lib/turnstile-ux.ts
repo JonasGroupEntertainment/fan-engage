@@ -191,3 +191,48 @@ export function signupTurnstileButtonLabel(opts: {
   // Loading / fail / retry copy lives on the Turnstile block, not this CTA.
   return "Create account";
 }
+
+/**
+ * Password login Turnstile gate. Sign in stays disabled until a real
+ * token exists (or Turnstile is not configured). Load / challenge errors
+ * beat a leftover token — #40's `!!turnstileToken` check fail-opened
+ * after error-callback because the parent did not clear the token.
+ */
+export type PasswordTurnstileGate = SignupTurnstileGate;
+
+function hasRealTurnstileToken(token: string | null): boolean {
+  return Boolean(token?.trim());
+}
+
+export function nextPasswordTurnstileGate(opts: {
+  configured: boolean;
+  token: string | null;
+  loadState: TurnstileLoadState;
+}): PasswordTurnstileGate {
+  if (!opts.configured) return "not-configured";
+  // Error / broken widget wins over a stale token so Sign in cannot
+  // re-enable after onError / timeout / stall.
+  if (opts.loadState === "error") return "retry-required";
+  if (hasRealTurnstileToken(opts.token)) return "ready";
+  if (opts.loadState === "loading") return "wait-load";
+  return "complete-check";
+}
+
+export function passwordLoginAllowsSubmit(gate: PasswordTurnstileGate): boolean {
+  return gate === "not-configured" || gate === "ready";
+}
+
+export function passwordLoginTurnstileHelper(
+  gate: PasswordTurnstileGate,
+): string | null {
+  switch (gate) {
+    case "wait-load":
+      return "Security check is loading. Sign in enables when it succeeds.";
+    case "complete-check":
+      return "Complete the security check above to enable Sign in.";
+    case "retry-required":
+      return "Tap Retry above. Sign in stays disabled until the security check succeeds.";
+    default:
+      return null;
+  }
+}

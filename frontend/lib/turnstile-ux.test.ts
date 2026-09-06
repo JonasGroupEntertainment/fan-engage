@@ -14,7 +14,10 @@ import {
   magicLinkGateMessage,
   magicLinkPersistentHelper,
   nextMagicLinkGate,
+  nextPasswordTurnstileGate,
   nextSignupTurnstileGate,
+  passwordLoginAllowsSubmit,
+  passwordLoginTurnstileHelper,
   shouldShowParentChallengeError,
   signupAllowsSubmit,
   signupTurnstileButtonLabel,
@@ -364,6 +367,110 @@ describe("timeout alignment", () => {
   it("updates skeleton copy after the slow-load hint", () => {
     assert.equal(turnstileSlowLoadHint(false), "Security check loading…");
     assert.match(turnstileSlowLoadHint(true), /12 seconds/);
+  });
+});
+
+describe("password login Turnstile gate (fail-closed)", () => {
+  it("is not ready when configured and no token exists", () => {
+    const gate = nextPasswordTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "loading",
+    });
+    assert.equal(gate, "wait-load");
+    assert.equal(passwordLoginAllowsSubmit(gate), false);
+    assert.equal(
+      passwordLoginAllowsSubmit(
+        nextPasswordTurnstileGate({
+          configured: true,
+          token: null,
+          loadState: "ready",
+        }),
+      ),
+      false,
+    );
+  });
+
+  it("is ready when configured and a real token exists", () => {
+    const gate = nextPasswordTurnstileGate({
+      configured: true,
+      token: "tok",
+      loadState: "ready",
+    });
+    assert.equal(gate, "ready");
+    assert.equal(passwordLoginAllowsSubmit(gate), true);
+  });
+
+  it("is not ready on load error or expire — even if a stale token is still in state", () => {
+    const loadError = nextPasswordTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "error",
+    });
+    assert.equal(loadError, "retry-required");
+    assert.equal(passwordLoginAllowsSubmit(loadError), false);
+
+    const staleTokenAfterError = nextPasswordTurnstileGate({
+      configured: true,
+      token: "stale-from-prior-success",
+      loadState: "error",
+    });
+    assert.equal(staleTokenAfterError, "retry-required");
+    assert.equal(passwordLoginAllowsSubmit(staleTokenAfterError), false);
+
+    const expired = nextPasswordTurnstileGate({
+      configured: true,
+      token: null,
+      loadState: "ready",
+    });
+    assert.equal(expired, "complete-check");
+    assert.equal(passwordLoginAllowsSubmit(expired), false);
+  });
+
+  it("is ready without a token when Turnstile is not configured", () => {
+    const gate = nextPasswordTurnstileGate({
+      configured: false,
+      token: null,
+      loadState: "loading",
+    });
+    assert.equal(gate, "not-configured");
+    assert.equal(passwordLoginAllowsSubmit(gate), true);
+  });
+
+  it("never fail-opens Sign in for an unknown or leftover grant", () => {
+    assert.equal(passwordLoginAllowsSubmit("fail-open" as never), false);
+    assert.equal(passwordLoginAllowsSubmit("retry-required"), false);
+  });
+
+  it("explains why Sign in stays disabled on load / retry", () => {
+    assert.match(
+      passwordLoginTurnstileHelper("wait-load") ?? "",
+      /loading/i,
+    );
+    assert.match(
+      passwordLoginTurnstileHelper("retry-required") ?? "",
+      /Retry/i,
+    );
+    assert.match(
+      passwordLoginTurnstileHelper("complete-check") ?? "",
+      /Complete the security check/i,
+    );
+    assert.equal(passwordLoginTurnstileHelper("ready"), null);
+    assert.equal(passwordLoginTurnstileHelper("not-configured"), null);
+  });
+
+  it("login form uses the fail-closed gate and clears the token on error", () => {
+    const login = readFileSync(
+      fileURLToPath(new URL("../app/login/login-form.tsx", import.meta.url)),
+      "utf8",
+    );
+    assert.match(login, /nextPasswordTurnstileGate/);
+    assert.match(login, /passwordLoginAllowsSubmit/);
+    assert.doesNotMatch(login, /failOpenGranted/);
+    assert.doesNotMatch(
+      login,
+      /const passwordCaptchaReady = !turnstileConfigured \|\| !!turnstileToken/,
+    );
   });
 });
 
