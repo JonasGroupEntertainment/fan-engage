@@ -89,6 +89,17 @@ export default function ForArtistsPage() {
         </p>
       </section>
 
+      {/* ─── Overview video ─────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-3xl">
+        <video
+          className="w-full rounded-2xl border border-white/10 shadow-glass"
+          controls
+          preload="metadata"
+        >
+          <source src="/videos/for-artists-overview.mp4" type="video/mp4" />
+        </video>
+      </section>
+
       {/* ─── Proof: what's already live ────────────────────────────────────── */}
       <section className="space-y-6">
         <div className="text-center">
