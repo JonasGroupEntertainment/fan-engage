@@ -1,6 +1,9 @@
 export const SIGNUP_NOT_CREATED_MESSAGE =
   "Account wasn't created. Complete the security check or tap Retry, then try again.";
 
+export const SIGNUP_EXISTING_ACCOUNT_MESSAGE =
+  "We couldn't finish creating that account. If you've already signed up with this email, try signing in or resetting your password instead.";
+
 export const SIGNUP_CREATE_FAILED_MESSAGE =
   "We couldn’t create your account. Try again in a moment.";
 
@@ -63,7 +66,7 @@ export function interpretSignupCreate(opts: SignupCreateInput): SignupCreateDeci
     return { action: "stay-error", message: sanitizeSignupError(opts.signUpError) };
   }
   if (!didSignupCreateUser(opts.user)) {
-    return { action: "stay-error", message: SIGNUP_NOT_CREATED_MESSAGE };
+    return { action: "stay-error", message: SIGNUP_EXISTING_ACCOUNT_MESSAGE };
   }
   if (opts.session || opts.signInSession) {
     return { action: "proceed", message: "" };
