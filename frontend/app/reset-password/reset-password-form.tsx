@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PasswordInput } from "@/components/password-input";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -106,10 +107,10 @@ export default function ResetPasswordForm({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-wide text-white/60">New password</span>
-            <input
-              type="password"
+          <div className="space-y-1">
+            <label htmlFor="new-password" className="block text-xs uppercase tracking-wide text-white/60">New password</label>
+            <PasswordInput
+              id="new-password"
               required
               autoComplete="new-password"
               value={password}
@@ -117,11 +118,11 @@ export default function ResetPasswordForm({
               className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               placeholder="••••••••"
             />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-wide text-white/60">Confirm password</span>
-            <input
-              type="password"
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="confirm-password" className="block text-xs uppercase tracking-wide text-white/60">Confirm password</label>
+            <PasswordInput
+              id="confirm-password"
               required
               autoComplete="new-password"
               value={confirmPassword}
@@ -129,7 +130,7 @@ export default function ResetPasswordForm({
               className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               placeholder="••••••••"
             />
-          </label>
+          </div>
 
           <button
             type="submit"
@@ -142,6 +143,7 @@ export default function ResetPasswordForm({
 
         {message && (
           <p
+            role={status === "error" ? "alert" : "status"}
             className={`text-sm ${
               status === "error" ? "text-red-300" : "text-emerald-300"
             }`}

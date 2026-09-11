@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { authEmailRedirectTo } from "@/lib/app-url";
+import { authEmailRedirectTo, sanitizeNextPath } from "@/lib/app-url";
 import { signedInLoginRedirectPath } from "@/lib/session-presence";
 import { buildPasswordAuthCredentials } from "@/lib/password-auth-credentials";
 import { buildMagicLinkAuthOptions } from "@/lib/magic-link-auth-options";
@@ -46,7 +47,7 @@ export function LoginForm({
   const searchParams = useSearchParams();
   // Only allow same-origin relative paths ("//host" is protocol-relative).
   const rawNext = searchParams.get("next") ?? "/";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const next = sanitizeNextPath(rawNext);
   const signupHref =
     next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`;
 
@@ -323,9 +324,6 @@ export function LoginForm({
             Welcome back
           </h1>
           <p className="text-sm text-white/70">Sign in with your email and password.</p>
-          <p className="text-xs text-white/45">
-            Google &amp; Apple sign-in coming soon — use email for now.
-          </p>
         </div>
 
         <form onSubmit={handlePassword} className="space-y-4">
@@ -341,10 +339,10 @@ export function LoginForm({
               placeholder="you@email.com"
             />
           </label>
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-wide text-white/60">Password</span>
-            <input
-              type="password"
+          <div className="space-y-1">
+            <label htmlFor="password" className="block text-xs uppercase tracking-wide text-white/60">Password</label>
+            <PasswordInput
+              id="password"
               required
               autoComplete="current-password"
               value={password}
@@ -352,7 +350,7 @@ export function LoginForm({
               className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-white/40 focus:outline-none"
               placeholder="••••••••"
             />
-          </label>
+          </div>
 
           {forgotPasswordEnabled && (
             <div className="flex justify-end">
@@ -360,6 +358,14 @@ export function LoginForm({
                 Forgot password?
               </Link>
             </div>
+          )}
+          {!forgotPasswordEnabled && (
+            <details className="text-sm text-white/75">
+              <summary className="cursor-pointer py-2 hover:text-white">Need help signing in?</summary>
+              <p className="mt-2">Check your email address and password. If you cannot access your account, contact support for help.</p>
+              <a href="mailto:support@fanengage.app" className="mt-2 inline-block py-2 text-white underline underline-offset-4">Contact support</a>
+              <p className="mt-1 text-xs text-white/60">Never send your password or verification codes.</p>
+            </details>
           )}
 
           {turnstileConfigured && (
@@ -372,6 +378,7 @@ export function LoginForm({
                 onStall={handleTurnstileStall}
                 onExpire={handleTurnstileExpire}
                 onLoadStateChange={handleTurnstileLoadState}
+                onRetry={resetChallenge}
                 theme="dark"
               />
               {showParentChallengeError && (
@@ -435,6 +442,7 @@ export function LoginForm({
         )}
         {message && (
           <p
+            role={status === "error" ? "alert" : "status"}
             className={`text-sm ${
               status === "error" ? "text-red-300" : "text-emerald-300"
             }`}
