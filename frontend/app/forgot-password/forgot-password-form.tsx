@@ -4,12 +4,11 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo } from "@/lib/app-url";
+import { buildPasswordRecoveryOptions } from "@/lib/password-recovery-options";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
   prefetchTurnstileScript,
-  turnstileFailureMessage,
-  verifyTurnstileToken,
   type TurnstileLoadState,
 } from "@/components/turnstile-widget";
 import { scrollToTurnstileChallenge, shouldShowParentChallengeError } from "@/lib/turnstile-ux";
@@ -29,10 +28,14 @@ export default function ForgotPasswordForm() {
     setTurnstileToken(token);
     setTurnstileError(false);
   }, []);
-  const handleTurnstileError = useCallback(() => setTurnstileError(true), []);
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileError(true);
+    setTurnstileToken(null);
+  }, []);
   const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
   const handleTurnstileLoadState = useCallback((state: TurnstileLoadState) => {
     setTurnstileLoadState(state);
+    if (state === "error" || state === "loading") setTurnstileToken(null);
     if (state === "loading" || state === "ready") {
       setTurnstileError(false);
     }
@@ -76,13 +79,13 @@ export default function ForgotPasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || status === "loading") return;
     if (!email) {
       setStatus("error");
       setMessage("Enter your email first.");
       return;
     }
-    if (turnstileConfigured && !turnstileToken) {
+    if (turnstileConfigured && (!turnstileToken || turnstileError || turnstileLoadState !== "ready")) {
       setStatus("error");
       setMessage(
         turnstileLoadState === "loading"
@@ -97,20 +100,13 @@ export default function ForgotPasswordForm() {
     setStatus("loading");
     setMessage("");
 
-    const captcha = await verifyTurnstileToken(turnstileToken);
-    resetChallenge();
-    if (!captcha.success) {
-      setStatus("error");
-      setMessage(turnstileFailureMessage(captcha.error));
-      requestAnimationFrame(() => scrollToTurnstileChallenge());
-      return;
-    }
-
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), buildPasswordRecoveryOptions({
         redirectTo: authEmailRedirectTo("/reset-password"),
-      });
+        turnstileConfigured,
+        turnstileToken,
+      }));
       if (error) throw error;
       setStatus("sent");
       setMessage(
@@ -120,6 +116,9 @@ export default function ForgotPasswordForm() {
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send reset link.");
+    } finally {
+      // Supabase consumes the single-use token; every retry needs a fresh one.
+      resetChallenge();
     }
   }
 
@@ -157,6 +156,8 @@ export default function ForgotPasswordForm() {
                 key={turnstileKey}
                 onSuccess={handleTurnstileSuccess}
                 onError={handleTurnstileError}
+                onStall={handleTurnstileError}
+                onRetry={resetChallenge}
                 onExpire={handleTurnstileExpire}
                 onLoadStateChange={handleTurnstileLoadState}
                 theme="dark"
@@ -193,6 +194,7 @@ export default function ForgotPasswordForm() {
 
         {message && (
           <p
+            role={status === "error" ? "alert" : "status"}
             className={`text-sm ${
               status === "error" ? "text-red-300" : "text-emerald-300"
             }`}

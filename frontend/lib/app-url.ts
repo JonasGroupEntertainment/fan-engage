@@ -1,3 +1,5 @@
+import { safeAppPath } from "./safe-app-path.ts";
+
 /**
  * Canonical public origin for auth redirects and emails.
  *
@@ -100,8 +102,7 @@ export function resolveAppUrl(
 }
 
 export function sanitizeNextPath(raw: string | null | undefined): string {
-  if (!raw) return "/";
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  return safeAppPath(raw) ?? "/";
 }
 
 export function authEmailRedirectTo(
