@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   SIGNUP_CREATE_FAILED_MESSAGE,
   SIGNUP_EMAIL_IN_USE_MESSAGE,
+  SIGNUP_EXISTING_ACCOUNT_MESSAGE,
   SIGNUP_NOT_CREATED_MESSAGE,
   didSignupCreateUser,
   interpretSignupCreate,
@@ -103,8 +104,9 @@ describe("interpretSignupCreate", () => {
       signInSession: null,
     });
     assert.equal(result.action, "stay-error");
-    assert.equal(result.message, SIGNUP_NOT_CREATED_MESSAGE);
+    assert.equal(result.message, SIGNUP_EXISTING_ACCOUNT_MESSAGE);
     assert.doesNotMatch(result.message, /password you just created/i);
+    assert.doesNotMatch(result.message, /security check/i);
   });
 
   it("stays on signup when create looked ok but password sign-in failed", () => {
