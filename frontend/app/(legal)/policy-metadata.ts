@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import {
-  getPolicy,
-  policyDocumentTitle,
-  policyRobots,
-  type PolicyPage,
-} from "@/lib/data/policies";
+import { getPolicy, type PolicyPage } from "@/lib/data/policies";
+import { policyDocumentTitle, policyRobots } from "@/lib/data/policy-seo";
 
 /**
  * Draft or missing policies stay noindex. Published policies (`is_draft`

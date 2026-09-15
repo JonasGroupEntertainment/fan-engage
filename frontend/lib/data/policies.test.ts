@@ -5,21 +5,19 @@ import { fileURLToPath } from "node:url";
 import {
   policyDocumentTitle,
   policyRobots,
-  type PolicyPage,
-} from "./policies.ts";
+  type PolicySeoRecord,
+} from "./policy-seo.ts";
 
 function readRepo(relFromHere: string): string {
   return readFileSync(fileURLToPath(new URL(relFromHere, import.meta.url)), "utf8");
 }
 
-function publishedPolicy(overrides: Partial<PolicyPage> = {}): PolicyPage {
+function publishedPolicy(
+  overrides: Partial<NonNullable<PolicySeoRecord>> = {},
+): NonNullable<PolicySeoRecord> {
   return {
-    slug: "cookie_policy",
     title: "Cookie Policy",
-    content_md: "# Cookies",
-    effective_date: "2026-09-18",
     is_draft: false,
-    updated_at: "2026-09-18T00:00:00.000Z",
     ...overrides,
   };
 }
