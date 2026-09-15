@@ -17,6 +17,25 @@ export interface PolicyPage {
   updated_at: string;
 }
 
+/** Missing and draft policies stay noindex; published policies may be indexed. */
+export function policyRobots(policy: PolicyPage | null): {
+  index: boolean;
+  follow: boolean;
+} {
+  if (!policy || policy.is_draft) {
+    return { index: false, follow: false };
+  }
+  return { index: true, follow: true };
+}
+
+export function policyDocumentTitle(
+  policy: PolicyPage | null,
+  fallbackTitle: string,
+): string {
+  const title = policy?.title?.trim();
+  return title || fallbackTitle;
+}
+
 export async function getPolicy(slug: string): Promise<PolicyPage | null> {
   try {
     const supabase = await createClient();
