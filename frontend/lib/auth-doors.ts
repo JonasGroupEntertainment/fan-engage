@@ -2,10 +2,11 @@
  * Auth doors that are not yet proven in production.
  *
  * Password signup + password sign-in stay. Magic-link / email-OTP and
- * forgot-password email recovery are PKCE and were proven broken on
- * 2026-08-26 (same-browser verify → "PKCE code verifier not found in
- * storage"). Hide those CTAs in production until an explicit enable
- * flag is set after PKCE actually works.
+ * forgot-password email recovery historically failed on 2026-08-26
+ * (same-browser verify → "PKCE code verifier not found in storage").
+ * Hide those CTAs in production until an explicit enable flag is set
+ * after recovery is proven on preview. `/auth/callback` now falls back
+ * to a browser PKCE exchange and accepts token_hash links.
  */
 
 export type AuthDoorsEnv = {
@@ -44,7 +45,8 @@ export function isForgotPasswordEnabled(
   const explicit = env.NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED?.trim().toLowerCase();
   if (explicit === "true" || explicit === "1") return true;
   if (explicit === "false" || explicit === "0") return false;
-  // HOLD: recovery email is PKCE. Do not leave a public /forgot-password
-  // form on production or preview unless the flag is explicitly on.
-  return false;
+  // Production HOLD until NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=true after
+  // recovery is proven. Preview/dev keep the form so the PKCE/token_hash
+  // callback can be verified before flipping production.
+  return vercelEnvOf(env) !== "production";
 }

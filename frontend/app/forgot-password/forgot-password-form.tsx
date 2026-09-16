@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo } from "@/lib/app-url";
 import { buildPasswordRecoveryOptions } from "@/lib/password-recovery-options";
@@ -14,10 +15,14 @@ import {
 import { scrollToTurnstileChallenge, shouldShowParentChallengeError } from "@/lib/turnstile-ux";
 
 export default function ForgotPasswordForm() {
+  const searchParams = useSearchParams();
+  const callbackError = searchParams.get("error");
   const turnstileConfigured = isTurnstileConfigured();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "sent">("idle");
-  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "error" | "sent">(
+    callbackError ? "error" : "idle",
+  );
+  const [message, setMessage] = useState(callbackError ?? "");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileLoadState, setTurnstileLoadState] =

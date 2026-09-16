@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PasswordInput } from "@/components/password-input";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { isAuthEmailOtpType } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordForm({
@@ -12,6 +13,7 @@ export default function ResetPasswordForm({
   forgotPasswordEnabled: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [sessionState, setSessionState] = useState<"checking" | "ready" | "missing">(
@@ -21,11 +23,42 @@ export default function ResetPasswordForm({
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSessionState(session ? "ready" : "missing");
-    });
-  }, []);
+    const code = searchParams.get("code");
+    const tokenHash = searchParams.get("token_hash");
+    const type = searchParams.get("type");
+
+    async function boot() {
+      try {
+        if (tokenHash && isAuthEmailOtpType(type)) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type,
+          });
+          if (error) throw error;
+        } else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+        }
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session && (code || tokenHash)) {
+          window.history.replaceState(null, "", "/reset-password");
+        }
+        setSessionState(session ? "ready" : "missing");
+      } catch {
+        if (!cancelled) setSessionState("missing");
+      }
+    }
+
+    boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
