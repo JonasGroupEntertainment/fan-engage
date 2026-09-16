@@ -13,10 +13,8 @@ describe("sticky-flow: forgot-password HOLD", () => {
     assert.match(page, /if\s*\(\s*!isForgotPasswordEnabled\(\)\s*\)\s*notFound\(\)/);
     assert.doesNotMatch(page, /"use client"/);
     const doors = readRepo("./auth-doors.ts");
-    assert.match(
-      doors,
-      /HOLD: recovery email is PKCE[\s\S]*return false;/,
-    );
+    assert.match(doors, /Production HOLD until NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=true/);
+    assert.match(doors, /return vercelEnvOf\(env\) !== "production";/);
   });
 
   it("does not add a /magic-link page", () => {
