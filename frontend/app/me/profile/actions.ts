@@ -19,6 +19,17 @@ export async function updateProfileAction(formData: FormData) {
   const instagramOrTiktok = (formData.get("instagramOrTiktok") as string | null)?.trim() || null;
   const avatarUrl = (formData.get("avatarUrl") as string | null)?.trim() || null;
 
+  // Merge into the existing socials object so other keys are preserved.
+  const { data: existing } = await supabase
+    .from("fans")
+    .select("socials")
+    .eq("id", user.id)
+    .maybeSingle();
+  const socials = {
+    ...((existing?.socials as Record<string, unknown> | null) ?? {}),
+    instagram_or_tiktok: instagramOrTiktok,
+  };
+
   const { error } = await supabase
     .from("fans")
     .update({
@@ -28,7 +39,7 @@ export async function updateProfileAction(formData: FormData) {
       phone,
       interest,
       music_outlet: musicOutlet,
-      socials: { instagram_or_tiktok: instagramOrTiktok },
+      socials,
       avatar_url: avatarUrl,
     })
     .eq("id", user.id);

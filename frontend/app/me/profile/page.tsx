@@ -80,7 +80,7 @@ export default async function EditProfilePage() {
             className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
           />
           <span className="mt-1 block text-xs text-white/50">
-            Recommended — unlocks SMS perks for artist drops, events, and rewards.
+            Recommended. Unlocks SMS perks for artist drops, events, and rewards.
           </span>
         </label>
 
