@@ -1,6 +1,7 @@
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 import MarketplaceComingSoon from "@/components/marketplace-coming-soon";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getActiveOffers } from "@/lib/data/offers";
 import { getCurrentFan, getPrimaryCommunityId } from "@/lib/data/fan";
 import type { Offer, OfferCategory } from "@/lib/data/types";
@@ -8,7 +9,13 @@ import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-e
 import PreviewSignupBanner from "@/components/preview-signup-banner";
 import { listRewardsForCommunity } from "@/lib/data/rewards";
 import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
-import { PREMIUM_CTA, getViewerPremiumAnywhere } from "@/lib/entitlements";
+import {
+  PREMIUM_CTA,
+  getViewerPremiumAnywhere,
+  merchAccess,
+  merchGuestSignupHref,
+} from "@/lib/entitlements";
+import { PremiumLockNote } from "@/components/premium-cta";
 
 export const dynamic = "force-dynamic";
 
@@ -60,49 +67,39 @@ interface PageProps {
 }
 
 export default async function MarketplacePage({ searchParams }: PageProps) {
-  // Physical merch stays Coming soon. Signed-in fans can still redeem
+  const fan = await getCurrentFan();
+  const isPremiumFan = fan ? await getViewerPremiumAnywhere() : false;
+  const access = merchAccess({
+    signedIn: fan !== null,
+    isPremium: isPremiumFan,
+  });
+
+  // Guests never see merch — send them to signup/login, not the shop.
+  if (access.reason === "signed-out") {
+    redirect(access.navHref);
+  }
+
+  // Signed-in Free: Premium CTA, not merch, and not another signup prompt.
+  if (!access.allowed) {
+    return (
+      <div className="min-h-screen bg-midnight">
+        <main className="mx-auto max-w-3xl space-y-6 px-6 py-12">
+          <p className="text-sm uppercase tracking-wide text-white/60">Merch</p>
+          <PremiumLockNote />
+        </main>
+      </div>
+    );
+  }
+
+  // Physical merch stays Coming soon. Premium fans can still redeem
   // digital launch SKUs — that is the only live marketplace surface.
   if (!isMarketplaceLive()) {
-    const fan = await getCurrentFan();
-    const digital = fan
-      ? await listRewardsForCommunity(LAUNCH_COMMUNITY_ID)
-      : [];
-    const guestDigitalTeasers = [
-      { title: "Phone Wallpaper", pts: "250 pts" },
-      { title: "Lyric Wallpaper", pts: "500 pts" },
-    ];
-    const redeemHref = `/artists/${LAUNCH_COMMUNITY_ID}/rewards`;
-    const guestRedeemHref = `/signup?ref=raelynn&next=${encodeURIComponent(redeemHref)}`;
+    const digital = await listRewardsForCommunity(LAUNCH_COMMUNITY_ID);
     return (
       <div className="min-h-screen bg-midnight">
         <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
-          <MarketplaceComingSoon artistName="RaeLynn" signedIn={fan !== null} />
-          {!fan && (
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold">Digital unlocks</h2>
-              <p className="text-sm text-white/60">
-                Same in-app rewards the homepage lists. Join to redeem —
-                physical merch stays Coming soon.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {guestDigitalTeasers.map((r) => (
-                  <Link
-                    key={r.title}
-                    href={guestRedeemHref}
-                    className="rounded-2xl border border-white/10 bg-black/30 p-5 hover:border-white/25"
-                  >
-                    <p className="text-xs uppercase tracking-wide text-white/50">
-                      Digital
-                    </p>
-                    <p className="mt-1 font-semibold">{r.title}</p>
-                    <p className="mt-3 text-emerald-300">{r.pts}</p>
-                    <p className="mt-3 text-xs text-white/60">Join to redeem →</p>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-          {fan && digital.length > 0 && (
+          <MarketplaceComingSoon artistName="RaeLynn" signedIn />
+          {digital.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-lg font-semibold">Digital unlocks</h2>
               <p className="text-sm text-white/60">
@@ -136,11 +133,9 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
     ? (rawTab as Tab)
     : "Featured";
 
-  const [dbOffers, fan, primaryCommunityId, isPremiumFan] = await Promise.all([
+  const [dbOffers, primaryCommunityId] = await Promise.all([
     getActiveOffers(),
-    getCurrentFan(),
     getPrimaryCommunityId(),
-    getViewerPremiumAnywhere(),
   ]);
   const isSignedIn = fan !== null;
   const redeemHref = primaryCommunityId
@@ -231,7 +226,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                   ? PREMIUM_CTA.href
                   : isSignedIn
                     ? redeemHref
-                    : "/signup?next=/marketplace";
+                    : merchGuestSignupHref();
               return (
               <Link
                 key={p.slug}

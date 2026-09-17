@@ -90,4 +90,19 @@ describe("v1 Premium gates on UI + APIs", () => {
     assert.match(referrals, /PREMIUM_CTA\.available/);
     assert.match(referrals, /1\.5×/);
   });
+
+  it("merch nav is labeled Merch and three-way gated", () => {
+    const layout = readRepo("../app/layout.tsx");
+    const market = readRepo("../app/marketplace/page.tsx");
+    const offers = readRepo("./data/offers.ts");
+    assert.match(layout, /label: "Merch"/);
+    assert.doesNotMatch(layout, /Merch Soon|Merch soon/);
+    assert.match(layout, /merchAccess/);
+    assert.match(market, /merchAccess/);
+    assert.match(market, /redirect\(access\.navHref\)/);
+    assert.match(market, /PremiumLockNote/);
+    assert.match(market, /PREMIUM_CTA/);
+    assert.match(offers, /category !== "merch"/);
+    assert.match(offers, /merch_drops/);
+  });
 });

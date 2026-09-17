@@ -30,16 +30,16 @@ describe("sticky-flow: forgot-password HOLD", () => {
 });
 
 describe("sticky-flow: marketplace guest digital path", () => {
-  it("guest marketplace points at digital redeem, not an empty merch-only wall", () => {
-    const soon = readRepo("../components/marketplace-coming-soon.tsx");
+  it("guest merch click goes to signup, not the merch catalog", () => {
+    const layout = readRepo("../app/layout.tsx");
     const market = readRepo("../app/marketplace/page.tsx");
+    const soon = readRepo("../components/marketplace-coming-soon.tsx");
     const rewards = readRepo("../app/rewards/page.tsx");
+    assert.match(layout, /label: "Merch"/);
+    assert.match(layout, /merchAccess/);
+    assert.match(market, /reason === "signed-out"/);
+    assert.match(market, /redirect\(access\.navHref\)/);
     assert.match(soon, /\/artists\/raelynn\/rewards/);
-    assert.match(soon, /Join to redeem digital unlocks/);
-    assert.match(soon, /merch coming soon/i);
-    assert.match(market, /guestDigitalTeasers/);
-    assert.match(market, /Phone Wallpaper/);
-    assert.match(market, /Lyric Wallpaper/);
     assert.match(rewards, /Redeem digital unlocks/);
     assert.match(rewards, /href:\s*"\/artists\/raelynn\/rewards"/);
     assert.doesNotMatch(soon, /jgos\.io/);
