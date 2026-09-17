@@ -13,6 +13,7 @@ interface PremiumCtaProps {
   className?: string;
   /** Compact chip vs a full-width button. */
   variant?: "link" | "button" | "chip";
+  onClick?: () => void;
 }
 
 const COPY: Record<CopyKey, string> = {
@@ -30,6 +31,7 @@ export default function PremiumCta({
   communityId,
   className,
   variant = "button",
+  onClick,
 }: PremiumCtaProps) {
   const href = premiumPath(communityId);
   const label = COPY[copy];
@@ -38,6 +40,7 @@ export default function PremiumCta({
     return (
       <Link
         href={href}
+        onClick={onClick}
         className={
           className ??
           "text-sm font-semibold text-white underline-offset-2 hover:underline"
@@ -52,6 +55,7 @@ export default function PremiumCta({
     return (
       <Link
         href={href}
+        onClick={onClick}
         className={
           className ??
           "inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85 hover:bg-white/10"
@@ -65,6 +69,7 @@ export default function PremiumCta({
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={
         className ??
         "inline-flex items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"

@@ -7,33 +7,46 @@ import {
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
 import PremiumCta from "@/components/premium-cta";
 import {
   PREMIUM_UPGRADE_PROMPT_COPY,
+  PREMIUM_UPGRADE_PROMPT_STORAGE_KEY,
   applyPremiumEntitlementToPromptState,
   dismissPremiumUpgradePrompt,
-  loadPremiumUpgradePromptState,
+  lockPremiumUpgradePrompt,
+  parsePremiumUpgradePromptState,
   pickFirstShowDelayMs,
   recordPremiumUpgradeNavigation,
   savePremiumUpgradePromptState,
   shouldShowPremiumUpgradePrompt,
   type PremiumUpgradePromptState,
-  EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
 } from "@/lib/premium-upgrade-prompt";
 
-function browserStorage(): Storage | null {
+function subscribe() {
+  return () => {};
+}
+
+function getSnapshot(): string | null {
   try {
-    return window.localStorage;
+    return window.localStorage.getItem(PREMIUM_UPGRADE_PROMPT_STORAGE_KEY);
   } catch {
     return null;
   }
 }
 
+function getServerSnapshot(): string | null {
+  return null;
+}
+
 function persist(state: PremiumUpgradePromptState) {
-  const storage = browserStorage();
-  if (storage) savePremiumUpgradePromptState(storage, state);
+  try {
+    savePremiumUpgradePromptState(window.localStorage, state);
+  } catch {
+    /* private mode / quota — prompt may reappear next visit */
+  }
 }
 
 export default function PremiumUpgradePrompt({
@@ -55,64 +68,76 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const previousPathRef = useRef<string | null>(null);
 
-  const [ready, setReady] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [state, setState] = useState<PremiumUpgradePromptState>(
-    EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+  const persistedRaw = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  const [session, setSession] = useState<PremiumUpgradePromptState | null>(
+    null,
+  );
+  const [delayElapsed, setDelayElapsed] = useState(false);
+
+  const persisted = parsePremiumUpgradePromptState(persistedRaw);
+  const state = applyPremiumEntitlementToPromptState(
+    session ?? persisted,
+    isPremium,
   );
 
+  const eligible = shouldShowPremiumUpgradePrompt({
+    isPremium,
+    state,
+    pathname,
+  });
+  const open = eligible && delayElapsed;
+
   useEffect(() => {
-    const storage = browserStorage();
-    const loaded = storage
-      ? loadPremiumUpgradePromptState(storage)
-      : { ...EMPTY_PREMIUM_UPGRADE_PROMPT_STATE };
-    const next = applyPremiumEntitlementToPromptState(loaded, isPremium);
-    setState(next);
-    if (next !== loaded) persist(next);
-    setReady(true);
-    if (isPremium) setOpen(false);
+    if (!isPremium) return;
+    const id = window.setTimeout(() => {
+      const locked = lockPremiumUpgradePrompt();
+      persist(locked);
+      setSession(locked);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [isPremium]);
 
   useEffect(() => {
-    if (!ready) return;
-    if (previousPathRef.current === null) {
-      previousPathRef.current = pathname;
-      return;
-    }
-    const previous = previousPathRef.current;
-    previousPathRef.current = pathname;
-    setState((current) => {
-      const next = recordPremiumUpgradeNavigation(current, previous, pathname);
-      if (next !== current) persist(next);
-      return next;
-    });
-  }, [pathname, ready]);
-
-  const eligible =
-    ready &&
-    shouldShowPremiumUpgradePrompt({
-      isPremium,
-      state,
-      pathname,
-    });
+    const id = window.setTimeout(() => {
+      setSession((current) => {
+        const previous = previousPathRef.current;
+        if (previous === null) {
+          previousPathRef.current = pathname;
+          return current;
+        }
+        if (previous === pathname) return current;
+        previousPathRef.current = pathname;
+        const base = current ?? parsePremiumUpgradePromptState(getSnapshot());
+        const next = recordPremiumUpgradeNavigation(base, previous, pathname);
+        if (next !== base) persist(next);
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [pathname]);
 
   useEffect(() => {
     if (!eligible) {
-      setOpen(false);
-      return;
+      const id = window.setTimeout(() => setDelayElapsed(false), 0);
+      return () => window.clearTimeout(id);
     }
     const delay = pickFirstShowDelayMs();
-    const id = window.setTimeout(() => setOpen(true), delay);
+    const id = window.setTimeout(() => setDelayElapsed(true), delay);
     return () => window.clearTimeout(id);
   }, [eligible]);
 
   const dismiss = useCallback(() => {
-    setState((current) => {
-      const next = dismissPremiumUpgradePrompt(current);
+    setSession((current) => {
+      const next = dismissPremiumUpgradePrompt(
+        current ?? parsePremiumUpgradePromptState(getSnapshot()),
+      );
       persist(next);
       return next;
     });
-    setOpen(false);
   }, []);
 
   useEffect(() => {
@@ -125,21 +150,23 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, dismiss]);
 
-  if (!open || !eligible) return null;
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center">
-      <div
+      <button
+        type="button"
+        tabIndex={-1}
         className="absolute inset-0 cursor-pointer bg-black/55 backdrop-blur-[2px]"
+        aria-label="Dismiss upgrade prompt"
         onClick={dismiss}
-        aria-hidden
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-slate-950/95 p-6 shadow-glass"
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-slate-950/95 p-6 shadow-glass"
       >
         <div
           aria-hidden
@@ -177,9 +204,7 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
           >
             {PREMIUM_UPGRADE_PROMPT_COPY.dismiss}
           </button>
-          <span onClickCapture={dismiss}>
-            <PremiumCta copy="upgrade" />
-          </span>
+          <PremiumCta copy="upgrade" onClick={dismiss} />
         </div>
       </div>
     </div>

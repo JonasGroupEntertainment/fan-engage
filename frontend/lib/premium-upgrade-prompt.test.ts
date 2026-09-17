@@ -201,7 +201,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
 describe("premium upgrade prompt: delay + namespaced storage", () => {
   it("picks a first-show delay between 3 and 5 seconds", () => {
     assert.equal(pickFirstShowDelayMs(() => 0), FIRST_SHOW_DELAY_MS_MIN);
-    assert.equal(pickFirstShowDelayMs(() => 0.999), FIRST_SHOW_DELAY_MS_MAX);
+    assert.equal(pickFirstShowDelayMs(() => 0.999999), FIRST_SHOW_DELAY_MS_MAX);
     for (let i = 0; i < 20; i += 1) {
       const delay = pickFirstShowDelayMs();
       assert.ok(delay >= FIRST_SHOW_DELAY_MS_MIN);
