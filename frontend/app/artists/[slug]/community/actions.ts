@@ -12,6 +12,11 @@ import { notifyNewPost } from "@/lib/notifications/triggers/new-post";
 import { notifyCommentOnMyPost } from "@/lib/notifications/triggers/comment-on-my-post";
 
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
+import {
+  premiumPath,
+  requirePremiumFeature,
+  type PremiumV1Feature,
+} from "@/lib/entitlements";
 type Visibility = "public" | "premium" | "founder-only";
 
 async function requireUser() {
@@ -21,6 +26,19 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   return { supabase, userId: user.id };
+}
+
+async function requirePremiumCommunityWrite(
+  userId: string,
+  communityId: string,
+  feature: PremiumV1Feature,
+) {
+  const adminUser = await getAdminUser();
+  if (adminUser) return;
+  const gate = await requirePremiumFeature(userId, communityId, feature);
+  if (!gate.allowed) {
+    redirect(premiumPath(communityId));
+  }
 }
 
 function normalizeVisibility(raw: FormDataEntryValue | null): Visibility {
@@ -57,6 +75,7 @@ export async function createPostAction(formData: FormData) {
   if (body.length > 2000) return;
 
   const { supabase, userId } = await requireUser();
+  await requirePremiumCommunityWrite(userId, artistSlug, "community_post");
   const imageUrl = normalizeUrl(imageUrlRaw);
   const videoUrl = normalizeUrl(videoUrlRaw);
   const videoPosterUrl = normalizeUrl(videoPosterUrlRaw);
@@ -115,6 +134,7 @@ export async function toggleReactionAction(formData: FormData) {
   if (!postId || !emoji || !artistSlug) return;
 
   const { supabase, userId } = await requireUser();
+  await requirePremiumCommunityWrite(userId, artistSlug, "community_react");
 
   // If the fan already reacted with this emoji, remove it (toggle off).
   // Otherwise insert.
@@ -152,6 +172,7 @@ export async function addCommentAction(formData: FormData) {
   if (body.length > 1000) return;
 
   const { supabase, userId } = await requireUser();
+  await requirePremiumCommunityWrite(userId, artistSlug, "community_reply");
 
   // Phase 3 #3: track AI-drafted comments for A/B analysis. Form sets
   // draft_used="1" when user picked from the drafter chips before
@@ -259,6 +280,7 @@ export async function votePollAction(formData: FormData) {
   if (!postId || !optionId || !artistSlug) return;
 
   const { supabase, userId } = await requireUser();
+  await requirePremiumCommunityWrite(userId, artistSlug, "community_react");
 
   // If fan already voted, replace their vote (delete + insert).
   await supabase
@@ -317,6 +339,7 @@ export async function submitEntryAction(formData: FormData) {
   if (!postId || !artistSlug || (!body && !imageUrlRaw)) return;
 
   const { supabase, userId } = await requireUser();
+  await requirePremiumCommunityWrite(userId, artistSlug, "community_post");
   const imageUrl = normalizeUrl(imageUrlRaw);
 
   await supabase.from("community_challenge_entries").insert({

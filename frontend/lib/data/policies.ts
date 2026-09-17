@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applyTermsColoradoEntityFacts } from "@/lib/legal/correct-terms-entity-facts";
 
 export type PolicySlug =
   | "terms"
@@ -26,7 +27,7 @@ export async function getPolicy(slug: string): Promise<PolicyPage | null> {
       .eq("slug", slug)
       .maybeSingle();
     if (error || !data) return null;
-    return data as PolicyPage;
+    return applyPublishedPolicyFacts(data as PolicyPage);
   } catch {
     return null;
   }
@@ -38,5 +39,12 @@ export async function listPolicies(): Promise<PolicyPage[]> {
     .from("policy_pages")
     .select("slug, title, content_md, effective_date, is_draft, updated_at")
     .order("slug");
-  return (data ?? []) as PolicyPage[];
+  return ((data ?? []) as PolicyPage[]).map(applyPublishedPolicyFacts);
+}
+
+function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
+  return {
+    ...policy,
+    content_md: applyTermsColoradoEntityFacts(policy.slug, policy.content_md),
+  };
 }

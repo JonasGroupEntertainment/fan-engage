@@ -19,6 +19,7 @@ import { gatherWeeklyRecap } from "@/lib/personal-recap/gather";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { first72hFromFanState } from "@/lib/first-72h";
 import FirstSessionChecklist from "@/components/first-session-checklist";
+import { sanitizeNextPath } from "@/lib/app-url";
 // ─── Signed-in dashboard content ──────────────────────────────────────────
 // Signed-out visitors render <SignedOutLanding/> earlier and never see any
 // of this.
@@ -47,23 +48,28 @@ function formatPts(n: number | null | undefined) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string; next?: string }>;
+  searchParams: Promise<{
+    code?: string;
+    next?: string;
+    token_hash?: string;
+    type?: string;
+  }>;
 }) {
   // Supabase's default email templates point the confirmation link at
   // `{SITE_URL}?code=...` — i.e., the root — instead of `/auth/callback`.
-  // Forward any code to the real callback route so sessions actually complete.
-  // Preserve an explicit ?next= when present; otherwise default to "/" so
-  // returning fans aren't forced through onboarding.
+  // Token-hash templates can land here the same way. Forward both to the
+  // real callback so sessions actually complete. Preserve an explicit
+  // ?next= when present; otherwise default to "/" so returning fans aren't
+  // forced through onboarding.
   const params = await searchParams;
-  if (params.code) {
-    const rawNext = params.next;
-    const next =
-      rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
-        ? rawNext
-        : "/";
-    redirect(
-      `/auth/callback?code=${encodeURIComponent(params.code)}&next=${encodeURIComponent(next)}`,
-    );
+  if (params.code || params.token_hash) {
+    const next = sanitizeNextPath(params.next);
+    const forwarded = new URLSearchParams();
+    if (params.code) forwarded.set("code", params.code);
+    if (params.token_hash) forwarded.set("token_hash", params.token_hash);
+    if (params.type) forwarded.set("type", params.type);
+    forwarded.set("next", next);
+    redirect(`/auth/callback?${forwarded.toString()}`);
   }
 
   // First pass: just fetch the fan. If signed-out, render the marketing

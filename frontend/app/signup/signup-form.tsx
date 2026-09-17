@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { signupOnboardingHref } from "@/lib/signup-destination";
+import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo } from "@/lib/app-url";
@@ -69,18 +71,9 @@ export function SignupForm({
   // preview banners when a session expires mid-flow). Only relative paths —
   // anything else would be an open redirect.
   const rawNext = searchParams.get("next");
-  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
-  // Always complete onboarding (signup bonus + profile). Carry ?next= as a
-  // post-Finish return path — never skip the wizard.
-  const onboardingParams = new URLSearchParams();
-  if (ref) onboardingParams.set("ref", ref);
-  if (next && !next.startsWith("/onboarding")) {
-    onboardingParams.set("next", next);
-  }
-  const onboardingQs = onboardingParams.toString();
-  const onboardingHref = onboardingQs ? `/onboarding?${onboardingQs}` : "/onboarding";
+  const onboardingHref = signupOnboardingHref(rawNext, ref);
   const fromOnboardingBounce =
-    next === "/onboarding" || (rawNext?.startsWith("/onboarding") ?? false);
+    rawNext === "/onboarding" || (rawNext?.startsWith("/onboarding") ?? false);
   const loginHref =
     onboardingHref === "/onboarding"
       ? "/login"
@@ -380,10 +373,6 @@ export function SignupForm({
             (e.g. auth.fanengage.com) and the Google OAuth client's
             redirect URIs point at the new domain. The original block
             in git history at the commit before this one. */}
-        <p className="text-xs text-white/50">
-          Google &amp; Apple sign-in coming soon — create your fan account with
-          email for now.
-        </p>
 
         {fromOnboardingBounce && (
           <div className="rounded-2xl border border-aurora/30 bg-aurora/10 px-4 py-3 text-sm text-white/85">
@@ -422,10 +411,10 @@ export function SignupForm({
               <span className="text-xs text-rose-300">{emailError}</span>
             )}
           </label>
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-wide text-white/60">Password</span>
-            <input
-              type="password"
+          <div className="space-y-1">
+            <label htmlFor="password" className="block text-xs uppercase tracking-wide text-white/60">Password</label>
+            <PasswordInput
+              id="password"
               required
               minLength={8}
               autoComplete="new-password"
@@ -472,7 +461,7 @@ export function SignupForm({
                 </div>
               );
             })()}
-          </label>
+          </div>
 
           {turnstileConfigured && (
             <div className="space-y-2">
@@ -608,6 +597,7 @@ export function SignupForm({
         )}
         {message && status !== "need-signin" && (
           <p
+            role={status === "error" ? "alert" : "status"}
             className={`text-sm ${
               status === "error" ? "text-red-300" : "text-emerald-300"
             }`}

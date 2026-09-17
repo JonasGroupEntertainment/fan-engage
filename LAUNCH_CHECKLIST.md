@@ -99,6 +99,7 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | `STRIPE_SEED_SECRET` | Bearer token for `/api/admin/stripe-seed` bootstrap endpoint | ✅ set |
 | `STRIPE_WEBHOOK_SECRET` | Verifies signatures on `/api/stripe/webhook` — copy from Stripe dashboard → Developers → Webhooks → endpoint → Signing secret | ✅ set |
 | **`NEXT_PUBLIC_APP_URL`** | Public origin baked into auth `emailRedirectTo`. Production must be `https://www.fanengagepro.com`. Do not set to `VERCEL_URL` or `fan-engage-pearl.vercel.app`. | **⏳ set to www + redeploy** |
+| **`NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED`** | Unhides `/forgot-password`, `/reset-password`, and the login “Forgot password?” link in Production. Preview/dev show the form without this. See `docs/password-recovery.md`. | **⏳ set `true` in Production after merge + Supabase www allowlist** |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (widget). Used on **signup**, **magic-link**, and **forgot-password** only — **password sign-in has no Turnstile**. | ⏳ set before soft-launch if bot protection desired |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret for `/api/turnstile/verify`. When unset, verify allows through (dev). | ⏳ set with site key |
 | `TURNSTILE_FAIL_OPEN` | Optional. Default fail-open on Cloudflare upstream/network outages so auth isn't hard-blocked. Set `0`/`false`/`off` to fail-closed on outages. Missing tokens + real challenge failures still fail-closed when keys are set. | optional (default: fail-open) |

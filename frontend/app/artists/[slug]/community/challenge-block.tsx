@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
 import type { ChallengeEntry } from "@/lib/data/types";
 import { submitEntryAction } from "./actions";
+import PremiumCta from "@/components/premium-cta";
 
 function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
@@ -24,11 +25,13 @@ export default function ChallengeBlock({
   artistSlug,
   entries,
   currentUserId,
+  canEnter = false,
 }: {
   postId: string;
   artistSlug: string;
   entries: ChallengeEntry[];
   currentUserId: string | null;
+  canEnter?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -58,13 +61,16 @@ export default function ChallengeBlock({
           🏆 Challenge · {entries.length}{" "}
           {entries.length === 1 ? "entry" : "entries"}
         </p>
-        {currentUserId && !alreadyEntered && (
+        {currentUserId && canEnter && !alreadyEntered && (
           <button
             onClick={() => setOpen((v) => !v)}
             className="rounded-full bg-gradient-to-r from-aurora to-ember px-3 py-1 text-xs font-semibold text-white"
           >
             {open ? "Cancel" : "Submit entry · +3 pts"}
           </button>
+        )}
+        {currentUserId && !canEnter && !alreadyEntered && (
+          <PremiumCta copy="upgrade" communityId={artistSlug} variant="chip" />
         )}
         {currentUserId && alreadyEntered && (
           <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-200">
@@ -73,7 +79,7 @@ export default function ChallengeBlock({
         )}
       </div>
 
-      {open && currentUserId && !alreadyEntered && (
+      {open && currentUserId && canEnter && !alreadyEntered && (
         <form
           ref={formRef}
           action={handleSubmit}

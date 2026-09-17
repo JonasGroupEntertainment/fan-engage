@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { draftComment } from "@/lib/drafts";
 import { apiRateLimiter } from "@/lib/rate-limit";
+import { PREMIUM_CTA, requirePremiumFeature } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,23 @@ export async function POST(request: Request) {
   const postId = (body?.postId ?? "").trim();
   if (!postId) {
     return NextResponse.json({ error: "Missing postId." }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: post } = await admin
+    .from("community_posts")
+    .select("artist_slug")
+    .eq("id", postId)
+    .maybeSingle();
+  const communityId = (post?.artist_slug as string | null) ?? "";
+  if (communityId) {
+    const gate = await requirePremiumFeature(user.id, communityId, "community_reply");
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: PREMIUM_CTA.unlock, upgrade: PREMIUM_CTA.href },
+        { status: 403 },
+      );
+    }
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {

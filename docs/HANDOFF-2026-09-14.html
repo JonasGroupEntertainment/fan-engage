@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fan Engage Pro Handoff</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#faf7f2;--paper-2:#f1ece3;--ink:#241f18;--ink-2:#5c544a;--ink-3:#8a8073;--accent:#8a6132;--accent-deep:#6e4c25;--line:#ddd5c8;--code-bg:#efe9de;--good:#4a7040;--warn:#a05c1e;--danger:#9a3b2c;--danger-bg:#f6e6e0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}}
+:root[data-theme="dark"]{--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:15.5px;line-height:1.6;padding-block:0 4rem;padding-inline:16px}
+.page{max-width:760px;margin:0 auto}
+header.top{padding:3.2rem 0 2rem;border-bottom:1px solid var(--line);margin-bottom:2.4rem}
+.kicker{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 .9rem}
+h1{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:clamp(1.7rem,4vw,2.3rem);line-height:1.15;margin:0 0 1rem;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;font-size:.86rem;color:var(--ink-2);margin:0;padding:0;list-style:none}
+.meta b{color:var(--ink);font-weight:600}
+section{margin-bottom:2.6rem}
+.eyebrow{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:0 0 .3rem}
+h2{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:1.35rem;line-height:1.25;margin:0 0 1rem;text-wrap:balance}
+h3{font-family:Archivo,sans-serif;font-size:.95rem;font-weight:600;margin:1.4rem 0 .5rem;color:var(--ink)}
+p{margin:0 0 .9rem;max-width:66ch}
+ul,ol{margin:0 0 1rem;padding-left:1.3rem;max-width:66ch}
+li{margin-bottom:.35rem}
+a{color:var(--accent-deep);text-decoration-thickness:1px;text-underline-offset:2px}
+code{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.84em;background:var(--code-bg);padding:.1em .35em;border-radius:3px}
+pre{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.8rem;line-height:1.55;background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:.9rem 1rem;overflow-x:auto;margin:0 0 1rem}
+pre code{background:none;padding:0;font-size:inherit}
+.tablewrap{overflow-x:auto;margin:0 0 1rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:.5rem .6rem .5rem 0;border-bottom:1px solid var(--line)}
+td{padding:.6rem .6rem .6rem 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+table.items td:first-child{white-space:normal;min-width:9rem}
+.callout{border-left:3px solid var(--accent);background:var(--paper-2);padding:.9rem 1.1rem;margin:0 0 1.2rem;border-radius:0 4px 4px 0}
+.callout p:last-child{margin-bottom:0}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-bg)}
+.callout .label{display:block;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--accent-deep);margin-bottom:.35rem}
+.callout.danger .label{color:var(--danger)}
+.rulelist{list-style:none;padding:0;margin:0 0 1rem;max-width:none}
+.rulelist li{display:grid;grid-template-columns:8.5rem 1fr;gap:.8rem;padding:.55rem 0;border-bottom:1px solid var(--line);margin:0}
+.rulelist .who{font-weight:600;font-size:.86rem;color:var(--accent-deep)}
+.rulelist .what{font-size:.92rem;color:var(--ink-2)}
+@media (max-width:520px){.rulelist li{grid-template-columns:1fr;gap:.2rem}}
+.owner{display:inline-block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:.15em .55em;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.owner.kevin{border-color:var(--accent);color:var(--accent-deep)}
+.owner.wait{color:var(--warn);border-color:var(--warn)}
+.status-good{color:var(--good);font-weight:600}
+.status-warn{color:var(--warn);font-weight:600}
+footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+<p class="kicker">Jonas Group Entertainment · Operations Handoff</p>
+<h1>Fan Engage Pro: state, workflow, and open items</h1>
+<ul class="meta">
+<li><b>Date</b> 2026-09-14</li>
+<li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, RaeLynn soft launch in progress</li>
+</ul>
+</header>
+
+<section>
+<p class="eyebrow">Orientation</p>
+<h2>Where everything lives</h2>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Live site</td><td><a href="https://www.fanengagepro.com">https://www.fanengagepro.com</a> (apex and the old fan-engage-pearl address 308-redirect to www)</td></tr>
+<tr><td>GitHub</td><td>JonasGroupEntertainment/fan-engage. Pull requests #23 through #41 are merged on upstream main.</td></tr>
+<tr><td>Vercel</td><td>Team jonas-group, project fan-engage, root directory <code>frontend</code></td></tr>
+<tr><td>Supabase project</td><td>The Fan Engage database. It shares a Supabase org with Brand Engage Pro, so confirm the project before any SQL.</td></tr>
+<tr><td>Local working copy</td><td><code>~/Documents/GitHub/fan-engage</code>, checked out on branch <code>fix/signup-duplicate-email-message</code> at <code>a9a7267</code>. Local <code>main</code> is stale at <code>87c8a8e</code>.</td></tr>
+<tr><td>Migrations</td><td>90 files. Numbered series ends at 0049. Timestamp series is current; latest is <code>20260816194300_raelynn_official_x_handle.sql</code>.</td></tr>
+<tr><td>Next migration</td><td>Use a timestamp name, <code>YYYYMMDDHHMMSS_short_name.sql</code>, matching the current series.</td></tr>
+<tr><td>Docs in repo</td><td>COLLABORATING.md, LAUNCH_CHECKLIST.md, docs/CONTEXT_HANDOFF.md (2026-06-15, stale URL), docs/LAUNCH_PLAN.md, docs/RAELYNN_PRELAUNCH_CHECKLIST.md, docs/AI_INFRASTRUCTURE.md, docs/ARTIST_AGREEMENT_RIGHTS.md</td></tr>
+</table></div>
+</section>
+
+<section>
+<p class="eyebrow">Current state</p>
+<h2>What is built and running</h2>
+<p>Fan Engage Pro is the super-fan membership app for artists. Fans join an artist community, earn points and tiers, claim Founding Fan status, get SMS and push alerts, and receive a weekly digest. It is a separate product from Brand Engage Pro, which serves businesses.</p>
+<h3>Stack</h3>
+<ul>
+<li>Next.js 16, React 19, Supabase with row level security, Vercel.</li>
+<li>Stripe for paid tiers. Mailchimp audience 554139 for email, with DIGESTHTML and DIGESTTEXT merge fields fed by the weekly-digest cron. Twilio for SMS. Web Push with VAPID keys. OpenAI plus pgvector for search and recommendations.</li>
+<li>Cloudflare Turnstile on signup, password login, and magic link, all fail-closed.</li>
+</ul>
+<h3>Communities</h3>
+<ul>
+<li>RaeLynn is the launch community. Fans auto-join RaeLynn on onboard.</li>
+<li>Danger Twins, Dan Marshall, and Hunter Hawkins exist but non-RaeLynn and family artists were paused by migrations on 2026-08-01.</li>
+<li>Nellie's Southern Kitchen is not here. It belongs to Brand Engage Pro.</li>
+</ul>
+<h3>Launch hardening, August 2026</h3>
+<ul>
+<li>Shared authentication rate limiter across all auth endpoints.</li>
+<li>Turnstile token bound to signup and password login. Magic link and forgot-password are hidden in production.</li>
+<li>Password-first signup. First 100 fans get Founding Fan free.</li>
+<li>Anon EXECUTE revoked on all SECURITY DEFINER RPCs.</li>
+<li>Financial and leaderboard tables secured (0049).</li>
+<li>Last change: duplicate-email signup no longer tells the fan to complete Turnstile.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Workflow</p>
+<h2>How to make a change safely</h2>
+<div class="callout danger">
+<span class="label">Critical rules</span>
+<p>Stop at <code>git commit</code>. Never run <code>git push</code> on this repo. Kevin pushes. This is COLLABORATING.md section 9 and it is not negotiable.</p>
+<p>Before any SQL, confirm you are in the Fan Engage project and not Brand Engage. The Supabase project switcher defaults to the wrong one.</p>
+<p>Do not touch the eighteen <code>network_*</code> migrations without asking. They may belong to JG Advisors infrastructure, not this app.</p>
+</div>
+<ol>
+<li>Fetch upstream and start from upstream main, not the local main, which is about twenty commits behind.</li>
+<li>Create a branch named for the fix, for example <code>fix/short-description</code>.</li>
+<li>Schema change: new timestamp-named file in <code>supabase/migrations</code>. Apply it to the Fan Engage project by hand and confirm with a select.</li>
+<li>Run the launch readiness quality gate before committing. It was added in PR #39 and fails the build on lint or type errors.</li>
+<li>Commit with a conventional message and stop. Tell Kevin the branch name and what to push.</li>
+<li>After Kevin pushes and Vercel deploys, smoke test on www.fanengagepro.com: signup with a fresh email, Turnstile passes, fan lands in RaeLynn, sign-out works.</li>
+</ol>
+<pre><code># Start from the real main
+cd ~/Documents/GitHub/fan-engage
+git fetch origin main
+git checkout -b fix/short-description origin/main
+
+# Confirm you are in the Fan Engage database, not Brand Engage
+select count(*) from public.fan_profiles;</code></pre>
+</section>
+
+<section>
+<p class="eyebrow">Conventions</p>
+<h2>House rules for this codebase</h2>
+<ul>
+<li>Env var names only: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET. Values stay in Vercel.</li>
+<li>Production magic links must land on www.fanengagepro.com. The redirect allow list in Supabase must include it.</li>
+<li>Every new RPC that is SECURITY DEFINER gets anon EXECUTE revoked in the same migration.</li>
+<li>LAUNCH_CHECKLIST.md is the migration ledger. Update it when you add a file.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Guardrails</p>
+<h2>Who can do what</h2>
+<ul class="rulelist">
+<li><span class="who">Kevin</span><span class="what">Only person who pushes to GitHub and flips production Supabase settings.</span></li>
+<li><span class="who">Agents</span><span class="what">Branch, commit, and report. No push, no production SQL without confirming the project first.</span></li>
+<li><span class="who">Artist content</span><span class="what">Nothing about an artist goes live without that artist's day-to-day manager clearing it. See docs/ARTIST_AGREEMENT_RIGHTS.md.</span></li>
+<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase, Mailchimp, or Twilio. No exports to chat or local files.</span></li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Handoff</p>
+<h2>Open items</h2>
+<div class="tablewrap"><table class="items">
+<tr><th>Item</th><th>Detail</th><th>Owner</th></tr>
+<tr><td>Sync local main</td><td>Local main is at 87c8a8e. Upstream is around twenty commits ahead. Run a fetch and fast-forward before the next change.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>Decide on network_* migrations</td><td>Eighteen files applied 2026-07-22 to 07-31 to the FE database. LAUNCH_CHECKLIST.md flags them as possibly JG Advisors infrastructure. Confirm whether they stay.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Refresh docs/CONTEXT_HANDOFF.md</td><td>Still uses the fan-engage-pearl URL and old repo name.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>superfan-radar-wip branch</td><td>Not present locally. Status of that work and its PR was not checked this session.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Unpause artists after RaeLynn launch</td><td>Danger Twins, Dan Marshall, Hunter Hawkins, and family artists are paused by migration. Reverse when ready.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Rate limiter backing store</td><td>Shared limiter is in memory per instance. Move to Redis or KV for true cross-instance limits.</td><td><span class="owner">Next session</span></td></tr>
+</table></div>
+<div class="callout">
+<span class="label">For the next agent</span>
+<p>Read COLLABORATING.md first, especially section 9. Start from upstream main. Confirm the Supabase project before every query. Commit and stop; Kevin pushes.</p>
+</div>
+</section>
+
+<footer>Verified on 2026-09-14: live HTTP redirect to www.fanengagepro.com, local branch and commit list, migration file count and names, docs folder. Not verified: Supabase dashboard settings, Vercel env vars, whether the network_* migrations were intentional, superfan-radar-wip status.</footer>
+</div>
+
+</body>
+</html>

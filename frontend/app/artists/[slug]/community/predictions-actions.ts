@@ -10,6 +10,7 @@ import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
 import { resolvePrediction } from "@/lib/predictions/resolve";
 import { notifyPredictionResolved } from "@/lib/notifications/triggers/prediction";
+import { premiumPath, requirePremiumFeature } from "@/lib/entitlements";
 
 type Visibility = "public" | "premium" | "founder-only";
 
@@ -114,6 +115,12 @@ export async function votePredictionAction(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const adminUser = await getAdminUser();
+  if (!adminUser) {
+    const gate = await requirePremiumFeature(user.id, artistSlug, "community_react");
+    if (!gate.allowed) redirect(premiumPath(artistSlug));
+  }
 
   // Confirm prediction is still open
   const { data: post } = await supabase
