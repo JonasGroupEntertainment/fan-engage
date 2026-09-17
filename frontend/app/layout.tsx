@@ -14,10 +14,9 @@ import { DesktopNav } from "@/components/desktop-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/lib/data/notifications";
 import { getCurrentCommunityId } from "@/lib/community";
-import { getEntitlement, fanIsPremiumAnywhere } from "@/lib/entitlements";
+import { getEntitlement, fanIsPremiumAnywhere, merchAccess } from "@/lib/entitlements";
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
-import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { APP_URL } from "@/lib/app-url";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
@@ -77,20 +76,6 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true },
   },
 };
-
-const navItems = [
-  { href: "/", label: "Fan Home" },
-  { href: "/community", label: "Community" },
-  { href: "/rewards", label: "Rewards" },
-  // Soft launch: marketplace not open — label must not read as a live shop.
-  {
-    href: "/marketplace",
-    label: isMarketplaceLive() ? "Marketplace" : "Merch Soon",
-  },
-  { href: "/premium", label: "Premium" },
-  { href: "/referrals", label: "Referrals" },
-  { href: "/artists", label: "Artists" },
-];
 
 /**
  * Tries to fetch the current user via the Supabase server client. If Supabase
@@ -158,6 +143,20 @@ export default async function RootLayout({
       // Already defaulted above.
     }
   }
+
+  const merch = merchAccess({
+    signedIn: Boolean(user),
+    isPremium,
+  });
+  const navItems = [
+    { href: "/", label: "Fan Home" },
+    { href: "/community", label: "Community" },
+    { href: "/rewards", label: "Rewards" },
+    { href: merch.navHref, label: "Merch" },
+    { href: "/premium", label: "Premium" },
+    { href: "/referrals", label: "Referrals" },
+    { href: "/artists", label: "Artists" },
+  ];
 
   return (
     <html

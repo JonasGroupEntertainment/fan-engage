@@ -14,8 +14,13 @@ import {
   isPremiumTier,
   paywallReason,
   premiumPath,
+  merchAccess,
+  merchGuestLoginHref,
+  merchGuestSignupHref,
+  MERCH_PATH,
   type MembershipEntitlement,
 } from "./entitlements-core.ts";
+import { guestSignupHref } from "./guest-signup.ts";
 
 function entitlement(
   overrides: Partial<MembershipEntitlement> = {},
@@ -127,5 +132,42 @@ describe("locked CTA copy", () => {
     assert.equal(premiumPath("raelynn"), "/premium?c=raelynn");
     assert.equal(paywallReason(null), "signed-out");
     assert.equal(paywallReason(entitlement()), "needs-premium");
+  });
+});
+
+describe("merch three-way click gate", () => {
+  it("sends guests to signup/login, not merch", () => {
+    const guest = merchAccess({ signedIn: false, isPremium: false });
+    assert.equal(guest.allowed, false);
+    assert.equal(guest.reason, "signed-out");
+    assert.equal(guest.navHref, merchGuestSignupHref());
+    assert.equal(
+      merchGuestSignupHref(),
+      guestSignupHref({ next: MERCH_PATH }),
+    );
+    assert.equal(
+      merchGuestLoginHref(),
+      `/login?next=${encodeURIComponent(MERCH_PATH)}`,
+    );
+    assert.equal(guest.navHref.startsWith("/signup"), true);
+    assert.equal(guest.loginHref, merchGuestLoginHref());
+    assert.notEqual(guest.navHref, MERCH_PATH);
+  });
+
+  it("sends signed-in Free to merch with a Premium CTA, not signup", () => {
+    const free = merchAccess({ signedIn: true, isPremium: false });
+    assert.equal(free.allowed, false);
+    assert.equal(free.reason, "needs-premium");
+    assert.equal(free.navHref, MERCH_PATH);
+    assert.doesNotMatch(free.navHref, /\/signup/);
+    assert.doesNotMatch(free.navHref, /\/login/);
+    assert.equal(PREMIUM_CTA.href, "/premium");
+  });
+
+  it("opens merch for Premium", () => {
+    const premium = merchAccess({ signedIn: true, isPremium: true });
+    assert.equal(premium.allowed, true);
+    assert.equal(premium.reason, "premium-member");
+    assert.equal(premium.navHref, MERCH_PATH);
   });
 });

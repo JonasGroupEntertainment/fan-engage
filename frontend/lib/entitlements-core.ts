@@ -8,7 +8,8 @@
  * legal pages, and limited points earn if already present.
  *
  * Premium unlocks: community post/reply/react; rewards redeem; Premium
- * badge; referral extras if wired; Stripe billing portal; merch drops.
+ * badge; referral extras if wired; Stripe billing portal; merch
+ * (nav + /marketplace + merch drops).
  */
 
 export type SubscriptionTier =
@@ -73,6 +74,58 @@ export const PREMIUM_CTA = {
 export function premiumPath(communityId?: string | null): string {
   if (!communityId) return PREMIUM_CTA.href;
   return `${PREMIUM_CTA.href}?c=${encodeURIComponent(communityId)}`;
+}
+
+/** Merch lives at /marketplace. Do not rename the route. */
+export const MERCH_PATH = "/marketplace";
+
+export function merchGuestSignupHref(): string {
+  return `/signup?ref=raelynn&next=${encodeURIComponent(MERCH_PATH)}`;
+}
+
+export function merchGuestLoginHref(): string {
+  return `/login?next=${encodeURIComponent(MERCH_PATH)}`;
+}
+
+export type MerchAccess = {
+  allowed: boolean;
+  reason: "signed-out" | "needs-premium" | "premium-member";
+  /** Where the main-menu Merch item should send this viewer. */
+  navHref: string;
+  /** Secondary guest door. Only set when signed out. */
+  loginHref?: string;
+};
+
+/**
+ * Three-way merch click/route gate.
+ * - Guest → signup (login is the secondary door on that page)
+ * - Signed-in Free → merch route, which renders the Premium CTA (not signup)
+ * - Premium → merch as it works today
+ */
+export function merchAccess(viewer: {
+  signedIn: boolean;
+  isPremium: boolean;
+}): MerchAccess {
+  if (!viewer.signedIn) {
+    return {
+      allowed: false,
+      reason: "signed-out",
+      navHref: merchGuestSignupHref(),
+      loginHref: merchGuestLoginHref(),
+    };
+  }
+  if (!viewer.isPremium) {
+    return {
+      allowed: false,
+      reason: "needs-premium",
+      navHref: MERCH_PATH,
+    };
+  }
+  return {
+    allowed: true,
+    reason: "premium-member",
+    navHref: MERCH_PATH,
+  };
 }
 
 /**
@@ -213,7 +266,7 @@ export function canUseFeature(
   return canUsePremiumFeature(feature as PremiumV1Feature, viewer);
 }
 
-/** Merch drops are Premium-only in v1 (catalog browse stays Free). */
+/** Merch drops are Premium-only in v1. The merch nav/route is also Premium. */
 export function isMerchDropReward(reward: {
   is_drop?: boolean | null;
   kind?: string | null;
