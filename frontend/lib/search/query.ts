@@ -19,7 +19,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
-import { embedText, pgvectorLiteral, slugToSourceId, EmbeddingError } from "@/lib/embeddings";
+import { pgvectorLiteral, slugToSourceId, EmbeddingError } from "@/lib/embeddings";
 import { cachedEmbedQuery } from "./embed-cache";
 import type {
   SearchHit,

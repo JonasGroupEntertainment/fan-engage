@@ -10,7 +10,7 @@
  * caching; we don't want a service worker to interfere.
  */
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   // Activate immediately on first install / update.
   self.skipWaiting();
 });
