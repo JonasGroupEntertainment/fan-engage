@@ -77,9 +77,8 @@ export default async function PremiumPage({
   const monthly = community.monthly_price_cents;
   const annual = community.annual_price_cents;
   const annualMonthlyEquiv = Math.round(annual / 12);
-  const annualSavingsPct = Math.round(
-    (1 - annual / (monthly * 12)) * 100,
-  );
+  const annualSavings = Math.max(0, monthly * 12 - annual);
+  const annualSavingsPct = monthly > 0 ? Math.round(annualSavings / (monthly * 12) * 100) : 0;
   const premiumNextPath = "/premium";
   const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
@@ -298,7 +297,7 @@ export default async function PremiumPage({
                   </span>
                 </p>
                 <p className="mt-2 text-xs text-white/55">
-                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo. Two months free.
+                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo.{annualSavings > 0 ? ` Save ${fmtPrice(annualSavings)} annually compared with monthly billing.` : ""}
                 </p>
                 <p className="mt-6 text-xs text-white/45">
                   Available after you create an account.
@@ -369,7 +368,7 @@ export default async function PremiumPage({
                   </span>
                 </p>
                 <p className="mt-2 text-xs text-white/55">
-                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo. Two months free.
+                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo.{annualSavings > 0 ? ` Save ${fmtPrice(annualSavings)} annually compared with monthly billing.` : ""}
                 </p>
                 <span
                   className="mt-6 inline-flex rounded-full px-4 py-2 text-sm font-semibold text-white transition group-hover:brightness-110"
