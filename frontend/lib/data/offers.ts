@@ -5,6 +5,10 @@ import type { Offer } from "./types";
 /**
  * Active offers. Empty list when Supabase isn't configured or returns no rows;
  * pages render their static preview data in that case.
+ *
+ * Merch SKUs stay out of this listing so Free/guest callers cannot browse
+ * them via the offers helper. Premium merch access is the /marketplace
+ * route gate plus merch_drops redeem.
  */
 export async function getActiveOffers(): Promise<Offer[]> {
   try {

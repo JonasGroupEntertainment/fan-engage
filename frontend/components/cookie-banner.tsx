@@ -60,6 +60,7 @@ function CookieBannerInner() {
     "/forgot-password",
     "/reset-password",
     "/onboarding",
+    "/auth",
   ];
   const hiddenForRoute = HIDE_ON.some((prefix) => pathname.startsWith(prefix));
 

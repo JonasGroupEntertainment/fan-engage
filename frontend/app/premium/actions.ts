@@ -11,6 +11,7 @@ import {
   pickPriceId,
 } from "@/lib/stripe-helpers";
 import { getCurrentCommunityId } from "@/lib/community";
+import { isPremium } from "@/lib/entitlements";
 
 /**
  * Start a Stripe Checkout Session for Premium. Reads the current
@@ -75,11 +76,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
     .eq("fan_id", user.id)
     .eq("community_id", communityId)
     .maybeSingle();
-  if (
-    existing?.subscription_tier === "premium" ||
-    existing?.subscription_tier === "past_due" ||
-    existing?.subscription_tier === "comped"
-  ) {
+  if (isPremium(existing?.subscription_tier as string | null)) {
     redirect(`/premium?already_active=1`);
   }
 
