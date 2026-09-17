@@ -85,7 +85,7 @@ const navItems = [
   // Soft launch: marketplace not open — label must not read as a live shop.
   {
     href: "/marketplace",
-    label: isMarketplaceLive() ? "Marketplace" : "Merch soon",
+    label: isMarketplaceLive() ? "Marketplace" : "Merch Soon",
   },
   { href: "/premium", label: "Premium" },
   { href: "/referrals", label: "Referrals" },
