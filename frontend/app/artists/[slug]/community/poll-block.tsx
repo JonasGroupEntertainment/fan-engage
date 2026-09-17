@@ -2,17 +2,21 @@
 
 import type { PollData } from "@/lib/data/types";
 import { votePollAction } from "./actions";
+import PremiumCta from "@/components/premium-cta";
+import { PREMIUM_CTA } from "@/lib/entitlements-core";
 
 export default function PollBlock({
   postId,
   artistSlug,
   poll,
   currentUserId,
+  canVote = false,
 }: {
   postId: string;
   artistSlug: string;
   poll: PollData;
   currentUserId: string | null;
+  canVote?: boolean;
 }) {
   const total = poll.total_votes;
   const hasVoted = poll.my_option_id !== null;
@@ -38,7 +42,7 @@ export default function PollBlock({
               <input type="hidden" name="artist_slug" value={artistSlug} />
               <button
                 type="submit"
-                disabled={!currentUserId}
+                disabled={!currentUserId || !canVote}
                 className={`relative w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-sm transition ${
                   mine
                     ? "border-aurora/60 bg-aurora/20 text-white"
@@ -67,12 +71,18 @@ export default function PollBlock({
       {!currentUserId && (
         <p className="text-xs text-white/50">Sign in to vote (+10 pts).</p>
       )}
-      {currentUserId && !hasVoted && (
+      {currentUserId && !canVote && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-white/60">{PREMIUM_CTA.available}</p>
+          <PremiumCta copy="upgrade" communityId={artistSlug} variant="chip" />
+        </div>
+      )}
+      {currentUserId && canVote && !hasVoted && (
         <p className="text-xs text-white/50">
           Tap an option to cast your vote (+10 pts).
         </p>
       )}
-      {currentUserId && hasVoted && (
+      {currentUserId && canVote && hasVoted && (
         <p className="text-xs text-white/50">
           Tap a different option to change your vote.
         </p>

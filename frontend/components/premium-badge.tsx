@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PREMIUM_CTA } from "@/lib/entitlements-core";
 
 interface PremiumBadgeProps {
   /** True if the viewer has Premium-level access (premium/comped/past_due). */
@@ -12,6 +13,8 @@ interface PremiumBadgeProps {
   accentTo?: string | null;
   /** If false, renders nothing. Convenience so callers can always mount it. */
   show?: boolean;
+  /** Override the click-through. Null renders a static badge (public profiles). */
+  href?: string | null;
 }
 
 /**
@@ -30,6 +33,7 @@ export default function PremiumBadge({
   accentFrom,
   accentTo,
   show = true,
+  href = PREMIUM_CTA.billingHref,
 }: PremiumBadgeProps) {
   if (!show || !isPremium) return null;
 
@@ -40,18 +44,35 @@ export default function PremiumBadge({
   const icon = isFounder ? "👑" : "⭐";
   const tooltip = isFounder
     ? `Founding Fan${founderNumber ? ` #${founderNumber}` : ""} — locked-in pricing for life`
-    : "Premium fan — manage billing";
+    : "Premium fan";
+
+  const className =
+    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-glass";
+  const style = { backgroundImage: `linear-gradient(90deg, ${from}, ${to})` };
+  const inner = (
+    <>
+      <span aria-hidden>{icon}</span>
+      <span>{label}</span>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <span aria-label={tooltip} title={tooltip} className={className} style={style}>
+        {inner}
+      </span>
+    );
+  }
 
   return (
     <Link
-      href="/account/billing"
+      href={href}
       aria-label={tooltip}
       title={tooltip}
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-glass transition hover:brightness-110"
-      style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
+      className={`${className} transition hover:brightness-110`}
+      style={style}
     >
-      <span aria-hidden>{icon}</span>
-      <span>{label}</span>
+      {inner}
     </Link>
   );
 }

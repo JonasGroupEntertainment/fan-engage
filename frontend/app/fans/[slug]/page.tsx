@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getFanProfileBySlug } from "@/lib/data/fan-profile";
 import ShareButton from "@/components/share-button";
+import PremiumBadge from "@/components/premium-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,9 @@ export default async function FanProfilePage({
             >
               {displayName}
             </h1>
+            <div className="mt-3">
+              <PremiumBadge isPremium={profile.isPremium} href={null} />
+            </div>
             <p className="mt-2 text-sm text-white/65">
               @{profile.profileSlug} · Member since {formatMemberSince(profile.memberSince)}
             </p>

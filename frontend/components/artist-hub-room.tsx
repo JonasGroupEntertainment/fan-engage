@@ -5,6 +5,7 @@ import {
   getPostsByArtist,
 } from "@/lib/data/community";
 import { getCurrentFan } from "@/lib/data/fan";
+import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
 import PostCard from "@/app/artists/[slug]/community/post-card";
 
 /**
@@ -18,7 +19,10 @@ export default async function ArtistHubRoom({
   artistSlug: string;
   artistName: string;
 }) {
-  const fan = await getCurrentFan();
+  const [fan, entitlement] = await Promise.all([
+    getCurrentFan(),
+    getViewerEntitlement(artistSlug),
+  ]);
   const isSignedIn = fan !== null;
 
   if (!isSignedIn) {
@@ -50,6 +54,7 @@ export default async function ArtistHubRoom({
   ]);
 
   const hasPoll = visible.some((p) => p.kind === "poll");
+  const canWrite = canUsePremiumFeature("community_post", entitlement);
 
   return (
     <section className="space-y-4">
@@ -83,6 +88,8 @@ export default async function ArtistHubRoom({
               isAuthor={post.author_id === fan.id}
               isAdmin={false}
               currentUserId={fan.id}
+              canReply={canWrite}
+              canReact={canWrite}
               poll={pollByPost[i]}
             />
           ))}

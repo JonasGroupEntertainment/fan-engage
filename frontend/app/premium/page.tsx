@@ -7,6 +7,7 @@ import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
+import { PREMIUM_CTA, isPremium as isPremiumSignal } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -69,17 +70,15 @@ export default async function PremiumPage({
       .maybeSingle();
     tier = (membership?.subscription_tier as string | null) ?? null;
   }
-  const isPremium =
-    tier === "premium" || tier === "past_due" || tier === "comped";
+  const isPremium = isPremiumSignal(tier);
 
   const founder = await getFoundingFanClaimState(communityId);
 
   const monthly = community.monthly_price_cents;
   const annual = community.annual_price_cents;
   const annualMonthlyEquiv = Math.round(annual / 12);
-  const annualSavingsPct = Math.round(
-    (1 - annual / (monthly * 12)) * 100,
-  );
+  const annualSavings = Math.max(0, monthly * 12 - annual);
+  const annualSavingsPct = monthly > 0 ? Math.round(annualSavings / (monthly * 12) * 100) : 0;
   const premiumNextPath = "/premium";
   const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
@@ -213,7 +212,7 @@ export default async function PremiumPage({
                   href="/account/billing"
                   className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
                 >
-                  Manage billing →
+                  {PREMIUM_CTA.manageBilling} →
                 </Link>
               )}
             </div>
@@ -298,7 +297,7 @@ export default async function PremiumPage({
                   </span>
                 </p>
                 <p className="mt-2 text-xs text-white/55">
-                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo. Two months free.
+                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo.{annualSavings > 0 ? ` Save ${fmtPrice(annualSavings)} annually compared with monthly billing.` : ""}
                 </p>
                 <p className="mt-6 text-xs text-white/45">
                   Available after you create an account.
@@ -369,7 +368,7 @@ export default async function PremiumPage({
                   </span>
                 </p>
                 <p className="mt-2 text-xs text-white/55">
-                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo. Two months free.
+                  Works out to {fmtPrice(annualMonthlyEquiv)}/mo.{annualSavings > 0 ? ` Save ${fmtPrice(annualSavings)} annually compared with monthly billing.` : ""}
                 </p>
                 <span
                   className="mt-6 inline-flex rounded-full px-4 py-2 text-sm font-semibold text-white transition group-hover:brightness-110"
@@ -420,11 +419,17 @@ export default async function PremiumPage({
         </section>
 
         <p className="mt-12 text-xs text-white/50">
-          Secure checkout via Stripe. Cancel anytime from your{" "}
-          <a href="/account/billing" className="underline hover:text-white/70">
-            billing settings
-          </a>
-          .
+          Secure checkout via Stripe.
+          {isPremium && (
+            <>
+              {" "}
+              Cancel anytime from{" "}
+              <a href={PREMIUM_CTA.billingHref} className="underline hover:text-white/70">
+                {PREMIUM_CTA.manageBilling}
+              </a>
+              .
+            </>
+          )}
         </p>
       </div>
     </main>

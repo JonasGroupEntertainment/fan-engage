@@ -16,6 +16,8 @@ import {
   FIRST_72H_TITLE,
   REFERRAL_REWARD_LADDER,
 } from "@/lib/first-72h";
+import { PREMIUM_CTA, getViewerPremiumAnywhere } from "@/lib/entitlements";
+import PremiumCta from "@/components/premium-cta";
 
 async function buildInviteUrl(code: string | null | undefined): Promise<string> {
   const origin = await getAppOrigin();
@@ -45,12 +47,13 @@ function formatRelativeTime(iso: string): string {
 }
 
 export default async function ReferralsPage() {
-  const [fan, myReferrals, leaderboard, artists, recentActivity] = await Promise.all([
+  const [fan, myReferrals, leaderboard, artists, recentActivity, isPremiumFan] = await Promise.all([
     getCurrentFan(),
     getMyReferrals(),
     getReferralLeaderboard(5),
     listArtistsFromDb(),
     getRecentReferralActivity(5),
+    getViewerPremiumAnywhere(),
   ]);
 
   const isSignedIn = fan !== null;
@@ -194,6 +197,43 @@ export default async function ReferralsPage() {
               })}
             </div>
           </section>
+
+          {isSignedIn && (
+            <section className="rounded-3xl border border-white/10 bg-black/25 p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                Referral extras
+              </p>
+              {isPremiumFan ? (
+                <>
+                  <h2
+                    className="mt-2 text-xl font-semibold"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    1.5× points on every referral
+                  </h2>
+                  <p className="mt-2 text-sm text-white/70">
+                    Premium is active — referral bonuses use the same 1.5×
+                    multiplier as the rest of your fan moves.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2
+                    className="mt-2 text-xl font-semibold"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {PREMIUM_CTA.available}
+                  </h2>
+                  <p className="mt-2 text-sm text-white/70">
+                    {PREMIUM_CTA.unlock} Premium fans earn 1.5× referral points.
+                  </p>
+                  <div className="mt-4">
+                    <PremiumCta copy="upgrade" />
+                  </div>
+                </>
+              )}
+            </section>
+          )}
 
           <section className="grid gap-4 md:grid-cols-3">
             {[
