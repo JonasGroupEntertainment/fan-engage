@@ -175,7 +175,9 @@ export function recordPremiumUpgradeNavigation(
   previousPath: string | null,
   nextPath: string,
 ): PremiumUpgradePromptState {
-  if (previousPath == null || previousPath === nextPath) return state;
+  const previous = previousPath?.trim() || null;
+  const next = nextPath.trim() || "/";
+  if (previous == null || previous === next) return state;
   return incrementPremiumUpgradePromptViews(state);
 }
 
