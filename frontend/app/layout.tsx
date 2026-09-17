@@ -14,7 +14,7 @@ import { DesktopNav } from "@/components/desktop-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/lib/data/notifications";
 import { getCurrentCommunityId } from "@/lib/community";
-import { getEntitlement } from "@/lib/entitlements";
+import { getEntitlement, fanIsPremiumAnywhere } from "@/lib/entitlements";
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
@@ -151,6 +151,9 @@ export default async function RootLayout({
           founderNumber = ent.founderNumber;
         }
       }
+      if (!isPremium) {
+        isPremium = await fanIsPremiumAnywhere(user.id).catch(() => false);
+      }
     } catch {
       // Already defaulted above.
     }
@@ -207,7 +210,7 @@ export default async function RootLayout({
                     </span>
                   )}
                 </Link>
-                <UserMenu fan={user} isAdmin={isAdmin} unreadCount={unread} />
+                <UserMenu fan={user} isAdmin={isAdmin} unreadCount={unread} isPremium={isPremium} />
               </div>
             ) : (
               <div className="flex items-center gap-2">

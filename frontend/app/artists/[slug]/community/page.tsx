@@ -13,13 +13,14 @@ import {
   getPostsByArtist,
   getTopTagsForArtist,
 } from "@/lib/data/community";
-import { canAccess, getViewerEntitlement } from "@/lib/entitlements";
+import { canAccess, canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
 import {
   filterCommunityTagsForMarketplace,
   isMarketplaceLive,
   sanitizeCommunityTagFilter,
 } from "@/lib/marketplace-live";
 import PremiumPaywall from "@/components/premium-paywall";
+import { PremiumLockNote } from "@/components/premium-cta";
 import FanCtaBlock from "./fan-cta-block";
 import NewPostForm from "./new-post-form";
 import PostCard from "./post-card";
@@ -86,6 +87,8 @@ export default async function ArtistCommunityPage({
 
   const isSignedIn = fan !== null;
   const isAdmin = adminUser !== null;
+  const canWrite =
+    isAdmin || canUsePremiumFeature("community_post", entitlement);
 
   const heroGradient = `linear-gradient(to bottom right, ${artist.accentFrom}40, #0f172a, #000000)`;
 
@@ -125,8 +128,13 @@ export default async function ArtistCommunityPage({
 
       <FanCtaBlock artistSlug={slug} actions={fanActions} signedIn={isSignedIn} />
 
-      {isSignedIn ? (
+      {isSignedIn && canWrite ? (
         <NewPostForm artistSlug={slug} isAdmin={isAdmin} />
+      ) : isSignedIn ? (
+        <PremiumLockNote
+          communityId={slug}
+          feature="Posting in this community"
+        />
       ) : (
         <section className="rounded-3xl border border-aurora/40 bg-gradient-to-r from-aurora/20 via-slate-900 to-ember/20 p-5">
           <p className="text-sm">
@@ -156,7 +164,9 @@ export default async function ArtistCommunityPage({
           <p className="text-sm font-semibold">Nothing posted yet</p>
           <p className="mt-2 text-xs text-white/60">
             {isSignedIn
-              ? "Be the first to post — earn 5 pts and kick off the conversation."
+              ? canWrite
+                ? "Be the first to post — earn 5 pts and kick off the conversation."
+                : "Read along — posting is available with Premium."
               : "Be the first in when the community fills up — sign in to post."}
           </p>
         </section>
@@ -199,6 +209,8 @@ export default async function ArtistCommunityPage({
                 isAuthor={fan !== null && post.author_id === fan.id}
                 isAdmin={isAdmin}
                 currentUserId={fan?.id ?? null}
+                canReply={canWrite}
+                canReact={canWrite}
                 poll={pollByPost[i]}
                 challengeEntries={entriesByPost[i]}
               />

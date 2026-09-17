@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { PREMIUM_CTA, requirePremiumAnywhere } from "@/lib/entitlements";
 
 export async function openBillingPortalAction(): Promise<void> {
   const supabase = await createClient();
@@ -12,6 +13,11 @@ export async function openBillingPortalAction(): Promise<void> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/account/billing");
+
+  const gate = await requirePremiumAnywhere(user.id);
+  if (!gate.allowed) {
+    redirect(PREMIUM_CTA.href);
+  }
 
   const admin = createAdminClient();
   const { data: fan } = await admin

@@ -1,40 +1,35 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  canUsePremiumFeature,
+  entitlementFromMembershipRow,
+  isPremium,
+  type MembershipEntitlement,
+  type PremiumV1Feature,
+} from "@/lib/entitlements-core";
 
-/**
- * Subscription tier states we recognize. Mirrors the enum space of
- * fan_community_memberships.subscription_tier.
- */
-export type SubscriptionTier =
-  | "free"
-  | "premium"
-  | "comped"
-  | "past_due"
-  | "cancelled";
+export {
+  PREMIUM_V1_FEATURES,
+  FREE_V1_FEATURES,
+  PREMIUM_CTA,
+  canAccess,
+  canUseFeature,
+  canUsePremiumFeature,
+  entitlementFromMembershipRow,
+  isFreeFeature,
+  isMerchDropReward,
+  isPremium,
+  isPremiumTier,
+  paywallReason,
+  premiumPath,
+  type FreeV1Feature,
+  type MembershipEntitlement,
+  type PremiumV1Feature,
+  type SubscriptionTier,
+} from "@/lib/entitlements-core";
 
-export interface MembershipEntitlement {
-  fanId: string;
-  communityId: string;
-  tier: SubscriptionTier;
-  isPremium: boolean;
-  isFounder: boolean;
-  founderNumber: number | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  monthlyCreditCents: number;
-  billingPeriod: "monthly" | "annual" | null;
-}
-
-/**
- * Returns true if the tier grants Premium-level access. 'past_due' counts
- * because Stripe is still retrying — we keep access until Stripe gives up
- * and fires subscription.deleted, which flips the row to 'cancelled'.
- */
-export function isPremiumTier(
-  tier: SubscriptionTier | string | null | undefined,
-): boolean {
-  return tier === "premium" || tier === "comped" || tier === "past_due";
-}
+const MEMBERSHIP_SELECT =
+  "fan_id, community_id, subscription_tier, is_founder, founder_number, current_period_end, cancel_at_period_end, monthly_credit_cents, billing_period";
 
 /**
  * Fetch the current viewer's entitlement for a specific community. Returns
@@ -49,29 +44,13 @@ export async function getEntitlement(
   const admin = createAdminClient();
   const { data } = await admin
     .from("fan_community_memberships")
-    .select(
-      "fan_id, community_id, subscription_tier, is_founder, founder_number, current_period_end, cancel_at_period_end, monthly_credit_cents, billing_period",
-    )
+    .select(MEMBERSHIP_SELECT)
     .eq("fan_id", fanId)
     .eq("community_id", communityId)
     .maybeSingle();
 
   if (!data) return null;
-
-  const tier = (data.subscription_tier as SubscriptionTier | null) ?? "free";
-  return {
-    fanId: data.fan_id as string,
-    communityId: data.community_id as string,
-    tier,
-    isPremium: isPremiumTier(tier),
-    isFounder: Boolean(data.is_founder),
-    founderNumber: (data.founder_number as number | null) ?? null,
-    currentPeriodEnd: (data.current_period_end as string | null) ?? null,
-    cancelAtPeriodEnd: Boolean(data.cancel_at_period_end),
-    monthlyCreditCents: (data.monthly_credit_cents as number | null) ?? 0,
-    billingPeriod:
-      (data.billing_period as "monthly" | "annual" | null) ?? null,
-  };
+  return entitlementFromMembershipRow(data as Parameters<typeof entitlementFromMembershipRow>[0]);
 }
 
 /**
@@ -95,44 +74,77 @@ export async function getViewerEntitlement(
 }
 
 /**
- * Decide whether a viewer can see a specific piece of content. Abstracts
- * the matrix of (viewer tier × content tag) so callers don't have to
- * re-derive it. Returns { allowed, reason } where reason is a short string
- * useful for analytics / paywall UX copy.
- *
- * Matrix:
- * - 'public': always allowed
- * - 'premium': allowed if viewer is premium/comped/past_due; else 'needs-premium'
- *             or 'signed-out' if not authenticated
- * - 'founder-only': allowed only if viewer has is_founder=true; else
- *                   'needs-founder' if authenticated but not a founder, or
- *                   'signed-out' if not authenticated
+ * Premium in any community — used for the nav badge, billing portal, and
+ * profile badge. Membership is still per-community for write gates.
  */
-export function canAccess(
-  contentTier: "public" | "premium" | "founder-only",
-  viewer: MembershipEntitlement | null,
-): {
-  allowed: boolean;
-  reason: "public" | "premium-member" | "founder-member" | "needs-premium" | "needs-founder" | "signed-out";
-} {
-  if (contentTier === "public") {
-    return { allowed: true, reason: "public" };
-  }
+export async function getFanPremiumMemberships(
+  fanId: string,
+): Promise<MembershipEntitlement[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("fan_community_memberships")
+    .select(MEMBERSHIP_SELECT)
+    .eq("fan_id", fanId)
+    .in("subscription_tier", ["premium", "comped", "past_due"]);
 
-  if (!viewer) {
-    return { allowed: false, reason: "signed-out" };
-  }
+  return (data ?? []).map((row) =>
+    entitlementFromMembershipRow(
+      row as Parameters<typeof entitlementFromMembershipRow>[0],
+    ),
+  );
+}
 
-  if (contentTier === "founder-only") {
-    if (viewer.isFounder) {
-      return { allowed: true, reason: "founder-member" };
-    }
-    return { allowed: false, reason: "needs-founder" };
-  }
+export async function fanIsPremiumAnywhere(fanId: string): Promise<boolean> {
+  const rows = await getFanPremiumMemberships(fanId);
+  return rows.some((row) => isPremium(row));
+}
 
-  // contentTier === "premium"
-  if (viewer.isPremium) {
-    return { allowed: true, reason: "premium-member" };
+export async function getViewerPremiumAnywhere(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+    return await fanIsPremiumAnywhere(user.id);
+  } catch {
+    return false;
+  }
+}
+
+export type PremiumGateResult =
+  | { allowed: true; entitlement: MembershipEntitlement | null }
+  | { allowed: false; reason: "signed-out" | "needs-premium" };
+
+/**
+ * Server-action/API gate for a v1 Premium feature in one community.
+ */
+export async function requirePremiumFeature(
+  fanId: string,
+  communityId: string,
+  feature: PremiumV1Feature,
+): Promise<PremiumGateResult> {
+  // v1: every Premium unlock uses the same isPremium membership signal.
+  const entitlement = await getEntitlement(fanId, communityId);
+  if (canUsePremiumFeature(feature, entitlement)) {
+    return { allowed: true, entitlement };
+  }
+  return {
+    allowed: false,
+    reason: entitlement ? "needs-premium" : "signed-out",
+  };
+}
+
+/**
+ * Platform-wide Premium gate (billing portal, nav badge).
+ */
+export async function requirePremiumAnywhere(
+  fanId: string,
+): Promise<PremiumGateResult> {
+  const memberships = await getFanPremiumMemberships(fanId);
+  const entitlement = memberships.find((row) => isPremium(row)) ?? null;
+  if (entitlement) {
+    return { allowed: true, entitlement };
   }
   return { allowed: false, reason: "needs-premium" };
 }
