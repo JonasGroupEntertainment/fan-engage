@@ -73,12 +73,12 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     getSnapshot,
     getServerSnapshot,
   );
+  const persisted = parsePremiumUpgradePromptState(persistedRaw);
   const [session, setSession] = useState<PremiumUpgradePromptState | null>(
     null,
   );
   const [delayElapsed, setDelayElapsed] = useState(false);
 
-  const persisted = parsePremiumUpgradePromptState(persistedRaw);
   const state = applyPremiumEntitlementToPromptState(
     session ?? persisted,
     isPremium,
@@ -92,33 +92,38 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   const open = eligible && delayElapsed;
 
   useEffect(() => {
+    if (!session) return;
+    persist(session);
+  }, [session]);
+
+  useEffect(() => {
     if (!isPremium) return;
     const id = window.setTimeout(() => {
-      const locked = lockPremiumUpgradePrompt();
-      persist(locked);
-      setSession(locked);
+      setSession(lockPremiumUpgradePrompt());
     }, 0);
     return () => window.clearTimeout(id);
   }, [isPremium]);
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      setSession((current) => {
-        const previous = previousPathRef.current;
-        if (previous === null) {
-          previousPathRef.current = pathname;
-          return current;
-        }
-        if (previous === pathname) return current;
-        previousPathRef.current = pathname;
-        const base = current ?? parsePremiumUpgradePromptState(getSnapshot());
-        const next = recordPremiumUpgradeNavigation(base, previous, pathname);
-        if (next !== base) persist(next);
-        return next;
-      });
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, [pathname]);
+    const nextPath = pathname.trim() || "/";
+    const previous = previousPathRef.current;
+    if (previous === null) {
+      previousPathRef.current = nextPath;
+      return;
+    }
+    if (previous === nextPath) return;
+    previousPathRef.current = nextPath;
+    // Route changes are the page-view signal — keep this in lockstep with
+    // usePathname, same pattern as mobile-nav closing on navigation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSession((current) =>
+      recordPremiumUpgradeNavigation(
+        current ?? parsePremiumUpgradePromptState(persistedRaw),
+        previous,
+        nextPath,
+      ),
+    );
+  }, [pathname, persistedRaw]);
 
   useEffect(() => {
     if (!eligible) {
@@ -131,14 +136,12 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   }, [eligible]);
 
   const dismiss = useCallback(() => {
-    setSession((current) => {
-      const next = dismissPremiumUpgradePrompt(
+    setSession((current) =>
+      dismissPremiumUpgradePrompt(
         current ?? parsePremiumUpgradePromptState(getSnapshot()),
-      );
-      persist(next);
-      return next;
-    });
-  }, []);
+      ),
+    );
+  }, [setSession]);
 
   useEffect(() => {
     if (!open) return;
@@ -166,7 +169,7 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-slate-950/95 p-6 shadow-glass"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-slate-950/95 p-6 shadow-glass"
       >
         <div
           aria-hidden

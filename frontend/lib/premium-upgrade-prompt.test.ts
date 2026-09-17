@@ -170,6 +170,10 @@ describe("premium upgrade prompt: counter + resurface", () => {
       0,
     );
     assert.equal(
+      recordPremiumUpgradeNavigation(dismissed, "", "/").views,
+      0,
+    );
+    assert.equal(
       recordPremiumUpgradeNavigation(dismissed, "/rewards", "/rewards").views,
       0,
     );
