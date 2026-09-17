@@ -17,7 +17,7 @@ export async function updateProfileAction(formData: FormData) {
   const { error } = await supabase
     .from("fans")
     .update({ first_name: firstName, city, avatar_url: avatarUrl })
-    .eq("user_id", user.id);
+    .eq("id", user.id);
 
   if (error) {
     throw new Error(error.message);
