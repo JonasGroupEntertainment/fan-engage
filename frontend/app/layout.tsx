@@ -5,6 +5,7 @@ import "./globals.css";
 import CookieBanner from "@/components/cookie-banner";
 import Footer from "@/components/footer";
 import InstallPrompt from "@/components/install-prompt";
+import PremiumUpgradePrompt from "@/components/premium-upgrade-prompt";
 import PremiumBadge from "@/components/premium-badge";
 import AdminPill from "@/components/admin-pill";
 import SearchInput from "@/components/search-input";
@@ -233,6 +234,7 @@ export default async function RootLayout({
         <Footer />
         <CookieBanner />
         <InstallPrompt />
+        <PremiumUpgradePrompt isPremium={isPremium} />
       </body>
     </html>
   );
