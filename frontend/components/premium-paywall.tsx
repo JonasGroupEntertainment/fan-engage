@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PREMIUM_CTA, premiumPath } from "@/lib/entitlements-core";
 
 interface PremiumPaywallProps {
   /** What the user is trying to see. Used in the headline copy. */
@@ -37,14 +38,14 @@ export default function PremiumPaywall({
   const from = accentFrom ?? "#7c3aed";
   const to = accentTo ?? "#fb923c";
 
-  const premiumPath = `/premium${communityId ? `?c=${communityId}` : ""}`;
+  const upgradeHref = premiumPath(communityId);
   const signupHref = communityId
-    ? `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumPath)}`
-    : `/signup?next=${encodeURIComponent(premiumPath)}`;
-  const loginHref = `/login?next=${encodeURIComponent(premiumPath)}`;
+    ? `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(upgradeHref)}`
+    : `/signup?next=${encodeURIComponent(upgradeHref)}`;
+  const loginHref = `/login?next=${encodeURIComponent(upgradeHref)}`;
   // Soft-launch guests hit gated content before they have an account —
   // primary CTA is Create account; Sign in is secondary for returners.
-  const ctaHref = reason === "signed-out" ? signupHref : "/premium";
+  const ctaHref = reason === "signed-out" ? signupHref : upgradeHref;
 
   let ctaLabel: string;
   let featureCopy: string;
@@ -56,9 +57,9 @@ export default function PremiumPaywall({
     ctaLabel = "Become a Founding Fan";
     featureCopy = `${feature} is for Founders only`;
   } else {
-    // needs-premium
-    ctaLabel = "Upgrade to Premium — $10/mo";
-    featureCopy = `${feature} is for Premium fans`;
+    // needs-premium — locked v1 copy
+    ctaLabel = PREMIUM_CTA.upgrade;
+    featureCopy = PREMIUM_CTA.unlock;
   }
 
   if (compact) {
@@ -103,7 +104,7 @@ export default function PremiumPaywall({
                 ? "Paid Premium only — separate from the free Founding Fan badge"
                 : reason === "signed-out"
                   ? "Join to unlock Premium"
-                  : "Upgrade to Premium"}
+                  : PREMIUM_CTA.available}
             </p>
             <h3 className="mt-2 text-lg font-bold text-white">{featureCopy}</h3>
             {description && (

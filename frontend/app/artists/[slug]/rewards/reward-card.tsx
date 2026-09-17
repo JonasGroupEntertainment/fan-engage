@@ -7,6 +7,8 @@ import { RedeemForm } from "./redeem-form";
 import InlineShareButton from "@/components/inline-share-button";
 import type { RewardRow } from "@/lib/data/rewards";
 import { isInAppOnlyLaunchReward } from "@/lib/launch-catalog";
+import PremiumCta from "@/components/premium-cta";
+import { PREMIUM_CTA, isMerchDropReward } from "@/lib/entitlements-core";
 
 interface RewardCardProps {
   reward: RewardRow;
@@ -22,6 +24,8 @@ interface RewardCardProps {
   /** Fan's current point balance for this community — used to gate the
    *  Redeem button and surface a clear "earn X more" message. */
   fanPoints?: number;
+  /** v1: redeem is Premium-only. Browse stays visible on Free. */
+  canRedeem?: boolean;
 }
 
 export default function RewardCardWithForm({
@@ -30,8 +34,10 @@ export default function RewardCardWithForm({
   artistName,
   fanHandle,
   fanPoints = 0,
+  canRedeem = false,
 }: RewardCardProps) {
   const [showForm, setShowForm] = useState(false);
+  const merchDrop = isMerchDropReward(reward);
 
   return (
     <>
@@ -64,12 +70,24 @@ export default function RewardCardWithForm({
             {reward.requires_tier}
           </div>
         )}
+        {merchDrop && (
+          <div className="mt-2 inline-flex rounded-full bg-aurora/20 px-2 py-1 text-xs uppercase tracking-wide text-aurora">
+            {PREMIUM_CTA.available}
+          </div>
+        )}
 
         {reward.stock !== null && (
           <p className="mt-2 text-xs text-white/50">Only {reward.stock} left</p>
         )}
 
-        {fanPoints >= reward.point_cost ? (
+        {!canRedeem ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-center text-xs text-white/60">
+              {PREMIUM_CTA.unlock}
+            </p>
+            <PremiumCta copy="upgrade" communityId={artistSlug} variant="button" />
+          </div>
+        ) : fanPoints >= reward.point_cost ? (
           <button
             onClick={() => setShowForm(true)}
             className="mt-4 w-full rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 px-3 py-2 text-xs font-medium text-white hover:opacity-90"
@@ -100,7 +118,7 @@ export default function RewardCardWithForm({
         )}
       </div>
 
-      {showForm && (
+      {showForm && canRedeem && (
         <RedeemForm
           rewardId={reward.id}
           rewardTitle={reward.title}

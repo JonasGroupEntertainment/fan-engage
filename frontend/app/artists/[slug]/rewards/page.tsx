@@ -9,6 +9,7 @@ import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import RecommendedRewardCard from "./recommended-reward-card";
 import { recommendReward } from "@/lib/recs";
 import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-empty-state";
+import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
 
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ export default async function RewardsPage({
   const artist = await getArtistFromDb(slug);
   if (!artist) return notFound();
 
-  const [rewards, myRedemptions, rec, fanHandle, fanPoints] = await Promise.all([
+  const [rewards, myRedemptions, rec, fanHandle, fanPoints, entitlement] = await Promise.all([
     listRewardsForCommunity(slug),
     listMyRedemptions(user.id),
     dismissRec
@@ -72,7 +73,9 @@ export default async function RewardsPage({
       : recommendReward({ fanId: user.id, communityId: slug }),
     getFanProfileSlug(user.id).catch(() => null),
     getFanPoints(user.id, slug),
+    getViewerEntitlement(slug),
   ]);
+  const canRedeem = canUsePremiumFeature("rewards_redeem", entitlement);
 
   if (rewards.length < MIN_INVENTORY) {
     return (
@@ -119,7 +122,7 @@ export default async function RewardsPage({
         {rewards.length > 0 ? (
           <div className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {rewards.map((reward) => (
-              <RewardCardWithForm key={reward.id} reward={reward} artistSlug={slug} artistName={artist.name} fanHandle={fanHandle} fanPoints={fanPoints} />
+              <RewardCardWithForm key={reward.id} reward={reward} artistSlug={slug} artistName={artist.name} fanHandle={fanHandle} fanPoints={fanPoints} canRedeem={canRedeem} />
             ))}
           </div>
         ) : (

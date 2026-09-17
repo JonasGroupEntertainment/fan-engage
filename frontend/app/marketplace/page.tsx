@@ -8,6 +8,7 @@ import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-e
 import PreviewSignupBanner from "@/components/preview-signup-banner";
 import { listRewardsForCommunity } from "@/lib/data/rewards";
 import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
+import { PREMIUM_CTA, getViewerPremiumAnywhere } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -135,10 +136,11 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
     ? (rawTab as Tab)
     : "Featured";
 
-  const [dbOffers, fan, primaryCommunityId] = await Promise.all([
+  const [dbOffers, fan, primaryCommunityId, isPremiumFan] = await Promise.all([
     getActiveOffers(),
     getCurrentFan(),
     getPrimaryCommunityId(),
+    getViewerPremiumAnywhere(),
   ]);
   const isSignedIn = fan !== null;
   const redeemHref = primaryCommunityId
@@ -222,10 +224,18 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {products.map((p) => (
+            {products.map((p) => {
+              const merchDrop = p.category === "Merch";
+              const href =
+                merchDrop && isSignedIn && !isPremiumFan
+                  ? PREMIUM_CTA.href
+                  : isSignedIn
+                    ? redeemHref
+                    : "/signup?next=/marketplace";
+              return (
               <Link
                 key={p.slug}
-                href={isSignedIn ? redeemHref : "/signup?next=/marketplace"}
+                href={href}
                 className="rounded-3xl border border-white/10 bg-black/30 p-5 transition hover:border-white/25"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -234,12 +244,16 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                     <p className="mt-1 text-base font-semibold">{p.title}</p>
                   </div>
                   <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/60">
-                    {p.badge}
+                    {merchDrop ? PREMIUM_CTA.available : p.badge}
                   </span>
                 </div>
                 <p className="mt-4 text-lg font-semibold text-emerald-300">{p.pts}</p>
+                {merchDrop && isSignedIn && !isPremiumFan && (
+                  <p className="mt-2 text-xs text-white/60">{PREMIUM_CTA.unlock}</p>
+                )}
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>

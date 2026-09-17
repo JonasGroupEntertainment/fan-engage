@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { PREMIUM_CTA } from "@/lib/entitlements-core";
 
 interface UserMenuProps {
   fan: {
@@ -14,6 +15,7 @@ interface UserMenuProps {
   } | null;
   isAdmin: boolean;
   unreadCount?: number;
+  isPremium?: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ interface UserMenuProps {
  * Opens on click, closes on click-outside or Escape.
  * Shows Fan home, Rewards, Inbox, and optionally Admin if isAdmin is true.
  */
-export default function UserMenu({ fan, isAdmin, unreadCount = 0 }: UserMenuProps) {
+export default function UserMenu({ fan, isAdmin, unreadCount = 0, isPremium = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,26 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0 }: UserMenuProp
             >
               Account
             </Link>
+
+            {isPremium ? (
+              <Link
+                href="/account/billing"
+                className="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+                role="menuitem"
+                onClick={() => setIsOpen(false)}
+              >
+                {PREMIUM_CTA.manageBilling}
+              </Link>
+            ) : (
+              <Link
+                href="/premium"
+                className="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+                role="menuitem"
+                onClick={() => setIsOpen(false)}
+              >
+                {PREMIUM_CTA.upgrade}
+              </Link>
+            )}
 
             {/* Divider before Sign out */}
             <div className="my-1 border-t border-white/10" />

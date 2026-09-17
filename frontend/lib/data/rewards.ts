@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shouldListLaunchReward } from "@/lib/launch-catalog";
+import {
+  PREMIUM_CTA,
+  isMerchDropReward,
+  requirePremiumAnywhere,
+  requirePremiumFeature,
+} from "@/lib/entitlements";
 
 export interface RewardRow {
   id: string;
@@ -166,6 +172,25 @@ export async function redeemReward({
     } = await supabase.auth.getUser();
     if (!user) {
       return { ok: false, error: "Not signed in" };
+    }
+
+    const { data: rewardRow } = await supabase
+      .from("rewards_catalog")
+      .select("community_id, is_drop, kind")
+      .eq("id", rewardId)
+      .maybeSingle();
+
+    const merch = isMerchDropReward({
+      is_drop: Boolean(rewardRow?.is_drop),
+      kind: (rewardRow?.kind as string | null) ?? null,
+    });
+    const feature = merch ? "merch_drops" : "rewards_redeem";
+    const communityId = (rewardRow?.community_id as string | null) ?? null;
+    const gate = communityId
+      ? await requirePremiumFeature(user.id, communityId, feature)
+      : await requirePremiumAnywhere(user.id);
+    if (!gate.allowed) {
+      return { ok: false, error: PREMIUM_CTA.unlock };
     }
 
     const { data, error } = await supabase.rpc("redeem_reward", {

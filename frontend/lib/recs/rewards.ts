@@ -15,6 +15,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shouldListLaunchReward } from "@/lib/launch-catalog";
+import { isPremium } from "@/lib/entitlements-core";
 
 export interface RecommendedReward {
   reward_id: string;
@@ -114,11 +115,7 @@ async function coldStartReward(
 
   const fanPoints = (fan?.total_points as number | null) ?? 0;
   const sub = (ent?.subscription_tier as string | null) ?? "free";
-  const isPremium =
-    sub === "premium" ||
-    sub === "comped" ||
-    sub === "past_due" ||
-    ent?.is_founder === true;
+  const premium = isPremium(sub);
   const isFounder = ent?.is_founder === true;
 
   // 2. Pull eligible rewards.
@@ -147,7 +144,7 @@ async function coldStartReward(
   }>).filter((r) => {
     if (!shouldListLaunchReward(r, { signedIn: true })) return false;
     if (!r.requires_tier) return true;
-    if (r.requires_tier === "premium") return isPremium;
+    if (r.requires_tier === "premium") return premium;
     if (r.requires_tier === "founder-only") return isFounder;
     return false;
   });
