@@ -16,7 +16,7 @@ export default async function EditProfilePage() {
   const { data: fan } = await supabase
     .from("fans")
     .select("first_name, city, avatar_url")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   return (
