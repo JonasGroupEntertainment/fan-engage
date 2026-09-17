@@ -48,9 +48,9 @@ export default async function PolicyPage({ slug }: { slug: string }) {
         // ─── Production-safe holding state ───────────────────────────
         // Until corporate counsel finalizes the policy, we do not show
         // draft text. The visible page describes the status and gives
-        // a contact path. The route also carries
-        // robots: { index: false, follow: false } via the page's
-        // metadata so search engines don't index the holding state.
+        // a contact path. generatePolicyMetadata noindexes drafts and
+        // missing records; published policies (is_draft false) are
+        // indexable so live legal pages can appear in search.
         <section className="space-y-6">
           <h1 className="text-3xl font-semibold leading-tight">
             {policyName}

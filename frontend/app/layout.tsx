@@ -5,6 +5,7 @@ import "./globals.css";
 import CookieBanner from "@/components/cookie-banner";
 import Footer from "@/components/footer";
 import InstallPrompt from "@/components/install-prompt";
+import PremiumUpgradePrompt from "@/components/premium-upgrade-prompt";
 import PremiumBadge from "@/components/premium-badge";
 import AdminPill from "@/components/admin-pill";
 import SearchInput from "@/components/search-input";
@@ -14,10 +15,9 @@ import { DesktopNav } from "@/components/desktop-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/lib/data/notifications";
 import { getCurrentCommunityId } from "@/lib/community";
-import { getEntitlement } from "@/lib/entitlements";
+import { getEntitlement, fanIsPremiumAnywhere, merchAccess } from "@/lib/entitlements";
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
-import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { APP_URL } from "@/lib/app-url";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
@@ -78,20 +78,6 @@ export const metadata: Metadata = {
   },
 };
 
-const navItems = [
-  { href: "/", label: "Fan Home" },
-  { href: "/community", label: "Community" },
-  { href: "/rewards", label: "Rewards" },
-  // Soft launch: marketplace not open — label must not read as a live shop.
-  {
-    href: "/marketplace",
-    label: isMarketplaceLive() ? "Marketplace" : "Merch soon",
-  },
-  { href: "/premium", label: "Premium" },
-  { href: "/referrals", label: "Referrals" },
-  { href: "/artists", label: "Artists" },
-];
-
 /**
  * Tries to fetch the current user via the Supabase server client. If Supabase
  * isn't configured yet (env vars missing) we degrade gracefully and render the
@@ -151,10 +137,27 @@ export default async function RootLayout({
           founderNumber = ent.founderNumber;
         }
       }
+      if (!isPremium) {
+        isPremium = await fanIsPremiumAnywhere(user.id).catch(() => false);
+      }
     } catch {
       // Already defaulted above.
     }
   }
+
+  const merch = merchAccess({
+    signedIn: Boolean(user),
+    isPremium,
+  });
+  const navItems = [
+    { href: "/", label: "Fan Home" },
+    { href: "/community", label: "Community" },
+    { href: "/rewards", label: "Rewards" },
+    { href: merch.navHref, label: "Merch" },
+    { href: "/premium", label: "Premium" },
+    { href: "/referrals", label: "Referrals" },
+    { href: "/artists", label: "Artists" },
+  ];
 
   return (
     <html
@@ -207,7 +210,7 @@ export default async function RootLayout({
                     </span>
                   )}
                 </Link>
-                <UserMenu fan={user} isAdmin={isAdmin} unreadCount={unread} />
+                <UserMenu fan={user} isAdmin={isAdmin} unreadCount={unread} isPremium={isPremium} />
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -231,6 +234,7 @@ export default async function RootLayout({
         <Footer />
         <CookieBanner />
         <InstallPrompt />
+        <PremiumUpgradePrompt isPremium={isPremium} />
       </body>
     </html>
   );

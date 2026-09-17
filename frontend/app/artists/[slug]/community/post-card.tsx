@@ -10,7 +10,6 @@ import type {
 import ModerationChip from "@/components/community/moderation-chip";
 import CommentComposer from "./comment-composer";
 import {
-  addCommentAction,
   deletePostAction,
   togglePinAction,
   toggleReactionAction,
@@ -18,6 +17,8 @@ import {
 import PollBlock from "./poll-block";
 import ChallengeBlock from "./challenge-block";
 import { relativeTime } from "@/lib/format/relative-time";
+import PremiumCta from "@/components/premium-cta";
+import { PREMIUM_CTA, premiumPath } from "@/lib/entitlements-core";
 
 const REACTION_SET = ["❤️", "🔥", "👏", "💯", "😂"] as const;
 
@@ -52,6 +53,8 @@ export default function PostCard({
   isAuthor,
   isAdmin,
   currentUserId,
+  canReply = false,
+  canReact = false,
   poll,
   challengeEntries,
 }: {
@@ -60,6 +63,8 @@ export default function PostCard({
   isAuthor: boolean;
   isAdmin: boolean;
   currentUserId: string | null;
+  canReply?: boolean;
+  canReact?: boolean;
   poll?: PollData | null;
   challengeEntries?: ChallengeEntry[];
 }) {
@@ -173,6 +178,7 @@ export default function PostCard({
           artistSlug={post.artist_slug}
           poll={poll}
           currentUserId={currentUserId}
+          canVote={canReact}
         />
       )}
 
@@ -182,6 +188,7 @@ export default function PostCard({
           artistSlug={post.artist_slug}
           entries={challengeEntries ?? []}
           currentUserId={currentUserId}
+          canEnter={canReply}
         />
       )}
 
@@ -195,11 +202,24 @@ export default function PostCard({
         </div>
       )}
 
-      {/* Reactions */}
+      {/* Reactions — counts stay visible on the Free read path. */}
       <div className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
         {REACTION_SET.map((emoji) => {
           const count = post.reaction_counts[emoji] ?? 0;
           const mine = post.my_reactions.includes(emoji);
+          if (!canReact) {
+            return (
+              <a
+                key={emoji}
+                href={currentUserId ? premiumPath(post.artist_slug) : `/login?next=${encodeURIComponent(premiumPath(post.artist_slug))}`}
+                title={PREMIUM_CTA.available}
+                className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-sm text-white/70 hover:bg-black/50"
+              >
+                <span>{emoji}</span>
+                {count > 0 && <span className="text-xs">{count}</span>}
+              </a>
+            );
+          }
           return (
             <form key={emoji} action={toggleReactionAction}>
               <input type="hidden" name="post_id" value={post.id} />
@@ -257,8 +277,18 @@ export default function PostCard({
               </p>
             </div>
           ))}
-          {currentUserId && (
+          {currentUserId && canReply && (
             <CommentComposer postId={post.id} artistSlug={post.artist_slug} />
+          )}
+          {currentUserId && !canReply && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2">
+              <p className="text-xs text-white/70">{PREMIUM_CTA.unlock}</p>
+              <PremiumCta
+                copy="upgrade"
+                communityId={post.artist_slug}
+                variant="chip"
+              />
+            </div>
           )}
         </div>
       )}

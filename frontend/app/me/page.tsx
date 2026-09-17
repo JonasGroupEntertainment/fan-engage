@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { PREMIUM_CTA, getViewerPremiumAnywhere } from "@/lib/entitlements";
+import PremiumCta from "@/components/premium-cta";
 
 export const metadata = { title: "Account" };
 
@@ -13,6 +15,7 @@ export default async function MeIndexPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/me");
+  const isPremiumFan = await getViewerPremiumAnywhere();
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
@@ -67,6 +70,25 @@ export default async function MeIndexPage() {
           title="Referrals"
           body="Invite friends — earn points when they join."
         />
+        {isPremiumFan ? (
+          <Row
+            href={PREMIUM_CTA.billingHref}
+            title={PREMIUM_CTA.manageBilling}
+            body="Update your card, switch plans, or cancel on Stripe."
+          />
+        ) : (
+          <li>
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <div>
+                <div className="font-medium">{PREMIUM_CTA.available}</div>
+                <div className="mt-0.5 text-sm text-white/60">
+                  {PREMIUM_CTA.unlock}
+                </div>
+              </div>
+              <PremiumCta copy="upgrade" variant="chip" />
+            </div>
+          </li>
+        )}
       </ul>
     </main>
   );

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPremium } from "@/lib/entitlements-core";
 
 /**
  * Public fan profile data layer.
@@ -58,6 +59,7 @@ export interface PublicFanProfile {
   memberSince: string;
   socials: FanSocials;
   founderBadges: PublicFounderBadge[];
+  isPremium: boolean;
   badges: PublicBadge[];
   communities: PublicCommunity[];
   recentPosts: PublicPost[];
@@ -80,7 +82,7 @@ export async function getFanProfileBySlug(
   if (fanError || !fan) return null;
   if (fan.public_profile_enabled === false) return null;
 
-  const [founderRes, badgesRes, followingRes, postsRes] = await Promise.all([
+  const [founderRes, badgesRes, followingRes, postsRes, premiumRes] = await Promise.all([
     admin
       .from("fan_community_memberships")
       .select(
@@ -105,6 +107,12 @@ export async function getFanProfileBySlug(
       .eq("kind", "post")
       .order("created_at", { ascending: false })
       .limit(5),
+    admin
+      .from("fan_community_memberships")
+      .select("subscription_tier")
+      .eq("fan_id", fan.id)
+      .in("subscription_tier", ["premium", "comped", "past_due"])
+      .limit(1),
   ]);
 
   type FounderRow = {
@@ -135,6 +143,9 @@ export async function getFanProfileBySlug(
   const badges = (badgesRes.data ?? []) as unknown as BadgeRow[];
   const following = (followingRes.data ?? []) as unknown as FollowRow[];
   const posts = (postsRes.data ?? []) as unknown as PostRow[];
+  const premiumRows = (premiumRes.data ?? []) as Array<{
+    subscription_tier: string | null;
+  }>;
 
   return {
     profileSlug: fan.profile_slug as string,
@@ -151,6 +162,7 @@ export async function getFanProfileBySlug(
       accentTo: m.communities.accent_to ?? "#fb923c",
       founderNumber: m.founder_number,
     })),
+    isPremium: premiumRows.some((row) => isPremium(row.subscription_tier)),
     badges: badges.map((b) => ({
       slug: b.badges.slug,
       name: b.badges.name,

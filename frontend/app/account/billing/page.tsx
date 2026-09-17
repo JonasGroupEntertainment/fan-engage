@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeOrNull } from "@/lib/stripe";
 import { openBillingPortalAction } from "./actions";
+import { PREMIUM_CTA, isPremium } from "@/lib/entitlements";
+import PremiumCta from "@/components/premium-cta";
 
 export const metadata = { title: "Billing" };
 export const dynamic = "force-dynamic";
@@ -21,10 +23,6 @@ export default async function BillingPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  const hasStripe = getStripeOrNull() !== null;
-  const hasCustomer = Boolean(fan?.stripe_customer_id);
-
-  // Pull the fan's active premium memberships for context
   const { data: memberships } = await admin
     .from("fan_community_memberships")
     .select(
@@ -32,6 +30,12 @@ export default async function BillingPage() {
     )
     .eq("fan_id", user.id)
     .in("subscription_tier", ["premium", "past_due", "comped"]);
+
+  const hasStripe = getStripeOrNull() !== null;
+  const hasCustomer = Boolean(fan?.stripe_customer_id);
+  const isPremiumFan = (memberships ?? []).some((m) =>
+    isPremium(m.subscription_tier as string | null),
+  );
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
@@ -55,13 +59,18 @@ export default async function BillingPage() {
       {hasStripe && !hasCustomer && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
           You don&apos;t have an active subscription yet.{" "}
-          <a href="/premium" className="underline hover:text-white">
-            Browse Premium plans →
-          </a>
+          <PremiumCta copy="upgrade" variant="link" />
         </div>
       )}
 
-      {hasStripe && hasCustomer && (
+      {hasStripe && hasCustomer && !isPremiumFan && (
+        <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <p className="text-sm text-white/70">{PREMIUM_CTA.unlock}</p>
+          <PremiumCta copy="upgrade" />
+        </div>
+      )}
+
+      {hasStripe && hasCustomer && isPremiumFan && (
         <div className="space-y-6">
           {memberships && memberships.length > 0 && (
             <section className="space-y-3">
@@ -116,7 +125,7 @@ export default async function BillingPage() {
               type="submit"
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
-              Manage billing on Stripe →
+              {PREMIUM_CTA.manageBilling}
             </button>
           </form>
           <p className="text-xs text-white/50">
