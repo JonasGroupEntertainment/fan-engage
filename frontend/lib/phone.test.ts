@@ -104,14 +104,12 @@ describe("isE164", () => {
 });
 
 describe("phone validation is wired into every write path", () => {
-  it("profile action validates and redirects with an error flag the page renders", () => {
+  it("profile action validates and the form shows the shared message on a reject", () => {
     const action = readRepo("../app/me/profile/actions.ts");
-    const page = readRepo("../app/me/profile/page.tsx");
-    assert.match(page, /pattern=\{PHONE_INPUT_PATTERN\}/);
+    const form = readRepo("../app/me/profile/profile-form.tsx");
     assert.match(action, /normalizePhoneE164/);
-    assert.match(action, /\/me\/profile\?error=phone/);
-    assert.match(page, /INVALID_PHONE_MESSAGE/);
-    assert.match(page, /error === "phone"|error\) === "phone"/);
+    assert.match(form, /pattern=\{PHONE_INPUT_PATTERN\}/);
+    assert.match(form, /INVALID_PHONE_MESSAGE/);
   });
 
   it("onboard route rejects an invalid phone with a 400 before writing", () => {
