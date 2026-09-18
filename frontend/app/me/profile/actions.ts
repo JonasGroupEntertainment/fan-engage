@@ -3,24 +3,31 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { normalizePhoneE164 } from "@/lib/phone";
+import {
+  readProfileFormValues,
+  rejectedProfileSubmit,
+  SAVE_FAILED_MESSAGE,
+  type ProfileFormState,
+} from "@/lib/profile-form";
 
-export async function updateProfileAction(formData: FormData) {
+const orNull = (value: string): string | null => value || null;
+
+export async function updateProfileAction(
+  prevState: ProfileFormState,
+  formData: FormData,
+): Promise<ProfileFormState> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/me/profile");
 
-  const firstName = (formData.get("firstName") as string | null)?.trim() || null;
-  const lastName = (formData.get("lastName") as string | null)?.trim() || null;
-  const city = (formData.get("city") as string | null)?.trim() || null;
-  const phoneResult = normalizePhoneE164(formData.get("phone") as string | null);
-  if (!phoneResult.ok) redirect("/me/profile?error=phone");
-  const phone = phoneResult.phone;
-  const interest = (formData.get("interest") as string | null)?.trim() || null;
-  const musicOutlet = (formData.get("musicOutlet") as string | null)?.trim() || null;
-  const instagramOrTiktok = (formData.get("instagramOrTiktok") as string | null)?.trim() || null;
-  const avatarUrl = (formData.get("avatarUrl") as string | null)?.trim() || null;
+  const values = readProfileFormValues(formData);
+
+  const phoneResult = normalizePhoneE164(values.phone);
+  if (!phoneResult.ok) {
+    return rejectedProfileSubmit(prevState, "phone", phoneResult.error, values);
+  }
 
   // Merge into the existing socials object so other keys are preserved.
   const { data: existing } = await supabase
@@ -30,25 +37,26 @@ export async function updateProfileAction(formData: FormData) {
     .maybeSingle();
   const socials = {
     ...((existing?.socials as Record<string, unknown> | null) ?? {}),
-    instagram_or_tiktok: instagramOrTiktok,
+    instagram_or_tiktok: orNull(values.instagramOrTiktok),
   };
 
   const { error } = await supabase
     .from("fans")
     .update({
-      first_name: firstName,
-      last_name: lastName,
-      city,
-      phone,
-      interest,
-      music_outlet: musicOutlet,
+      first_name: orNull(values.firstName),
+      last_name: orNull(values.lastName),
+      city: orNull(values.city),
+      phone: phoneResult.phone,
+      interest: orNull(values.interest),
+      music_outlet: orNull(values.musicOutlet),
       socials,
-      avatar_url: avatarUrl,
+      avatar_url: orNull(values.avatarUrl),
     })
     .eq("id", user.id);
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[me/profile] update failed", { userId: user.id, message: error.message });
+    return rejectedProfileSubmit(prevState, "save", SAVE_FAILED_MESSAGE, values);
   }
 
   redirect("/me");
