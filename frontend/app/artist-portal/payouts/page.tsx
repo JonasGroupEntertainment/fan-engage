@@ -21,6 +21,10 @@ async function getPayoutData(communityId: string): Promise<{
   payouts: PayoutRow[];
 }> {
   const admin = createAdminClient();
+  // Payout rows are read through the signed-in client so the
+  // artist_payouts_owner_read RLS policy (migration 0060) scopes them to the
+  // owner's own community.
+  const supabase = await createClient();
 
   const { data: community } = await admin
     .from("communities")
@@ -30,7 +34,7 @@ async function getPayoutData(communityId: string): Promise<{
 
   let payouts: PayoutRow[] = [];
   try {
-    const { data } = await admin
+    const { data } = await supabase
       .from("artist_payouts")
       .select(
         "id, month_start, amount_cents, payout_split_pct, stripe_transfer_id, status, created_at"
