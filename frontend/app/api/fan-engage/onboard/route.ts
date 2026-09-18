@@ -5,6 +5,7 @@ import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { awardPoints } from "@/lib/points/award";
 import { LAUNCH_COMMUNITY_ID, REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
 import { resolveOnboardCommunityId } from "@/lib/onboard-community";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,16 @@ export async function POST(request: NextRequest) {
 
     const payload = (await request.json()) as OnboardPayload;
 
+    // Phone is optional, but anything provided must normalize to E.164 so
+    // Twilio and phone-based lookups always see one canonical shape.
+    const phoneResult = normalizePhoneE164(payload.phone);
+    if (!phoneResult.ok) {
+      return NextResponse.json(
+        { error: phoneResult.error, field: "phone" },
+        { status: 400 },
+      );
+    }
+
     // 1. Update the fan's profile row (created by the auth trigger).
     //
     // The onboarding wizard's "TikTok or Instagram handle" field arrives
@@ -93,7 +104,7 @@ export async function POST(request: NextRequest) {
       first_name: payload.firstName ?? null,
       last_name: payload.lastName ?? null,
       city: payload.city ?? null,
-      phone: payload.phone ?? null,
+      phone: phoneResult.phone,
       music_outlet: payload.musicOutlet ?? null,
       interest: payload.interest ?? null,
       sms_opted_in: Boolean(payload.smsOptedIn),
