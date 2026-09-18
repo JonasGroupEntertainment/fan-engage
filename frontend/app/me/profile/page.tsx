@@ -2,11 +2,18 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfileAction } from "./actions";
 import ImageUploader from "@/components/image-uploader";
+import { INVALID_PHONE_MESSAGE, PHONE_INPUT_PATTERN } from "@/lib/phone";
 
 export const metadata = { title: "Edit profile" };
 export const dynamic = "force-dynamic";
 
-export default async function EditProfilePage() {
+type EditProfilePageProps = {
+  searchParams: Promise<{ error?: string }>;
+};
+
+export default async function EditProfilePage({ searchParams }: EditProfilePageProps) {
+  const { error } = await searchParams;
+  const hasPhoneError = error === "phone";
   const supabase = await createClient();
   const {
     data: { user },
@@ -77,9 +84,22 @@ export default async function EditProfilePage() {
             name="phone"
             defaultValue={fan?.phone ?? ""}
             placeholder="+1 (615) 555-0123"
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-white/40 focus:outline-none"
+            pattern={PHONE_INPUT_PATTERN}
+            title={INVALID_PHONE_MESSAGE}
+            aria-invalid={hasPhoneError || undefined}
+            aria-describedby="phone-hint"
+            className={`mt-2 w-full rounded-2xl border bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:outline-none ${
+              hasPhoneError
+                ? "border-rose-400/70 focus:border-rose-300"
+                : "border-white/10 focus:border-white/40"
+            }`}
           />
-          <span className="mt-1 block text-xs text-white/50">
+          {hasPhoneError && (
+            <span role="alert" className="mt-1 block text-xs text-rose-300">
+              {INVALID_PHONE_MESSAGE}
+            </span>
+          )}
+          <span id="phone-hint" className="mt-1 block text-xs text-white/50">
             Recommended. Unlocks SMS perks for artist drops, events, and rewards.
           </span>
         </label>

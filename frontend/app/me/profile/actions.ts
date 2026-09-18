@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export async function updateProfileAction(formData: FormData) {
   const supabase = await createClient();
@@ -13,7 +14,9 @@ export async function updateProfileAction(formData: FormData) {
   const firstName = (formData.get("firstName") as string | null)?.trim() || null;
   const lastName = (formData.get("lastName") as string | null)?.trim() || null;
   const city = (formData.get("city") as string | null)?.trim() || null;
-  const phone = (formData.get("phone") as string | null)?.trim() || null;
+  const phoneResult = normalizePhoneE164(formData.get("phone") as string | null);
+  if (!phoneResult.ok) redirect("/me/profile?error=phone");
+  const phone = phoneResult.phone;
   const interest = (formData.get("interest") as string | null)?.trim() || null;
   const musicOutlet = (formData.get("musicOutlet") as string | null)?.trim() || null;
   const instagramOrTiktok = (formData.get("instagramOrTiktok") as string | null)?.trim() || null;

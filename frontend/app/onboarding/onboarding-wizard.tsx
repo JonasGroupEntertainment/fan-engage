@@ -28,6 +28,9 @@ type Field = {
   hint?: string;
 };
 
+const GENERIC_FINISH_ERROR =
+  "Could not save your profile. Refresh this page and try again.";
+
 const MUSIC_OUTLET_OPTIONS = [
   "Spotify",
   "Apple Music",
@@ -133,6 +136,7 @@ export default function OnboardingWizard({
   const [smsStatus, setSmsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [smsMessage, setSmsMessage] = useState(EMPTY_PHONE_SMS_MESSAGE);
   const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [finishMessage, setFinishMessage] = useState(GENERIC_FINISH_ERROR);
   const [tosConsent, setTosConsent] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
   // Tracks whether the email field was successfully auto-prefilled from
@@ -357,8 +361,13 @@ export default function OnboardingWizard({
       });
 
       if (!onboardRes.ok) {
+        const body = (await onboardRes.json().catch(() => null)) as { error?: string } | null;
+        setFinishMessage(
+          onboardRes.status === 400 && body?.error ? body.error : GENERIC_FINISH_ERROR,
+        );
         throw new Error(`Onboarding save failed (${onboardRes.status})`);
       }
+      setFinishMessage(GENERIC_FINISH_ERROR);
 
       if (refFromCookie && typeof document !== "undefined") {
         document.cookie = "fanengage_ref=; path=/; max-age=0";
@@ -693,8 +702,8 @@ export default function OnboardingWizard({
               )}
             </div>
             {finishStatus === "error" && (
-              <p className="text-sm text-rose-300">
-                Could not save your profile. Refresh this page and try again.
+              <p role="alert" className="text-sm text-rose-300">
+                {finishMessage}
               </p>
             )}
           </div>

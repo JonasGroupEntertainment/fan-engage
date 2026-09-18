@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import twilio from "twilio";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeSmsPhone } from "@/lib/sms-send-gate";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export const runtime = "nodejs";
 
@@ -57,15 +57,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const { phone: rawPhone, firstName, interest } = (await request.json()) as SmsPayload;
-    const phone = normalizeSmsPhone(rawPhone);
-
-    if (!phone) {
+    // Require E.164 so arbitrary strings never reach Twilio.
+    const phoneResult = normalizePhoneE164(rawPhone);
+    if (!phoneResult.ok) {
+      return NextResponse.json({ error: phoneResult.error }, { status: 400 });
+    }
+    if (!phoneResult.phone) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
     }
-    // Require E.164 format to prevent passing arbitrary strings to Twilio
-    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-      return NextResponse.json({ error: "Invalid phone number format" }, { status: 400 });
-    }
+    const phone = phoneResult.phone;
 
     const client = twilio(accountSid, authToken);
     // Welcome text — points at the first point-earning action so the fan has
