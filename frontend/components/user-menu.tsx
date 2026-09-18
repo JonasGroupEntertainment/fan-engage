@@ -115,6 +115,16 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0, isPremium = fa
               Fan home
             </Link>
 
+            {/* Edit Profile */}
+            <Link
+              href="/me/profile"
+              className="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+              role="menuitem"
+              onClick={() => setIsOpen(false)}
+            >
+              Edit profile
+            </Link>
+
             {/* My Profile */}
             {fan.profileSlug && (
               <Link
