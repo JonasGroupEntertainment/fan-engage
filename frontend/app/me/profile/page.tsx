@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfileAction } from "./actions";
 import ImageUploader from "@/components/image-uploader";
-import { INVALID_PHONE_MESSAGE } from "@/lib/phone";
+import { INVALID_PHONE_MESSAGE, PHONE_INPUT_PATTERN } from "@/lib/phone";
 
 export const metadata = { title: "Edit profile" };
 export const dynamic = "force-dynamic";
@@ -84,6 +84,8 @@ export default async function EditProfilePage({ searchParams }: EditProfilePageP
             name="phone"
             defaultValue={fan?.phone ?? ""}
             placeholder="+1 (615) 555-0123"
+            pattern={PHONE_INPUT_PATTERN}
+            title={INVALID_PHONE_MESSAGE}
             aria-invalid={hasPhoneError || undefined}
             aria-describedby="phone-hint"
             className={`mt-2 w-full rounded-2xl border bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:outline-none ${

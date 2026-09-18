@@ -10,6 +10,16 @@
 export const INVALID_PHONE_MESSAGE =
   "Enter a valid phone number with area code, like +1 (615) 555-0123.";
 
+/**
+ * Loose browser-side check for the HTML `pattern` attribute: an optional "+",
+ * then 8 to 15 digits with only spaces, dots, dashes, and parentheses between
+ * them. It stops typos and letters before the form submits (so other unsaved
+ * edits are not lost on a round trip); normalizePhoneE164 stays the real gate.
+ * Browsers compile it as ^(?:pattern)$ with the v flag, so "(" ")" "-" are escaped.
+ */
+export const PHONE_INPUT_PATTERN =
+  "\\+?(?:[\\s\\(\\)\\.\\-]*\\d){8,15}[\\s\\(\\)\\.\\-]*";
+
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 const SEPARATORS_PATTERN = /[\s().-]/g;
 const DIGITS_ONLY_PATTERN = /^\d+$/;

@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { INVALID_PHONE_MESSAGE, isE164, normalizePhoneE164 } from "./phone.ts";
+import {
+  INVALID_PHONE_MESSAGE,
+  PHONE_INPUT_PATTERN,
+  isE164,
+  normalizePhoneE164,
+} from "./phone.ts";
 
 function readRepo(relFromLib: string): string {
   return readFileSync(fileURLToPath(new URL(relFromLib, import.meta.url)), "utf8");
@@ -102,6 +107,7 @@ describe("phone validation is wired into every write path", () => {
   it("profile action validates and redirects with an error flag the page renders", () => {
     const action = readRepo("../app/me/profile/actions.ts");
     const page = readRepo("../app/me/profile/page.tsx");
+    assert.match(page, /pattern=\{PHONE_INPUT_PATTERN\}/);
     assert.match(action, /normalizePhoneE164/);
     assert.match(action, /\/me\/profile\?error=phone/);
     assert.match(page, /INVALID_PHONE_MESSAGE/);
@@ -124,5 +130,30 @@ describe("phone validation is wired into every write path", () => {
   it("onboarding wizard shows the server's phone error instead of a generic failure", () => {
     const wizard = readRepo("../app/onboarding/onboarding-wizard.tsx");
     assert.match(wizard, /finishMessage/);
+  });
+});
+
+describe("PHONE_INPUT_PATTERN (browser-side pattern attribute)", () => {
+  // Browsers compile the pattern attribute as ^(?:pattern)$ with the v flag.
+  const browserRegex = new RegExp(`^(?:${PHONE_INPUT_PATTERN})$`, "v");
+
+  it("accepts every shape the server normalizer accepts", () => {
+    for (const value of [
+      "+16155550123",
+      "(615) 555-0123",
+      "615-555-0123",
+      "615.555.0123",
+      "1 615 555 0123",
+      "+44 20 7946 0958",
+      "0044 20 7946 0958",
+    ]) {
+      assert.ok(browserRegex.test(value), `expected accept: ${value}`);
+    }
+  });
+
+  it("rejects obviously bad input before the form submits", () => {
+    for (const value of ["12345", "abc", "615-555-0123 x22", "+1 (615) 555-0123456789"]) {
+      assert.ok(!browserRegex.test(value), `expected reject: ${value}`);
+    }
   });
 });
