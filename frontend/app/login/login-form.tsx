@@ -6,7 +6,10 @@ import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo, sanitizeNextPath } from "@/lib/app-url";
-import { signedInLoginRedirectPath } from "@/lib/session-presence";
+import {
+  cookiesFromHeader,
+  signedInLoginRedirectPath,
+} from "@/lib/session-presence";
 import { buildPasswordAuthCredentials } from "@/lib/password-auth-credentials";
 import { buildMagicLinkAuthOptions } from "@/lib/magic-link-auth-options";
 import {
@@ -132,9 +135,7 @@ export function LoginForm({
       if (cancelled) return;
       const dest = signedInLoginRedirectPath({
         user,
-        cookies: document.cookie.split(";").map((part) => ({
-          name: part.split("=")[0]?.trim() ?? "",
-        })),
+        cookies: cookiesFromHeader(document.cookie),
         nextPath: next,
       });
       if (dest) {
