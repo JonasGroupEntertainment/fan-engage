@@ -1,5 +1,11 @@
 -- Fan Engage — network_watchdog feeder-silence: empty funnel is not an outage
 --
+-- REPO SYNC ONLY. Do not apply to prod.
+-- Live already applied out-of-band as network_watchdog_empty_funnel_guard
+-- (version 20260921112742) on uhovonrljcauaoctypbg. This file records that
+-- function body so the repo matches prod. create or replace of the same
+-- definition is a no-op if someone pastes it later.
+--
 -- Replaces only the alert.feeder_silent branch of public.network_watchdog().
 -- Fraud / flood / cron-failure branches are copied verbatim from
 -- 20260724190845_network_watchdog_v1.sql.
@@ -9,55 +15,47 @@
 -- died. Cody HARD PASS: silence = no traffic, not outage. Kevin/DJ: do
 -- not treat an empty feeder as an outage until there is a real funnel.
 --
--- New silence rule (9d lookback; if last event is 48h+ stale, that window
--- is the prior ~7d of traffic):
---   events_7d >= 50
---   OR (distinct UTC days >= 5 AND events_7d >= 21)
+-- Live / this-file silence rule (9d lookback):
+--   events >= 50
+--   AND distinct active days >= 5
 --   AND max(occurred_at) < now() - 48 hours
 --
--- Does not reschedule cron jobid 6 (network_watchdog, `5 * * * *`).
--- Does not run the function (would insert rows). Does not touch
--- network_actions, network_launch_plan, or fan_events data.
+-- OR (events >= 50 OR (days >= 5 AND events >= 21)) was considered and
+-- rejected for this ledger: it would re-page fan_engage_internal at
+-- ~35 events / 6 days. Prod keeps AND.
 --
--- Prod note (2026-09-21): an out-of-band apply named
--- network_watchdog_empty_funnel_guard (version 20260921112742) already
--- replaced the live function with a stricter AND (events >= 50 AND
--- distinct days >= 5). This file is the requested OR rule for the repo
--- ledger. Applying it will loosen that live AND guard — see PR.
+-- Does not reschedule cron jobid 6 (network_watchdog, `5 * * * *`).
+-- Does not run the function. Does not touch network_actions,
+-- network_launch_plan, or fan_events. Does not change RaeLynn launch dates.
 
 create or replace function public.network_watchdog()
 returns void language plpgsql security definer set search_path = public as $$
 declare r record; v_hourly_avg numeric; v_last_hour bigint; v_fraud bigint;
 begin
-  -- 1) Feeder silence: sustained feeder then sudden silence.
-  --    Empty funnel / soft-launch quiet is not an outage.
+  -- 1) Feeder silence: require sustained cadence (not a sparse tester burst),
+  --    then 48h with zero events. Empty funnel / soft-launch quiet ≠ outage.
   for r in
     select source_app,
            max(occurred_at) as last_event,
-           count(*) as events_7d,
-           count(distinct (timezone('utc', occurred_at))::date) as active_days_7d
+           count(*) as events_9d,
+           count(distinct date_trunc('day', occurred_at)) as active_days_9d
     from fan_events
     where occurred_at > now() - interval '9 days'
     group by source_app
     having max(occurred_at) < now() - interval '48 hours'
-       and (
-         count(*) >= 50
-         or (
-           count(distinct (timezone('utc', occurred_at))::date) >= 5
-           and count(*) >= 21
-         )
-       )
+       and count(distinct date_trunc('day', occurred_at)) >= 5
+       and count(*) >= 50
   loop
     insert into network_actions (action_type, ring, payload, reason, proposed_by, dedupe_key)
     values ('alert.feeder_silent', 'free',
             jsonb_build_object(
               'source_app', r.source_app,
               'last_event', r.last_event,
-              'events_prior_7d', r.events_7d,
-              'active_days_prior_7d', r.active_days_7d
+              'events_prior_9d', r.events_9d,
+              'active_days_prior_9d', r.active_days_9d
             ),
-            format('Feeder %s silent 48h+ after sustained feeder then sudden silence (%s events across %s days)',
-                   r.source_app, r.events_7d, r.active_days_7d),
+            format('Feeder %s silent 48h+ after sustained cadence (%s events across %s days) — possible outage, not empty funnel',
+                   r.source_app, r.events_9d, r.active_days_9d),
             'watchdog', 'silent:' || r.source_app || ':' || current_date)
     on conflict (dedupe_key) do nothing;
   end loop;
