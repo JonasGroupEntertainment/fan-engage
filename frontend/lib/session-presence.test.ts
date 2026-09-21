@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  cookiesFromHeader,
   hasSupabaseAuthCookies,
   hasSupabaseAuthCookiesFromHeader,
   missionClientGate,
@@ -21,6 +22,23 @@ describe("hasSupabaseAuthCookies", () => {
     assert.equal(hasSupabaseAuthCookies([{ name: "sb-abc-auth-token.0" }]), true);
     assert.equal(hasSupabaseAuthCookies([{ name: "theme" }]), false);
     assert.equal(hasSupabaseAuthCookies([]), false);
+  });
+
+  it("ignores PKCE verifiers and empty auth-token cookies", () => {
+    assert.equal(
+      hasSupabaseAuthCookies([
+        { name: "sb-abc-auth-token-code-verifier", value: "verifier" },
+      ]),
+      false,
+    );
+    assert.equal(
+      hasSupabaseAuthCookies([{ name: "sb-abc-auth-token", value: "" }]),
+      false,
+    );
+    assert.equal(
+      hasSupabaseAuthCookies([{ name: "sb-abc-auth-token", value: "stale" }]),
+      true,
+    );
   });
 });
 
@@ -91,6 +109,16 @@ describe("hasSupabaseAuthCookiesFromHeader", () => {
     );
     assert.equal(hasSupabaseAuthCookiesFromHeader("theme=dark"), false);
     assert.equal(hasSupabaseAuthCookiesFromHeader(""), false);
+    assert.equal(
+      hasSupabaseAuthCookiesFromHeader("sb-xxx-auth-token="),
+      false,
+    );
+    assert.equal(
+      hasSupabaseAuthCookiesFromHeader(
+        "sb-xxx-auth-token-code-verifier=verifier",
+      ),
+      false,
+    );
   });
 });
 
@@ -151,7 +179,7 @@ describe("signedInLoginRedirectPath", () => {
     );
   });
 
-  it("cookie-present getUser miss follows onboarding/home next, not protected", () => {
+  it("cookie-present getUser miss follows onboarding next, not protected", () => {
     assert.equal(
       signedInLoginRedirectPath({
         user: null,
@@ -167,6 +195,53 @@ describe("signedInLoginRedirectPath", () => {
         nextPath: "/inbox",
       }),
       "/onboarding",
+    );
+  });
+
+  it("does not bounce a cookie-only visitor to the signed-out landing", () => {
+    assert.equal(
+      signedInLoginRedirectPath({
+        user: null,
+        cookies: [{ name: "sb-xxx-auth-token", value: "stale" }],
+        nextPath: "/",
+      }),
+      null,
+    );
+    assert.equal(
+      signedInLoginRedirectPath({
+        user: null,
+        cookies: [{ name: "sb-xxx-auth-token", value: "stale" }],
+        nextPath: null,
+      }),
+      null,
+    );
+    assert.equal(
+      signedInLoginRedirectPath({
+        user: null,
+        cookies: [
+          { name: "sb-xxx-auth-token-code-verifier", value: "verifier" },
+        ],
+        nextPath: "/",
+      }),
+      null,
+    );
+    assert.equal(
+      signedInLoginRedirectPath({
+        user: { id: "u1" },
+        cookies: [],
+        nextPath: "/",
+      }),
+      "/",
+    );
+  });
+
+  it("parses document.cookie values so an emptied auth cookie is not a session", () => {
+    assert.deepEqual(
+      cookiesFromHeader("sb-xxx-auth-token=; sb-xxx-auth-token-code-verifier=v"),
+      [
+        { name: "sb-xxx-auth-token", value: "" },
+        { name: "sb-xxx-auth-token-code-verifier", value: "v" },
+      ],
     );
   });
 });

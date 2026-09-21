@@ -1,20 +1,36 @@
-import { isSupabaseAuthCookie } from "./auth-signout.ts";
+import { isSupabaseSessionCookie } from "./auth-signout.ts";
 import { sanitizeNextPath } from "./app-url.ts";
 import { isOnboardingPath } from "./guest-signup.ts";
 
-export type CookieName = { name: string };
+export type CookieName = { name: string; value?: string };
+
+function sessionCookiePresent(cookie: CookieName): boolean {
+  if (!isSupabaseSessionCookie(cookie.name)) return false;
+  // Name-only checks still count. An explicit empty value does not: a failed
+  // refresh writes sb-*-auth-token= with no session behind it.
+  if (cookie.value !== undefined && cookie.value.trim() === "") return false;
+  return true;
+}
+
+export function cookiesFromHeader(cookieHeader: string): CookieName[] {
+  if (!cookieHeader.trim()) return [];
+  return cookieHeader.split(";").map((part) => {
+    const eq = part.indexOf("=");
+    if (eq === -1) return { name: part.trim(), value: "" };
+    return {
+      name: part.slice(0, eq).trim(),
+      value: part.slice(eq + 1).trim(),
+    };
+  });
+}
 
 export function hasSupabaseAuthCookies(cookies: CookieName[]): boolean {
-  return cookies.some((cookie) => isSupabaseAuthCookie(cookie.name));
+  return cookies.some(sessionCookiePresent);
 }
 
 /** Browser `document.cookie` / Cookie header — same names as request cookies. */
 export function hasSupabaseAuthCookiesFromHeader(cookieHeader: string): boolean {
-  if (!cookieHeader.trim()) return false;
-  return cookieHeader.split(";").some((part) => {
-    const name = part.split("=")[0]?.trim() ?? "";
-    return isSupabaseAuthCookie(name);
-  });
+  return hasSupabaseAuthCookies(cookiesFromHeader(cookieHeader));
 }
 
 /**
@@ -54,9 +70,16 @@ export function missionClientGate(opts: {
 }
 
 /**
- * Signed-in (or cookie-present) visitors must not sit on /login. Cookie-only
- * sessions only follow next when that surface stays put; otherwise send them
- * to /onboarding so /inbox?next cannot bounce login ↔ protected.
+ * Confirmed sessions leave /login for `next`.
+ *
+ * A cookie without a user is not signed in. `/` is the signed-out landing,
+ * and its Sign in link is `/login`, so sending that visitor to `/` loops
+ * (production: leftover sb-*-auth-token or PKCE verifier → 307 Location: /).
+ * Stay on the form.
+ *
+ * Cookie-only visitors may still follow an onboarding `next` (that page
+ * stays put) or be sent to /onboarding instead of a protected `next`, so
+ * /login?next=/inbox cannot bounce with middleware.
  */
 export function signedInLoginRedirectPath(opts: {
   user: unknown | null;
@@ -66,6 +89,7 @@ export function signedInLoginRedirectPath(opts: {
   const next = sanitizeNextPath(opts.nextPath);
   if (opts.user) return next;
   if (!hasSupabaseAuthCookies(opts.cookies)) return null;
-  if (isOnboardingPath(next) || next === "/") return next;
+  if (next === "/") return null;
+  if (isOnboardingPath(next)) return next;
   return "/onboarding";
 }

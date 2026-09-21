@@ -21,6 +21,19 @@ export function isSupabaseAuthCookie(name: string): boolean {
   return name.startsWith("sb-") && name.includes("auth-token");
 }
 
+/**
+ * PKCE verifier cookies are named sb-<ref>-auth-token-code-verifier, so they
+ * match isSupabaseAuthCookie. They are not a session. Sign-out still clears
+ * them; session checks must not.
+ */
+export function isSupabaseCodeVerifierCookie(name: string): boolean {
+  return name.includes("code-verifier");
+}
+
+export function isSupabaseSessionCookie(name: string): boolean {
+  return isSupabaseAuthCookie(name) && !isSupabaseCodeVerifierCookie(name);
+}
+
 export type CookieToClear = { name: string };
 
 /**
