@@ -11,7 +11,8 @@ import {
 /**
  * Cron: GET /api/cron/leaderboard-notifications
  *
- * Runs once daily (recommended: 08:00 UTC via vercel.json).
+ * Runs once daily at 16:00 UTC via vercel.json (late morning in the US,
+ * since SMS ignores quiet hours).
  *
  * For every active artist community:
  *   1. Compute today's leaderboard with gatherArtistLeaderboard.

@@ -6,6 +6,8 @@ import { awardPoints } from "@/lib/points/award";
 import { LAUNCH_COMMUNITY_ID, REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
 import { resolveOnboardCommunityId } from "@/lib/onboard-community";
 import { normalizePhoneE164 } from "@/lib/phone";
+import { setPreferences } from "@/lib/notifications/preferences";
+import { smsEnabledFromOnboarding } from "@/lib/sms-send-gate";
 
 export const runtime = "nodejs";
 
@@ -127,6 +129,17 @@ export async function POST(request: NextRequest) {
         { error: "Unable to save profile." },
         { status: 500 },
       );
+    }
+
+    // 1b. Mirror the text opt-in onto the SMS channel toggle. The notifier
+    //     reads notification_preferences.sms_enabled, which defaults off,
+    //     so without this an opted-in fan never gets a text.
+    try {
+      await setPreferences(user.id, {
+        sms_enabled: smsEnabledFromOnboarding(payload.smsOptedIn, phoneResult.phone),
+      });
+    } catch (err) {
+      console.warn("onboard: failed to sync SMS preference", err);
     }
 
     // 2a. Always join a community so the founding claim can assign
