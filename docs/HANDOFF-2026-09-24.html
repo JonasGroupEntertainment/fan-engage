@@ -77,7 +77,7 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <tr><td>Local working copy</td><td><code>~/Developer/fan-engage</code>. It is checked out on <code>stage0/auto-2026-09-23</code>, a local auto branch that is not ours. Switch to a fresh <code>main</code> before starting work.</td></tr>
 <tr><td>Migrations</td><td>Root <code>supabase/migrations/</code>. The numbered series now ends at <code>0062_lock_down_security_definer_functions.sql</code>. 0061 (privacy counsel contact) came in with PR #64 on 2026-09-23. <b>Next free number is 0063.</b></td></tr>
 <tr><td>CI on main</td><td>Frontend tests and Secret Scan both passed on b904d62.</td></tr>
-<tr><td>Handoffs</td><td>This file is <code>docs/HANDOFF-2026-09-24.html</code>, untracked. <code>docs/HANDOFF-2026-09-17.html</code> is also still untracked. The 2026-09-14 one is committed.</td></tr>
+<tr><td>Handoffs</td><td>This file is <code>docs/HANDOFF-2026-09-24.html</code>. It and <code>docs/HANDOFF-2026-09-17.html</code> landed on main in PR #67 (aa1042c). The 2026-09-14 one is committed too.</td></tr>
 </table></div>
 </section>
 
@@ -171,7 +171,7 @@ git checkout main && git pull</code></pre>
 <tr><td>Rollback for 0062</td><td>There is no file in <code>supabase/rollbacks/</code> for 0061 or 0062. Add one for 0062 so the grants can be restored fast if a caller breaks.</td><td><span class="owner">Next session</span></td></tr>
 <tr><td>Local checkout branch</td><td>The working copy sits on <code>stage0/auto-2026-09-23</code>. Confirm with Kevin whether that branch and the two Cursor remote branches can go.</td><td><span class="owner kevin">Kevin</span></td></tr>
 <tr><td>Radar env vars</td><td>Still parked. See the 2026-09-17 handoff for the exact steps.</td><td><span class="owner kevin">Kevin</span></td></tr>
-<tr><td>Carried from 2026-09-17</td><td>Signed-in browser check of /admin/super-fans, /artist-portal/payouts, /me/profile. Misnamed rollback 0040 (it rolls back 0049). COLLABORATING.md drift. PR #4 videos. Commit the 09-17 and 09-24 handoffs if wanted.</td><td><span class="owner kevin">Kevin</span> / <span class="owner">Next session</span></td></tr>
+<tr><td>Carried from 2026-09-17</td><td>Signed-in browser check of /admin/super-fans, /artist-portal/payouts, /me/profile. Misnamed rollback 0040 (it rolls back 0049). COLLABORATING.md drift. PR #4 videos.</td><td><span class="owner kevin">Kevin</span> / <span class="owner">Next session</span></td></tr>
 </table></div>
 <div class="callout">
 <span class="label">For the next agent</span>
