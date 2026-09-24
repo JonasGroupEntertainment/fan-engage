@@ -92,6 +92,7 @@ export default async function PremiumPage({
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
     { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points — not a Premium purchase." },
+    { icon: "🛍️", title: "Merch drops coming soon", body: "Physical merch is not live yet. Premium today is the in-app community, rewards, and backstage access." },
   ];
 
   return (

@@ -15,6 +15,7 @@ import {
   applyPremiumEntitlementToPromptState,
   dismissPremiumUpgradePrompt,
   incrementPremiumUpgradePromptViews,
+  isCookieBannerOpen,
   loadPremiumUpgradePromptState,
   parsePremiumUpgradePromptState,
   pickFirstShowDelayMs,
@@ -55,6 +56,7 @@ describe("premium upgrade prompt: hide when Premium", () => {
       assert.equal(shouldHidePremiumUpgradeForEntitlement(tier), true);
       assert.equal(
         shouldShowPremiumUpgradePrompt({
+          signedIn: true,
           isPremium: isPremium(tier),
           state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
           pathname: "/",
@@ -68,6 +70,7 @@ describe("premium upgrade prompt: hide when Premium", () => {
     assert.equal(shouldHidePremiumUpgradeForEntitlement(true), true);
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: true,
         state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
         pathname: "/",
@@ -85,6 +88,7 @@ describe("premium upgrade prompt: hide when Premium", () => {
     assert.equal(locked.views, 0);
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state: locked,
         pathname: "/",
@@ -109,6 +113,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
   it("shows on the first visit before any dismiss", () => {
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
         pathname: "/",
@@ -135,6 +140,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
     assert.equal(dismissed.views, 0);
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state: dismissed,
         pathname: "/",
@@ -149,6 +155,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
       const to = path[(i + 1) % path.length];
       state = recordPremiumUpgradeNavigation(state, from, to);
       const show = shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state,
         pathname: to,
@@ -185,6 +192,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
     assert.equal(next.dismissed, true);
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state: next,
         pathname: "/",
@@ -257,6 +265,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
       );
       assert.equal(
         shouldShowPremiumUpgradePrompt({
+          signedIn: true,
           isPremium: false,
           state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
           pathname: `${prefix}/extra`,
@@ -269,6 +278,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
   it("also hides on /premium so it does not cover checkout", () => {
     assert.equal(
       shouldShowPremiumUpgradePrompt({
+        signedIn: true,
         isPremium: false,
         state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
         pathname: "/premium",
@@ -281,6 +291,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
     for (const pathname of ["/", "/community", "/rewards", "/artists"]) {
       assert.equal(
         shouldShowPremiumUpgradePrompt({
+          signedIn: true,
           isPremium: false,
           state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
           pathname,
@@ -316,6 +327,103 @@ describe("premium upgrade prompt: wiring", () => {
       "Go Premium. Unlock the good stuff ✨",
     );
     assert.match(PREMIUM_UPGRADE_PROMPT_COPY.body, /community|rewards|merch/i);
+    assert.match(PREMIUM_UPGRADE_PROMPT_COPY.body, /Merch drops coming soon/);
+    assert.doesNotMatch(PREMIUM_UPGRADE_PROMPT_COPY.body, /grab merch/i);
     assert.equal(PREMIUM_UPGRADE_PROMPT_COPY.dismiss, "Not now");
+    const premiumPage = readRepo("../app/premium/page.tsx");
+    assert.doesNotMatch(premiumPage, /grab merch/i);
+    assert.match(premiumPage, /Merch drops coming soon/);
+  });
+
+  it("passes signed-in state from the layout and waits out the cookie banner", () => {
+    const layout = readRepo("../app/layout.tsx");
+    const component = readRepo("../components/premium-upgrade-prompt.tsx");
+    assert.match(layout, /signedIn=\{Boolean\(user\)\}/);
+    assert.match(component, /isCookieBannerOpen/);
+    assert.match(component, /COOKIE_CONSENT_EVENT/);
+    assert.match(component, /PREMIUM_UPGRADE_PROMPT_COPY\.dismiss/);
+    assert.match(component, /Close upgrade prompt/);
+  });
+});
+
+describe("premium upgrade prompt: guests and cookie banner", () => {
+  it("never shows to signed-out guests, even on a first visit", () => {
+    assert.equal(
+      shouldShowPremiumUpgradePrompt({
+        signedIn: false,
+        isPremium: false,
+        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        pathname: "/",
+        cookieBannerOpen: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldShowPremiumUpgradePrompt({
+        signedIn: false,
+        isPremium: false,
+        state: waiting(PAGE_VIEWS_TO_RESURFACE),
+        pathname: "/artists/raelynn/community",
+      }),
+      false,
+    );
+  });
+
+  it("shows for a signed-in Free member once the cookie banner is gone", () => {
+    assert.equal(
+      shouldShowPremiumUpgradePrompt({
+        signedIn: true,
+        isPremium: false,
+        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        pathname: "/",
+        cookieBannerOpen: false,
+      }),
+      true,
+    );
+  });
+
+  it("stays hidden while the cookie banner is open", () => {
+    assert.equal(
+      shouldShowPremiumUpgradePrompt({
+        signedIn: true,
+        isPremium: false,
+        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        pathname: "/",
+        cookieBannerOpen: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldShowPremiumUpgradePrompt({
+        signedIn: true,
+        isPremium: false,
+        state: waiting(PAGE_VIEWS_TO_RESURFACE),
+        pathname: "/community",
+        cookieBannerOpen: true,
+      }),
+      false,
+    );
+  });
+
+  it("treats a stored consent value as resolved and an empty home visit as open", () => {
+    assert.equal(
+      isCookieBannerOpen({ consentRaw: null, pathname: "/" }),
+      true,
+    );
+    assert.equal(
+      isCookieBannerOpen({
+        consentRaw: JSON.stringify({ choice: "accept" }),
+        pathname: "/",
+      }),
+      false,
+    );
+    assert.equal(
+      isCookieBannerOpen({ consentRaw: null, pathname: "/signup" }),
+      false,
+    );
+    assert.equal(
+      isCookieBannerOpen({ consentRaw: null, pathname: "/artists/raelynn/community" }),
+      true,
+    );
   });
 });
