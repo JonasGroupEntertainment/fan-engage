@@ -1,6 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { applyTermsColoradoEntityFacts } from "@/lib/legal/correct-terms-entity-facts";
+import {
+  alignOfficialContactEmails,
+  applyTermsSupportContact,
+} from "@/lib/legal/official-contact";
+import {
+  applyPrivacyCounselScrub,
+  privacyCounselEffectiveDate,
+} from "@/lib/legal/scrub-privacy-policy";
 
 export type PolicySlug =
   | "terms"
@@ -43,8 +51,17 @@ export async function listPolicies(): Promise<PolicyPage[]> {
 }
 
 function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
+  let contentMd = alignOfficialContactEmails(policy.content_md);
+  contentMd = applyTermsColoradoEntityFacts(policy.slug, contentMd);
+  contentMd = applyTermsSupportContact(policy.slug, contentMd);
+  let effectiveDate = policy.effective_date;
+  if (policy.slug === "privacy") {
+    contentMd = applyPrivacyCounselScrub(contentMd);
+    effectiveDate = privacyCounselEffectiveDate(effectiveDate);
+  }
   return {
     ...policy,
-    content_md: applyTermsColoradoEntityFacts(policy.slug, policy.content_md),
+    content_md: contentMd,
+    effective_date: effectiveDate,
   };
 }

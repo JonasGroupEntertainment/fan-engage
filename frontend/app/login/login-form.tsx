@@ -3,6 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { PasswordInput } from "@/components/password-input";
+import {
+  OFFICIAL_CONTACT_EMAIL,
+  OFFICIAL_CONTACT_MAILTO,
+} from "@/lib/legal/official-contact";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo, sanitizeNextPath } from "@/lib/app-url";
@@ -364,7 +368,7 @@ export function LoginForm({
             <details className="text-sm text-white/75">
               <summary className="cursor-pointer py-2 hover:text-white">Need help signing in?</summary>
               <p className="mt-2">Check your email address and password. If you cannot access your account, contact support for help.</p>
-              <a href="mailto:support@fanengage.app" className="mt-2 inline-block py-2 text-white underline underline-offset-4">Contact support</a>
+              <a href={OFFICIAL_CONTACT_MAILTO} className="mt-2 inline-block py-2 text-white underline underline-offset-4">Contact support at {OFFICIAL_CONTACT_EMAIL}</a>
               <p className="mt-1 text-xs text-white/60">Never send your password or verification codes.</p>
             </details>
           )}
