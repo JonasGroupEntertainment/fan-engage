@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fan Engage Pro Handoff</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#faf7f2;--paper-2:#f1ece3;--ink:#241f18;--ink-2:#5c544a;--ink-3:#8a8073;--accent:#8a6132;--accent-deep:#6e4c25;--line:#ddd5c8;--code-bg:#efe9de;--good:#4a7040;--warn:#a05c1e;--danger:#9a3b2c;--danger-bg:#f6e6e0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}}
+:root[data-theme="dark"]{--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:15.5px;line-height:1.6;padding-block:0 4rem;padding-inline:16px}
+.page{max-width:760px;margin:0 auto}
+header.top{padding:3.2rem 0 2rem;border-bottom:1px solid var(--line);margin-bottom:2.4rem}
+.kicker{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 .9rem}
+h1{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:clamp(1.7rem,4vw,2.3rem);line-height:1.15;margin:0 0 1rem;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;font-size:.86rem;color:var(--ink-2);margin:0;padding:0;list-style:none}
+.meta b{color:var(--ink);font-weight:600}
+section{margin-bottom:2.6rem}
+.eyebrow{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:0 0 .3rem}
+h2{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:1.35rem;line-height:1.25;margin:0 0 1rem;text-wrap:balance}
+h3{font-family:Archivo,sans-serif;font-size:.95rem;font-weight:600;margin:1.4rem 0 .5rem;color:var(--ink)}
+p{margin:0 0 .9rem;max-width:66ch}
+ul,ol{margin:0 0 1rem;padding-left:1.3rem;max-width:66ch}
+li{margin-bottom:.35rem}
+a{color:var(--accent-deep);text-decoration-thickness:1px;text-underline-offset:2px}
+code{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.84em;background:var(--code-bg);padding:.1em .35em;border-radius:3px}
+pre{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.8rem;line-height:1.55;background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:.9rem 1rem;overflow-x:auto;margin:0 0 1rem}
+pre code{background:none;padding:0;font-size:inherit}
+.tablewrap{overflow-x:auto;margin:0 0 1rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:.5rem .6rem .5rem 0;border-bottom:1px solid var(--line)}
+td{padding:.6rem .6rem .6rem 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+table.items td:first-child{white-space:normal;min-width:9rem}
+.callout{border-left:3px solid var(--accent);background:var(--paper-2);padding:.9rem 1.1rem;margin:0 0 1.2rem;border-radius:0 4px 4px 0}
+.callout p:last-child{margin-bottom:0}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-bg)}
+.callout .label{display:block;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--accent-deep);margin-bottom:.35rem}
+.callout.danger .label{color:var(--danger)}
+.rulelist{list-style:none;padding:0;margin:0 0 1rem;max-width:none}
+.rulelist li{display:grid;grid-template-columns:8.5rem 1fr;gap:.8rem;padding:.55rem 0;border-bottom:1px solid var(--line);margin:0}
+.rulelist .who{font-weight:600;font-size:.86rem;color:var(--accent-deep)}
+.rulelist .what{font-size:.92rem;color:var(--ink-2)}
+@media (max-width:520px){.rulelist li{grid-template-columns:1fr;gap:.2rem}}
+.owner{display:inline-block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:.15em .55em;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.owner.kevin{border-color:var(--accent);color:var(--accent-deep)}
+.owner.wait{color:var(--warn);border-color:var(--warn)}
+.status-good{color:var(--good);font-weight:600}
+.status-warn{color:var(--warn);font-weight:600}
+footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+<p class="kicker">Jonas Group Entertainment · Operations Handoff</p>
+<h1>Fan Engage Pro: what landed on 2026-09-24 and what remains</h1>
+<ul class="meta">
+<li><b>Date</b> 2026-09-24</li>
+<li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at b904d62, 1 open pull request (#62, not from this session)</li>
+<li><b>Supersedes</b> the 2026-09-17 handoff for state and open items. The 2026-09-17 workflow recipe and the 2026-09-14 product overview still apply.</li>
+</ul>
+</header>
+
+<section>
+<p class="eyebrow">Orientation</p>
+<h2>Where everything lives</h2>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Live site</td><td><a href="https://www.fanengagepro.com">https://www.fanengagepro.com</a> (returned 200 after today's deploy)</td></tr>
+<tr><td>GitHub</td><td>JonasGroupEntertainment/fan-engage. Main is at <code>b904d62</code> (PR #66). Remote branches: <code>main</code>, <code>feat/stripe-connect-foundation</code> (kept as the Stripe Connect reference), and two Cursor branches, <code>cursor/privacy-contact-alignment-aab3</code> and <code>cursor/watchdog-empty-funnel-748d</code> (the head of open PR #62).</td></tr>
+<tr><td>Vercel</td><td>Team jonas-group, project fan-engage, root directory <code>frontend</code>. Config is <code>frontend/vercel.json</code>, which now holds 17 cron schedules. The Production deploy for b904d62 succeeded.</td></tr>
+<tr><td>Supabase</td><td>Fan Engage production is project ref <code>uhovonrljcauaoctypbg</code>. Super Fan Radar is <code>ysekxezezkucynjyvjwr</code>. Brand Engage Pro is a third project, <code>enfpviapxvqyoarwwsuf</code>. Confirm the ref before any SQL.</td></tr>
+<tr><td>Local working copy</td><td><code>~/Developer/fan-engage</code>. It is checked out on <code>stage0/auto-2026-09-23</code>, a local auto branch that is not ours. Switch to a fresh <code>main</code> before starting work.</td></tr>
+<tr><td>Migrations</td><td>Root <code>supabase/migrations/</code>. The numbered series now ends at <code>0062_lock_down_security_definer_functions.sql</code>. 0061 (privacy counsel contact) came in with PR #64 on 2026-09-23. <b>Next free number is 0063.</b></td></tr>
+<tr><td>CI on main</td><td>Frontend tests and Secret Scan both passed on b904d62.</td></tr>
+<tr><td>Handoffs</td><td>This file is <code>docs/HANDOFF-2026-09-24.html</code>, untracked. <code>docs/HANDOFF-2026-09-17.html</code> is also still untracked. The 2026-09-14 one is committed.</td></tr>
+</table></div>
+</section>
+
+<section>
+<p class="eyebrow">Current state</p>
+<h2>What landed since 2026-09-17</h2>
+<p>This session started from a Jev-routed review of Fan Engage Pro and Brand Engage Pro for security, launch readiness, and stickiness. The Fan Engage half produced two pull requests, both merged through protected main with checks green and the Production deploy verified.</p>
+
+<h3>Pull requests merged</h3>
+<div class="tablewrap"><table class="items">
+<tr><th>PR</th><th>What it did</th></tr>
+<tr><td>#63 (2026-09-21)</td><td>Leftover auth cookies no longer bounce Sign in to the landing page. Not from this session.</td></tr>
+<tr><td>#64 (2026-09-23)</td><td>Privacy Policy scrubbed of nonprofit language and the public contact email locked, with migration 0061. Not from this session.</td></tr>
+<tr><td>#65</td><td>Migration 0062. Before it, 41 SECURITY DEFINER functions in public could be called by anyone holding the public anon key, including ones that write data (award_community_badge, bump_membership_points, claim_founder_slot, upsert_notification) and ones that read across fans. Every definer function was revoked from PUBLIC, anon, and authenticated, kept for service_role, and only what a browser or network caller needs was granted back: is_admin_of, get_fan_display_names, network_ingest_event, and the three network agent functions for anon and authenticated; redeem_reward and is_member_of for authenticated only. Applied to production first, then recorded.</td></tr>
+<tr><td>#66</td><td>SMS opt-in fix plus the leaderboard cron. Onboarding saved <code>fans.sms_opted_in</code> but never set <code>notification_preferences.sms_enabled</code>, which defaults off, so every text was suppressed as channel_opted_out. Onboarding now mirrors the opt-in when a phone is on file. Separately, <code>/api/cron/leaderboard-notifications</code> existed but was never scheduled; it now runs daily at <code>0 16 * * *</code> (16:00 UTC), because SMS ignores quiet hours.</td></tr>
+</table></div>
+
+<h3>Production data fix</h3>
+<ul>
+<li><code>sms_enabled</code> was backfilled in production for fans who had opted in with a phone on file. 17 of the 19 opted-in fans now have the channel on.</li>
+<li>Texts still only go to Gold tier and above. That gate in <code>lib/notifications/sms.ts</code> was left as it is on purpose.</li>
+</ul>
+
+<h3>Housekeeping</h3>
+<ul>
+<li>Both feature branches were deleted on GitHub and locally. The temporary worktree <code>~/Developer/fep-step4</code> was removed.</li>
+<li>The Super Fan Radar env vars (FAD_SUPABASE_URL, FAD_SUPABASE_SERVICE_ROLE_KEY) stay parked at Kevin's request. Nothing changed there today.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Workflow</p>
+<h2>How changes land</h2>
+<div class="callout danger">
+<span class="label">Read this before pushing</span>
+<p>Kevin authorized pushing, opening, and merging PRs in chat for this session only. Get that go-ahead again each session. Never turn on auto-merge.</p>
+<p>Main is protected: a pull request is required, admins are included, the branch must be up to date, and three checks must pass: <code>Unit tests + typecheck</code>, <code>Detect secrets (gitleaks)</code>, and <code>Vercel</code>. When a PR is behind main, run <code>gh pr update-branch N</code> and wait for checks again.</p>
+</div>
+<pre><code>cd ~/Developer/fan-engage && git checkout main && git pull
+git checkout -b fix/short-description
+# make the change, run npm test in frontend/, commit with a conventional message
+git push -u origin fix/short-description
+gh pr create --base main --head fix/short-description --title "..." --body "..."
+gh pr checks N --watch --fail-fast
+gh pr update-branch N          # only if the PR is behind main, then watch checks again
+gh pr merge N --merge --delete-branch
+git checkout main && git pull</code></pre>
+<p>The recipe for checking the Production deploy by SHA is in the 2026-09-17 handoff and still works. In this shell, a foreground <code>sleep</code> is blocked; use <code>--watch</code> or an until-loop instead.</p>
+<h3>Database changes</h3>
+<ol>
+<li>Apply the SQL to the correct project through the Supabase MCP first, and confirm with a select.</li>
+<li>Record it as the next numbered file (0063) in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
+<li>Any new SECURITY DEFINER function starts closed. Revoke EXECUTE from PUBLIC, anon, and authenticated, grant service_role, and only grant a browser role back with a written reason, the way 0062 does.</li>
+</ol>
+</section>
+
+<section>
+<p class="eyebrow">Conventions</p>
+<h2>House rules</h2>
+<ul>
+<li>Every phone number write goes through <code>frontend/lib/phone.ts</code> and is stored as E.164.</li>
+<li>An SMS opt-in means two fields: <code>fans.sms_opted_in</code> and <code>notification_preferences.sms_enabled</code>. Any new opt-in path must set both.</li>
+<li>New cron routes need an entry in <code>frontend/vercel.json</code>, or they never run.</li>
+<li>Env var names only, never values: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FAD_SUPABASE_URL, FAD_SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET.</li>
+<li>Jev runs in shadow mode for non-trivial work. Report its action and reason in one line, then use judgment.</li>
+<li>Plain English in every report to Kevin, no em dashes, direct truth about what was and was not verified.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Guardrails</p>
+<h2>Who can do what</h2>
+<ul class="rulelist">
+<li><span class="who">Kevin</span><span class="what">Adds secret env var values in Vercel, flips production Supabase settings, and gives the per-session go-ahead to land pull requests.</span></li>
+<li><span class="who">Agents</span><span class="what">Branch, test, open the pull request, wait for checks, merge only with Kevin's go-ahead, verify the deploy, and report. Never type a secret value anywhere, never print a token, never decrypt an env value.</span></li>
+<li><span class="who">Database</span><span class="what">Confirm the project ref before every query. Fan Engage, Super Fan Radar, and Brand Engage Pro are three different projects.</span></li>
+<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase, Mailchimp, or Twilio. No exports to chat or local files.</span></li>
+<li><span class="who">Other product</span><span class="what">Brand Engage Pro is for businesses. This app is for artist super fans. Never mix the two.</span></li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Handoff</p>
+<h2>Open items</h2>
+<div class="tablewrap"><table class="items">
+<tr><th>Item</th><th>Detail</th><th>Owner</th></tr>
+<tr><td>PR #62</td><td>"repo-sync network_watchdog empty-funnel AND guard", opened 2026-09-21 from a Cursor branch. Not reviewed this session. Decide whether to land or close it.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>2 opted-in fans without SMS</td><td>2 of the 19 opted-in fans were left off by the backfill, most likely because no phone is on file. Check them by id, without exporting phone numbers.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>First leaderboard cron run</td><td>The first scheduled run is 16:00 UTC after the deploy. Check the Vercel cron log and the notifications table the next day to confirm it sent and did not double-send.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>SMS tier gate</td><td>Texts only reach Gold and above. Decide whether that stays for launch or opens up to more tiers.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Rollback for 0062</td><td>There is no file in <code>supabase/rollbacks/</code> for 0061 or 0062. Add one for 0062 so the grants can be restored fast if a caller breaks.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>Local checkout branch</td><td>The working copy sits on <code>stage0/auto-2026-09-23</code>. Confirm with Kevin whether that branch and the two Cursor remote branches can go.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Radar env vars</td><td>Still parked. See the 2026-09-17 handoff for the exact steps.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Carried from 2026-09-17</td><td>Signed-in browser check of /admin/super-fans, /artist-portal/payouts, /me/profile. Misnamed rollback 0040 (it rolls back 0049). COLLABORATING.md drift. PR #4 videos. Commit the 09-17 and 09-24 handoffs if wanted.</td><td><span class="owner kevin">Kevin</span> / <span class="owner">Next session</span></td></tr>
+</table></div>
+<div class="callout">
+<span class="label">For the next agent</span>
+<p>Start in ~/Developer/fan-engage on a fresh main, not the stage0 branch. Read this file, then the 2026-09-17 one for the deploy check recipe. Ask Kevin whether pull requests may be landed this session. The next migration is 0063, and any new definer function starts closed.</p>
+</div>
+</section>
+
+<footer>Verified on 2026-09-24: PRs #65 and #66 merged, main at b904d62, Frontend tests and Secret Scan green on b904d62, Production deploy succeeded and the site returned 200, migration filenames on origin/main through 0062, leaderboard cron entry in frontend/vercel.json, remote branch list, open PR list, sms_enabled backfill count in production. Not verified: a live SMS delivery, the first scheduled cron run, signed-in rendering of any page.</footer>
+</div>
+
+</body>
+</html>
