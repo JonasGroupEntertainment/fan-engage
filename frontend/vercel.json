@@ -63,6 +63,10 @@
     {
       "path": "/api/cron/fraud-scan",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/leaderboard-notifications",
+      "schedule": "0 16 * * *"
     }
   ]
 }

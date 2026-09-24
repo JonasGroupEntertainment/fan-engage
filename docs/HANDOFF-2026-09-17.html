@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fan Engage Pro Handoff</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#faf7f2;--paper-2:#f1ece3;--ink:#241f18;--ink-2:#5c544a;--ink-3:#8a8073;--accent:#8a6132;--accent-deep:#6e4c25;--line:#ddd5c8;--code-bg:#efe9de;--good:#4a7040;--warn:#a05c1e;--danger:#9a3b2c;--danger-bg:#f6e6e0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}}
+:root[data-theme="dark"]{--paper:#17140f;--paper-2:#1f1b15;--ink:#ece5d8;--ink-2:#b5ab9b;--ink-3:#847a6b;--accent:#c9995f;--accent-deep:#e0b57c;--line:#332c22;--code-bg:#221d16;--good:#8db57f;--warn:#d29450;--danger:#d8735f;--danger-bg:#2c1c17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:15.5px;line-height:1.6;padding-block:0 4rem;padding-inline:16px}
+.page{max-width:760px;margin:0 auto}
+header.top{padding:3.2rem 0 2rem;border-bottom:1px solid var(--line);margin-bottom:2.4rem}
+.kicker{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 .9rem}
+h1{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:clamp(1.7rem,4vw,2.3rem);line-height:1.15;margin:0 0 1rem;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;font-size:.86rem;color:var(--ink-2);margin:0;padding:0;list-style:none}
+.meta b{color:var(--ink);font-weight:600}
+section{margin-bottom:2.6rem}
+.eyebrow{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:0 0 .3rem}
+h2{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:1.35rem;line-height:1.25;margin:0 0 1rem;text-wrap:balance}
+h3{font-family:Archivo,sans-serif;font-size:.95rem;font-weight:600;margin:1.4rem 0 .5rem;color:var(--ink)}
+p{margin:0 0 .9rem;max-width:66ch}
+ul,ol{margin:0 0 1rem;padding-left:1.3rem;max-width:66ch}
+li{margin-bottom:.35rem}
+a{color:var(--accent-deep);text-decoration-thickness:1px;text-underline-offset:2px}
+code{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.84em;background:var(--code-bg);padding:.1em .35em;border-radius:3px}
+pre{font-family:"IBM Plex Mono",Menlo,monospace;font-size:.8rem;line-height:1.55;background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:.9rem 1rem;overflow-x:auto;margin:0 0 1rem}
+pre code{background:none;padding:0;font-size:inherit}
+.tablewrap{overflow-x:auto;margin:0 0 1rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:.5rem .6rem .5rem 0;border-bottom:1px solid var(--line)}
+td{padding:.6rem .6rem .6rem 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+table.items td:first-child{white-space:normal;min-width:9rem}
+.callout{border-left:3px solid var(--accent);background:var(--paper-2);padding:.9rem 1.1rem;margin:0 0 1.2rem;border-radius:0 4px 4px 0}
+.callout p:last-child{margin-bottom:0}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-bg)}
+.callout .label{display:block;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--accent-deep);margin-bottom:.35rem}
+.callout.danger .label{color:var(--danger)}
+.rulelist{list-style:none;padding:0;margin:0 0 1rem;max-width:none}
+.rulelist li{display:grid;grid-template-columns:8.5rem 1fr;gap:.8rem;padding:.55rem 0;border-bottom:1px solid var(--line);margin:0}
+.rulelist .who{font-weight:600;font-size:.86rem;color:var(--accent-deep)}
+.rulelist .what{font-size:.92rem;color:var(--ink-2)}
+@media (max-width:520px){.rulelist li{grid-template-columns:1fr;gap:.2rem}}
+.owner{display:inline-block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:.15em .55em;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.owner.kevin{border-color:var(--accent);color:var(--accent-deep)}
+.owner.wait{color:var(--warn);border-color:var(--warn)}
+.status-good{color:var(--good);font-weight:600}
+.status-warn{color:var(--warn);font-weight:600}
+footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+<p class="kicker">Jonas Group Entertainment · Operations Handoff</p>
+<h1>Fan Engage Pro: what landed on 2026-09-17 and what remains</h1>
+<ul class="meta">
+<li><b>Date</b> 2026-09-17 (GitHub timestamps for the evening merges read 2026-09-18 UTC)</li>
+<li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at fa47687, 0 open pull requests</li>
+<li><b>Supersedes</b> the 2026-09-14 handoff for workflow and open items. That document still holds the product overview.</li>
+</ul>
+</header>
+
+<section>
+<p class="eyebrow">Orientation</p>
+<h2>Where everything lives</h2>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Live site</td><td><a href="https://www.fanengagepro.com">https://www.fanengagepro.com</a></td></tr>
+<tr><td>GitHub</td><td>JonasGroupEntertainment/fan-engage. Main is at <code>fa47687</code> (PR #61). Only two remote branches remain: <code>main</code> and <code>feat/stripe-connect-foundation</code>, which is kept on purpose as the Stripe Connect reference.</td></tr>
+<tr><td>Vercel</td><td>Team jonas-group, project fan-engage, root directory <code>frontend</code>. The Production deploy for fa47687 succeeded.</td></tr>
+<tr><td>Supabase</td><td>Fan Engage production is project ref <code>uhovonrljcauaoctypbg</code>. Super Fan Radar (the Fan Analytics Dashboard database) is project ref <code>ysekxezezkucynjyvjwr</code>. Confirm the ref before any SQL.</td></tr>
+<tr><td>Local working copy</td><td><code>~/Developer/fan-engage</code>, on <code>main</code>, clean tree. Every repo moved here from iCloud on 2026-09-17 and <code>~/Documents/GitHub</code> was deleted after a full audit. Never work under <code>~/Documents</code> again; iCloud evicts files and hangs git and tsc.</td></tr>
+<tr><td>Migrations</td><td>Root <code>supabase/migrations/</code> only, with rollbacks in <code>supabase/rollbacks/</code>. The numbered series now ends at <code>0060_artist_payouts_owner_read.sql</code>. <b>Next free number is 0061.</b></td></tr>
+<tr><td>Tests</td><td><code>npm test</code> inside <code>frontend/</code>: 352 tests in 115 suites, all passing on fa47687. Lint baseline is 0 errors and 25 warnings. Typecheck is clean.</td></tr>
+<tr><td>Saved from the old folder</td><td><code>~/Developer/_from-documents-github/</code> holds root scripts and notes from the deleted GitHub folder, plus <code>fan-engage-videos/</code> with the two overview videos from closed PR #4.</td></tr>
+<tr><td>Handoffs</td><td>This file is <code>docs/HANDOFF-2026-09-17.html</code>. The previous one, <code>docs/HANDOFF-2026-09-14.html</code>, was committed to main in PR #53.</td></tr>
+</table></div>
+</section>
+
+<section>
+<p class="eyebrow">Current state</p>
+<h2>What landed today</h2>
+<p>The day had two halves. The first half moved every repo off iCloud and audited the old folder so nothing unmerged was lost. The second half worked through the fan-engage pull request queue, landing each one through protected main with checks green and the Production deploy verified.</p>
+
+<h3>Repos moved off iCloud</h3>
+<ul>
+<li>Root cause of the tsc and git hangs was iCloud eviction under <code>~/Documents</code>. Confirmed with a process sample and an open file handle on a dataless type definition.</li>
+<li>Every active repo was cloned fresh from GitHub into <code>~/Developer/&lt;name&gt;</code>, and the ignored env and <code>.vercel</code> files were copied over.</li>
+<li><code>~/Documents/GitHub</code> was deleted at Kevin's request after each repo was checked against GitHub. The two fan-engage backup folders and the empty Fanengage-pro repo held nothing unmerged.</li>
+<li>The "untracked" signup destination test was a false alarm. It had already landed in PR #44; the branch was just behind main.</li>
+</ul>
+
+<h3>Pull requests merged in this session, in order</h3>
+<div class="tablewrap"><table class="items">
+<tr><th>PR</th><th>What it did</th></tr>
+<tr><td>#53</td><td>2026-09-14 handoff doc, CLAUDE.md, and the launch config for the preview server.</td></tr>
+<tr><td>#52</td><td>Premium upgrade popup that resurfaces every 8 page views.</td></tr>
+<tr><td>#45</td><td>Duplicate-email signup no longer tells the fan to complete Turnstile.</td></tr>
+<tr><td>#43, #42, #46</td><td>Dependabot: next 16.2.12 to 16.3.3, sharp 0.35.3 to 0.35.4, js-yaml 4.3.1 to 4.3.2. <code>npm audit</code> is clean afterwards.</td></tr>
+<tr><td>#54</td><td>Count one Premium popup page view per navigation instead of per render.</td></tr>
+<tr><td>#55</td><td>Stage 0 lint cleanups from August 17 to 19, landed as-is.</td></tr>
+<tr><td>#56</td><td>Profile edit queries fans by id. Combobox role on the search box.</td></tr>
+<tr><td>#57</td><td>Profile edit fields: last name, phone, interests, socials. Migration 0059 records the <code>fans.socials</code> column that was already in production.</td></tr>
+<tr><td>#58</td><td>E.164 phone validation for the profile action, the onboard route, and the SMS route, through <code>frontend/lib/phone.ts</code>.</td></tr>
+<tr><td>#59</td><td>Unsaved profile edits survive a rejected phone number. The form moved to <code>useActionState</code>.</td></tr>
+<tr><td>#60</td><td>Super Fan Radar admin page at <code>/admin/super-fans</code>, plus migration 0060 (owner-read RLS on <code>artist_payouts</code>, applied to production first, then recorded). Supersedes PR #4.</td></tr>
+<tr><td>#61</td><td>Empty commit to rebuild Production after the Radar env vars were reported saved. The deploy succeeded, but the vars were not on the project, so the rebuild changed nothing. See open items.</td></tr>
+</table></div>
+<p>Also merged on 2026-09-17 ahead of this queue: #47 (Terms entity, governing law, and venue corrected to Colorado), #49 (Free vs Premium v1 entitlements), #50 and #51 (Merch menu label and the guest / Free / Premium click gate).</p>
+
+<h3>Closed without merging</h3>
+<ul>
+<li><b>PR #1, Stripe Connect foundation.</b> Closed. The branch stays as a reference for when Stripe Connect is picked back up.</li>
+<li><b>PR #4, superfan-radar-wip.</b> Closed as superseded by #60. Its two overview videos (fan experience and for artists) are saved locally, not committed.</li>
+</ul>
+
+<h3>Housekeeping</h3>
+<ul>
+<li>44 stale remote branches deleted. Every one was either merged or superseded; this was checked branch by branch before deletion.</li>
+<li>Migration 0060 was applied to production through the Supabase MCP, then recorded in the repo with the standard header.</li>
+</ul>
+
+<h3>Super Fan Radar status</h3>
+<div class="callout">
+<span class="label">Parked at Kevin's request</span>
+<p>The admin page is live behind login, but it shows its "not connected" card for every community because <code>FAD_SUPABASE_URL</code> and <code>FAD_SUPABASE_SERVICE_ROLE_KEY</code> do not exist on the Vercel project. Kevin reported saving them twice on 2026-09-17. Both times the project's variable list was checked by name through the Vercel API across every project in the personal and jonas-group scopes his login can see, and neither name was present. The newest variable on the project dates from 2026-09-16. The likely cause is that they were saved under a different Vercel login or team, or the save did not complete. Check the account avatar on the fan-engage environment variables page. Separately, the Radar database has one BRAND tenant and no ARTIST tenants, so the page will stay empty until artist tenants exist.</p>
+</div>
+</section>
+
+<section>
+<p class="eyebrow">Workflow</p>
+<h2>How changes landed today</h2>
+<div class="callout danger">
+<span class="label">Read this before pushing</span>
+<p>COLLABORATING.md section 10 still says stop at <code>git commit</code> and do not push. On 2026-09-17 Kevin authorized landing changes through pull requests directly in chat. Get that go-ahead each session; do not assume it carries over.</p>
+<p>Main is protected: a pull request is required, admins are included, the branch must be up to date, and three checks must pass: <code>Unit tests + typecheck</code>, <code>Detect secrets (gitleaks)</code>, and <code>Vercel</code>.</p>
+</div>
+<pre><code>cd ~/Developer/fan-engage && git checkout main && git pull
+git checkout -b fix/short-description
+# make the change, run npm test in frontend/, commit with a conventional message
+git push -u origin fix/short-description
+gh pr create --base main --head fix/short-description --title "..." --body "..."
+sleep 30 && gh pr checks N --watch --fail-fast
+gh pr view N --json mergeStateStatus,mergeable -q '.mergeStateStatus + " " + .mergeable'   # must print CLEAN MERGEABLE
+gh pr merge N --squash --delete-branch
+git checkout main && git pull
+
+# Verify the Production deploy for the new main SHA
+SHA=$(git rev-parse HEAD)
+ID=$(gh api "repos/JonasGroupEntertainment/fan-engage/deployments?environment=Production&sha=$SHA" -q '.[0].id')
+gh api "repos/JonasGroupEntertainment/fan-engage/deployments/$ID/statuses" -q '.[0].state'   # poll every 30s until success</code></pre>
+<p>Adding an env var in Vercel does not redeploy on its own. An empty commit through the same recipe is the rebuild.</p>
+<h3>Database changes</h3>
+<ol>
+<li>Apply the SQL to the correct project through the Supabase MCP first, and confirm with a select.</li>
+<li>Record it as the next numbered file in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
+<li>Add the matching rollback in <code>supabase/rollbacks/</code>.</li>
+</ol>
+</section>
+
+<section>
+<p class="eyebrow">Conventions</p>
+<h2>House rules confirmed today</h2>
+<ul>
+<li>Migrations live only in root <code>supabase/migrations/</code>. COLLABORATING.md still points at <code>frontend/supabase/migrations/</code>; that is stale.</li>
+<li>Every phone number write goes through <code>frontend/lib/phone.ts</code> and is stored as E.164.</li>
+<li>Env var names only, never values: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FAD_SUPABASE_URL, FAD_SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET.</li>
+<li>The FAD service role key is read only by the server-side client for the Radar page. It never reaches the browser.</li>
+<li>To check which env vars exist on the Vercel project, use <code>npx vercel env ls production --scope jonas-group</code> from <code>frontend/</code> (names only), or the Vercel REST API with the CLI's own token, printing only key, target, type, and createdAt. The Vercel MCP env listing returns 403 for this token on every project.</li>
+<li>Commits end with <code>Co-Authored-By: Claude Fable 5.1 &lt;noreply@anthropic.com&gt;</code>. PR bodies end with the Claude Code attribution line.</li>
+<li>Plain English in every report to Kevin, no em dashes, direct truth about what was and was not verified.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Guardrails</p>
+<h2>Who can do what</h2>
+<ul class="rulelist">
+<li><span class="who">Kevin</span><span class="what">Adds secret env var values in Vercel, flips production Supabase settings, and gives the per-session go-ahead to land pull requests.</span></li>
+<li><span class="who">Agents</span><span class="what">Branch, test, open the pull request, wait for checks, merge only with Kevin's go-ahead, verify the deploy, and report. Never type a secret value anywhere, never print a token, never decrypt an env value.</span></li>
+<li><span class="who">Database</span><span class="what">Confirm the project ref before every query. Fan Engage and Super Fan Radar are different projects.</span></li>
+<li><span class="who">Artist content</span><span class="what">Nothing about an artist goes live without that artist's day-to-day manager clearing it. See docs/ARTIST_AGREEMENT_RIGHTS.md.</span></li>
+<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase, Mailchimp, or Twilio. No exports to chat or local files.</span></li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Handoff</p>
+<h2>Open items</h2>
+<div class="tablewrap"><table class="items">
+<tr><th>Item</th><th>Detail</th><th>Owner</th></tr>
+<tr><td>Radar env vars</td><td>Parked. Open vercel.com/jonas-group/fan-engage/settings/environment-variables, confirm the account avatar is kevinjonassr, and add FAD_SUPABASE_URL and FAD_SUPABASE_SERVICE_ROLE_KEY for Production. Then tell the next session, which will check the names and land another empty-commit rebuild.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Radar artist tenants</td><td>The Radar database has one BRAND tenant and no ARTIST tenants. Decide which artists get a tenant so the page has data to show.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Signed-in browser check</td><td>/admin/super-fans, /artist-portal/payouts, and /me/profile were tested by unit tests and unauthenticated HTTP only. Nobody has clicked through them signed in since today's changes.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>PR #4 videos</td><td>Two mp4 files sit in ~/Developer/_from-documents-github/fan-engage-videos/, uncommitted. Decide whether they belong in the repo, in storage, or nowhere.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Misnamed rollback</td><td>supabase/rollbacks/0040_secure_financial_and_leaderboard_tables_rollback.sql rolls back migration 0049, not 0040. Rename it.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>COLLABORATING.md drift</td><td>Section 10 says stop at commit and points migrations at frontend/supabase/migrations/. Neither matches how the repo works now. Decide the rule, then update the file.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Commit this handoff</td><td>Done on 2026-09-24: docs/HANDOFF-2026-09-17.html landed on main with the 09-24 handoff in PR #67 (aa1042c).</td><td><span class="owner">Done</span></td></tr>
+<tr><td>Carried from 2026-09-14</td><td>The 22 network_* migrations are still unexplained. docs/CONTEXT_HANDOFF.md still carries the fan-engage-pearl URL. Paused artists (Danger Twins, Dan Marshall, Hunter Hawkins, family artists) stay paused. The auth rate limiter is still in-memory per instance.</td><td><span class="owner kevin">Kevin</span> / <span class="owner">Next session</span></td></tr>
+</table></div>
+<div class="callout">
+<span class="label">For the next agent</span>
+<p>Start in ~/Developer/fan-engage on a fresh main. Read this file, then COLLABORATING.md. Ask Kevin whether pull requests may be landed this session. The repo and the live site win over any memory file. Before touching Super Fan Radar, check the two FAD env var names first and do not assume they exist.</p>
+</div>
+</section>
+
+<footer>Verified on 2026-09-17: merged and closed pull request list and timestamps from GitHub, remote branch list, main at fa47687, clean working tree, migration and rollback filenames, 352 passing tests, Production deploy status for fa47687, Vercel env var names on the project through the API. Not verified: signed-in rendering of the changed pages, the Vercel dashboard as Kevin sees it, whether the paused artists should stay paused.</footer>
+</div>
+
+</body>
+</html>
