@@ -92,12 +92,12 @@ export default async function ArtistPage({
   const ctaGradient = `linear-gradient(to right, ${artist.accentFrom}, ${artist.accentTo})`;
 
   // Primary CTA adapts to the viewer's state:
-  // - anonymous  → "Join the Fan Experience" → signup
+  // - anonymous  → "Create your fan profile" → signup (Founding badge lives there)
   // - signed in, no profile → "Complete profile" → /onboarding
   // - signed in, profile done → drops / rewards (marketplace not open at soft launch)
   const marketplaceLive = isMarketplaceLive();
   const primaryCta = !isSignedIn
-    ? { label: "Join the Fan Experience", href: `/signup?ref=${artist.slug}` }
+    ? { label: "Create your fan profile", href: `/signup?ref=${artist.slug}` }
     : needsProfile
       ? { label: "Complete your profile", href: `/onboarding?ref=${artist.slug}` }
       : marketplaceLive
@@ -343,7 +343,7 @@ export default async function ArtistPage({
                   accentFrom={artist.accentFrom}
                   accentTo={artist.accentTo}
                   reason={
-                    access.reason === "signed-out"
+                    !isSignedIn
                       ? "signed-out"
                       : access.reason === "needs-founder"
                         ? "needs-founder"

@@ -43,7 +43,7 @@ export const COOKIE_BANNER_HIDE_PREFIXES = [
 
 export const PREMIUM_UPGRADE_PROMPT_COPY = {
   headline: "Go Premium. Unlock the good stuff ✨",
-  body: "Post in the community, redeem rewards, grab merch drops — all unlocked.",
+  body: "Post in the community, redeem rewards, and more. Merch drops coming soon.",
   dismiss: "Not now",
 } as const;
 
@@ -127,6 +127,21 @@ export function isPremiumUpgradePromptHiddenPath(pathname: string): boolean {
 }
 
 /**
+ * Cookie banner is visible when no consent value is stored and the route
+ * does not suppress the banner. Any stored value counts as resolved —
+ * the banner hides as soon as localStorage is non-null.
+ */
+export function isCookieBannerOpen(opts: {
+  consentRaw: string | null | undefined;
+  pathname: string;
+}): boolean {
+  if (opts.consentRaw != null) return false;
+  return !COOKIE_BANNER_HIDE_PREFIXES.some((prefix) =>
+    opts.pathname.startsWith(prefix),
+  );
+}
+
+/**
  * True when the viewer has Premium-level access. Accepts the shared
  * isPremium signals (tier string, membership row, or boolean).
  */
@@ -144,10 +159,16 @@ export function shouldHidePremiumUpgradeForEntitlement(
 }
 
 export function shouldShowPremiumUpgradePrompt(args: {
+  /** Signed-in Free members only. Guests never see the prompt. */
+  signedIn: boolean;
   isPremium: boolean;
   state: PremiumUpgradePromptState;
   pathname: string;
+  /** True while the cookie consent banner is still on screen. */
+  cookieBannerOpen?: boolean;
 }): boolean {
+  if (!args.signedIn) return false;
+  if (args.cookieBannerOpen) return false;
   if (
     shouldHidePremiumUpgradeForEntitlement(args.isPremium) ||
     args.state.premiumLocked

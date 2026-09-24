@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { resolveCommunityFromHost } from "@/lib/community";
 import { productionHostRedirect, requestHostname } from "@/lib/canonical-host";
 import { guestSignupHref, isOnboardingPath } from "@/lib/guest-signup";
+import { legacyGuestRedirect } from "@/lib/legacy-path-redirects";
 import { isSignOutPath } from "@/lib/auth-signout";
 import { shouldRedirectGuestFromOnboarding } from "@/lib/session-presence";
 
@@ -68,6 +69,17 @@ export async function middleware(request: NextRequest) {
   );
   if (hostRedirect) {
     return NextResponse.redirect(hostRedirect, 308);
+  }
+
+  // Public aliases (/join, /create-account, /events) before auth and before
+  // the Supabase-missing early return, so previews without keys still
+  // redirect. Query string is copied explicitly (?ref= must survive).
+  const legacyDestination = legacyGuestRedirect(
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+  );
+  if (legacyDestination) {
+    return NextResponse.redirect(new URL(legacyDestination, request.url), 307);
   }
 
   // Layer 0: optional HTTP Basic Auth on /admin/*

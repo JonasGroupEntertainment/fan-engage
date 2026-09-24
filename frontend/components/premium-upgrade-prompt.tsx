@@ -10,12 +10,17 @@ import {
   useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
+import {
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_STORAGE_KEY,
+} from "@/components/cookie-banner";
 import PremiumCta from "@/components/premium-cta";
 import {
   PREMIUM_UPGRADE_PROMPT_COPY,
   PREMIUM_UPGRADE_PROMPT_STORAGE_KEY,
   applyPremiumEntitlementToPromptState,
   dismissPremiumUpgradePrompt,
+  isCookieBannerOpen,
   lockPremiumUpgradePrompt,
   parsePremiumUpgradePromptState,
   pickFirstShowDelayMs,
@@ -41,6 +46,25 @@ function getServerSnapshot(): string | null {
   return null;
 }
 
+function subscribeCookieConsent(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onChange();
+  window.addEventListener(COOKIE_CONSENT_EVENT, handler);
+  window.addEventListener("storage", handler);
+  return () => {
+    window.removeEventListener(COOKIE_CONSENT_EVENT, handler);
+    window.removeEventListener("storage", handler);
+  };
+}
+
+function getCookieConsentSnapshot(): string | null {
+  try {
+    return window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function persist(state: PremiumUpgradePromptState) {
   try {
     savePremiumUpgradePromptState(window.localStorage, state);
@@ -51,17 +75,25 @@ function persist(state: PremiumUpgradePromptState) {
 
 export default function PremiumUpgradePrompt({
   isPremium = false,
+  signedIn = false,
 }: {
   isPremium?: boolean;
+  signedIn?: boolean;
 }) {
   return (
     <Suspense fallback={null}>
-      <PremiumUpgradePromptInner isPremium={isPremium} />
+      <PremiumUpgradePromptInner isPremium={isPremium} signedIn={signedIn} />
     </Suspense>
   );
 }
 
-function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
+function PremiumUpgradePromptInner({
+  isPremium,
+  signedIn,
+}: {
+  isPremium: boolean;
+  signedIn: boolean;
+}) {
   const pathname = usePathname() ?? "";
   const titleId = useId();
   const bodyId = useId();
@@ -71,6 +103,11 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   const persistedRaw = useSyncExternalStore(
     subscribe,
     getSnapshot,
+    getServerSnapshot,
+  );
+  const consentRaw = useSyncExternalStore(
+    subscribeCookieConsent,
+    getCookieConsentSnapshot,
     getServerSnapshot,
   );
   const persisted = parsePremiumUpgradePromptState(persistedRaw);
@@ -85,9 +122,11 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   );
 
   const eligible = shouldShowPremiumUpgradePrompt({
+    signedIn,
     isPremium,
     state,
     pathname,
+    cookieBannerOpen: isCookieBannerOpen({ consentRaw, pathname }),
   });
   const open = eligible && delayElapsed;
 
@@ -115,7 +154,6 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     previousPathRef.current = nextPath;
     // Route changes are the page-view signal — keep this in lockstep with
     // usePathname, same pattern as mobile-nav closing on navigation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession((current) =>
       recordPremiumUpgradeNavigation(
         current ?? parsePremiumUpgradePromptState(persistedRaw),

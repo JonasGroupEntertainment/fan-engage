@@ -27,6 +27,11 @@ describe("soft-launch CS: guest copy and honesty", () => {
         `${name} still contains “in the writer”`,
       );
     }
+    assert.match(guestSurfaces.homepage, /Create your fan profile/);
+    assert.match(guestSurfaces.foundingBlock, /Claim your Founding badge/);
+    assert.match(guestSurfaces.foundingBlock, /href="\/signup\?ref=raelynn"/);
+    assert.match(guestSurfaces.community, /Create your fan profile/);
+    assert.match(guestSurfaces.artistPage, /Create your fan profile/);
     assert.match(guestSurfaces.foundingBlock, /Founding Fans/);
     assert.match(guestSurfaces.foundingBlock, /1\.5× points/);
     assert.match(guestSurfaces.community, /Founding Fans #1–100 earn 1\.5× points/);

@@ -7,6 +7,9 @@ import {
   TURNSTILE_LOAD_TIMEOUT_MS,
   TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
   TURNSTILE_SLOW_LOAD_HINT_MS,
+  TURNSTILE_STUCK_COPY,
+  TURNSTILE_STUCK_HINT_MS,
+  TURNSTILE_STUCK_REFRESH_LABEL,
   TURNSTILE_WIDGET_ERROR_COPY,
   emailReadyForMagicLink,
   magicLinkButtonLabel,
@@ -19,6 +22,7 @@ import {
   passwordLoginAllowsSubmit,
   passwordLoginTurnstileHelper,
   shouldShowParentChallengeError,
+  shouldShowTurnstileStuckHint,
   signupAllowsSubmit,
   signupTurnstileButtonLabel,
   turnstileSlowLoadHint,
@@ -368,6 +372,57 @@ describe("timeout alignment", () => {
     assert.equal(turnstileSlowLoadHint(false), "Security check loading…");
     assert.match(turnstileSlowLoadHint(true), /12 seconds/);
   });
+
+  it("shows a refresh hint when the widget is still not interactive after 10s", () => {
+    assert.equal(TURNSTILE_STUCK_HINT_MS, 10_000);
+    assert.ok(TURNSTILE_STUCK_HINT_MS > TURNSTILE_SLOW_LOAD_HINT_MS);
+    assert.ok(TURNSTILE_STUCK_HINT_MS < TURNSTILE_LOAD_TIMEOUT_MS);
+    assert.equal(
+      TURNSTILE_STUCK_COPY,
+      "Security check stuck? Refresh this page and keep cookies on.",
+    );
+    assert.equal(TURNSTILE_STUCK_REFRESH_LABEL, "Refresh this page");
+    assert.equal(
+      shouldShowTurnstileStuckHint({
+        elapsedMs: 9_999,
+        loadState: "loading",
+        hasToken: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldShowTurnstileStuckHint({
+        elapsedMs: 10_000,
+        loadState: "loading",
+        hasToken: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldShowTurnstileStuckHint({
+        elapsedMs: 12_000,
+        loadState: "error",
+        hasToken: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldShowTurnstileStuckHint({
+        elapsedMs: 20_000,
+        loadState: "ready",
+        hasToken: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldShowTurnstileStuckHint({
+        elapsedMs: 20_000,
+        loadState: "loading",
+        hasToken: true,
+      }),
+      false,
+    );
+  });
 });
 
 describe("password login Turnstile gate (fail-closed)", () => {
@@ -487,6 +542,9 @@ describe("signup Turnstile stays closed until a token exists", () => {
     assert.match(widget, /TURNSTILE_CHALLENGE_STALL_MS/);
     assert.match(widget, /challenge stalled/);
     assert.match(widget, /Retry security check/);
+    assert.match(widget, /TURNSTILE_STUCK_COPY/);
+    assert.match(widget, /TURNSTILE_STUCK_HINT_MS/);
+    assert.match(widget, /location\.reload\(\)/);
     assert.doesNotMatch(signup, /You can still create an account/);
     assert.doesNotMatch(signup, /failOpenGranted/);
   });

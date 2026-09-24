@@ -234,7 +234,7 @@ export default async function RootLayout({
         <Footer />
         <CookieBanner />
         <InstallPrompt />
-        <PremiumUpgradePrompt isPremium={isPremium} />
+        <PremiumUpgradePrompt isPremium={isPremium} signedIn={Boolean(user)} />
       </body>
     </html>
   );
