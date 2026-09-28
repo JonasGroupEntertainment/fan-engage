@@ -56,11 +56,11 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <div class="page">
 <header class="top">
 <p class="kicker">Jonas Group Entertainment · Operations Handoff</p>
-<h1>Fan Engage Pro: what landed on 2026-09-24 and what remains</h1>
+<h1>Fan Engage Pro: what landed on 2026-09-24 and 2026-09-27, and what remains</h1>
 <ul class="meta">
-<li><b>Date</b> 2026-09-24</li>
+<li><b>Date</b> 2026-09-24, updated 2026-09-27</li>
 <li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
-<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at b904d62, 1 open pull request (#62, not from this session)</li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at a0bb3bf, 1 open pull request (#62, not from these sessions)</li>
 <li><b>Supersedes</b> the 2026-09-17 handoff for state and open items. The 2026-09-17 workflow recipe and the 2026-09-14 product overview still apply.</li>
 </ul>
 </header>
@@ -71,12 +71,12 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <div class="tablewrap"><table>
 <tr><th>Item</th><th>Value</th></tr>
 <tr><td>Live site</td><td><a href="https://www.fanengagepro.com">https://www.fanengagepro.com</a> (returned 200 after today's deploy)</td></tr>
-<tr><td>GitHub</td><td>JonasGroupEntertainment/fan-engage. Main is at <code>b904d62</code> (PR #66). Remote branches: <code>main</code>, <code>feat/stripe-connect-foundation</code> (kept as the Stripe Connect reference), and two Cursor branches, <code>cursor/privacy-contact-alignment-aab3</code> and <code>cursor/watchdog-empty-funnel-748d</code> (the head of open PR #62).</td></tr>
-<tr><td>Vercel</td><td>Team jonas-group, project fan-engage, root directory <code>frontend</code>. Config is <code>frontend/vercel.json</code>, which now holds 17 cron schedules. The Production deploy for b904d62 succeeded.</td></tr>
+<tr><td>GitHub</td><td>JonasGroupEntertainment/fan-engage. Main is at <code>a0bb3bf</code> (PR #72, 2026-09-27). Remote branches: <code>main</code>, <code>feat/stripe-connect-foundation</code> (kept as the Stripe Connect reference), and three Cursor branches, <code>cursor/guest-first-visit-tweaks-84b2</code>, <code>cursor/privacy-contact-alignment-aab3</code>, and <code>cursor/watchdog-empty-funnel-748d</code> (the head of open PR #62).</td></tr>
+<tr><td>Vercel</td><td>Team jonas-group, project fan-engage, root directory <code>frontend</code>. Config is <code>frontend/vercel.json</code>, which now holds 17 cron schedules. The Production deploy for a0bb3bf succeeded.</td></tr>
 <tr><td>Supabase</td><td>Fan Engage production is project ref <code>uhovonrljcauaoctypbg</code>. Super Fan Radar is <code>ysekxezezkucynjyvjwr</code>. Brand Engage Pro is a third project, <code>enfpviapxvqyoarwwsuf</code>. Confirm the ref before any SQL.</td></tr>
-<tr><td>Local working copy</td><td><code>~/Developer/fan-engage</code>. It is checked out on <code>stage0/auto-2026-09-23</code>, a local auto branch that is not ours. Switch to a fresh <code>main</code> before starting work.</td></tr>
-<tr><td>Migrations</td><td>Root <code>supabase/migrations/</code>. The numbered series now ends at <code>0062_lock_down_security_definer_functions.sql</code>. 0061 (privacy counsel contact) came in with PR #64 on 2026-09-23. <b>Next free number is 0063.</b></td></tr>
-<tr><td>CI on main</td><td>Frontend tests and Secret Scan both passed on b904d62.</td></tr>
+<tr><td>Local working copy</td><td><code>~/Developer/fan-engage</code>. It was left on <code>main</code> at a0bb3bf on 2026-09-27. Four local <code>stage0/auto-*</code> branches exist that are not ours; do not work on them. Pull a fresh <code>main</code> before starting work.</td></tr>
+<tr><td>Migrations</td><td>Root <code>supabase/migrations/</code>. The numbered series now ends at <code>0064_prediction_correct_point_source.sql</code>. 0063 and 0064 came in on 2026-09-27 (PRs #71 and #72). <b>Next free number is 0065.</b></td></tr>
+<tr><td>CI on main</td><td>Frontend tests and Secret Scan both passed on a0bb3bf.</td></tr>
 <tr><td>Handoffs</td><td>This file is <code>docs/HANDOFF-2026-09-24.html</code>. It and <code>docs/HANDOFF-2026-09-17.html</code> landed on main in PR #67 (aa1042c). The 2026-09-14 one is committed too.</td></tr>
 </table></div>
 </section>
@@ -109,6 +109,30 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 </section>
 
 <section>
+<p class="eyebrow">Update</p>
+<h2>What landed on 2026-09-27</h2>
+<p>A second Jev-routed review of Fan Engage Pro and Brand Engage Pro (Artifact 49gUST6zCFi4rPWEb2t1qk) found one critical and two high issues in Fan Engage. All three were fixed in three pull requests, merged in order through protected main with checks green, and the Production deploy for a0bb3bf succeeded.</p>
+
+<h3>Pull requests merged</h3>
+<div class="tablewrap"><table class="items">
+<tr><th>PR</th><th>What it did</th></tr>
+<tr><td>#70 (4b72dff)</td><td><b>Critical fix.</b> The admin resolve action had no auth check and the fan-side one only checked for any admin, so anyone could post and award points. Resolve now checks the caller against the prediction's own community (owner, admin, or super-admin), the chosen option must belong to the prediction, and a rerun with a different answer is refused.</td></tr>
+<tr><td>#71 (984e063)</td><td>Migration 0063, <code>cancel_redemption</code>. Three server actions used to cancel a redemption by flipping its status and refunding separately. Now one locked transaction cancels only a pending redemption, refunds the points, and puts one unit back for limited-stock rewards. The function is service_role only.</td></tr>
+<tr><td>#72 (a0bb3bf)</td><td>Migration 0064 adds the <code>prediction_correct</code> point source. Prediction winners are now paid through <code>apply_points_award</code>, so the award lands in the ledger and the membership total together instead of bumping points directly.</td></tr>
+</table></div>
+
+<h3>Production database</h3>
+<ul>
+<li>0063 and 0064 were applied to <code>uhovonrljcauaoctypbg</code> on 2026-09-27 and checked with selects. <code>cancel_redemption</code> is executable by service_role only.</li>
+</ul>
+
+<h3>Housekeeping</h3>
+<ul>
+<li>The three fix branches were deleted on GitHub after merge.</li>
+</ul>
+</section>
+
+<section>
 <p class="eyebrow">Workflow</p>
 <h2>How changes land</h2>
 <div class="callout danger">
@@ -129,7 +153,7 @@ git checkout main && git pull</code></pre>
 <h3>Database changes</h3>
 <ol>
 <li>Apply the SQL to the correct project through the Supabase MCP first, and confirm with a select.</li>
-<li>Record it as the next numbered file (0063) in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
+<li>Record it as the next numbered file (0065) in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
 <li>Any new SECURITY DEFINER function starts closed. Revoke EXECUTE from PUBLIC, anon, and authenticated, grant service_role, and only grant a browser role back with a written reason, the way 0062 does.</li>
 </ol>
 </section>
@@ -169,17 +193,19 @@ git checkout main && git pull</code></pre>
 <tr><td>First leaderboard cron run</td><td>The first scheduled run is 16:00 UTC after the deploy. Check the Vercel cron log and the notifications table the next day to confirm it sent and did not double-send.</td><td><span class="owner">Next session</span></td></tr>
 <tr><td>SMS tier gate</td><td>Texts only reach Gold and above. Decide whether that stays for launch or opens up to more tiers.</td><td><span class="owner kevin">Kevin</span></td></tr>
 <tr><td>Rollback for 0062</td><td>There is no file in <code>supabase/rollbacks/</code> for 0061 or 0062. Add one for 0062 so the grants can be restored fast if a caller breaks.</td><td><span class="owner">Next session</span></td></tr>
-<tr><td>Local checkout branch</td><td>The working copy sits on <code>stage0/auto-2026-09-23</code>. Confirm with Kevin whether that branch and the two Cursor remote branches can go.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Old branches</td><td>Four local <code>stage0/auto-*</code> branches and three Cursor remote branches are not ours. Confirm with Kevin which can go.</td><td><span class="owner kevin">Kevin</span></td></tr>
+<tr><td>Test the 2026-09-27 fixes signed in</td><td>Resolve one test prediction as a community admin and confirm the winner's points show in the ledger. Cancel one test redemption and confirm the points come back and stock goes up by one. Neither was run end to end on 2026-09-27.</td><td><span class="owner">Next session</span></td></tr>
+<tr><td>Other review findings</td><td>The medium and low findings in the 2026-09-27 review (Artifact 49gUST6zCFi4rPWEb2t1qk) are still open. Work through them in order.</td><td><span class="owner">Next session</span></td></tr>
 <tr><td>Radar env vars</td><td>Still parked. See the 2026-09-17 handoff for the exact steps.</td><td><span class="owner kevin">Kevin</span></td></tr>
 <tr><td>Carried from 2026-09-17</td><td>Signed-in browser check of /admin/super-fans, /artist-portal/payouts, /me/profile. Misnamed rollback 0040 (it rolls back 0049). COLLABORATING.md drift. PR #4 videos.</td><td><span class="owner kevin">Kevin</span> / <span class="owner">Next session</span></td></tr>
 </table></div>
 <div class="callout">
 <span class="label">For the next agent</span>
-<p>Start in ~/Developer/fan-engage on a fresh main, not the stage0 branch. Read this file, then the 2026-09-17 one for the deploy check recipe. Ask Kevin whether pull requests may be landed this session. The next migration is 0063, and any new definer function starts closed.</p>
+<p>Start in ~/Developer/fan-engage on a fresh main, not a stage0 branch. Read this file, then the 2026-09-17 one for the deploy check recipe. Ask Kevin whether pull requests may be landed this session. The next migration is 0065, and any new definer function starts closed.</p>
 </div>
 </section>
 
-<footer>Verified on 2026-09-24: PRs #65 and #66 merged, main at b904d62, Frontend tests and Secret Scan green on b904d62, Production deploy succeeded and the site returned 200, migration filenames on origin/main through 0062, leaderboard cron entry in frontend/vercel.json, remote branch list, open PR list, sms_enabled backfill count in production. Not verified: a live SMS delivery, the first scheduled cron run, signed-in rendering of any page.</footer>
+<footer>Verified on 2026-09-27: PRs #70, #71, #72 merged, main at a0bb3bf, Production deploy succeeded, migration filenames through 0064, 0063 and 0064 applied to uhovonrljcauaoctypbg, cancel_redemption grants, open PR list, remote branch list. Not verified on 2026-09-27: a signed-in prediction resolve or redemption cancel. Verified on 2026-09-24: PRs #65 and #66 merged, main at b904d62, Frontend tests and Secret Scan green on b904d62, Production deploy succeeded and the site returned 200, migration filenames on origin/main through 0062, leaderboard cron entry in frontend/vercel.json, remote branch list, open PR list, sms_enabled backfill count in production. Not verified: a live SMS delivery, the first scheduled cron run, signed-in rendering of any page.</footer>
 </div>
 
 </body>
