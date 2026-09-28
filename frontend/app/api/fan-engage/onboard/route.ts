@@ -8,6 +8,7 @@ import { resolveOnboardCommunityId } from "@/lib/onboard-community";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { setPreferences } from "@/lib/notifications/preferences";
 import { smsEnabledFromOnboarding } from "@/lib/sms-send-gate";
+import { onboardConsentUpdates } from "@/lib/consent";
 
 export const runtime = "nodejs";
 
@@ -24,9 +25,11 @@ type OnboardPayload = {
   referralCode?: string; // optional — the ref code that was passed in the invite link
   communitySlug?: string; // optional — artist/community slug the fan joined through
   smsOptedIn?: boolean;
+  /** True only when the fan ticked the SMS consent box. */
+  smsConsent?: boolean;
   emailOptedIn?: boolean;
+  /** When the fan ticked the Terms box (client clock, validated here). */
   consentAcceptedAt?: string;
-  consentVersion?: string;
 };
 
 /**
@@ -82,6 +85,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const consent = onboardConsentUpdates(payload, phoneResult.phone);
+    if (!consent.ok) {
+      return NextResponse.json(
+        { error: consent.error, field: "consent" },
+        { status: 400 },
+      );
+    }
+
     // 1. Update the fan's profile row (created by the auth trigger).
     //
     // The onboarding wizard's "TikTok or Instagram handle" field arrives
@@ -109,10 +120,11 @@ export async function POST(request: NextRequest) {
       phone: phoneResult.phone,
       music_outlet: payload.musicOutlet ?? null,
       interest: payload.interest ?? null,
-      sms_opted_in: Boolean(payload.smsOptedIn),
+      sms_opted_in: consent.smsOptedIn,
       email_opted_in: Boolean(payload.emailOptedIn),
-      consent_accepted_at: payload.consentAcceptedAt ?? new Date().toISOString(),
-      consent_version: payload.consentVersion ?? null,
+      // Only written when the fan ticked the Terms box this time, so a
+      // re-submit never blanks or back-dates an earlier consent.
+      ...(consent.consent ?? {}),
     };
     if (socialsMerge !== undefined) updates.socials = socialsMerge;
 
@@ -136,7 +148,7 @@ export async function POST(request: NextRequest) {
     //     so without this an opted-in fan never gets a text.
     try {
       await setPreferences(user.id, {
-        sms_enabled: smsEnabledFromOnboarding(payload.smsOptedIn, phoneResult.phone),
+        sms_enabled: smsEnabledFromOnboarding(consent.smsOptedIn, phoneResult.phone),
       });
     } catch (err) {
       console.warn("onboard: failed to sync SMS preference", err);

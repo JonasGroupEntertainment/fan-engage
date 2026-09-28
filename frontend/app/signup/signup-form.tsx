@@ -27,6 +27,7 @@ import {
   sanitizeSignupError,
 } from "@/lib/signup-outcome";
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
+import { CONSENT_VERSION } from "@/lib/consent";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
@@ -37,8 +38,6 @@ export type ConsentDoc = {
   title: string;
   content_md: string;
 };
-
-const CONSENT_VERSION = "2026-08-01.v1";
 
 export type ReferrerArtist = {
   slug: string;
