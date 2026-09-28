@@ -68,7 +68,7 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
       {/* Daily quest — first incomplete CTA surfaced as a highlighted action */}
       <DailyQuestCard ctas={ctas} primaryCommunity={primaryCommunity} />
 
-      {/* Monthly credit — teal card, only for premium fans with a balance */}
+      {/* Monthly credit: teal card, only for premium fans with a balance */}
       <CreditBalanceCard
         creditCents={fan.monthly_credit_cents ?? 0}
         isPremium={premiumCommunities.length > 0}
@@ -605,7 +605,8 @@ function StreakCard({
 }
 
 /**
- * Teal credit card — only visible to premium fans with a non-zero balance.
+ * Teal credit card, only visible to premium fans with a non-zero balance.
+ * Credit builds up monthly but nothing can spend it yet, so the copy says so.
  */
 function CreditBalanceCard({
   creditCents,
@@ -626,12 +627,15 @@ function CreditBalanceCard({
       <div className="flex items-center gap-3">
         <span className="text-3xl" aria-hidden>💳</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-teal-300">
+          <p className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-teal-300">
             Monthly credit
+            <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70">
+              Coming soon
+            </span>
           </p>
           <p className="mt-0.5 text-xl font-bold text-white">${dollars}</p>
           <p className="mt-0.5 text-xs text-teal-300/70">
-            Used automatically at checkout
+            Saved to your account. Ways to spend it are coming soon.
           </p>
         </div>
       </div>

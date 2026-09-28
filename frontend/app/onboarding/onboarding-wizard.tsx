@@ -702,6 +702,15 @@ export default function OnboardingWizard({
                   </button>
                 )}
               </div>
+              {isLastStep && (
+                <p className="text-right text-xs text-white/50">
+                  By joining you agree to the{" "}
+                  <Link href="/rewards-terms" className="text-aurora underline">
+                    Rewards Terms
+                  </Link>
+                  .
+                </p>
+              )}
               {!isLastStep && !stepValid && (
                 <p className="text-right text-xs text-white/50">
                   Fill in the required fields (

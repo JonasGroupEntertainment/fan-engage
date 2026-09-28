@@ -27,8 +27,17 @@ import {
   recordPremiumUpgradeNavigation,
   savePremiumUpgradePromptState,
   shouldShowPremiumUpgradePrompt,
+  stampPremiumUpgradeFirstSeen,
   type PremiumUpgradePromptState,
 } from "@/lib/premium-upgrade-prompt";
+import {
+  claimPromptSlot,
+  getActivePromptSlot,
+  getServerPromptSlot,
+  isPromptSlotFree,
+  releasePromptSlot,
+  subscribePromptSlot,
+} from "@/lib/prompt-slot";
 
 function subscribe() {
   return () => {};
@@ -65,6 +74,20 @@ function getCookieConsentSnapshot(): string | null {
   }
 }
 
+// Minute-level clock for the grace and cooldown rules. Rounding keeps the
+// snapshot stable between renders, which useSyncExternalStore requires.
+const CLOCK_TICK_MS = 60_000;
+function subscribeClock(onChange: () => void) {
+  const id = window.setInterval(onChange, CLOCK_TICK_MS);
+  return () => window.clearInterval(id);
+}
+function getClockSnapshot(): number {
+  return Math.floor(Date.now() / CLOCK_TICK_MS) * CLOCK_TICK_MS;
+}
+function getServerClockSnapshot(): number {
+  return 0;
+}
+
 function persist(state: PremiumUpgradePromptState) {
   try {
     savePremiumUpgradePromptState(window.localStorage, state);
@@ -76,13 +99,20 @@ function persist(state: PremiumUpgradePromptState) {
 export default function PremiumUpgradePrompt({
   isPremium = false,
   signedIn = false,
+  accountCreatedAt = null,
 }: {
   isPremium?: boolean;
   signedIn?: boolean;
+  /** Supabase auth created_at, used for the first-day grace period. */
+  accountCreatedAt?: string | null;
 }) {
   return (
     <Suspense fallback={null}>
-      <PremiumUpgradePromptInner isPremium={isPremium} signedIn={signedIn} />
+      <PremiumUpgradePromptInner
+        isPremium={isPremium}
+        signedIn={signedIn}
+        accountCreatedAt={accountCreatedAt}
+      />
     </Suspense>
   );
 }
@@ -90,9 +120,11 @@ export default function PremiumUpgradePrompt({
 function PremiumUpgradePromptInner({
   isPremium,
   signedIn,
+  accountCreatedAt,
 }: {
   isPremium: boolean;
   signedIn: boolean;
+  accountCreatedAt: string | null;
 }) {
   const pathname = usePathname() ?? "";
   const titleId = useId();
@@ -109,6 +141,16 @@ function PremiumUpgradePromptInner({
     subscribeCookieConsent,
     getCookieConsentSnapshot,
     getServerSnapshot,
+  );
+  const activeSlot = useSyncExternalStore(
+    subscribePromptSlot,
+    getActivePromptSlot,
+    getServerPromptSlot,
+  );
+  const now = useSyncExternalStore(
+    subscribeClock,
+    getClockSnapshot,
+    getServerClockSnapshot,
   );
   const persisted = parsePremiumUpgradePromptState(persistedRaw);
   const [session, setSession] = useState<PremiumUpgradePromptState | null>(
@@ -127,8 +169,35 @@ function PremiumUpgradePromptInner({
     state,
     pathname,
     cookieBannerOpen: isCookieBannerOpen({ consentRaw, pathname }),
+    now,
+    accountCreatedAt,
   });
-  const open = eligible && delayElapsed;
+  // One floating prompt at a time: wait for the install banner to finish.
+  const candidate =
+    eligible && delayElapsed && isPromptSlotFree("premium", activeSlot);
+  const open = candidate && activeSlot === "premium";
+
+  useEffect(() => {
+    if (candidate) claimPromptSlot("premium");
+    else releasePromptSlot("premium");
+  }, [candidate]);
+
+  useEffect(() => () => releasePromptSlot("premium"), []);
+
+  // Remember when this device first saw the fan, so the first-day grace
+  // still works when auth created_at is unavailable.
+  useEffect(() => {
+    if (!signedIn || state.firstSeenAt) return;
+    const id = window.setTimeout(() => {
+      setSession((current) =>
+        stampPremiumUpgradeFirstSeen(
+          current ?? parsePremiumUpgradePromptState(getSnapshot()),
+          Date.now(),
+        ),
+      );
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [signedIn, state.firstSeenAt]);
 
   useEffect(() => {
     if (!session) return;
@@ -138,7 +207,11 @@ function PremiumUpgradePromptInner({
   useEffect(() => {
     if (!isPremium) return;
     const id = window.setTimeout(() => {
-      setSession(lockPremiumUpgradePrompt());
+      setSession((current) =>
+        lockPremiumUpgradePrompt(
+          current ?? parsePremiumUpgradePromptState(getSnapshot()),
+        ),
+      );
     }, 0);
     return () => window.clearTimeout(id);
   }, [isPremium]);
@@ -177,6 +250,7 @@ function PremiumUpgradePromptInner({
     setSession((current) =>
       dismissPremiumUpgradePrompt(
         current ?? parsePremiumUpgradePromptState(getSnapshot()),
+        Date.now(),
       ),
     );
   }, [setSession]);

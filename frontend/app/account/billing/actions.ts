@@ -5,19 +5,20 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
-import { PREMIUM_CTA, requirePremiumAnywhere } from "@/lib/entitlements";
+import { PREMIUM_CTA } from "@/lib/entitlements";
 
+/**
+ * Opens the Stripe billing portal for any fan who has a Stripe customer,
+ * not only active Premium members. Lapsed, canceled or past-due fans still
+ * need to see invoices and update a card. Fans with no customer yet go to
+ * the Premium page instead.
+ */
 export async function openBillingPortalAction(): Promise<void> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/account/billing");
-
-  const gate = await requirePremiumAnywhere(user.id);
-  if (!gate.allowed) {
-    redirect(PREMIUM_CTA.href);
-  }
 
   const admin = createAdminClient();
   const { data: fan } = await admin
@@ -28,9 +29,7 @@ export async function openBillingPortalAction(): Promise<void> {
 
   const customerId = fan?.stripe_customer_id as string | null;
   if (!customerId) {
-    throw new Error(
-      "No billing account found. Subscribe to a community first.",
-    );
+    redirect(PREMIUM_CTA.href);
   }
 
   const h = await headers();

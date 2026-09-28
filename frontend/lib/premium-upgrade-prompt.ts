@@ -4,6 +4,13 @@
  * First visit waits 3–5s, then can show. "Not now" dismisses and
  * resurfaces after 8 App Router page views (navigations, not clicks).
  * Premium / comped / past_due never see it; once Premium, it stays gone.
+ *
+ * Guardrails so it never interrupts the welcome or staff work:
+ * - Never on admin, artist portal, billing, legal or onboarding routes.
+ * - Never in a new fan's first day (account age, or first seen on this
+ *   device when the account date is unknown).
+ * - After 3 lifetime dismissals it stops for good.
+ * - At most once every 7 days after a dismissal.
  */
 
 import { isPremium, type SubscriptionTier } from "./entitlements-core.ts";
@@ -16,9 +23,21 @@ export const PAGE_VIEWS_TO_RESURFACE = 8;
 export const FIRST_SHOW_DELAY_MS_MIN = 3000;
 export const FIRST_SHOW_DELAY_MS_MAX = 5000;
 
+/** After this many "Not now" taps the prompt never comes back. */
+export const MAX_LIFETIME_DISMISSALS = 3;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Minimum gap between a dismissal and the next show. */
+export const RESURFACE_COOLDOWN_MS = 7 * DAY_MS;
+
+/** New fans get a quiet first day with no upgrade pitch. */
+export const NEW_FAN_GRACE_MS = DAY_MS;
+
 /**
  * Same form-heavy prefixes as the cookie banner, plus /premium so the
- * prompt never covers checkout or auth CTAs.
+ * prompt never covers checkout or auth CTAs, plus staff tools, billing and
+ * the legal pages (a sales pitch over the terms a fan is reading is not ok).
  */
 export const PREMIUM_UPGRADE_PROMPT_HIDE_PREFIXES = [
   "/for-artists/apply",
@@ -29,6 +48,16 @@ export const PREMIUM_UPGRADE_PROMPT_HIDE_PREFIXES = [
   "/onboarding",
   "/auth",
   "/premium",
+  "/admin",
+  "/artist-portal",
+  "/account/billing",
+  "/terms",
+  "/privacy",
+  "/rewards-terms",
+  "/cookie-policy",
+  "/cancellation-refund",
+  "/dmca",
+  "/legal",
 ] as const;
 
 export const COOKIE_BANNER_HIDE_PREFIXES = [
@@ -54,13 +83,32 @@ export type PremiumUpgradePromptState = {
   views: number;
   /** Sticky hide after we observed Premium (premium/comped/past_due). */
   premiumLocked: boolean;
+  /** ISO time this device first saw a signed-in fan. Null until stamped. */
+  firstSeenAt: string | null;
+  /** Lifetime "Not now" count. Stops the prompt at MAX_LIFETIME_DISMISSALS. */
+  dismissCount: number;
+  /** ISO time of the last dismissal, for the 7-day cooldown. */
+  lastDismissedAt: string | null;
 };
 
 export const EMPTY_PREMIUM_UPGRADE_PROMPT_STATE: PremiumUpgradePromptState = {
   dismissed: false,
   views: 0,
   premiumLocked: false,
+  firstSeenAt: null,
+  dismissCount: 0,
+  lastDismissedAt: null,
 };
+
+function parseIsoOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function parseCount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+}
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -72,12 +120,17 @@ export function parsePremiumUpgradePromptState(
 ): PremiumUpgradePromptState {
   if (!raw) return { ...EMPTY_PREMIUM_UPGRADE_PROMPT_STATE };
   try {
-    const parsed = JSON.parse(raw) as Partial<PremiumUpgradePromptState>;
-    const views = Number(parsed.views);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const dismissed = parsed.dismissed === true;
+    const dismissCount = parseCount(parsed.dismissCount);
     return {
-      dismissed: parsed.dismissed === true,
-      views: Number.isFinite(views) ? Math.max(0, Math.floor(views)) : 0,
+      dismissed,
+      views: parseCount(parsed.views),
       premiumLocked: parsed.premiumLocked === true,
+      firstSeenAt: parseIsoOrNull(parsed.firstSeenAt),
+      // Legacy state (before the cap) only knew "dismissed at least once".
+      dismissCount: dismissed ? Math.max(1, dismissCount) : dismissCount,
+      lastDismissedAt: parseIsoOrNull(parsed.lastDismissedAt),
     };
   } catch {
     return { ...EMPTY_PREMIUM_UPGRADE_PROMPT_STATE };
@@ -91,6 +144,9 @@ export function serializePremiumUpgradePromptState(
     dismissed: state.dismissed,
     views: state.views,
     premiumLocked: state.premiumLocked,
+    firstSeenAt: state.firstSeenAt,
+    dismissCount: state.dismissCount,
+    lastDismissedAt: state.lastDismissedAt,
   });
 }
 
@@ -158,6 +214,36 @@ export function shouldHidePremiumUpgradeForEntitlement(
   return isPremium(source);
 }
 
+/**
+ * True during a new fan's first day. Uses the account creation time when
+ * the server knows it, otherwise when this device first saw the fan. With
+ * neither, the fan is treated as brand new (the component stamps
+ * firstSeenAt on first render, so this only holds for that first session).
+ */
+export function isInNewFanGrace(args: {
+  now: number;
+  accountCreatedAt?: string | null;
+  firstSeenAt: string | null;
+}): boolean {
+  const start =
+    parseIsoOrNull(args.accountCreatedAt) ?? parseIsoOrNull(args.firstSeenAt);
+  if (start == null) return true;
+  return args.now - Date.parse(start) < NEW_FAN_GRACE_MS;
+}
+
+/** True when a dismissed prompt is allowed to come back. */
+export function canResurfacePremiumUpgradePrompt(
+  state: PremiumUpgradePromptState,
+  now: number,
+): boolean {
+  if (state.dismissCount >= MAX_LIFETIME_DISMISSALS) return false;
+  if (state.views < PAGE_VIEWS_TO_RESURFACE) return false;
+  const last = parseIsoOrNull(state.lastDismissedAt);
+  // Legacy dismissals have no timestamp; the view count alone gates them.
+  if (last == null) return true;
+  return now - Date.parse(last) >= RESURFACE_COOLDOWN_MS;
+}
+
 export function shouldShowPremiumUpgradePrompt(args: {
   /** Signed-in Free members only. Guests never see the prompt. */
   signedIn: boolean;
@@ -166,6 +252,10 @@ export function shouldShowPremiumUpgradePrompt(args: {
   pathname: string;
   /** True while the cookie consent banner is still on screen. */
   cookieBannerOpen?: boolean;
+  /** Current time in ms. Defaults to Date.now(). */
+  now?: number;
+  /** Supabase auth created_at for the signed-in fan, when known. */
+  accountCreatedAt?: string | null;
 }): boolean {
   if (!args.signedIn) return false;
   if (args.cookieBannerOpen) return false;
@@ -176,8 +266,27 @@ export function shouldShowPremiumUpgradePrompt(args: {
     return false;
   }
   if (isPremiumUpgradePromptHiddenPath(args.pathname)) return false;
+  const now = args.now ?? Date.now();
+  if (
+    isInNewFanGrace({
+      now,
+      accountCreatedAt: args.accountCreatedAt,
+      firstSeenAt: args.state.firstSeenAt,
+    })
+  ) {
+    return false;
+  }
   if (!args.state.dismissed) return true;
-  return args.state.views >= PAGE_VIEWS_TO_RESURFACE;
+  return canResurfacePremiumUpgradePrompt(args.state, now);
+}
+
+/** Stamp the first time this device saw the fan. Keeps an existing stamp. */
+export function stampPremiumUpgradeFirstSeen(
+  state: PremiumUpgradePromptState,
+  now: number,
+): PremiumUpgradePromptState {
+  if (state.firstSeenAt) return state;
+  return { ...state, firstSeenAt: new Date(now).toISOString() };
 }
 
 export function incrementPremiumUpgradePromptViews(
@@ -204,12 +313,21 @@ export function recordPremiumUpgradeNavigation(
 
 export function dismissPremiumUpgradePrompt(
   state: PremiumUpgradePromptState,
+  now: number = Date.now(),
 ): PremiumUpgradePromptState {
-  return { ...state, dismissed: true, views: 0 };
+  return {
+    ...state,
+    dismissed: true,
+    views: 0,
+    dismissCount: state.dismissCount + 1,
+    lastDismissedAt: new Date(now).toISOString(),
+  };
 }
 
-export function lockPremiumUpgradePrompt(): PremiumUpgradePromptState {
-  return { dismissed: true, views: 0, premiumLocked: true };
+export function lockPremiumUpgradePrompt(
+  state: PremiumUpgradePromptState = EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+): PremiumUpgradePromptState {
+  return { ...state, dismissed: true, views: 0, premiumLocked: true };
 }
 
 export function applyPremiumEntitlementToPromptState(
@@ -218,7 +336,7 @@ export function applyPremiumEntitlementToPromptState(
 ): PremiumUpgradePromptState {
   if (!shouldHidePremiumUpgradeForEntitlement(isPremiumViewer)) return state;
   if (state.premiumLocked) return state;
-  return lockPremiumUpgradePrompt();
+  return lockPremiumUpgradePrompt(state);
 }
 
 export function pickFirstShowDelayMs(random = Math.random): number {

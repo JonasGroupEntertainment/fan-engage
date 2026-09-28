@@ -148,7 +148,7 @@ export default async function TierOpengraphImage({
           }}
         >
           <div style={{ maxWidth: 720 }}>
-            Unlocked the Premium tier — backstage feed, early drops, monthly AMA, and more.
+            Unlocked the Premium tier: backstage feed, 1.5x points and rewards. Early drops and AMA coming soon.
           </div>
           <div
             style={{
