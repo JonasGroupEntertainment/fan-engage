@@ -44,14 +44,21 @@ describe("v1 Premium gates on UI + APIs", () => {
     assert.match(card, /PREMIUM_CTA\.unlock/);
   });
 
-  it("Stripe billing portal is Premium-only and Manage billing copy is gated", () => {
+  it("Stripe billing portal opens for any Stripe customer and Manage billing copy is gated", () => {
     const billingAction = readRepo("../app/account/billing/actions.ts");
     const billingPage = readRepo("../app/account/billing/page.tsx");
     const menu = readRepo("../components/user-menu.tsx");
     const me = readRepo("../app/me/page.tsx");
     const premium = readRepo("../app/premium/page.tsx");
-    assert.match(billingAction, /requirePremiumAnywhere/);
+    // Lapsed or canceled fans still need invoices, so no Premium gate here.
+    assert.doesNotMatch(billingAction, /requirePremiumAnywhere/);
+    assert.match(billingAction, /stripe_customer_id/);
     assert.match(billingAction, /PREMIUM_CTA\.href/);
+    assert.equal(
+      (billingPage.match(/action=\{openBillingPortalAction\}/g) ?? []).length,
+      2,
+      "portal form shows for Premium and for non-Premium customers",
+    );
     assert.match(billingPage, /isPremiumFan/);
     assert.match(billingPage, /PREMIUM_CTA\.manageBilling/);
     assert.match(menu, /isPremium \?/);

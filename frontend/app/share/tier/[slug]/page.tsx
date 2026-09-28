@@ -16,7 +16,7 @@ export async function generateMetadata({
   const artist = await getArtistFromDb(slug).catch(() => null);
   const artistName = artist?.name ?? "Fan Engage";
   const title = `Premium Fan — ${artistName}`;
-  const description = `Unlocked the Premium tier for ${artistName} on Fan Engage — backstage feed, early drops, monthly AMA, and more.`;
+  const description = `Unlocked the Premium tier for ${artistName} on Fan Engage: backstage feed, 1.5x points and rewards. Early drops and a monthly AMA are coming soon.`;
   return {
     title,
     description,
@@ -45,7 +45,7 @@ export default async function TierSharePage({
       ? `${process.env.NEXT_PUBLIC_APP_URL}/share/tier/${slug}`
       : `https://fan-engage-pearl.vercel.app/share/tier/${slug}`;
   const shareTitle = `I just unlocked Premium for ${artist.name}`;
-  const shareText = `Backstage feed, early drops, monthly AMA and more — I'm a Premium fan for ${artist.name} on Fan Engage. ${shareUrl}`;
+  const shareText = `Backstage feed, 1.5x points and rewards, with early drops and a monthly AMA coming soon. I'm a Premium fan for ${artist.name} on Fan Engage. ${shareUrl}`;
 
   return (
     <main className="min-h-screen bg-[#050b1f] text-white flex flex-col items-center justify-center px-6 py-16">
@@ -75,7 +75,7 @@ export default async function TierSharePage({
           <h1 className="text-3xl font-bold">{artist.name}</h1>
         </div>
         <p className="text-white/60 text-sm max-w-xs">
-          Backstage feed, early drops, monthly AMA, and exclusive community perks.
+          Backstage feed, 1.5x points, rewards and the full community. Early drops and a monthly AMA are coming soon.
         </p>
         <ShareButton
           title={shareTitle}
