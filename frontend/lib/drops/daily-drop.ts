@@ -1,8 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { awardPoints } from "@/lib/points/award";
+import { easternDateString } from "@/lib/dates/eastern";
 
 /**
- * Daily drop — a variable-reward bonus revealed once per calendar day (UTC)
+ * Daily drop — a variable-reward bonus revealed once per calendar day (US Eastern)
  * when a signed-in fan visits an artist page.
  *
  * The amount is deterministic per (fan, day): a hash of `fanId:date` picks
@@ -43,6 +44,11 @@ function bucketFor(key: string): number {
   return (h >>> 0) % 100;
 }
 
+/** Ledger dedupe key for one fan's drop on one Eastern calendar day. */
+export function dailyDropRef(fanId: string, dateStr: string): string {
+  return `daily-drop:${fanId}:${dateStr}`;
+}
+
 export function rollDailyDrop(fanId: string, dateStr: string): {
   points: number;
   rarity: DropRarity;
@@ -53,7 +59,7 @@ export function rollDailyDrop(fanId: string, dateStr: string): {
 }
 
 /**
- * Claim today's drop for a fan. Idempotent within the same UTC day.
+ * Claim today's drop for a fan. Idempotent within the same Eastern calendar day.
  * Non-essential: any failure returns a benign zero-state rather than
  * blocking the page render.
  */
@@ -70,23 +76,27 @@ export async function claimDailyDrop(
   if (!fanId) return benign;
 
   try {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = easternDateString();
     const { points, rarity } = rollDailyDrop(fanId, todayStr);
-    const sourceRef = `daily-drop:${fanId}:${todayStr}`;
+    const sourceRef = dailyDropRef(fanId, todayStr);
 
     const admin = createAdminClient();
-    const { data: existing } = await admin
+    // Look up by source_ref only. The ref is unique per fan and day, and
+    // rows written before 0065 were filed as manual_adjustment, so a
+    // source filter would miss them.
+    const { data: existing, error: lookupErr } = await admin
       .from("points_ledger")
       .select("id")
-      .eq("source", "daily_drop")
       .eq("source_ref", sourceRef)
+      .limit(1)
       .maybeSingle();
+    if (lookupErr) throw lookupErr;
 
     if (existing) {
       return { points, rarity, claimedToday: false, alreadyClaimed: true };
     }
 
-    await awardPoints(admin, {
+    const awarded = await awardPoints(admin, {
       fanId,
       delta: points,
       source: "daily_drop",
@@ -95,6 +105,10 @@ export async function claimDailyDrop(
       ...(communityId ? { communityId } : {}),
     });
 
+    // 0 means a concurrent visit claimed it first (the RPC deduped).
+    if (awarded === 0) {
+      return { points, rarity, claimedToday: false, alreadyClaimed: true };
+    }
     return { points, rarity, claimedToday: true, alreadyClaimed: false };
   } catch (err) {
     console.warn("claimDailyDrop failed (non-blocking):", err);

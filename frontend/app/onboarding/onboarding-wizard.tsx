@@ -139,6 +139,9 @@ export default function OnboardingWizard({
   const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
   const [finishMessage, setFinishMessage] = useState(GENERIC_FINISH_ERROR);
   const [tosConsent, setTosConsent] = useState(false);
+  // The moment the fan ticked the Terms box. Sent as the consent time so
+  // the server never has to invent one.
+  const [tosConsentAt, setTosConsentAt] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(false);
   // Tracks whether the email field was successfully auto-prefilled from
   // auth.users. When true, the field stays readOnly (no risk of typo
@@ -243,6 +246,49 @@ export default function OnboardingWizard({
   const nextStep = () => setStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
   const prevStep = () => setStepIndex((prev) => Math.max(prev - 1, 0));
 
+  const readRefCodes = () => {
+    const refFromUrl =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("ref") ?? undefined
+        : undefined;
+    const refFromCookie =
+      typeof document !== "undefined"
+        ? document.cookie
+            .split("; ")
+            .find((c) => c.startsWith("fanengage_ref="))
+            ?.split("=")[1]
+        : undefined;
+    return { refFromUrl, refFromCookie, refCode: refFromUrl ?? refFromCookie };
+  };
+
+  /**
+   * Onboard payload. SMS opt-in is sent only when the fan ticked the SMS
+   * box, and the consent time is the moment they ticked the Terms box.
+   * The server sets the consent version from its own constant.
+   */
+  const buildOnboardBody = () => {
+    const { refFromUrl, refCode } = readRefCodes();
+    const textsConsented = hasSendablePhone(formState.phone) && smsConsent;
+    return JSON.stringify({
+      firstName: formState.firstName,
+      city: formState.city,
+      phone: formState.phone,
+      handle: formState.handle,
+      musicOutlet: resolveMusicOutlet(),
+      interest: formState.interest,
+      referralCode: refCode,
+      communitySlug: refFromUrl || "raelynn",
+      smsOptedIn: textsConsented,
+      smsConsent: textsConsented,
+      emailOptedIn: Boolean(formState.email),
+      consentAcceptedAt: tosConsent && tosConsentAt ? tosConsentAt : undefined,
+    });
+  };
+
+  /** Sends the confirmation text to the fan's own saved number. */
+  const sendConfirmationText = () =>
+    fetch("/api/fan-engage/sms", { method: "POST" });
+
   const handleSmsOptIn = async () => {
     const blocked = smsSendBlockedReason(formState.phone);
     if (blocked) {
@@ -250,20 +296,28 @@ export default function OnboardingWizard({
       setSmsMessage(blocked);
       return;
     }
+    if (!smsConsent) {
+      setSmsStatus("error");
+      setSmsMessage("Tick the SMS consent box before we text you.");
+      return;
+    }
 
     try {
       setSmsStatus("loading");
       setSmsMessage("Sending confirmation text...");
-      const response = await fetch("/api/fan-engage/sms", {
+
+      // Save the number and the SMS consent first. The SMS route only texts
+      // the fan's own stored number after the opt-in is recorded.
+      const onboardRes = await fetch("/api/fan-engage/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: formState.phone,
-          firstName: formState.firstName,
-          interest: formState.interest,
-        }),
+        body: buildOnboardBody(),
       });
+      if (!onboardRes.ok) {
+        throw new Error(`Saving SMS consent failed (${onboardRes.status})`);
+      }
 
+      const response = await sendConfirmationText();
       if (!response.ok) {
         throw new Error("Failed to send SMS");
       }
@@ -286,34 +340,10 @@ export default function OnboardingWizard({
           console.warn("Mailchimp subscribe did not complete:", err);
         });
       }
-
-      // Fire-and-forget backend onboarding completion.
-      const refCode =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("ref") ?? undefined
-          : undefined;
-      fetch("/api/fan-engage/onboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: formState.firstName,
-          city: formState.city,
-          phone: formState.phone,
-          handle: formState.handle,
-          musicOutlet: resolveMusicOutlet(),
-          interest: formState.interest,
-          referralCode: refCode,
-          communitySlug: refCode || "raelynn",
-          smsOptedIn: true,
-          emailOptedIn: Boolean(formState.email),
-        }),
-      }).catch((err) => {
-        console.warn("Onboarding completion did not persist:", err);
-      });
     } catch (error) {
       console.error(error);
       setSmsStatus("error");
-      setSmsMessage("Twilio did not accept the request. Double-check the number and try again.");
+      setSmsMessage("We could not send the text. Double-check the number and try again.");
     }
   };
 
@@ -327,35 +357,11 @@ export default function OnboardingWizard({
     try {
       setFinishStatus("saving");
 
-      const refFromUrl =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("ref") ?? undefined
-          : undefined;
-      const refFromCookie =
-        typeof document !== "undefined"
-          ? document.cookie
-              .split("; ")
-              .find((c) => c.startsWith("fanengage_ref="))
-              ?.split("=")[1]
-          : undefined;
-      const refCode = refFromUrl ?? refFromCookie;
+      const { refFromCookie } = readRefCodes();
       const onboardRes = await fetch("/api/fan-engage/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: formState.firstName,
-          city: formState.city,
-          phone: formState.phone,
-          handle: formState.handle,
-          musicOutlet: resolveMusicOutlet(),
-          interest: formState.interest,
-          referralCode: refCode,
-          communitySlug: refFromUrl || "raelynn",
-          smsOptedIn: hasSendablePhone(formState.phone) && smsConsent,
-          emailOptedIn: Boolean(formState.email),
-          consentAcceptedAt: new Date().toISOString(),
-          consentVersion: "2026-04-22.v1",
-        }),
+        body: buildOnboardBody(),
       });
 
       if (!onboardRes.ok) {
@@ -385,16 +391,11 @@ export default function OnboardingWizard({
         }).catch((err) => console.warn("Mailchimp subscribe did not complete:", err));
       }
 
-      if (hasSendablePhone(formState.phone)) {
-        fetch("/api/fan-engage/sms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: formState.phone,
-            firstName: formState.firstName,
-            interest: formState.interest,
-          }),
-        }).catch((err) => console.warn("Twilio SMS did not complete:", err));
+      // Text only a fan who ticked the SMS box, and only once.
+      if (hasSendablePhone(formState.phone) && smsConsent && smsStatus !== "success") {
+        sendConfirmationText().catch((err) =>
+          console.warn("Twilio SMS did not complete:", err),
+        );
       }
 
       // Prefer the artist welcome celebration (first points moment). If signup
@@ -585,7 +586,10 @@ export default function OnboardingWizard({
                   <input
                     type="checkbox"
                     checked={tosConsent}
-                    onChange={(e) => setTosConsent(e.target.checked)}
+                    onChange={(e) => {
+                      setTosConsent(e.target.checked);
+                      setTosConsentAt(e.target.checked ? new Date().toISOString() : null);
+                    }}
                     className="mt-0.5 h-4 w-4 accent-aurora"
                   />
                   <span>
@@ -643,8 +647,12 @@ export default function OnboardingWizard({
             <button
               onClick={handleSmsOptIn}
               className="mt-4 rounded-full border border-white/30 px-4 py-2 text-sm text-white/80 disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={smsStatus === "loading" || !hasSendablePhone(formState.phone)}
-              aria-disabled={smsStatus === "loading" || !hasSendablePhone(formState.phone)}
+              disabled={
+                smsStatus === "loading" || !hasSendablePhone(formState.phone) || !smsConsent
+              }
+              aria-disabled={
+                smsStatus === "loading" || !hasSendablePhone(formState.phone) || !smsConsent
+              }
             >
               {smsStatus === "loading" ? "Sending..." : "Send confirmation text"}
             </button>
