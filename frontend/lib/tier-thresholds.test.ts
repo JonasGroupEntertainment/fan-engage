@@ -48,7 +48,7 @@ describe("tier thresholds are one ladder", () => {
   it("Fan Home, badge gallery, and SMS copy share the module", () => {
     const tiers = readRepo("./data/tiers.ts");
     const badges = readRepo("./data/badges.ts");
-    const sms = readRepo("../app/settings/notifications/page.tsx");
+    const sms = readRepo("../app/me/notifications/page.tsx");
     assert.match(tiers, /FALLBACK_TIERS|TIER_MIN_POINTS/);
     assert.match(badges, /tierBadgeDescription/);
     assert.match(sms, /pointsToGold|TIER_MIN_POINTS/);

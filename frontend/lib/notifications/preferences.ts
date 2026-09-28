@@ -4,7 +4,7 @@ import { preferenceColumnFor } from "./types";
 
 /**
  * Lazy fetch of a fan's notification preferences. If the row doesn't exist
- * yet (fan never visited /settings/notifications), we return the schema
+ * yet (fan never visited /me/notifications), we return the schema
  * defaults — push_enabled false, sms_enabled false, all granular flags true.
  */
 export async function getPreferences(
