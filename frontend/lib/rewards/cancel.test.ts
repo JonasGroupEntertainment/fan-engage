@@ -37,6 +37,13 @@ describe("0063 cancel_redemption", () => {
     assert.doesNotMatch(body, /apply_points_award|points_multiplier/);
   });
 
+  it("puts one unit of limited stock back", () => {
+    assert.match(
+      migration,
+      /update public\.rewards_catalog\s+set stock = stock \+ 1\s+where id = v_redemption\.reward_id\s+and stock is not null/,
+    );
+  });
+
   it("allows only one refund row per redemption", () => {
     assert.match(
       migration,

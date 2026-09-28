@@ -67,6 +67,13 @@ begin
      set status = 'cancelled', cancelled_at = now()
    where id = p_redemption_id;
 
+  -- Put the unit back. redeem_reward() takes one off limited stock, so the
+  -- cancel gives it back; unlimited rewards (stock is null) are untouched.
+  update public.rewards_catalog
+     set stock = stock + 1
+   where id = v_redemption.reward_id
+     and stock is not null;
+
   if v_redemption.point_cost > 0 then
     insert into public.points_ledger (fan_id, delta, source, source_ref, community_id, note)
     values (
