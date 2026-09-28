@@ -3,6 +3,9 @@
 -- REPO SYNC ONLY. Do not apply to prod.
 -- Live already applied out-of-band as network_watchdog_empty_funnel_guard
 -- (version 20260921112742) on uhovonrljcauaoctypbg. This file records that
+-- Numbered 0067 (was 0061 on this branch; 0061 is taken by
+-- 0061_privacy_counsel_contact.sql). Recorded in prod ledger as
+-- 20260921112742 network_watchdog_empty_funnel_guard, so no apply needed.
 -- function body so the repo matches prod. create or replace of the same
 -- definition is a no-op if someone pastes it later.
 --
