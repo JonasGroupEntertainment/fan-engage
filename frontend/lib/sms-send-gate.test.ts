@@ -41,7 +41,7 @@ describe("SMS send is blocked when phone is empty", () => {
     assert.match(wizard, /hasSendablePhone|smsSendBlockedReason/);
     assert.match(wizard, /disabled=\{/);
     assert.match(wizard, /EMPTY_PHONE_SMS_MESSAGE|Add a phone number/);
-    assert.match(route, /normalizeSmsPhone|Phone number required/);
+    assert.match(route, /smsRecipientForFan/);
     assert.doesNotMatch(
       wizard,
       /disabled=\{smsStatus === "loading"\}/,

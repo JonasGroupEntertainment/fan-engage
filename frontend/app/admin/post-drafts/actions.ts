@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminContext, getAdminUser } from "@/lib/admin";
+import { getAdminContext } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import {
   generateArtistPostDraft,
   type DraftContext,
@@ -13,16 +14,15 @@ async function requireAdminCommunity(): Promise<{
   communityId: string;
   userId: string;
 }> {
+  // Act on the community the admin currently has selected, and only when
+  // they hold at least the "editor" role there (or are a super-admin).
   const ctx = await getAdminContext();
-  const user = await getAdminUser();
-  if (!ctx || !user) redirect("/login");
-  const communityId =
-    (ctx as unknown as { communityId?: string }).communityId ??
-    (ctx as unknown as { artist_slug?: string }).artist_slug ??
-    (ctx as unknown as { activeCommunityId?: string }).activeCommunityId ??
-    "";
+  if (!ctx) redirect("/login");
+  const communityId = ctx.currentCommunityId ?? "";
   if (!communityId) redirect("/admin");
-  return { communityId, userId: user.id };
+  const guard = await authorizeAdmin({ communityId, minRole: "editor" }, ctx);
+  if (!guard.ok) throw new Error("Forbidden");
+  return { communityId, userId: ctx.user.id };
 }
 
 export async function generateAction() {

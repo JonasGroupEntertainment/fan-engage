@@ -2,15 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import twilio from "twilio";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { normalizePhoneE164 } from "@/lib/phone";
+import { SMS_WELCOME_MESSAGE, smsRecipientForFan } from "@/lib/sms/welcome";
 
 export const runtime = "nodejs";
-
-type SmsPayload = {
-  phone: string;
-  firstName?: string;
-  interest?: string;
-};
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -56,29 +50,31 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { phone: rawPhone, firstName, interest } = (await request.json()) as SmsPayload;
-    // Require E.164 so arbitrary strings never reach Twilio.
-    const phoneResult = normalizePhoneE164(rawPhone);
-    if (!phoneResult.ok) {
-      return NextResponse.json({ error: phoneResult.error }, { status: 400 });
+    // Only ever text the signed-in fan's own stored number, and only after
+    // they ticked the SMS consent box (recorded as fans.sms_opted_in by the
+    // onboard route). The request body is ignored: no client-supplied
+    // number or wording reaches Twilio.
+    const { data: fan, error: fanErr } = await supabase
+      .from("fans")
+      .select("phone, sms_opted_in")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (fanErr) {
+      console.error("sms: failed to load fan", fanErr);
+      return NextResponse.json(
+        { error: "Unable to send confirmation text." },
+        { status: 500 },
+      );
     }
-    if (!phoneResult.phone) {
-      return NextResponse.json({ error: "Phone number required" }, { status: 400 });
+    const recipient = smsRecipientForFan(fan);
+    if (!recipient.ok) {
+      return NextResponse.json({ error: recipient.error }, { status: recipient.status });
     }
-    const phone = phoneResult.phone;
 
     const client = twilio(accountSid, authToken);
-    // Welcome text — points at the first point-earning action so the fan has
-    // a reason to open the app right away. Includes carrier-required opt-out.
-    const body =
-      `Hey ${firstName ?? "fan"}! 🎶 Welcome to Fan Engage` +
-      (interest ? ` — we'll keep an ear out for ${interest}.` : ".") +
-      ` Earn your first 100 pts: follow an artist, RSVP to an event, or share the app. ` +
-      `Reply HELP for help. STOP to opt out. Msg&data rates may apply.`;
-
     const config: Parameters<typeof client.messages.create>[0] = {
-      to: phone,
-      body,
+      to: recipient.phone,
+      body: SMS_WELCOME_MESSAGE,
     };
 
     if (messagingServiceSid) {

@@ -1,7 +1,9 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
+import { importFanRows } from "@/lib/fans/import-fans";
+import { MAX_IMPORT_ROWS_PER_REQUEST } from "@/lib/fans/import-patch";
 
 export interface ImportRow {
   email: string;
@@ -21,114 +23,26 @@ export interface ImportResult {
 }
 
 /**
- * Upserts fans from a parsed CSV. Matches on email — creates a new fan row
- * if none exists, otherwise merges the supplied fields in (never overwrites
- * with blank values). Social handles land in fans.socials jsonb.
- * If communityId is provided, also creates/upserts a fan_community_memberships
- * row to segment the fan to that artist community. No emails are sent.
+ * Imports fans from a parsed CSV into one community the caller administers.
+ * Matches on email. Existing fans only get blank fields filled in, never
+ * overwritten. New fans get an auth user (no email sent) and a fans row.
+ * Every imported fan gets a membership in `communityId`.
  */
 export async function importFansAction(
   rows: ImportRow[],
-  communityId?: string,
+  communityId: string,
 ): Promise<ImportResult> {
-  const adminUser = await getAdminUser();
-  if (!adminUser) throw new Error("Unauthorized");
-  const admin = createAdminClient();
+  const target = typeof communityId === "string" ? communityId.trim() : "";
+  if (!target) throw new Error("Choose a community to import into.");
 
-  const result: ImportResult = {
-    total: rows.length,
-    created: 0,
-    updated: 0,
-    skipped: 0,
-    errors: [],
-  };
+  const guard = await authorizeAdmin({ communityId: target, minRole: "admin" });
+  if (!guard.ok) throw new Error(guard.reason === "signed_out" ? "Unauthorized" : "Forbidden");
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const email = row.email?.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      result.errors.push({ row: i + 2, email: row.email ?? "", reason: "Invalid email" });
-      result.skipped++;
-      continue;
-    }
-
-    // Look up existing fan by email
-    const { data: existing } = await admin
-      .from("fans")
-      .select("id, socials")
-      .eq("email", email)
-      .maybeSingle();
-
-    // Build socials patch — merge with existing, never blank out
-    const existingSocials = (existing?.socials as Record<string, string> | null) ?? {};
-    const newSocials: Record<string, string> = { ...existingSocials };
-    if (row.instagram?.trim()) newSocials.instagram = row.instagram.trim().replace(/^@/, "");
-    if (row.tiktok?.trim()) newSocials.tiktok = row.tiktok.trim().replace(/^@/, "");
-
-    const patch: Record<string, unknown> = { socials: newSocials };
-    if (row.first_name?.trim()) patch.first_name = row.first_name.trim();
-    if (row.phone?.trim()) patch.phone = row.phone.trim();
-    if (row.city?.trim()) patch.city = row.city.trim();
-
-    let fanId: string | null = existing?.id ?? null;
-
-    if (existing) {
-      const { error } = await admin
-        .from("fans")
-        .update(patch)
-        .eq("id", existing.id);
-      if (error) {
-        result.errors.push({ row: i + 2, email, reason: error.message });
-        result.skipped++;
-        continue;
-      } else {
-        result.updated++;
-      }
-    } else {
-      // Create an auth user first (no email sent — email_confirm skips verification)
-      const { data: authData, error: authError } = await admin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-      });
-      if (authError) {
-        result.errors.push({ row: i + 2, email, reason: authError.message });
-        result.skipped++;
-        continue;
-      }
-      const authUserId = authData.user.id;
-
-      const { data: inserted, error } = await admin
-        .from("fans")
-        .insert({ id: authUserId, email, ...patch })
-        .select("id")
-        .maybeSingle();
-      if (error) {
-        result.errors.push({ row: i + 2, email, reason: error.message });
-        result.skipped++;
-        continue;
-      } else {
-        fanId = inserted?.id ?? null;
-        result.created++;
-      }
-    }
-
-    // Assign to community if specified — no emails sent, just a membership row.
-    if (communityId && fanId) {
-      await admin
-        .from("fan_community_memberships")
-        .upsert(
-          {
-            fan_id: fanId,
-            community_id: communityId,
-            total_points: 0,
-            current_tier: "bronze",
-            status: "active",
-            joined_at: new Date().toISOString(),
-          },
-          { onConflict: "fan_id,community_id", ignoreDuplicates: true },
-        );
-    }
+  if (!Array.isArray(rows)) throw new Error("rows must be an array");
+  if (rows.length > MAX_IMPORT_ROWS_PER_REQUEST) {
+    throw new Error(`Send at most ${MAX_IMPORT_ROWS_PER_REQUEST} rows per request.`);
   }
 
-  return result;
+  const result = await importFanRows(createAdminClient(), rows, target);
+  return { total: rows.length, ...result };
 }

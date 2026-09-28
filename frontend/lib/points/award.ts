@@ -7,6 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Delegates to apply_points_award(): ledger is the source of truth,
  * Founding Fan 1.5× is applied there, and denorm totals are synced.
  *
+ * Returns the delta actually written (0 when the award was a duplicate).
+ *
  * Pass the admin client so this works in server actions, API routes, and
  * cron jobs alike.
  *
@@ -34,7 +36,7 @@ export async function awardPoints(
     note?: string;
     communityId?: string;
   },
-): Promise<void> {
+): Promise<number> {
   if (!communityId) {
     const { data: memberships } = await admin
       .from("fan_community_memberships")
@@ -49,7 +51,7 @@ export async function awardPoints(
 
   // Single SQL writer: ledger insert + Founding Fan 1.5× + denorm sync.
   // Clients cannot call this RPC (service_role only).
-  const { error } = await admin.rpc("apply_points_award", {
+  const { data, error } = await admin.rpc("apply_points_award", {
     p_fan_id: fanId,
     p_base_delta: delta,
     p_source: source,
@@ -61,4 +63,8 @@ export async function awardPoints(
   if (error) {
     throw new Error(`apply_points_award failed: ${error.message}`);
   }
+
+  // The RPC returns the delta it wrote, or 0 when source_ref was already
+  // in the ledger (a duplicate award).
+  return typeof data === "number" ? data : 0;
 }

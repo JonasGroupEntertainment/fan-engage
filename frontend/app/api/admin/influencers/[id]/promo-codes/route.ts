@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminContext } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
+import { validateInfluencerPromo } from "@/lib/influencer-promo-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,13 +20,35 @@ async function requireAdmin() {
   return ctx;
 }
 
+/**
+ * The caller must administer the influencer's artist community. Loaded
+ * from the database, never from the request. Returns an error response
+ * or null when allowed.
+ */
+async function influencerAccessError(
+  ctx: NonNullable<Awaited<ReturnType<typeof getAdminContext>>>,
+  influencerId: string,
+): Promise<NextResponse | null> {
+  const { data } = await createAdminClient()
+    .from("influencers")
+    .select("artist_slug")
+    .eq("id", influencerId)
+    .maybeSingle();
+  if (!data) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  const guard = await authorizeAdmin({ communityId: String(data.artist_slug), minRole: "admin" }, ctx);
+  if (!guard.ok) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  return null;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdmin();
+    const ctx = await requireAdmin();
     const { id: influencerId } = await params;
+    const denied = await influencerAccessError(ctx, influencerId);
+    if (denied) return denied;
 
     const db = createAdminClient();
     const { data, error } = await db
@@ -53,16 +77,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdmin();
+    const ctx = await requireAdmin();
     const { id: influencerId } = await params;
+    const denied = await influencerAccessError(ctx, influencerId);
+    if (denied) return denied;
     const body = await request.json();
     const { code, discount_type, discount_value, max_redemptions } = body;
 
-    if (!code || !discount_type || discount_value === undefined) {
+    if (!code || typeof code !== "string" || !discount_type || discount_value === undefined) {
       return NextResponse.json(
         { ok: false, error: "code, discount_type, and discount_value are required" },
         { status: 400 },
       );
+    }
+    const checked = validateInfluencerPromo({
+      discountType: discount_type,
+      discountValue: discount_value,
+      maxRedemptions: max_redemptions,
+    });
+    if (!checked.ok) {
+      return NextResponse.json({ ok: false, error: checked.error }, { status: 400 });
     }
 
     const db = createAdminClient();
@@ -71,9 +105,9 @@ export async function POST(
       .insert({
         influencer_id: influencerId,
         code: code.toUpperCase(),
-        discount_type,
-        discount_value,
-        max_redemptions: max_redemptions || null,
+        discount_type: checked.value.discountType,
+        discount_value: checked.value.discountValue,
+        max_redemptions: checked.value.maxRedemptions,
         current_redemptions: 0,
       })
       .select()

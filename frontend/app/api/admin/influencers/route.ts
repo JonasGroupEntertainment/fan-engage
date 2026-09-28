@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminContext } from "@/lib/admin";
+import { authorizeAdmin, guardStatus } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,12 +67,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Non-super-admins can only manage their own community
-    if (!ctx.isSuperAdmin && artist_slug !== ctx.currentCommunityId) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    // Must hold the admin role in the target community (or be super-admin).
+    const guard = await authorizeAdmin({ communityId: String(artist_slug), minRole: "admin" }, ctx);
+    if (!guard.ok) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: guardStatus(guard.reason) });
     }
 
     const db = createAdminClient();
+
+    if (id) {
+      // Updating: the existing row must also belong to a community the
+      // caller administers, so an influencer cannot be moved between
+      // communities by id.
+      const { data: existing } = await db
+        .from("influencers")
+        .select("artist_slug")
+        .eq("id", id)
+        .maybeSingle();
+      if (!existing) {
+        return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+      }
+      const existingGuard = await authorizeAdmin(
+        { communityId: String(existing.artist_slug), minRole: "admin" },
+        ctx,
+      );
+      if (!existingGuard.ok) {
+        return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     if (id) {
       // Update existing

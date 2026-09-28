@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import {
   notifySlackApproved,
   notifySlackRejected,
@@ -42,8 +42,12 @@ interface ActionResult {
 export async function approveApplicationAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  const adminUser = await getAdminUser();
-  if (!adminUser) redirect("/login");
+  // Approving or rejecting artist applications is super-admin only.
+  const guard = await authorizeAdmin({ superAdminOnly: true });
+  if (!guard.ok) {
+    if (guard.reason === "signed_out") redirect("/login");
+    return { ok: false, error: "forbidden" };
+  }
 
   const supabase = await createClient();
   const {
@@ -127,8 +131,12 @@ export async function approveApplicationAction(
 export async function rejectApplicationAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  const adminUser = await getAdminUser();
-  if (!adminUser) redirect("/login");
+  // Approving or rejecting artist applications is super-admin only.
+  const guard = await authorizeAdmin({ superAdminOnly: true });
+  if (!guard.ok) {
+    if (guard.reason === "signed_out") redirect("/login");
+    return { ok: false, error: "forbidden" };
+  }
 
   const supabase = await createClient();
   const {
