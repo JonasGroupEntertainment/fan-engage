@@ -1,4 +1,4 @@
--- Not yet applied to production; apply via MCP before merge.
+-- Already applied to production via MCP on 2026-09-27.
 --
 -- 0066_no_multiplier_on_refunds.sql
 --
