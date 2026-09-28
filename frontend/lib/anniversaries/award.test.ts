@@ -43,7 +43,7 @@ describe("daily drop claim", () => {
 describe("migrations for the new point sources", () => {
   const m65 = readRepo("../../../supabase/migrations/0065_anniversary_daily_drop_point_sources.sql");
   const m66 = readRepo("../../../supabase/migrations/0066_no_multiplier_on_refunds.sql");
-  const HEADER = "-- Not yet applied to production; apply via MCP before merge.";
+  const HEADER = "-- Already applied to production via MCP on 2026-09-27.";
 
   it("0065 only adds the two enum values, idempotently", () => {
     assert.equal(m65.split("\n")[0], HEADER);
