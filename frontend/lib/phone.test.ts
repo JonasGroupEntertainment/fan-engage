@@ -119,9 +119,11 @@ describe("phone validation is wired into every write path", () => {
     assert.doesNotMatch(route, /phone: payload\.phone \?\? null/);
   });
 
-  it("sms route uses the shared normalizer instead of an inline regex", () => {
+  it("sms route texts only the stored E.164 number, with no inline regex", () => {
     const route = readRepo("../app/api/fan-engage/sms/route.ts");
-    assert.match(route, /normalizePhoneE164/);
+    const welcome = readRepo("./sms/welcome.ts");
+    assert.match(route, /smsRecipientForFan/);
+    assert.match(welcome, /isE164/);
     assert.doesNotMatch(route, /\^\\\+\[1-9\]\\d\{7,14\}\$/);
   });
 

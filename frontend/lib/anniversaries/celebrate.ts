@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "@/lib/notifications/send";
+import { awardPoints } from "@/lib/points/award";
 import {
   ANNIVERSARY_MILESTONES,
   milestoneForToday,
@@ -15,13 +16,11 @@ import {
  *
  * Steps:
  *   1. INSERT dedupe row (catches re-runs early)
- *   2. fans.total_points += milestone.points (best-effort)
- *   3. points_ledger entry for audit trail
- *   4. push notification with templated message
+ *   2. award points via apply_points_award (ledger row + totals sync)
+ *   3. push notification with templated message
  *
- * Failure mode: any per-step failure is logged but doesn't abort the
- * batch — partial celebrations are fine since the dedupe row was
- * already written.
+ * Failure mode: if the points award fails, the dedupe row is released and
+ * the error is thrown so the scan counts it. A push failure is logged only.
  */
 export async function celebrateAnniversary(opts: {
   fanId: string;
@@ -52,37 +51,43 @@ export async function celebrateAnniversary(opts: {
     return { celebrated: false };
   }
 
-  // 2. Award points (read current → update; same pattern as other ledger writes)
-  try {
-    const { data: fan } = await admin
-      .from("fans")
-      .select("total_points")
-      .eq("id", opts.fanId)
-      .maybeSingle();
-    const newTotal =
-      ((fan?.total_points as number) ?? 0) + opts.milestone.points;
-    await admin
-      .from("fans")
-      .update({ total_points: newTotal })
-      .eq("id", opts.fanId);
-  } catch (err) {
-    console.warn("celebrateAnniversary: fan points update failed", err);
+  // 2. Award points through the single ledger writer. It writes the ledger
+  //    row, applies the Founding Fan multiplier, and syncs totals, so the
+  //    points survive the next resync. The ref is per fan: the RPC dedupes
+  //    on source_ref across the whole ledger.
+  if (opts.milestone.points > 0) {
+    try {
+      await awardPoints(admin, {
+        fanId: opts.fanId,
+        delta: opts.milestone.points,
+        source: "anniversary",
+        sourceRef: anniversaryAwardRef(opts.fanId, opts.artistSlug, opts.milestone.marker),
+        note: `${opts.artistName} ${opts.milestone.label} anniversary`,
+        communityId: opts.artistSlug,
+      });
+    } catch (err) {
+      // Release the dedupe row so a retry can pay out, then surface the
+      // failure to the scan instead of reporting a celebration that paid 0.
+      console.error("celebrateAnniversary: points award failed", {
+        fanId: opts.fanId,
+        artistSlug: opts.artistSlug,
+        marker: opts.milestone.marker,
+        err,
+      });
+      const { error: releaseErr } = await admin
+        .from("fan_anniversary_log")
+        .delete()
+        .eq("fan_id", opts.fanId)
+        .eq("artist_slug", opts.artistSlug)
+        .eq("anniversary_marker", opts.milestone.marker);
+      if (releaseErr) {
+        console.error("celebrateAnniversary: could not release dedupe row", releaseErr);
+      }
+      throw err;
+    }
   }
 
-  // 3. Ledger entry for audit
-  try {
-    await admin.from("points_ledger").insert({
-      fan_id: opts.fanId,
-      delta: opts.milestone.points,
-      source: "anniversary",
-      source_ref: `anniversary:${opts.artistSlug}:${opts.milestone.marker}`,
-      note: `${opts.artistName} ${opts.milestone.label} anniversary`,
-    });
-  } catch (err) {
-    console.warn("celebrateAnniversary: ledger insert failed", err);
-  }
-
-  // 4. Push notification (best-effort)
+  // 3. Push notification (best-effort)
   try {
     await sendNotification({
       fanId: opts.fanId,
@@ -104,6 +109,15 @@ export async function celebrateAnniversary(opts: {
   }
 
   return { celebrated: true };
+}
+
+/** Ledger dedupe key for one fan's anniversary award. Must include fanId. */
+export function anniversaryAwardRef(
+  fanId: string,
+  artistSlug: string,
+  marker: number,
+): string {
+  return `anniversary:${fanId}:${artistSlug}:${marker}`;
 }
 
 /**
