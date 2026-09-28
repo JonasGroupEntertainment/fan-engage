@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { getAdminContext, getAdminUser } from "@/lib/admin";
 import { indexRowAsync } from "@/lib/embeddings";
 import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
@@ -162,8 +162,8 @@ export async function votePredictionAction(formData: FormData) {
  * voters, fire push notification to all voters with the result.
  */
 export async function resolvePredictionAction(formData: FormData) {
-  const adminUser = await getAdminUser();
-  if (!adminUser) return { error: "admin_required" };
+  const ctx = await getAdminContext();
+  if (!ctx) return { error: "admin_required" };
 
   const postId = String(formData.get("post_id") ?? "");
   const correctOptionId = String(formData.get("correct_option_id") ?? "");
@@ -174,7 +174,7 @@ export async function resolvePredictionAction(formData: FormData) {
 
   let result;
   try {
-    result = await resolvePrediction({ postId, correctOptionId });
+    result = await resolvePrediction({ postId, correctOptionId, ctx });
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "resolve_failed",
