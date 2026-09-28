@@ -216,7 +216,15 @@ export default async function AdminFoundersPage() {
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Joined</th>
                     <th className="px-4 py-3">Billing</th>
-                    <th className="px-4 py-3 text-right">Monthly credit</th>
+                    <th
+                      className="px-4 py-3 text-right"
+                      title="$5 store credit added every month. Spending it is coming soon."
+                    >
+                      Monthly credit
+                      <span className="block text-[10px] font-normal normal-case text-white/40">
+                        Spending coming soon
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

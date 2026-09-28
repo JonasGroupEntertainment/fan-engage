@@ -2,6 +2,19 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_STORAGE_KEY,
+} from "@/components/cookie-banner";
+import {
+  claimPromptSlot,
+  getActivePromptSlot,
+  getServerPromptSlot,
+  isCookieConsentResolved,
+  isPromptSlotFree,
+  releasePromptSlot,
+  subscribePromptSlot,
+} from "@/lib/prompt-slot";
 
 /**
  * Tasteful "Install Fan Engage" prompt that appears after a fan engages for
@@ -13,6 +26,9 @@ import { createClient } from "@/lib/supabase/client";
  * and brand-new sign-ups shouldn't see the install banner before they've
  * actually engaged with the product. This avoids competing with the
  * conversion path on first impression.
+ *
+ * Only one floating prompt shows at a time: this waits until the cookie
+ * banner has been answered, and shares a slot with the Premium prompt.
  *
  * Works on Chromium browsers and Android Chrome. iOS Safari has no
  * programmatic install event — we show a text tip there instead.
@@ -31,6 +47,18 @@ function getSnapshot(): string | null {
   try { return window.localStorage.getItem(DISMISSED_KEY); } catch { return null; }
 }
 function getServerSnapshot(): string | null { return null; }
+
+function subscribeCookieConsent(onChange: () => void) {
+  window.addEventListener(COOKIE_CONSENT_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(COOKIE_CONSENT_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+function getCookieConsentSnapshot(): string | null {
+  try { return window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY); } catch { return null; }
+}
 
 export default function InstallPrompt() {
   const storedDismissal = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -52,6 +80,30 @@ export default function InstallPrompt() {
     () => "",
   );
   const isIos = /iPad|iPhone|iPod/.test(ua);
+
+  const consentRaw = useSyncExternalStore(
+    subscribeCookieConsent,
+    getCookieConsentSnapshot,
+    getServerSnapshot,
+  );
+  const activeSlot = useSyncExternalStore(
+    subscribePromptSlot,
+    getActivePromptSlot,
+    getServerPromptSlot,
+  );
+  const candidate =
+    !dismissed &&
+    show &&
+    isCookieConsentResolved(consentRaw) &&
+    isPromptSlotFree("install", activeSlot);
+  const visible = candidate && activeSlot === "install";
+
+  useEffect(() => {
+    if (candidate) claimPromptSlot("install");
+    else releasePromptSlot("install");
+  }, [candidate]);
+
+  useEffect(() => () => releasePromptSlot("install"), []);
 
   // Check whether the signed-in fan has at least one follow before we
   // arm the install-prompt timer.
@@ -123,6 +175,7 @@ export default function InstallPrompt() {
     }
     setSessionDismissed(true);
     setShow(false);
+    releasePromptSlot("install");
   }
 
   async function handleInstall() {
@@ -134,7 +187,7 @@ export default function InstallPrompt() {
     }
   }
 
-  if (dismissed || !show) return null;
+  if (!visible) return null;
 
   return (
     <div className="fixed inset-x-4 bottom-4 z-40 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-xl backdrop-blur md:inset-x-auto md:right-4 md:max-w-sm">
