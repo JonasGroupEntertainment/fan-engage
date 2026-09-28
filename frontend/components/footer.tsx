@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  OFFICIAL_CONTACT_EMAIL,
+  OFFICIAL_CONTACT_MAILTO,
+} from "@/lib/legal/official-contact";
 
 export default function Footer() {
   return (
@@ -14,7 +18,7 @@ export default function Footer() {
           <Link href="/cookie-policy" className="hover:text-white">Cookies</Link>
           <Link href="/dmca" className="hover:text-white">DMCA</Link>
           <Link href="/unsubscribe" className="hover:text-white">Unsubscribe</Link>
-          <a href="mailto:support@fanengage.app" className="hover:text-white">Contact</a>
+          <a href={OFFICIAL_CONTACT_MAILTO} className="hover:text-white">{OFFICIAL_CONTACT_EMAIL}</a>
         </nav>
       </div>
     </footer>

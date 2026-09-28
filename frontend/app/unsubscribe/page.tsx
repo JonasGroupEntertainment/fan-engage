@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  OFFICIAL_CONTACT_EMAIL,
+  OFFICIAL_CONTACT_MAILTO,
+} from "@/lib/legal/official-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +66,8 @@ export default async function UnsubscribePage({
           <h1 className="text-2xl font-semibold">Link not recognized</h1>
           <p className="text-sm text-white/70">
             The unsubscribe token in this link doesn&apos;t match any account. If you&apos;re still
-            getting messages you don&apos;t want, email support@fanengage.app.
+            getting messages you don&apos;t want, email{" "}
+            <a href={OFFICIAL_CONTACT_MAILTO} className="underline">{OFFICIAL_CONTACT_EMAIL}</a>.
           </p>
         </>
       )}
@@ -71,7 +76,9 @@ export default async function UnsubscribePage({
           <h1 className="text-2xl font-semibold">Missing unsubscribe token</h1>
           <p className="text-sm text-white/70">
             Unsubscribe links in our emails include a token. Use the link in a recent email, or
-            email support@fanengage.app for help.
+            email{" "}
+            <a href={OFFICIAL_CONTACT_MAILTO} className="underline">{OFFICIAL_CONTACT_EMAIL}</a>{" "}
+            for help.
           </p>
         </>
       )}
@@ -79,7 +86,8 @@ export default async function UnsubscribePage({
         <>
           <h1 className="text-2xl font-semibold">Something went wrong</h1>
           <p className="text-sm text-white/70">
-            Please try again in a moment, or email support@fanengage.app.
+            Please try again in a moment, or email{" "}
+            <a href={OFFICIAL_CONTACT_MAILTO} className="underline">{OFFICIAL_CONTACT_EMAIL}</a>.
           </p>
         </>
       )}

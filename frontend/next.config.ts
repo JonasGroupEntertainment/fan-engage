@@ -137,6 +137,24 @@ const nextConfig: NextConfig = {
         destination: "/me",
         permanent: false,
       },
+      // Query string is preserved by Next (prepareDestination merges the
+      // incoming query). Middleware repeats these with an explicit copy so
+      // ?ref= still survives if a request reaches the proxy.
+      {
+        source: "/create-account",
+        destination: "/signup",
+        permanent: false,
+      },
+      {
+        source: "/join",
+        destination: "/signup",
+        permanent: false,
+      },
+      {
+        source: "/events",
+        destination: "/artists/raelynn/community",
+        permanent: false,
+      },
     ];
   },
 };

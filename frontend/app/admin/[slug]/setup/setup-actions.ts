@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
+import type { AdminRequirement } from "@/lib/admin-authz";
 import { initializeCommunityFromApplication } from "@/lib/onboarding/init";
 
 interface ActionResult {
@@ -25,9 +26,15 @@ const SOCIAL_PLATFORMS: Array<{
   { key: "twitter",   label: "Twitter",   prefix: "https://twitter.com/" },
 ];
 
-async function requireAdmin(): Promise<void> {
-  const adminUser = await getAdminUser();
-  if (!adminUser) redirect("/login");
+/**
+ * Guard for setup actions. Signed-out callers go to /login. Returns an
+ * error result when the caller does not administer this community.
+ */
+async function requireAdmin(req: AdminRequirement): Promise<ActionResult | null> {
+  const guard = await authorizeAdmin(req);
+  if (guard.ok) return null;
+  if (guard.reason === "signed_out") redirect("/login");
+  return { ok: false, error: "forbidden" };
 }
 
 /**
@@ -37,9 +44,11 @@ async function requireAdmin(): Promise<void> {
 export async function initializeCommunityAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) return { ok: false, error: "missing_slug" };
+  // Creating an artist and community from an application is super-admin only.
+  const denied = await requireAdmin({ superAdminOnly: true });
+  if (denied) return denied;
 
   const result = await initializeCommunityFromApplication(slug);
   if (!result.ok) return { ok: false, error: result.error ?? "init_failed" };
@@ -65,11 +74,12 @@ export async function initializeCommunityAction(
 export async function updateProfileAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   const tagline = String(formData.get("tagline") ?? "").trim() || null;
   const bio = String(formData.get("bio") ?? "").trim() || null;
   if (!slug) return { ok: false, error: "missing_slug" };
+  const denied = await requireAdmin({ communityId: slug, minRole: "admin" });
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -89,11 +99,12 @@ export async function updateProfileAction(
 export async function updateBrandingAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   const accent_from = String(formData.get("accent_from") ?? "").trim();
   const accent_to = String(formData.get("accent_to") ?? "").trim();
   if (!slug) return { ok: false, error: "missing_slug" };
+  const denied = await requireAdmin({ communityId: slug, minRole: "admin" });
+  if (denied) return denied;
   if (!/^#[0-9a-fA-F]{6}$/.test(accent_from) || !/^#[0-9a-fA-F]{6}$/.test(accent_to)) {
     return { ok: false, error: "invalid_hex" };
   }
@@ -122,9 +133,10 @@ export async function updateBrandingAction(
 export async function updateSocialAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) return { ok: false, error: "missing_slug" };
+  const denied = await requireAdmin({ communityId: slug, minRole: "admin" });
+  if (denied) return denied;
 
   const social: { label: string; href: string }[] = [];
   for (const p of SOCIAL_PLATFORMS) {
@@ -162,9 +174,10 @@ export async function updateSocialAction(
 export async function markSetupCompleteAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) return { ok: false, error: "missing_slug" };
+  const denied = await requireAdmin({ communityId: slug, minRole: "admin" });
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { error } = await admin

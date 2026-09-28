@@ -32,6 +32,8 @@ export default function CreateStripeCouponForm() {
           <input
             name="promo_code"
             required
+            pattern="[A-Za-z0-9_\-]{3,32}"
+            maxLength={32}
             placeholder="e.g. SUMMER25"
             className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm uppercase tracking-wider text-white placeholder:normal-case placeholder:text-white/30 focus:border-aurora/50 focus:outline-none"
           />
@@ -47,12 +49,13 @@ export default function CreateStripeCouponForm() {
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-white/50">Amount (% or dollars)</label>
+          <label className="text-xs text-white/50">Amount (1 to 100%, or up to $100)</label>
           <input
             name="amount"
             type="number"
             required
             min="1"
+            max="100"
             placeholder="25"
             className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-aurora/50 focus:outline-none"
           />
@@ -65,25 +68,27 @@ export default function CreateStripeCouponForm() {
           >
             <option value="once">Once (first billing only)</option>
             <option value="repeating">Repeating (N months)</option>
-            <option value="forever">Forever</option>
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-white/50">Duration months (if repeating)</label>
+          <label className="text-xs text-white/50">Duration months (if repeating, 1 to 12)</label>
           <input
             name="duration_months"
             type="number"
             min="1"
+            max="12"
             placeholder="3"
             className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-aurora/50 focus:outline-none"
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-white/50">Max redemptions (blank = unlimited)</label>
+          <label className="text-xs text-white/50">Max redemptions * (1 to 1000)</label>
           <input
             name="max_redemptions"
             type="number"
+            required
             min="1"
+            max="1000"
             placeholder="100"
             className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-aurora/50 focus:outline-none"
           />

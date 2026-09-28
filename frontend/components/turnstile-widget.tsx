@@ -7,6 +7,9 @@ import {
   TURNSTILE_LOAD_TIMEOUT_MS,
   TURNSTILE_SCRIPT_RETRY_DELAYS_MS,
   TURNSTILE_SLOW_LOAD_HINT_MS,
+  TURNSTILE_STUCK_COPY,
+  TURNSTILE_STUCK_HINT_MS,
+  TURNSTILE_STUCK_REFRESH_LABEL,
   TURNSTILE_WIDGET_ERROR_COPY,
   turnstileSlowLoadHint,
   type TurnstileLoadState,
@@ -132,10 +135,14 @@ export function TurnstileWidget({
   const [loadState, setLoadState] = useState<TurnstileLoadState>("loading");
   const [retryNonce, setRetryNonce] = useState(0);
   const [slowLoad, setSlowLoad] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  const loadStateRef = useRef<TurnstileLoadState>("loading");
 
   const setState = useCallback(
     (state: TurnstileLoadState) => {
+      loadStateRef.current = state;
       setLoadState(state);
+      if (state === "ready") setStuck(false);
       onLoadStateChange?.(state);
     },
     [onLoadStateChange],
@@ -161,6 +168,7 @@ export function TurnstileWidget({
         appearance: "always",
         callback: (token: string) => {
           tokenReceivedRef.current = true;
+          setStuck(false);
           setState("ready");
           onSuccess(token);
         },
@@ -273,12 +281,27 @@ export function TurnstileWidget({
     return () => window.clearTimeout(id);
   }, [loadState, retryNonce]);
 
+  useEffect(() => {
+    if (!SITE_KEY) return;
+    const id = window.setTimeout(() => {
+      if (tokenReceivedRef.current) return;
+      if (loadStateRef.current === "ready") return;
+      setStuck(true);
+    }, TURNSTILE_STUCK_HINT_MS);
+    return () => window.clearTimeout(id);
+  }, [retryNonce]);
+
+  function reloadPage() {
+    window.location.reload();
+  }
+
   function handleRetry() {
     resetTurnstileScriptLoader();
     tokenReceivedRef.current = false;
     widgetIdRef.current = null;
     if (containerRef.current) containerRef.current.innerHTML = "";
     setSlowLoad(false);
+    setStuck(false);
     setState("loading");
     if (onRetry) {
       onRetry();
@@ -331,6 +354,18 @@ export function TurnstileWidget({
           style={{ colorScheme: "light" }}
         />
       </div>
+      {stuck && loadState !== "ready" && (
+        <div className="space-y-2">
+          <p className="text-xs text-amber-100/90">{TURNSTILE_STUCK_COPY}</p>
+          <button
+            type="button"
+            onClick={reloadPage}
+            className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/10"
+          >
+            {TURNSTILE_STUCK_REFRESH_LABEL}
+          </button>
+        </div>
+      )}
       {loadState === "error" && !failOpen && (
         <div className="space-y-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2">
           <p className="text-xs text-rose-200">{TURNSTILE_WIDGET_ERROR_COPY}</p>

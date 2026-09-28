@@ -67,6 +67,15 @@ export default async function BillingPage() {
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
           <p className="text-sm text-white/70">{PREMIUM_CTA.unlock}</p>
           <PremiumCta copy="upgrade" />
+          {/* Lapsed or canceled fans can still reach invoices and card details. */}
+          <form action={openBillingPortalAction}>
+            <button
+              type="submit"
+              className="text-sm text-white/60 underline underline-offset-4 hover:text-white"
+            >
+              View past invoices and billing details
+            </button>
+          </form>
         </div>
       )}
 

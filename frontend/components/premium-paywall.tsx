@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PREMIUM_CTA, premiumPath } from "@/lib/entitlements-core";
+import { guestSignupHref } from "@/lib/guest-signup";
 
 interface PremiumPaywallProps {
   /** What the user is trying to see. Used in the headline copy. */
@@ -39,20 +40,23 @@ export default function PremiumPaywall({
   const to = accentTo ?? "#fb923c";
 
   const upgradeHref = premiumPath(communityId);
-  const signupHref = communityId
-    ? `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(upgradeHref)}`
-    : `/signup?next=${encodeURIComponent(upgradeHref)}`;
-  const loginHref = `/login?next=${encodeURIComponent(upgradeHref)}`;
-  // Soft-launch guests hit gated content before they have an account —
-  // primary CTA is Create account; Sign in is secondary for returners.
+  // Guests get a profile / Founding badge door. Do not send them through
+  // a Premium checkout next-step — Premium stays in the nav and on /premium.
+  const signupHref = guestSignupHref({
+    ref: communityId,
+    next: communityId ? `/artists/${communityId}/community` : "/onboarding",
+  });
+  const loginHref = communityId
+    ? `/login?next=${encodeURIComponent(`/artists/${communityId}/community`)}`
+    : "/login";
   const ctaHref = reason === "signed-out" ? signupHref : upgradeHref;
 
   let ctaLabel: string;
   let featureCopy: string;
 
   if (reason === "signed-out") {
-    ctaLabel = "Create account to unlock";
-    featureCopy = `${feature} is for Premium fans`;
+    ctaLabel = "Create your fan profile";
+    featureCopy = "Create your fan profile and claim a Founding Fan badge";
   } else if (reason === "needs-founder") {
     ctaLabel = "Become a Founding Fan";
     featureCopy = `${feature} is for Founders only`;
@@ -76,7 +80,7 @@ export default function PremiumPaywall({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-white">{featureCopy}</p>
-          {description && (
+          {description && reason !== "signed-out" && (
             <p className="truncate text-xs text-white/55">{description}</p>
           )}
         </div>
@@ -85,7 +89,7 @@ export default function PremiumPaywall({
           className="flex-none rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-glass transition hover:brightness-110"
           style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
         >
-          {reason === "signed-out" ? "Join" : reason === "needs-founder" ? "Founders" : "Upgrade"}
+          {reason === "signed-out" ? "Create your fan profile" : reason === "needs-founder" ? "Founders" : "Upgrade"}
         </Link>
       </div>
     );
@@ -103,11 +107,11 @@ export default function PremiumPaywall({
               {reason === "needs-founder"
                 ? "Paid Premium only — separate from the free Founding Fan badge"
                 : reason === "signed-out"
-                  ? "Join to unlock Premium"
+                  ? "Free Founding Fan badge"
                   : PREMIUM_CTA.available}
             </p>
             <h3 className="mt-2 text-lg font-bold text-white">{featureCopy}</h3>
-            {description && (
+            {description && reason !== "signed-out" && (
               <p className="mt-2 text-sm text-white/75">{description}</p>
             )}
           </div>
@@ -128,6 +132,11 @@ export default function PremiumPaywall({
                 <li>✓ Lifetime founder status & badge</li>
               </ul>
             </>
+          ) : reason === "signed-out" ? (
+            <p className="text-xs text-white/60">
+              First 100 fans who create a profile lock a numbered Founding Fan
+              badge and 1.5× points. It is free — not a paid plan.
+            </p>
           ) : (
             <>
               <p className="text-xs text-white/60">

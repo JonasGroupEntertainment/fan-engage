@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { OFFICIAL_CONTACT_EMAIL } from "@/lib/legal/official-contact";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
 
     if (HELP_KEYWORDS.has(keyword)) {
       return twimlResponse(
-        "Fan Engage: artist alerts + fan rewards. Msg & data rates may apply. Reply STOP to opt out. Support: support@fanengage.app",
+        `Fan Engage: artist alerts + fan rewards. Msg & data rates may apply. Reply STOP to opt out. Support: ${OFFICIAL_CONTACT_EMAIL}`,
       );
     }
 

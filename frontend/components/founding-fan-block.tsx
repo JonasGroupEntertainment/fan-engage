@@ -61,7 +61,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               href="/signup?ref=raelynn"
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
-              Claim founding status →
+              Claim your Founding badge
             </Link>
           </div>
         </div>

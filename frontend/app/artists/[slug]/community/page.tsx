@@ -14,6 +14,7 @@ import {
   getTopTagsForArtist,
 } from "@/lib/data/community";
 import { canAccess, canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
+import { guestSignupHref } from "@/lib/guest-signup";
 import {
   filterCommunityTagsForMarketplace,
   isMarketplaceLive,
@@ -87,6 +88,10 @@ export default async function ArtistCommunityPage({
 
   const isSignedIn = fan !== null;
   const isAdmin = adminUser !== null;
+  const guestSignup = guestSignupHref({
+    ref: slug,
+    next: `/artists/${slug}/community`,
+  });
   const canWrite =
     isAdmin || canUsePremiumFeature("community_post", entitlement);
 
@@ -138,14 +143,15 @@ export default async function ArtistCommunityPage({
       ) : (
         <section className="rounded-3xl border border-aurora/40 bg-gradient-to-r from-aurora/20 via-slate-900 to-ember/20 p-5">
           <p className="text-sm">
-            Sign in to post in the {artist.name} community.
+            Create your fan profile and claim a Founding Fan badge for the{" "}
+            {artist.name} community.
           </p>
           <div className="mt-3 flex gap-2">
             <Link
-              href={`/signup?ref=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/artists/${slug}/community`)}`}
+              href={guestSignup}
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-xs font-semibold text-white shadow-glass"
             >
-              Create account
+              Create your fan profile
             </Link>
             <Link
               href={`/login?next=/artists/${slug}/community`}
@@ -167,7 +173,7 @@ export default async function ArtistCommunityPage({
               ? canWrite
                 ? "Be the first to post — earn 5 pts and kick off the conversation."
                 : "Read along — posting is available with Premium."
-              : "Be the first in when the community fills up — sign in to post."}
+              : "Create your fan profile to claim a Founding Fan badge and join the conversation."}
           </p>
         </section>
       ) : (
@@ -178,6 +184,29 @@ export default async function ArtistCommunityPage({
               ? { allowed: true, reason: "premium-member" as const }
               : canAccess(post.visibility, entitlement);
             if (!access.allowed) {
+              if (!isSignedIn) {
+                return (
+                  <section
+                    key={post.id}
+                    className="rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm"
+                  >
+                    <p className="font-medium text-white">
+                      Create your fan profile and claim a Founding Fan badge
+                    </p>
+                    <p className="mt-1 text-xs text-white/60">
+                      {post.title
+                        ? `"${post.title}" is waiting in the ${artist.name} community.`
+                        : `Join the ${artist.name} community to read this.`}
+                    </p>
+                    <Link
+                      href={guestSignup}
+                      className="mt-3 inline-flex rounded-full bg-gradient-to-r from-aurora to-ember px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Create your fan profile
+                    </Link>
+                  </section>
+                );
+              }
               return (
                 <PremiumPaywall
                   key={post.id}
@@ -191,11 +220,9 @@ export default async function ArtistCommunityPage({
                   accentFrom={artist.accentFrom}
                   accentTo={artist.accentTo}
                   reason={
-                    access.reason === "signed-out"
-                      ? "signed-out"
-                      : access.reason === "needs-founder"
-                        ? "needs-founder"
-                        : "needs-premium"
+                    access.reason === "needs-founder"
+                      ? "needs-founder"
+                      : "needs-premium"
                   }
                   compact
                 />

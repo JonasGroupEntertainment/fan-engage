@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SimpleMarkdown } from "@/components/simple-markdown";
 import { getPolicy } from "@/lib/data/policies";
+import {
+  OFFICIAL_CONTACT_EMAIL,
+  OFFICIAL_CONTACT_MAILTO,
+} from "@/lib/legal/official-contact";
 
 /**
  * Renders a policy document.
@@ -63,10 +67,10 @@ export default async function PolicyPage({ slug }: { slug: string }) {
               about privacy, terms, cookies, data use, or your account,
               email{" "}
               <a
-                href="mailto:support@fanengagepro.com"
+                href={OFFICIAL_CONTACT_MAILTO}
                 className="text-aurora underline-offset-4 hover:underline"
               >
-                support@fanengagepro.com
+                {OFFICIAL_CONTACT_EMAIL}
               </a>
               . This page will be updated with the finalized policy before
               production rollout.

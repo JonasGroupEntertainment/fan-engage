@@ -165,7 +165,7 @@ export default async function FounderOpengraphImage({
           }}
         >
           <div style={{ maxWidth: 720 }}>
-            One of 100 founding fans. Limited tier — points multiplier, early drops, founder-only experiences.
+            One of 100 founding fans. 1.5x points and a numbered badge. Founder drops coming soon.
           </div>
           <div
             style={{

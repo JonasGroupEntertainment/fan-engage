@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { assertAdmin } from "@/lib/admin-guard";
 import { broadcastEmail, broadcastSms } from "@/lib/broadcast";
 import { createNotification } from "@/lib/data/notifications";
 
@@ -11,11 +11,7 @@ import { createNotification } from "@/lib/data/notifications";
  * offers, fan_actions (CTAs), optional email/SMS blasts, and records a
  * campaign_items row per side-effect for reporting.
  */
-async function requireAdmin() {
-  const admin = await getAdminUser();
-  if (!admin) throw new Error("Forbidden");
-  return admin;
-}
+const CAMPAIGN_ROLE = "admin" as const;
 
 function parseJsonBlock<T>(raw: FormDataEntryValue | null, fallback: T): T {
   if (typeof raw !== "string" || !raw.trim()) return fallback;
@@ -27,13 +23,15 @@ function parseJsonBlock<T>(raw: FormDataEntryValue | null, fallback: T): T {
 }
 
 export async function createAndPublishCampaign(formData: FormData) {
-  const admin = await requireAdmin();
   const supa = createAdminClient();
 
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   if (!artistSlug || !title) return { success: false as const, error: "Artist and title are required." };
+  // Campaigns post, email and text on the artist's behalf, so the caller
+  // must administer that artist's community.
+  const { user: admin } = await assertAdmin({ communityId: artistSlug, minRole: CAMPAIGN_ROLE });
 
   // 1) Create the campaign row
   const { data: campaign } = await supa
@@ -301,10 +299,16 @@ export async function createAndPublishCampaign(formData: FormData) {
 }
 
 export async function deactivateCampaignAction(formData: FormData) {
-  await requireAdmin();
   const campaignId = String(formData.get("campaign_id") ?? "");
   if (!campaignId) return;
   const supa = createAdminClient();
+  const { data: campaign } = await supa
+    .from("campaigns")
+    .select("artist_slug")
+    .eq("id", campaignId)
+    .maybeSingle();
+  if (!campaign) return;
+  await assertAdmin({ communityId: campaign.artist_slug as string, minRole: CAMPAIGN_ROLE });
   // Set ends_at to now + deactivate linked fan_actions
   await supa
     .from("campaigns")

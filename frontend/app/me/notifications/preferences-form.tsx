@@ -2,30 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { savePreferencesAction } from "./actions";
+import type { Prefs, ToggleKey } from "./prefs";
 
-/**
- * Aligned to the actual notification_preferences columns on FE+BEP
- * (verified 2026-05-05).
- */
-export type Prefs = {
-  // Channel toggles
-  push_enabled: boolean;
-  sms_enabled: boolean;
-  // Notification types
-  notify_new_post: boolean;
-  notify_event_match: boolean;
-  notify_comment_on_my_post: boolean;
-  notify_redemption: boolean;
-  notify_drops: boolean;
-  notify_rsvp_confirmation: boolean;
-  notify_predictions: boolean;
-  notify_anniversaries: boolean;
-  notify_leaderboard: boolean;
-  notify_weekly_digest: boolean;
-};
+export type { Prefs } from "./prefs";
 
 const CHANNEL_ROWS: Array<{
-  key: keyof Prefs;
+  key: ToggleKey;
   emoji: string;
   title: string;
   body: string;
@@ -45,7 +27,7 @@ const CHANNEL_ROWS: Array<{
 ];
 
 const TYPE_ROWS: Array<{
-  key: keyof Prefs;
+  key: ToggleKey;
   emoji: string;
   title: string;
   body: string;
@@ -115,9 +97,13 @@ const TYPE_ROWS: Array<{
 export function PreferencesForm({
   initial,
   hadRow,
+  smsAllowed,
+  smsCopy,
 }: {
   initial: Prefs;
   hadRow: boolean;
+  smsAllowed: boolean; // false below Gold: SMS can be turned off, not on
+  smsCopy?: string; // shown on the SMS row when smsAllowed is false
 }) {
   const [prefs, setPrefs] = useState<Prefs>(initial);
   const [pending, startTransition] = useTransition();
@@ -125,22 +111,38 @@ export function PreferencesForm({
   const [error, setError] = useState<string | null>(null);
 
   const allRows = [...CHANNEL_ROWS, ...TYPE_ROWS];
-  const dirty = allRows.some((r) => prefs[r.key] !== initial[r.key]);
+  const dirty =
+    allRows.some((r) => prefs[r.key] !== initial[r.key]) ||
+    prefs.quiet_start !== initial.quiet_start ||
+    prefs.quiet_end !== initial.quiet_end;
 
-  function toggle(key: keyof Prefs) {
-    setPrefs((p) => ({ ...p, [key]: !p[key] }));
+  function update(patch: Partial<Prefs>) {
+    setPrefs((p) => ({ ...p, ...patch }));
     setSavedAt(null);
     setError(null);
+  }
+
+  function toggle(key: ToggleKey) {
+    update({ [key]: !prefs[key] });
+  }
+
+  // Below Gold the SMS switch is locked: it can go off but not back on.
+  function smsLocked(key: ToggleKey): boolean {
+    return key === "sms_enabled" && !smsAllowed && !prefs.sms_enabled;
   }
 
   function save() {
     setError(null);
     startTransition(async () => {
-      const res = await savePreferencesAction(prefs);
-      if (res && 'error' in res) {
-        setError(res.error);
-      } else {
-        setSavedAt(Date.now());
+      try {
+        const res = await savePreferencesAction(prefs);
+        if ("error" in res) {
+          setError(res.error);
+        } else {
+          setSavedAt(Date.now());
+        }
+      } catch {
+        setError("Could not save your preferences. Please try again.");
       }
     });
   }
@@ -151,8 +153,18 @@ export function PreferencesForm({
         {CHANNEL_ROWS.map((row) => (
           <PrefRow
             key={row.key}
-            row={row}
+            row={
+              row.key === "sms_enabled" && !smsAllowed
+                ? {
+                    ...row,
+                    body:
+                      smsCopy ??
+                      "Available at Gold and Platinum tiers. Keep climbing.",
+                  }
+                : row
+            }
             on={prefs[row.key]}
+            disabled={smsLocked(row.key)}
             onToggle={() => toggle(row.key)}
           />
         ))}
@@ -167,6 +179,27 @@ export function PreferencesForm({
             onToggle={() => toggle(row.key)}
           />
         ))}
+      </Section>
+
+      <Section title="Quiet hours">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <p className="text-sm text-white/60">
+            We hold non-urgent alerts during this window. RSVP and redemption
+            confirmations always come through.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <TimeField
+              label="Start"
+              value={prefs.quiet_start}
+              onChange={(v) => update({ quiet_start: v })}
+            />
+            <TimeField
+              label="End"
+              value={prefs.quiet_end}
+              onChange={(v) => update({ quiet_end: v })}
+            />
+          </div>
+        </div>
       </Section>
 
       <div className="flex items-center justify-between pt-2">
@@ -216,17 +249,46 @@ function Section({
   );
 }
 
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-white/70">
+      {label}
+      <input
+        type="time"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+      />
+    </label>
+  );
+}
+
 function PrefRow({
   row,
   on,
+  disabled,
   onToggle,
 }: {
-  row: { key: keyof Prefs; emoji: string; title: string; body: string };
+  row: { key: ToggleKey; emoji: string; title: string; body: string };
   on: boolean;
+  disabled?: boolean;
   onToggle: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 transition hover:border-white/20">
+    <label
+      className={
+        "flex items-start gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 transition " +
+        (disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-white/20")
+      }
+    >
       <span aria-hidden className="mt-0.5 text-xl">
         {row.emoji}
       </span>
@@ -239,6 +301,7 @@ function PrefRow({
           type="checkbox"
           className="peer sr-only"
           checked={on}
+          disabled={disabled}
           onChange={onToggle}
           aria-label={`Toggle ${row.title}`}
         />

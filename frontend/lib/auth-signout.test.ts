@@ -7,6 +7,7 @@ import {
   SIGNOUT_REDIRECT_PATH,
   isSignOutPath,
   isSupabaseAuthCookie,
+  isSupabaseSessionCookie,
   signOutCookieNames,
 } from "./auth-signout.ts";
 
@@ -36,6 +37,21 @@ describe("Supabase auth cookie names", () => {
     assert.equal(isSupabaseAuthCookie("sb-uhovonrljcauaoctypbg-auth-token-code-verifier"), true);
     assert.equal(isSupabaseAuthCookie("fanengage_ref"), false);
     assert.equal(isSupabaseAuthCookie("sb-other"), false);
+  });
+
+  it("does not treat the PKCE verifier as a session cookie", () => {
+    assert.equal(
+      isSupabaseSessionCookie("sb-uhovonrljcauaoctypbg-auth-token"),
+      true,
+    );
+    assert.equal(
+      isSupabaseSessionCookie("sb-uhovonrljcauaoctypbg-auth-token.0"),
+      true,
+    );
+    assert.equal(
+      isSupabaseSessionCookie("sb-uhovonrljcauaoctypbg-auth-token-code-verifier"),
+      false,
+    );
   });
 
   it("collects every auth cookie present on the request", () => {

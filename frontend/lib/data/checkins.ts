@@ -1,12 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { awardPoints } from "@/lib/points/award";
+import { easternDateString } from "@/lib/dates/eastern";
 
 const CHECKIN_POINTS = 25;
 
-function todayET(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-}
+const todayET = (): string => easternDateString();
 
 export async function recordCheckin(
   fanId: string,

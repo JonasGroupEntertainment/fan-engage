@@ -22,7 +22,7 @@ export async function generateMetadata({
   const artist = await getArtistFromDb(slug).catch(() => null);
   const artistName = artist?.name ?? "Fan Engage";
   const title = `Founder #${number} for ${artistName}`;
-  const description = `One of 100 founding fans for ${artistName} on Fan Engage. Founder tier — points multiplier, early drops, founder-only experiences.`;
+  const description = `One of 100 founding fans for ${artistName} on Fan Engage. Founder tier: 1.5x points and a numbered badge. Early drops and founder-only experiences are coming soon.`;
   return {
     title,
     description,
@@ -93,8 +93,8 @@ export default async function FounderSharePage({
           </p>
           <p className="max-w-xl text-sm text-white/70">
             One of 100 founding fans for {artist.name} on Fan Engage. Founder
-            tier comes with a points multiplier, early access to drops, and
-            founder-only experiences.
+            tier comes with 1.5x points and a numbered badge. Early access to
+            drops and founder-only experiences are coming soon.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
             <ShareButton
@@ -119,8 +119,9 @@ export default async function FounderSharePage({
           Want to claim a slot for {artist.name}?
         </p>
         <p className="mt-2">
-          Founders are capped at 100 per artist. They earn points 1.5x faster,
-          unlock founder-only drops, and get first access to events.{" "}
+          Founders are capped at 100 per artist. They earn points 1.5x faster
+          and get a numbered badge. Founder-only drops and first access to
+          events are coming soon.{" "}
           <Link
             href={`/artists/${artist.slug}`}
             className="text-aurora underline hover:text-white"

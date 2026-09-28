@@ -10,6 +10,14 @@ export type TurnstileLoadState = "loading" | "ready" | "error";
 export const TURNSTILE_LOAD_TIMEOUT_MS = 12_000;
 export const TURNSTILE_SLOW_LOAD_HINT_MS = 6_000;
 /**
+ * Widget still loading or never became interactive. Show a refresh hint
+ * before the 12s hard error so a stuck challenge is not a silent spinner.
+ */
+export const TURNSTILE_STUCK_HINT_MS = 10_000;
+export const TURNSTILE_STUCK_COPY =
+  "Security check stuck? Refresh this page and keep cookies on.";
+export const TURNSTILE_STUCK_REFRESH_LABEL = "Refresh this page";
+/**
  * Widget painted (iframe present) but never issued a token — invalid
  * hostname / site key, interactive checkbox ignored, or Cloudflare
  * error inside the iframe without error-callback. Show Retry and keep
@@ -132,6 +140,21 @@ export function shouldShowParentChallengeError(opts: {
 export function turnstileSlowLoadHint(elapsedHint: boolean): string {
   if (!elapsedHint) return "Security check loading…";
   return `Still loading — this can take up to ${TURNSTILE_LOAD_TIMEOUT_MS / 1000} seconds.`;
+}
+
+/**
+ * True when the widget has been on screen ~10s and is still not
+ * interactive (loading or failed) and has not issued a token.
+ * A visible, solvable widget (`ready`) is not stuck.
+ */
+export function shouldShowTurnstileStuckHint(opts: {
+  elapsedMs: number;
+  loadState: TurnstileLoadState;
+  hasToken: boolean;
+}): boolean {
+  if (opts.hasToken) return false;
+  if (opts.loadState === "ready") return false;
+  return opts.elapsedMs >= TURNSTILE_STUCK_HINT_MS;
 }
 
 /** Single widget-owned fail copy (login/signup/forgot share this). */

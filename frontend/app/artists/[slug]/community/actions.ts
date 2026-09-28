@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { communityAdminUser } from "@/lib/admin-guard";
 import { indexRowAsync } from "@/lib/embeddings";
 import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
@@ -33,8 +33,7 @@ async function requirePremiumCommunityWrite(
   communityId: string,
   feature: PremiumV1Feature,
 ) {
-  const adminUser = await getAdminUser();
-  if (adminUser) return;
+  if (await communityAdminUser(communityId, "viewer")) return;
   const gate = await requirePremiumFeature(userId, communityId, feature);
   if (!gate.allowed) {
     redirect(premiumPath(communityId));
@@ -210,12 +209,17 @@ export async function deletePostAction(formData: FormData) {
   if (!postId || !artistSlug) return;
 
   const { supabase, userId } = await requireUser();
-  const adminUser = await getAdminUser();
+  const adminUser = await communityAdminUser(artistSlug, "editor");
 
-  // Author can delete own; admin can delete any (via service-role client).
+  // Author can delete own; an admin of this community can delete any post
+  // in it (via service-role client, scoped to the community).
   if (adminUser) {
     const admin = createAdminClient();
-    await admin.from("community_posts").delete().eq("id", postId);
+    await admin
+      .from("community_posts")
+      .delete()
+      .eq("id", postId)
+      .eq("artist_slug", artistSlug);
   } else {
     await supabase
       .from("community_posts")
@@ -231,10 +235,10 @@ export async function deletePostAction(formData: FormData) {
 
 export async function createPollAction(formData: FormData) {
   // Admin only — regular fans can't create polls in Phase 2a.
-  const adminUser = await getAdminUser();
+  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
+  const adminUser = await communityAdminUser(artistSlug, "editor");
   if (!adminUser) return;
 
-  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const visibility = normalizeVisibility(formData.get("visibility"));
   const options = formData
@@ -301,10 +305,10 @@ export async function votePollAction(formData: FormData) {
 // ─── Phase 2a: challenges ─────────────────────────────────────────────────
 
 export async function createChallengeAction(formData: FormData) {
-  const adminUser = await getAdminUser();
+  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
+  const adminUser = await communityAdminUser(artistSlug, "editor");
   if (!adminUser) return;
 
-  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const visibility = normalizeVisibility(formData.get("visibility"));
@@ -355,10 +359,10 @@ export async function submitEntryAction(formData: FormData) {
 // ─── Phase 2a: announcements ──────────────────────────────────────────────
 
 export async function createAnnouncementAction(formData: FormData) {
-  const adminUser = await getAdminUser();
+  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
+  const adminUser = await communityAdminUser(artistSlug, "editor");
   if (!adminUser) return;
 
-  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const visibility = normalizeVisibility(formData.get("visibility"));
@@ -403,14 +407,14 @@ export async function togglePinAction(formData: FormData) {
   const currentlyPinned = String(formData.get("currently_pinned") ?? "false") === "true";
   if (!postId || !artistSlug) return;
 
-  const adminUser = await getAdminUser();
-  if (!adminUser) return;
+  if (!(await communityAdminUser(artistSlug, "editor"))) return;
 
   const admin = createAdminClient();
   await admin
     .from("community_posts")
     .update({ pinned: !currentlyPinned })
-    .eq("id", postId);
+    .eq("id", postId)
+    .eq("artist_slug", artistSlug);
 
   revalidatePath(`/artists/${artistSlug}/community`);
 }

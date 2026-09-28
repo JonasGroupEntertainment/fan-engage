@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
+import { communityOfRow } from "@/lib/community-owner";
 import { applyAdminOverride, type ModerateSourceTable } from "@/lib/moderation";
 
 /**
@@ -20,9 +21,6 @@ async function override(
   formData: FormData,
   newStatus: "safe" | "flag_review" | "auto_hide",
 ): Promise<void> {
-  const adminUser = await getAdminUser();
-  if (!adminUser) return;
-
   const table = String(formData.get("table") ?? "") as ModerateSourceTable;
   const rowId = String(formData.get("row_id") ?? "");
   const notes = String(formData.get("notes") ?? "").trim() || undefined;
@@ -34,10 +32,16 @@ async function override(
     return;
   }
 
+  // Check the caller against the community that owns the row, not the form.
+  const communityId = await communityOfRow(table, rowId);
+  if (!communityId) return;
+  const guard = await authorizeAdmin({ communityId, minRole: "editor" });
+  if (!guard.ok) return;
+
   const result = await applyAdminOverride({
     table,
     rowId,
-    adminUserId: adminUser.id,
+    adminUserId: guard.ctx.user.id,
     newStatus,
     adminNotes: notes,
   });

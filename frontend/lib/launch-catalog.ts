@@ -183,4 +183,7 @@ export const GUEST_FORBIDDEN_PHRASES = [
   "pre-sale",
   "vip parties",
   "$5/mo store credit",
+  // Premium copy for the credit is "$5 store credit added every month.
+  // Spending it is coming soon." Guests must not see that either.
+  "$5 store credit added every month",
 ] as const;

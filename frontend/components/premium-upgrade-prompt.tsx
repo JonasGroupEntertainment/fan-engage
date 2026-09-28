@@ -10,20 +10,34 @@ import {
   useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
+import {
+  COOKIE_CONSENT_EVENT,
+  COOKIE_CONSENT_STORAGE_KEY,
+} from "@/components/cookie-banner";
 import PremiumCta from "@/components/premium-cta";
 import {
   PREMIUM_UPGRADE_PROMPT_COPY,
   PREMIUM_UPGRADE_PROMPT_STORAGE_KEY,
   applyPremiumEntitlementToPromptState,
   dismissPremiumUpgradePrompt,
+  isCookieBannerOpen,
   lockPremiumUpgradePrompt,
   parsePremiumUpgradePromptState,
   pickFirstShowDelayMs,
   recordPremiumUpgradeNavigation,
   savePremiumUpgradePromptState,
   shouldShowPremiumUpgradePrompt,
+  stampPremiumUpgradeFirstSeen,
   type PremiumUpgradePromptState,
 } from "@/lib/premium-upgrade-prompt";
+import {
+  claimPromptSlot,
+  getActivePromptSlot,
+  getServerPromptSlot,
+  isPromptSlotFree,
+  releasePromptSlot,
+  subscribePromptSlot,
+} from "@/lib/prompt-slot";
 
 function subscribe() {
   return () => {};
@@ -41,6 +55,39 @@ function getServerSnapshot(): string | null {
   return null;
 }
 
+function subscribeCookieConsent(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onChange();
+  window.addEventListener(COOKIE_CONSENT_EVENT, handler);
+  window.addEventListener("storage", handler);
+  return () => {
+    window.removeEventListener(COOKIE_CONSENT_EVENT, handler);
+    window.removeEventListener("storage", handler);
+  };
+}
+
+function getCookieConsentSnapshot(): string | null {
+  try {
+    return window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+// Minute-level clock for the grace and cooldown rules. Rounding keeps the
+// snapshot stable between renders, which useSyncExternalStore requires.
+const CLOCK_TICK_MS = 60_000;
+function subscribeClock(onChange: () => void) {
+  const id = window.setInterval(onChange, CLOCK_TICK_MS);
+  return () => window.clearInterval(id);
+}
+function getClockSnapshot(): number {
+  return Math.floor(Date.now() / CLOCK_TICK_MS) * CLOCK_TICK_MS;
+}
+function getServerClockSnapshot(): number {
+  return 0;
+}
+
 function persist(state: PremiumUpgradePromptState) {
   try {
     savePremiumUpgradePromptState(window.localStorage, state);
@@ -51,17 +98,34 @@ function persist(state: PremiumUpgradePromptState) {
 
 export default function PremiumUpgradePrompt({
   isPremium = false,
+  signedIn = false,
+  accountCreatedAt = null,
 }: {
   isPremium?: boolean;
+  signedIn?: boolean;
+  /** Supabase auth created_at, used for the first-day grace period. */
+  accountCreatedAt?: string | null;
 }) {
   return (
     <Suspense fallback={null}>
-      <PremiumUpgradePromptInner isPremium={isPremium} />
+      <PremiumUpgradePromptInner
+        isPremium={isPremium}
+        signedIn={signedIn}
+        accountCreatedAt={accountCreatedAt}
+      />
     </Suspense>
   );
 }
 
-function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
+function PremiumUpgradePromptInner({
+  isPremium,
+  signedIn,
+  accountCreatedAt,
+}: {
+  isPremium: boolean;
+  signedIn: boolean;
+  accountCreatedAt: string | null;
+}) {
   const pathname = usePathname() ?? "";
   const titleId = useId();
   const bodyId = useId();
@@ -72,6 +136,21 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     subscribe,
     getSnapshot,
     getServerSnapshot,
+  );
+  const consentRaw = useSyncExternalStore(
+    subscribeCookieConsent,
+    getCookieConsentSnapshot,
+    getServerSnapshot,
+  );
+  const activeSlot = useSyncExternalStore(
+    subscribePromptSlot,
+    getActivePromptSlot,
+    getServerPromptSlot,
+  );
+  const now = useSyncExternalStore(
+    subscribeClock,
+    getClockSnapshot,
+    getServerClockSnapshot,
   );
   const persisted = parsePremiumUpgradePromptState(persistedRaw);
   const [session, setSession] = useState<PremiumUpgradePromptState | null>(
@@ -85,11 +164,40 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   );
 
   const eligible = shouldShowPremiumUpgradePrompt({
+    signedIn,
     isPremium,
     state,
     pathname,
+    cookieBannerOpen: isCookieBannerOpen({ consentRaw, pathname }),
+    now,
+    accountCreatedAt,
   });
-  const open = eligible && delayElapsed;
+  // One floating prompt at a time: wait for the install banner to finish.
+  const candidate =
+    eligible && delayElapsed && isPromptSlotFree("premium", activeSlot);
+  const open = candidate && activeSlot === "premium";
+
+  useEffect(() => {
+    if (candidate) claimPromptSlot("premium");
+    else releasePromptSlot("premium");
+  }, [candidate]);
+
+  useEffect(() => () => releasePromptSlot("premium"), []);
+
+  // Remember when this device first saw the fan, so the first-day grace
+  // still works when auth created_at is unavailable.
+  useEffect(() => {
+    if (!signedIn || state.firstSeenAt) return;
+    const id = window.setTimeout(() => {
+      setSession((current) =>
+        stampPremiumUpgradeFirstSeen(
+          current ?? parsePremiumUpgradePromptState(getSnapshot()),
+          Date.now(),
+        ),
+      );
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [signedIn, state.firstSeenAt]);
 
   useEffect(() => {
     if (!session) return;
@@ -99,7 +207,11 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
   useEffect(() => {
     if (!isPremium) return;
     const id = window.setTimeout(() => {
-      setSession(lockPremiumUpgradePrompt());
+      setSession((current) =>
+        lockPremiumUpgradePrompt(
+          current ?? parsePremiumUpgradePromptState(getSnapshot()),
+        ),
+      );
     }, 0);
     return () => window.clearTimeout(id);
   }, [isPremium]);
@@ -115,7 +227,6 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     previousPathRef.current = nextPath;
     // Route changes are the page-view signal — keep this in lockstep with
     // usePathname, same pattern as mobile-nav closing on navigation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession((current) =>
       recordPremiumUpgradeNavigation(
         current ?? parsePremiumUpgradePromptState(persistedRaw),
@@ -139,6 +250,7 @@ function PremiumUpgradePromptInner({ isPremium }: { isPremium: boolean }) {
     setSession((current) =>
       dismissPremiumUpgradePrompt(
         current ?? parsePremiumUpgradePromptState(getSnapshot()),
+        Date.now(),
       ),
     );
   }, [setSession]);

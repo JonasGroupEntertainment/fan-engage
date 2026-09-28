@@ -83,15 +83,18 @@ export default async function PremiumPage({
   const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
 
-  const perks = [
+  // comingSoon marks perks that are promised but not built yet. Keep them
+  // listed so fans know what is planned, but never sell them as live.
+  const perks: Array<{ icon: string; title: string; body: string; comingSoon?: boolean }> = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
-    { icon: "🎁", title: "Exclusive digital drops", body: "Premium-only digital unlocks inside the app." },
-    { icon: "🎬", title: "Behind-the-song clips", body: "In-app clips when a track is ready — digital only." },
+    { icon: "🎁", title: "Exclusive digital drops", body: "Premium-only digital unlocks inside the app.", comingSoon: true },
+    { icon: "🎬", title: "Behind-the-song clips", body: "In-app clips when a track is ready. Digital only.", comingSoon: true },
     { icon: "📱", title: "Phone & lyric wallpapers", body: "Exclusive wallpapers you redeem with points inside the app." },
-    { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist — ask anything." },
+    { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist. Ask anything.", comingSoon: true },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
     { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points — not a Premium purchase." },
+    { icon: "🛍️", title: "Merch drops coming soon", body: "Physical merch is not live yet. Premium today is the in-app community, rewards, and backstage access." },
   ];
 
   return (
@@ -411,7 +414,14 @@ export default async function PremiumPage({
                 className="rounded-2xl border border-white/10 bg-black/30 p-5"
               >
                 <p className="text-2xl">{p.icon}</p>
-                <p className="mt-2 font-semibold">{p.title}</p>
+                <p className="mt-2 flex flex-wrap items-center gap-2 font-semibold">
+                  {p.title}
+                  {p.comingSoon && (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70">
+                      Coming soon
+                    </span>
+                  )}
+                </p>
                 <p className="mt-1 text-sm text-white/60">{p.body}</p>
               </div>
             ))}

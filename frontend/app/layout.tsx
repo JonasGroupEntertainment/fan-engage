@@ -97,6 +97,7 @@ async function getCurrentUserSafe() {
     return {
       id: data.user.id,
       email: data.user.email,
+      created_at: data.user.created_at ?? null,
       first_name: (fan?.first_name as string | null) ?? null,
       avatar_url: (fan?.avatar_url as string | null) ?? null,
       profileSlug,
@@ -234,7 +235,11 @@ export default async function RootLayout({
         <Footer />
         <CookieBanner />
         <InstallPrompt />
-        <PremiumUpgradePrompt isPremium={isPremium} />
+        <PremiumUpgradePrompt
+          isPremium={isPremium}
+          signedIn={Boolean(user)}
+          accountCreatedAt={user?.created_at ?? null}
+        />
       </body>
     </html>
   );
