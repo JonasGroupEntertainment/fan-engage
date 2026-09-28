@@ -1,4 +1,6 @@
+import type { AdminContext } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canResolvePrediction } from "./authz";
 
 /**
  * Resolve a prediction by marking the correct option, then batch-award
@@ -10,6 +12,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *
  * Returns counts so the caller can render a confirmation toast.
  *
+ * Guards (checked here so every caller gets them):
+ *   - the admin must be allowed to resolve for the prediction's own
+ *     community (read from the DB row, not the form);
+ *   - the chosen option must belong to this prediction;
+ *   - once resolved, the answer is locked. A rerun with the same option
+ *     only finishes any awards that failed; a different option is refused.
+ *
  * Failure mode: throws if the post isn't a prediction or doesn't exist.
  * Award errors per-fan are logged but don't abort the batch — partial
  * awards persist (the dedupe log rows make a retry safe).
@@ -17,6 +26,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function resolvePrediction(opts: {
   postId: string;
   correctOptionId: string;
+  ctx: AdminContext | null;
 }): Promise<{
   alreadyResolved: boolean;
   pointsPerWinner: number;
@@ -37,20 +47,46 @@ export async function resolvePrediction(opts: {
 
   if (!post) throw new Error("prediction not found");
   if (post.kind !== "prediction") throw new Error("post is not a prediction");
+  if (!canResolvePrediction(opts.ctx, post.artist_slug as string | null)) {
+    throw new Error("not_allowed");
+  }
+
+  const { data: option } = await admin
+    .from("community_poll_options")
+    .select("id")
+    .eq("id", opts.correctOptionId)
+    .eq("post_id", opts.postId)
+    .maybeSingle();
+  if (!option) throw new Error("option does not belong to this prediction");
 
   const points = (post.points_for_correct as number | null) ?? 0;
-  const alreadyResolved = post.resolved_at != null;
+  let alreadyResolved = post.resolved_at != null;
 
-  // Stamp resolution if not yet done
+  // Stamp resolution once. The resolved_at IS NULL filter makes two
+  // concurrent first resolves race safely: only one row update wins.
   if (!alreadyResolved) {
-    const { error } = await admin
+    const { data: stamped, error } = await admin
       .from("community_posts")
       .update({
         correct_option_id: opts.correctOptionId,
         resolved_at: new Date().toISOString(),
       })
-      .eq("id", opts.postId);
+      .eq("id", opts.postId)
+      .is("resolved_at", null)
+      .select("id");
     if (error) throw error;
+    if (!stamped || stamped.length === 0) alreadyResolved = true;
+  }
+
+  if (alreadyResolved) {
+    const { data: current } = await admin
+      .from("community_posts")
+      .select("correct_option_id")
+      .eq("id", opts.postId)
+      .maybeSingle();
+    if (current?.correct_option_id !== opts.correctOptionId) {
+      throw new Error("prediction already resolved with a different answer");
+    }
   }
 
   // Find winning voters
