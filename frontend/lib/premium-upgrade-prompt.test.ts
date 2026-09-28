@@ -45,8 +45,20 @@ function memoryStorage(initial: Record<string, string> = {}) {
   };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Fixed clock for deterministic time rules. */
+const T0 = Date.parse("2026-09-01T12:00:00.000Z");
+/** Past the 7-day cooldown after a dismissal at T0. */
+const LATER = T0 + 8 * DAY_MS;
+
+/** A fan first seen long ago, so the first-day grace does not apply. */
+const SETTLED: PremiumUpgradePromptState = {
+  ...EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+  firstSeenAt: "2020-01-01T00:00:00.000Z",
+};
+
 function waiting(views = 0): PremiumUpgradePromptState {
-  return { dismissed: true, views, premiumLocked: false };
+  return { ...SETTLED, dismissed: true, views, dismissCount: 1 };
 }
 
 describe("premium upgrade prompt: hide when Premium", () => {
@@ -58,7 +70,7 @@ describe("premium upgrade prompt: hide when Premium", () => {
         shouldShowPremiumUpgradePrompt({
           signedIn: true,
           isPremium: isPremium(tier),
-          state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+          state: SETTLED,
           pathname: "/",
         }),
         false,
@@ -72,7 +84,7 @@ describe("premium upgrade prompt: hide when Premium", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: true,
         isPremium: true,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/",
       }),
       false,
@@ -115,7 +127,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: true,
         isPremium: false,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/",
       }),
       true,
@@ -133,9 +145,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
   });
 
   it("hides after Not now until 8 client navigations", () => {
-    const dismissed = dismissPremiumUpgradePrompt(
-      EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
-    );
+    const dismissed = dismissPremiumUpgradePrompt(SETTLED, T0);
     assert.equal(dismissed.dismissed, true);
     assert.equal(dismissed.views, 0);
     assert.equal(
@@ -144,6 +154,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
         isPremium: false,
         state: dismissed,
         pathname: "/",
+        now: LATER,
       }),
       false,
     );
@@ -159,6 +170,7 @@ describe("premium upgrade prompt: counter + resurface", () => {
         isPremium: false,
         state,
         pathname: to,
+        now: LATER,
       });
       if (i < PAGE_VIEWS_TO_RESURFACE - 1) {
         assert.equal(state.views, i + 1);
@@ -227,9 +239,7 @@ describe("premium upgrade prompt: delay + namespaced storage", () => {
       "fanengage_premium_upgrade_prompt",
     );
     const storage = memoryStorage();
-    const dismissed = dismissPremiumUpgradePrompt(
-      EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
-    );
+    const dismissed = dismissPremiumUpgradePrompt(SETTLED, T0);
     const withViews = incrementPremiumUpgradePromptViews(
       incrementPremiumUpgradePromptViews(dismissed),
     );
@@ -239,7 +249,14 @@ describe("premium upgrade prompt: delay + namespaced storage", () => {
       true,
     );
     const loaded = loadPremiumUpgradePromptState(storage);
-    assert.deepEqual(loaded, { dismissed: true, views: 2, premiumLocked: false });
+    assert.deepEqual(loaded, {
+      ...SETTLED,
+      dismissed: true,
+      views: 2,
+      premiumLocked: false,
+      dismissCount: 1,
+      lastDismissedAt: new Date(T0).toISOString(),
+    });
   });
 
   it("recovers from missing or corrupt storage", () => {
@@ -267,7 +284,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
         shouldShowPremiumUpgradePrompt({
           signedIn: true,
           isPremium: false,
-          state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+          state: SETTLED,
           pathname: `${prefix}/extra`,
         }),
         false,
@@ -280,7 +297,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: true,
         isPremium: false,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/premium",
       }),
       false,
@@ -293,7 +310,7 @@ describe("premium upgrade prompt: hide on auth-heavy routes", () => {
         shouldShowPremiumUpgradePrompt({
           signedIn: true,
           isPremium: false,
-          state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+          state: SETTLED,
           pathname,
         }),
         true,
@@ -352,7 +369,7 @@ describe("premium upgrade prompt: guests and cookie banner", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: false,
         isPremium: false,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/",
         cookieBannerOpen: false,
       }),
@@ -374,7 +391,7 @@ describe("premium upgrade prompt: guests and cookie banner", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: true,
         isPremium: false,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/",
         cookieBannerOpen: false,
       }),
@@ -387,7 +404,7 @@ describe("premium upgrade prompt: guests and cookie banner", () => {
       shouldShowPremiumUpgradePrompt({
         signedIn: true,
         isPremium: false,
-        state: EMPTY_PREMIUM_UPGRADE_PROMPT_STATE,
+        state: SETTLED,
         pathname: "/",
         cookieBannerOpen: true,
       }),
