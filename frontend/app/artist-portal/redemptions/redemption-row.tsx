@@ -46,8 +46,6 @@ export default function RedemptionRow({
     setLoading(true);
     const fd = new FormData();
     fd.set("redemption_id", redemption.id);
-    fd.set("fan_id", redemption.fan_id);
-    fd.set("point_cost", String(redemption.point_cost));
     const result = await cancelRedemptionPortalAction(fd);
     if (result?.error) setErr(result.error);
     else router.refresh();
