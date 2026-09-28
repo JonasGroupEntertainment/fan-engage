@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { smsEnabledFromOnboarding } from "./sms-send-gate.ts";
+import { smsEnabledFromOnboarding, smsOptInFromSettings } from "./sms-send-gate.ts";
 
 function readRepo(relFromLib: string): string {
   return readFileSync(fileURLToPath(new URL(relFromLib, import.meta.url)), "utf8");
@@ -20,6 +20,33 @@ describe("onboarding SMS opt-in turns on the SMS channel", () => {
   it("onboard route writes sms_enabled to notification_preferences", () => {
     const src = readRepo("../app/api/fan-engage/onboard/route.ts");
     assert.match(src, /setPreferences\(user\.id,\s*\{\s*sms_enabled:\s*smsEnabledFromOnboarding\(/);
+  });
+});
+
+describe("settings SMS switch syncs fans.sms_opted_in", () => {
+  it("records consent only for an allowed tier with a phone", () => {
+    assert.equal(smsOptInFromSettings(true, true, "+16155550123"), true);
+    assert.equal(smsOptInFromSettings(true, true, null), null);
+    assert.equal(smsOptInFromSettings(true, true, "  "), null);
+  });
+
+  it("never revokes consent when the tier gate blocks the switch", () => {
+    assert.equal(smsOptInFromSettings(true, false, "+16155550123"), null);
+  });
+
+  it("revokes consent when the fan turns SMS off", () => {
+    assert.equal(smsOptInFromSettings(false, true, "+16155550123"), false);
+    assert.equal(smsOptInFromSettings(false, false, null), false);
+  });
+
+  it("leaves consent alone when the patch has no SMS change", () => {
+    assert.equal(smsOptInFromSettings(undefined, true, "+16155550123"), null);
+  });
+
+  it("settings action writes sms_opted_in from the helper", () => {
+    const src = readRepo("../app/settings/notifications/actions.ts");
+    assert.match(src, /smsOptInFromSettings\(/);
+    assert.match(src, /\.update\(\{\s*sms_opted_in:\s*smsOptIn\s*\}\)/);
   });
 });
 
