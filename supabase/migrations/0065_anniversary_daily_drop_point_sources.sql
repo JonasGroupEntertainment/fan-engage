@@ -1,4 +1,4 @@
--- Not yet applied to production; apply via MCP before merge.
+-- Already applied to production via MCP on 2026-09-27.
 --
 -- 0065_anniversary_daily_drop_point_sources.sql
 --
