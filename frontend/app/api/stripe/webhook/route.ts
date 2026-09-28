@@ -4,6 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import {
+  invoiceSubscriptionId,
+  subscriptionPeriodEndIso,
+} from "@/lib/stripe-moved-fields";
+import {
   isStripeEventReplay,
   stripeEventCompletionPatch,
 } from "@/lib/stripe-webhook-processed";
@@ -276,8 +280,7 @@ async function handleInvoicePaid(
   // An invoice paid against an active subscription — the canonical
   // signal that the subscription is healthy. If the fan was past_due,
   // this flips them back to premium. Also refresh the $5 monthly credit.
-  const subscriptionField = (invoice as unknown as { subscription?: string | null }).subscription;
-  const subId = typeof subscriptionField === "string" ? subscriptionField : null;
+  const subId = invoiceSubscriptionId(invoice);
   if (!subId) return; // Non-subscription invoice — ignore.
 
   const { data: membership } = await admin
@@ -327,8 +330,7 @@ async function handleInvoicePaymentFailed(
   // their card, but keep access alive during the grace window. When
   // retries are exhausted, Stripe fires subscription.deleted and we
   // revert to 'free'.
-  const subscriptionField = (invoice as unknown as { subscription?: string | null }).subscription;
-  const subId = typeof subscriptionField === "string" ? subscriptionField : null;
+  const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
   await admin
@@ -351,8 +353,9 @@ function parseSubMetadata(sub: Stripe.Subscription) {
 }
 
 function subPeriodEnd(sub: Stripe.Subscription): string | null {
-  const end = (sub as unknown as { current_period_end?: number }).current_period_end;
-  return end ? new Date(end * 1000).toISOString() : null;
+  // current_period_end moved onto subscription items in newer Stripe API
+  // versions; the helper reads the new spot and falls back to the old one.
+  return subscriptionPeriodEndIso(sub);
 }
 
 /**
