@@ -9,7 +9,11 @@ import {
 } from "@/lib/stripe-moved-fields";
 import {
   isStripeEventReplay,
+  monthlyCreditGrantRow,
+  MONTHLY_CREDIT_CENTS,
   stripeEventCompletionPatch,
+  stripeEventInsertOutcome,
+  throwIfDbError,
 } from "@/lib/stripe-webhook-processed";
 
 export const runtime = "nodejs";
@@ -82,13 +86,23 @@ export async function POST(request: Request) {
   // Record the raw event (first sight). We'll mark it processed after
   // the handler runs.
   if (!existing) {
-    await admin.from("stripe_events").insert({
+    const { error: insertErr } = await admin.from("stripe_events").insert({
       id: event.id,
       type: event.type,
       community_id: extractCommunityId(event),
       fan_id: extractFanId(event),
       payload: event as unknown as Record<string, unknown>,
     });
+    // A concurrent delivery may have inserted the row first (duplicate
+    // key). Anything else means we cannot track this event, so ask
+    // Stripe to retry rather than processing it untracked.
+    if (stripeEventInsertOutcome(insertErr) === "failed") {
+      console.error("stripe/webhook: event insert failed", insertErr?.message);
+      return NextResponse.json(
+        { ok: false, error: "event log unavailable" },
+        { status: 500 },
+      );
+    }
   }
 
   let processError: string | null = null;
@@ -113,7 +127,11 @@ export async function POST(request: Request) {
         );
         break;
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object as Stripe.Invoice, admin);
+        await handleInvoicePaid(
+          event.data.object as Stripe.Invoice,
+          event.id,
+          admin,
+        );
         break;
       case "invoice.payment_failed":
         await handleInvoicePaymentFailed(
@@ -191,7 +209,7 @@ async function handleSubscriptionCreated(
     .update(updates)
     .eq("fan_id", fanId)
     .eq("community_id", communityId);
-  if (updErr) throw new Error(`membership update failed: ${updErr.message}`);
+  throwIfDbError({ error: updErr }, "subscription.created membership update");
 
   // Referral conversion — award 500 points to the referrer if this fan
   // was referred and their referral is still pending.
@@ -230,11 +248,12 @@ async function handleSubscriptionUpdated(
   const { fanId, communityId } = parseSubMetadata(sub);
   if (!fanId || !communityId) {
     // Metadata stripped somehow — fall back to lookup by subscription id.
-    const { data: row } = await admin
+    const { data: row, error: readErr } = await admin
       .from("fan_community_memberships")
       .select("fan_id, community_id")
       .eq("stripe_subscription_id", sub.id)
       .maybeSingle();
+    throwIfDbError({ error: readErr }, "subscription.updated membership read");
     if (!row) {
       console.warn("subscription.updated: no matching membership", sub.id);
       return;
@@ -249,10 +268,11 @@ async function handleSubscriptionUpdated(
     cancel_at_period_end: sub.cancel_at_period_end ?? false,
   };
 
-  await admin
+  const result = await admin
     .from("fan_community_memberships")
     .update(updates)
     .eq("stripe_subscription_id", sub.id);
+  throwIfDbError(result, "subscription.updated membership update");
 }
 
 async function handleSubscriptionDeleted(
@@ -261,7 +281,7 @@ async function handleSubscriptionDeleted(
 ) {
   // Stripe fires this when the subscription ends (after cancel_at_period_end
   // runs out, or after payment_failed retries exhaust). Revert to free.
-  await admin
+  const result = await admin
     .from("fan_community_memberships")
     .update({
       subscription_tier: "free",
@@ -271,10 +291,12 @@ async function handleSubscriptionDeleted(
       // resubscribe will overwrite it.
     })
     .eq("stripe_subscription_id", sub.id);
+  throwIfDbError(result, "subscription.deleted membership update");
 }
 
 async function handleInvoicePaid(
   invoice: Stripe.Invoice,
+  eventId: string,
   admin: SupabaseClient,
 ) {
   // An invoice paid against an active subscription — the canonical
@@ -283,13 +305,14 @@ async function handleInvoicePaid(
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return; // Non-subscription invoice — ignore.
 
-  const { data: membership } = await admin
+  const { data: membership, error: readErr } = await admin
     .from("fan_community_memberships")
     .select(
       "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at",
     )
     .eq("stripe_subscription_id", subId)
     .maybeSingle();
+  throwIfDbError({ error: readErr }, "invoice.paid membership read");
   if (!membership) return;
 
   const updates: Record<string, unknown> = {
@@ -302,23 +325,35 @@ async function handleInvoicePaid(
     ? new Date(membership.monthly_credit_refreshed_at as string).getTime()
     : 0;
   const daysSince = (Date.now() - lastRefreshed) / (1000 * 60 * 60 * 24);
-  if (daysSince >= 25) {
-    updates.monthly_credit_cents = 500;
+  const refreshCredit = daysSince >= 25;
+  if (refreshCredit) {
+    updates.monthly_credit_cents = MONTHLY_CREDIT_CENTS;
     updates.monthly_credit_refreshed_at = new Date().toISOString();
-
-    await admin.from("credit_grants").insert({
-      fan_id: membership.fan_id,
-      community_id: membership.community_id,
-      amount_cents: 500,
-      reason: "monthly_refresh",
-      stripe_event_id: invoice.id,
-    });
   }
 
-  await admin
+  // Membership first: if this fails we throw and Stripe retries, and no
+  // ledger row has been written yet.
+  const result = await admin
     .from("fan_community_memberships")
     .update(updates)
     .eq("stripe_subscription_id", subId);
+  throwIfDbError(result, "invoice.paid membership update");
+
+  if (!refreshCredit) return;
+
+  // Ledger row is an audit trail. The balance is already set above, so a
+  // failed insert is logged but does not fail the event: a retry would
+  // skip the refresh (refreshed_at is now recent) and could not repair it.
+  const { error: grantErr } = await admin.from("credit_grants").insert(
+    monthlyCreditGrantRow({
+      fanId: membership.fan_id as string,
+      communityId: membership.community_id as string,
+      eventId,
+    }),
+  );
+  if (grantErr) {
+    console.error("invoice.paid credit_grants insert failed", grantErr.message);
+  }
 }
 
 async function handleInvoicePaymentFailed(
@@ -333,10 +368,11 @@ async function handleInvoicePaymentFailed(
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
-  await admin
+  const result = await admin
     .from("fan_community_memberships")
     .update({ subscription_tier: "past_due" })
     .eq("stripe_subscription_id", subId);
+  throwIfDbError(result, "invoice.payment_failed membership update");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
