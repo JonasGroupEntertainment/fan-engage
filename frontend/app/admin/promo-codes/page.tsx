@@ -175,7 +175,13 @@ export default async function PromoCodesPage() {
             These apply a percentage or fixed discount at Stripe checkout. Fans enter them in the Stripe-hosted payment page.
           </p>
         </div>
-        <CreateStripeCouponForm />
+        {ctx.isSuperAdmin ? (
+          <CreateStripeCouponForm />
+        ) : (
+          <p className="text-sm text-white/55">
+            Only super-admins can create Stripe coupons.
+          </p>
+        )}
       </section>
     </div>
   );

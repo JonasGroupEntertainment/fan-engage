@@ -3,11 +3,40 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cancelRedemption } from "@/lib/rewards/cancel";
 import { getAdminContext } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import { redirect } from "next/navigation";
+
+/**
+ * Every reward action checks the caller against the community the reward
+ * (or redemption) belongs to, loaded from the database. Owners and admins
+ * of that community, and super-admins, may act.
+ */
+async function guardCommunity(communityId: string | null | undefined) {
+  const guard = await authorizeAdmin({ communityId, minRole: "admin" });
+  if (!guard.ok && guard.reason === "signed_out") redirect("/login");
+  return guard;
+}
+
+async function loadCommunityId(
+  table: "rewards_catalog" | "reward_redemptions",
+  id: string,
+): Promise<string | null> {
+  if (!id) return null;
+  const { data } = await createAdminClient()
+    .from(table)
+    .select("community_id")
+    .eq("id", id)
+    .maybeSingle();
+  return (data?.community_id as string | null | undefined) ?? null;
+}
 
 export async function createRewardAction(formData: FormData) {
   const ctx = await getAdminContext();
   if (!ctx) redirect("/login");
+  // New rewards go into the community the admin is working in.
+  const communityId = ctx.currentCommunityId;
+  const guard = await authorizeAdmin({ communityId, minRole: "admin" }, ctx);
+  if (!guard.ok) return { error: "Forbidden" };
 
   const supabase = createAdminClient();
   const title = formData.get("title") as string;
@@ -27,7 +56,7 @@ export async function createRewardAction(formData: FormData) {
     .from("rewards_catalog")
     .insert([
       {
-        community_id: ctx.currentCommunityId,
+        community_id: communityId,
         title,
         description: description || null,
         image_url: image_url || null,
@@ -51,10 +80,10 @@ export async function createRewardAction(formData: FormData) {
 }
 
 export async function updateRewardAction(formData: FormData) {
-  const ctx = await getAdminContext();
-  if (!ctx) redirect("/login");
+  const rewardId = String(formData.get("id") ?? "");
+  const guard = await guardCommunity(await loadCommunityId("rewards_catalog", rewardId));
+  if (!guard.ok) return { error: "Forbidden" };
 
-  const rewardId = formData.get("id") as string;
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
   const image_url = formData.get("image_url") as string;
@@ -99,8 +128,8 @@ export async function updateRewardAction(formData: FormData) {
 }
 
 export async function toggleRewardActiveAction(rewardId: string, active: boolean) {
-  const ctx = await getAdminContext();
-  if (!ctx) redirect("/login");
+  const guard = await guardCommunity(await loadCommunityId("rewards_catalog", rewardId));
+  if (!guard.ok) return { error: "Forbidden" };
 
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -116,8 +145,8 @@ export async function toggleRewardActiveAction(rewardId: string, active: boolean
 }
 
 export async function markFulfilledAction(redemptionId: string, fulfillmentNote: string) {
-  const ctx = await getAdminContext();
-  if (!ctx) redirect("/login");
+  const guard = await guardCommunity(await loadCommunityId("reward_redemptions", redemptionId));
+  if (!guard.ok) return { error: "Forbidden" };
 
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -137,12 +166,13 @@ export async function markFulfilledAction(redemptionId: string, fulfillmentNote:
 }
 
 export async function cancelRedemptionAction(redemptionId: string) {
-  const ctx = await getAdminContext();
-  if (!ctx) redirect("/login");
+  const guard = await guardCommunity(await loadCommunityId("reward_redemptions", redemptionId));
+  if (!guard.ok) return { error: "Forbidden" };
 
   // Super admins can cancel in any community; everyone else only in theirs.
+  // The SQL function re-checks the community inside its row lock.
+  const { ctx } = guard;
   const scope = ctx.isSuperAdmin ? null : ctx.currentCommunityId;
-  if (!ctx.isSuperAdmin && !scope) return { error: "Unauthorized" };
 
   return cancelRedemption(createAdminClient(), redemptionId, scope);
 }

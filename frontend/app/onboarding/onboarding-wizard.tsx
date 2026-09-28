@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { safeAppPath } from "@/lib/safe-app-path";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { first72hFromFanState } from "@/lib/first-72h";
 import { onboardingClientGate } from "@/lib/session-presence";
@@ -154,10 +155,7 @@ export default function OnboardingWizard({
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const rawNext = searchParams.get("next");
-    const next =
-      rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
-        ? rawNext
-        : "/onboarding";
+    const next = safeAppPath(rawNext) ?? "/onboarding";
     const ref = searchParams.get("ref");
     const signupParams = new URLSearchParams({ next });
     if (ref) signupParams.set("ref", ref);
@@ -409,10 +407,7 @@ export default function OnboardingWizard({
         typeof window !== "undefined"
           ? new URLSearchParams(window.location.search).get("next")
           : null;
-      const returnTo =
-        rawReturn && rawReturn.startsWith("/") && !rawReturn.startsWith("//")
-          ? rawReturn
-          : null;
+      const returnTo = safeAppPath(rawReturn);
 
       if (returnTo) {
         router.push(returnTo);
