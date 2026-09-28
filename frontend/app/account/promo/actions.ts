@@ -4,6 +4,18 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
+import { authorizeAdmin } from "@/lib/admin-guard";
+
+/**
+ * Promo codes grant comped premium access. A universal code ('*') works in
+ * every community, so only super-admins may create or toggle one. A code
+ * for one community needs owner or admin in that community.
+ */
+function promoCodeRequirement(communityId: string) {
+  return communityId === "*"
+    ? { superAdminOnly: true as const }
+    : { communityId, minRole: "admin" as const };
+}
 
 export type RedeemResult =
   | { ok: true; message: string }
@@ -97,10 +109,9 @@ export async function redeemPromoCode(
 // ── Admin actions ──────────────────────────────────────────────────────────
 
 export async function createPromoCode(formData: FormData) {
-  const admin = createAdminClient();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  const communityId = formData.get("community_id")?.toString().trim() || "*";
+  const guard = await authorizeAdmin(promoCodeRequirement(communityId));
+  if (!guard.ok) throw new Error(guard.reason === "signed_out" ? "Unauthorized" : "Forbidden");
 
   const raw = (formData.get("code") ?? "").toString().trim().toUpperCase();
   if (!raw) throw new Error("Code is required");
@@ -108,15 +119,16 @@ export async function createPromoCode(formData: FormData) {
   const maxUsesRaw = formData.get("max_uses")?.toString().trim();
   const expiresRaw = formData.get("expires_at")?.toString().trim();
 
+  const admin = createAdminClient();
   await admin.from("promo_codes").insert({
     code: raw,
     description: formData.get("description")?.toString().trim() || null,
     grants_tier: formData.get("grants_tier")?.toString() || "comped",
-    community_id: formData.get("community_id")?.toString() || "*",
+    community_id: communityId,
     max_uses: maxUsesRaw ? parseInt(maxUsesRaw, 10) : null,
     expires_at: expiresRaw || null,
     active: true,
-    created_by: user.id,
+    created_by: guard.ctx.user.id,
   });
 
   revalidatePath("/admin/promo-codes");
@@ -124,6 +136,16 @@ export async function createPromoCode(formData: FormData) {
 
 export async function togglePromoCode(id: string, active: boolean) {
   const admin = createAdminClient();
+  const { data: row } = await admin
+    .from("promo_codes")
+    .select("community_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) throw new Error("Not found");
+
+  const guard = await authorizeAdmin(promoCodeRequirement(row.community_id as string));
+  if (!guard.ok) throw new Error(guard.reason === "signed_out" ? "Unauthorized" : "Forbidden");
+
   await admin.from("promo_codes").update({ active }).eq("id", id);
   revalidatePath("/admin/promo-codes");
 }

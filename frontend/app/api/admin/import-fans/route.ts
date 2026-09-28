@@ -1,100 +1,48 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin, guardStatus } from "@/lib/admin-guard";
+import { importFanRows, type ImportRowInput } from "@/lib/fans/import-fans";
+import { MAX_IMPORT_ROWS_PER_REQUEST } from "@/lib/fans/import-patch";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/**
+ * CSV fan import. The caller must be owner or admin of the target
+ * community (or a super-admin). Existing fans only get blank fields filled.
+ */
 export async function POST(request: NextRequest) {
-  const adminUser = await getAdminUser();
-  if (!adminUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const { rows, communityId } = (body ?? {}) as { rows?: unknown; communityId?: unknown };
+
+  const target = typeof communityId === "string" ? communityId.trim() : "";
+  if (!target) {
+    return NextResponse.json({ error: "Choose a community to import into." }, { status: 400 });
   }
 
-  const { rows, communityId } = await request.json();
-  const admin = createAdminClient();
-
-  const result = { created: 0, updated: 0, skipped: 0, errors: [] as { row: number; email: string; reason: string }[] };
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const email = row.email?.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      result.errors.push({ row: row._rowIndex ?? i + 2, email: row.email ?? "", reason: "Invalid email" });
-      result.skipped++;
-      continue;
-    }
-
-    const { data: existing } = await admin.from("fans").select("id, socials").eq("email", email).maybeSingle();
-
-    const existingSocials = (existing?.socials as Record<string, string> | null) ?? {};
-    const newSocials: Record<string, string> = { ...existingSocials };
-    if (row.instagram?.trim()) newSocials.instagram = row.instagram.trim().replace(/^@/, "");
-    if (row.tiktok?.trim()) newSocials.tiktok = row.tiktok.trim().replace(/^@/, "");
-
-    const patch: Record<string, unknown> = { socials: newSocials };
-    if (row.first_name?.trim()) patch.first_name = row.first_name.trim();
-    if (row.phone?.trim()) patch.phone = row.phone.trim();
-    if (row.city?.trim()) patch.city = row.city.trim();
-
-    let fanId: string | null = existing?.id ?? null;
-
-    if (existing) {
-      const { error } = await admin.from("fans").update(patch).eq("id", existing.id);
-      if (error) {
-        result.errors.push({ row: row._rowIndex ?? i + 2, email, reason: error.message });
-        result.skipped++;
-        continue;
-      }
-      result.updated++;
-    } else {
-      let authUserId: string | null = null;
-      const { data: authData, error: authError } = await admin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-      });
-      if (authError) {
-        // User may already exist in auth but not in fans — look them up
-        const { data: userList } = await admin.auth.admin.listUsers();
-        const existingAuthUser = userList?.users?.find((u) => u.email === email);
-        if (existingAuthUser) {
-          authUserId = existingAuthUser.id;
-        } else {
-          result.errors.push({ row: row._rowIndex ?? i + 2, email, reason: authError.message });
-          result.skipped++;
-          continue;
-        }
-      } else {
-        authUserId = authData.user.id;
-      }
-      const { data: inserted, error } = await admin
-        .from("fans")
-        .upsert({ id: authUserId, email, ...patch }, { onConflict: "id" })
-        .select("id")
-        .maybeSingle();
-      if (error) {
-        result.errors.push({ row: row._rowIndex ?? i + 2, email, reason: error.message });
-        result.skipped++;
-        continue;
-      }
-      fanId = inserted?.id ?? null;
-      result.created++;
-    }
-
-    if (communityId && fanId) {
-      await admin.from("fan_community_memberships").upsert(
-        {
-          fan_id: fanId,
-          community_id: communityId,
-          total_points: 0,
-          current_tier: "bronze",
-          status: "active",
-          joined_at: new Date().toISOString(),
-        },
-        { onConflict: "fan_id,community_id", ignoreDuplicates: true },
-      );
-    }
+  const guard = await authorizeAdmin({ communityId: target, minRole: "admin" });
+  if (!guard.ok) {
+    return NextResponse.json(
+      { error: guard.reason === "signed_out" ? "Unauthorized" : "Forbidden" },
+      { status: guardStatus(guard.reason) },
+    );
   }
 
+  if (!Array.isArray(rows)) {
+    return NextResponse.json({ error: "rows must be an array" }, { status: 400 });
+  }
+  if (rows.length > MAX_IMPORT_ROWS_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `Send at most ${MAX_IMPORT_ROWS_PER_REQUEST} rows per request.` },
+      { status: 400 },
+    );
+  }
+
+  const result = await importFanRows(createAdminClient(), rows as ImportRowInput[], target);
   return NextResponse.json(result);
 }

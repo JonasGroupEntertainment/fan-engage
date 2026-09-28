@@ -2,14 +2,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
 import { sendEventReminder, type ReminderWindowEvent } from "@/lib/reminders";
 import { parseSocialLines } from "@/lib/socials/parse";
 
-async function requireAdmin() {
-  const admin = await getAdminUser();
-  if (!admin) throw new Error("Forbidden");
-  return admin;
+const EDIT_ROLE = "admin" as const;
+
+/** Loads the artist an event belongs to, so by-id writes are scoped by the DB row. */
+async function loadEventArtist(eventId: string): Promise<string | null> {
+  const { data } = await createAdminClient()
+    .from("artist_events")
+    .select("artist_slug")
+    .eq("id", eventId)
+    .maybeSingle();
+  return (data?.artist_slug as string | undefined) ?? null;
 }
 
 /**
@@ -19,7 +25,9 @@ async function requireAdmin() {
  * can work without the redirect throwing NEXT_REDIRECT mid-retry.
  */
 export async function createArtistAction(formData: FormData) {
-  await requireAdmin();
+  // Creating a new artist is super-admin only.
+  const guard = await authorizeAdmin({ superAdminOnly: true });
+  if (!guard.ok) return { error: "Only super-admins can create artists." };
   const slug = String(formData.get("slug") ?? "")
     .toLowerCase()
     .trim()
@@ -40,9 +48,9 @@ export async function createArtistAction(formData: FormData) {
 }
 
 export async function updateArtistAction(formData: FormData) {
-  await requireAdmin();
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) return;
+  await assertAdmin({ communityId: slug, minRole: EDIT_ROLE });
   const name = String(formData.get("name") ?? "").trim();
   const tagline = String(formData.get("tagline") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
@@ -97,12 +105,13 @@ export async function updateArtistAction(formData: FormData) {
  * uses useFormSave for retry-on-503 + visible status feedback.
  */
 export async function createEventAction(formData: FormData) {
-  await requireAdmin();
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   if (!artistSlug || !title) {
     return { error: "Title is required." };
   }
+  const guard = await authorizeAdmin({ communityId: artistSlug, minRole: EDIT_ROLE });
+  if (!guard.ok) return { error: "You do not manage this artist." };
   const detail = String(formData.get("detail") ?? "").trim();
   const eventDate = String(formData.get("event_date") ?? "").trim();
   const startsAt = String(formData.get("starts_at") ?? "").trim();
@@ -150,12 +159,15 @@ export async function createEventAction(formData: FormData) {
  *    "premium" toggle.
  */
 export async function updateEventAction(formData: FormData) {
-  await requireAdmin();
   const eventId = String(formData.get("event_id") ?? "").trim();
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   if (!eventId || !artistSlug) {
     return { error: "Missing event_id or artist_slug." };
   }
+  // The update below also filters on artist_slug, so the event must belong
+  // to the artist the caller is authorized for.
+  const guard = await authorizeAdmin({ communityId: artistSlug, minRole: EDIT_ROLE });
+  if (!guard.ok) return { error: "You do not manage this artist." };
   const title = String(formData.get("title") ?? "").trim();
   if (!title) {
     return { error: "Title is required." };
@@ -197,7 +209,6 @@ export async function updateEventAction(formData: FormData) {
 }
 
 export async function sendReminderNowAction(formData: FormData) {
-  await requireAdmin();
   const eventId = String(formData.get("event_id") ?? "").trim();
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   if (!eventId || !artistSlug) return;
@@ -211,6 +222,7 @@ export async function sendReminderNowAction(formData: FormData) {
     supa.from("artists").select("name").eq("slug", artistSlug).maybeSingle(),
   ]);
   if (!event) return;
+  await assertAdmin({ communityId: event.artist_slug as string, minRole: EDIT_ROLE });
   const reminderEvent: ReminderWindowEvent = {
     id: event.id as string,
     artist_slug: event.artist_slug as string,
@@ -227,12 +239,13 @@ export async function sendReminderNowAction(formData: FormData) {
 }
 
 export async function deleteEventAction(formData: FormData) {
-  await requireAdmin();
   const id = String(formData.get("event_id") ?? "");
-  const artistSlug = String(formData.get("artist_slug") ?? "");
   if (!id) return;
+  const artistSlug = await loadEventArtist(id);
+  if (!artistSlug) return;
+  await assertAdmin({ communityId: artistSlug, minRole: EDIT_ROLE });
   const supa = createAdminClient();
-  await supa.from("artist_events").delete().eq("id", id);
+  await supa.from("artist_events").delete().eq("id", id).eq("artist_slug", artistSlug);
   revalidatePath(`/admin/artists/${artistSlug}`);
   revalidatePath(`/artists/${artistSlug}`);
 }

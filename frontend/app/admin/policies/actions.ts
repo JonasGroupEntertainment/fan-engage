@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { assertAdmin } from "@/lib/admin-guard";
 
+/** Legal policy pages are site-wide, so only super-admins may edit them. */
 async function requireAdmin() {
-  const admin = await getAdminUser();
-  if (!admin) throw new Error("Forbidden");
-  return admin;
+  const ctx = await assertAdmin({ superAdminOnly: true });
+  return ctx.user;
 }
 
 export async function updatePolicyAction(formData: FormData) {

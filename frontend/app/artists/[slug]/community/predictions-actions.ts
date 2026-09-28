@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminContext, getAdminUser } from "@/lib/admin";
+import { getAdminContext } from "@/lib/admin";
+import { communityAdminUser } from "@/lib/admin-guard";
 import { indexRowAsync } from "@/lib/embeddings";
 import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
@@ -30,10 +31,10 @@ function normalizeVisibility(raw: FormDataEntryValue | null): Visibility {
  *   points_for_correct (integer; default 50)
  */
 export async function createPredictionAction(formData: FormData) {
-  const adminUser = await getAdminUser();
+  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
+  const adminUser = await communityAdminUser(artistSlug, "editor");
   if (!adminUser) return { error: "admin_required" };
 
-  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const visibility = normalizeVisibility(formData.get("visibility"));
@@ -116,7 +117,7 @@ export async function votePredictionAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const adminUser = await getAdminUser();
+  const adminUser = await communityAdminUser(artistSlug, "viewer");
   if (!adminUser) {
     const gate = await requirePremiumFeature(user.id, artistSlug, "community_react");
     if (!gate.allowed) redirect(premiumPath(artistSlug));

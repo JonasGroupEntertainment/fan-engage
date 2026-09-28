@@ -73,7 +73,7 @@ export default function FanImportPage() {
   }
 
   async function handleImport() {
-    if (!preview.length) return;
+    if (!preview.length || !communityId) return;
     setStatus("importing");
     try {
       const CHUNK = 25;
@@ -83,7 +83,7 @@ export default function FanImportPage() {
         const res = await fetch("/api/admin/import-fans", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: chunk, communityId: communityId || undefined }),
+          body: JSON.stringify({ rows: chunk, communityId }),
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
@@ -108,8 +108,9 @@ export default function FanImportPage() {
         </Link>
         <h1 className="mt-3 text-2xl font-semibold text-white">Import fans from CSV</h1>
         <p className="mt-1 text-sm text-white/60">
-          Upload a CSV with fan email addresses. Existing fans are updated (never duplicated);
-          new rows are created. Social handles strip leading @.
+          Upload a CSV with fan email addresses. Existing fans only get blank fields filled in
+          (never overwritten or duplicated); new rows are created. You can only import into a
+          community you administer. Social handles strip leading @.
         </p>
       </header>
 
@@ -134,7 +135,7 @@ export default function FanImportPage() {
           onChange={(e) => setCommunityId(e.target.value)}
           className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
         >
-          <option value="">— No community assignment —</option>
+          <option value="">Choose a community (required)</option>
           {COMMUNITIES.map((c) => (
             <option key={c.slug} value={c.slug}>{c.label}</option>
           ))}
@@ -217,7 +218,7 @@ export default function FanImportPage() {
 
           <button
             onClick={handleImport}
-            disabled={status === "importing"}
+            disabled={status === "importing" || !communityId}
             className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
           >
             {status === "importing" ? `Importing ${preview.length} fans…` : `Import ${preview.length} fans`}

@@ -2,21 +2,30 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import { awardPoints } from "@/lib/points/award";
 import { createNotification } from "@/lib/data/notifications";
 
 const WINNER_BONUS_POINTS = 200;
 
 export async function pickWinnerAction(formData: FormData) {
-  const admin = await getAdminUser();
-  if (!admin) return;
   const postId = String(formData.get("post_id") ?? "");
   const entryId = String(formData.get("entry_id") ?? "");
   const fanId = String(formData.get("fan_id") ?? "");
   if (!postId || !entryId || !fanId) return;
 
   const supa = createAdminClient();
+
+  // Winners award points in the post's community, so the caller must
+  // administer the community that owns the challenge post.
+  const { data: owner } = await supa
+    .from("community_posts")
+    .select("artist_slug")
+    .eq("id", postId)
+    .maybeSingle();
+  if (!owner?.artist_slug) return;
+  const guard = await authorizeAdmin({ communityId: owner.artist_slug as string, minRole: "admin" });
+  if (!guard.ok) return;
 
   // Record the winner via campaign_items (item_kind='challenge_winner'), guard against dupes.
   const { data: existing } = await supa
