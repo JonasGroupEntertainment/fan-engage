@@ -15,6 +15,33 @@ import {
  */
 export const PRIVACY_COUNSEL_EFFECTIVE_DATE = "2026-09-24";
 
+/** Mailchimp US SMS review sentence. Privacy phone/SMS section only. */
+export const SMS_PRIVACY_NO_SHARE_SENTENCE =
+  "We do not sell, rent, or share mobile phone numbers or SMS opt-in data and consent with third parties or affiliates for their marketing or promotional purposes.";
+
+const TEXT_MESSAGE_BULLET =
+  "To provide you with communications when you sign up for our text messages;";
+
+/**
+ * The stored policy wraps "messages;" onto the next line, and the policy
+ * renderer only keeps lines that start a list item, so /privacy shows a
+ * sentence that stops at "text". Join that bullet onto one line and add
+ * the no-share sentence once. Terms are never passed through here.
+ */
+export function applyPrivacySmsDisclosure(content: string): string {
+  let next = content.replace(
+    /To provide you with communications when you sign up for our text\s+messages;/g,
+    TEXT_MESSAGE_BULLET,
+  );
+  if (next.includes(TEXT_MESSAGE_BULLET) && !next.includes(SMS_PRIVACY_NO_SHARE_SENTENCE)) {
+    next = next.replace(
+      TEXT_MESSAGE_BULLET,
+      `${TEXT_MESSAGE_BULLET}\n\n${SMS_PRIVACY_NO_SHARE_SENTENCE}`,
+    );
+  }
+  return next;
+}
+
 const PRIOR_PRIVACY_EFFECTIVE_DATE = "2026-06-19";
 
 const PROCESSING_FROM =
@@ -70,6 +97,7 @@ export function applyPrivacyCounselScrub(content: string): string {
   next = replaceFlexible(next, LAST_UPDATED_FROM, LAST_UPDATED_TO);
   next = alignOfficialContactEmails(next);
   next = fillEmptyPrivacyContact(next);
+  next = applyPrivacySmsDisclosure(next);
   return next;
 }
 

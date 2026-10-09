@@ -9,6 +9,11 @@ import { normalizePhoneE164 } from "@/lib/phone";
 import { setPreferences } from "@/lib/notifications/preferences";
 import { smsEnabledFromOnboarding } from "@/lib/sms-send-gate";
 import { onboardConsentUpdates } from "@/lib/consent";
+import {
+  channelOptInTimestampPatch,
+  isMissingOptInTimestampColumn,
+  omitOptInTimestamps,
+} from "@/lib/channel-opt-in";
 
 export const runtime = "nodejs";
 
@@ -100,19 +105,21 @@ export async function POST(request: NextRequest) {
     // — instead we merge it into the socials jsonb column so social
     // identifiers stay in their own field. The URL slug column,
     // fans.profile_slug, is owned by the BEFORE INSERT trigger.
+    const { data: existingFan } = await supabase
+      .from("fans")
+      .select("socials, sms_opted_in, email_opted_in")
+      .eq("id", user.id)
+      .maybeSingle();
+
     let socialsMerge: Record<string, unknown> | undefined = undefined;
     if (typeof payload.handle === "string" && payload.handle.trim()) {
-      const { data: existing } = await supabase
-        .from("fans")
-        .select("socials")
-        .eq("id", user.id)
-        .maybeSingle();
       socialsMerge = {
-        ...((existing?.socials as Record<string, unknown> | null) ?? {}),
+        ...((existingFan?.socials as Record<string, unknown> | null) ?? {}),
         instagram_or_tiktok: payload.handle.trim(),
       };
     }
 
+    const nextEmailOptedIn = Boolean(payload.emailOptedIn);
     const updates: Record<string, unknown> = {
       first_name: payload.firstName ?? null,
       last_name: payload.lastName ?? null,
@@ -121,19 +128,41 @@ export async function POST(request: NextRequest) {
       music_outlet: payload.musicOutlet ?? null,
       interest: payload.interest ?? null,
       sms_opted_in: consent.smsOptedIn,
-      email_opted_in: Boolean(payload.emailOptedIn),
+      email_opted_in: nextEmailOptedIn,
+      // Stamp the channel time only on a false → true flip. Opt-out leaves
+      // the previous timestamp in place (see lib/channel-opt-in.ts).
+      ...channelOptInTimestampPatch(
+        {
+          smsOptedIn: existingFan?.sms_opted_in === true,
+          emailOptedIn: existingFan?.email_opted_in === true,
+        },
+        { smsOptedIn: consent.smsOptedIn, emailOptedIn: nextEmailOptedIn },
+      ),
       // Only written when the fan ticked the Terms box this time, so a
       // re-submit never blanks or back-dates an earlier consent.
       ...(consent.consent ?? {}),
     };
     if (socialsMerge !== undefined) updates.socials = socialsMerge;
 
-    const { data: fan, error: updateErr } = await supabase
+    let { data: fan, error: updateErr } = await supabase
       .from("fans")
       .update(updates)
       .eq("id", user.id)
       .select("id, first_name, current_tier, total_points, profile_slug")
       .single();
+
+    // 0068 is not applied yet: the timestamp columns are unknown. Save the
+    // flags that already exist so onboarding still completes.
+    if (updateErr && isMissingOptInTimestampColumn(updateErr)) {
+      const retry = await supabase
+        .from("fans")
+        .update(omitOptInTimestamps(updates))
+        .eq("id", user.id)
+        .select("id, first_name, current_tier, total_points, profile_slug")
+        .single();
+      fan = retry.data;
+      updateErr = retry.error;
+    }
 
     if (updateErr) {
       console.error("onboard: failed to update fan", updateErr);

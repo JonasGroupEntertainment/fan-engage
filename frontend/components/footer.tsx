@@ -15,6 +15,7 @@ export default function Footer() {
           <Link href="/legal" className="hover:text-white">Legal</Link>
           <Link href="/terms" className="hover:text-white">Terms</Link>
           <Link href="/privacy" className="hover:text-white">Privacy</Link>
+          <Link href="/sms" className="hover:text-white">Text alerts</Link>
           <Link href="/cookie-policy" className="hover:text-white">Cookies</Link>
           <Link href="/dmca" className="hover:text-white">DMCA</Link>
           <Link href="/unsubscribe" className="hover:text-white">Unsubscribe</Link>

@@ -32,9 +32,22 @@ export default async function OnboardingPage() {
   }
 
   const email = user?.email ?? "";
+  let initialPhone = "";
+  let initialSmsConsent = false;
+  if (user) {
+    const { data: fan } = await supabase
+      .from("fans")
+      .select("phone, sms_opted_in")
+      .eq("id", user.id)
+      .maybeSingle();
+    initialPhone = typeof fan?.phone === "string" ? fan.phone : "";
+    initialSmsConsent = fan?.sms_opted_in === true;
+  }
   return (
     <OnboardingWizard
       initialEmail={email}
+      initialPhone={initialPhone}
+      initialSmsConsent={initialSmsConsent}
       sessionConfirmed={!bounce}
     />
   );
