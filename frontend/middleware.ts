@@ -6,6 +6,7 @@ import { guestSignupHref, isOnboardingPath } from "@/lib/guest-signup";
 import { legacyGuestRedirect } from "@/lib/legacy-path-redirects";
 import { isSignOutPath } from "@/lib/auth-signout";
 import { shouldRedirectGuestFromOnboarding } from "@/lib/session-presence";
+import { guestAdminPolicyRedirect } from "@/lib/admin-policy-redirect";
 
 /**
  * Routes a signed-in user must be able to reach.
@@ -139,6 +140,18 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+
+  // Mailchimp links /admin/policies/terms and /privacy. Logged-out
+  // reviewers are not admins — send them to the public policy (307).
+  // A signed-in user falls through; the admin layout still renders the
+  // editor for admins and sends non-admins to the same public page.
+  // Query string is dropped. No other /admin path is affected.
+  if (!user) {
+    const policyTarget = guestAdminPolicyRedirect(pathname);
+    if (policyTarget) {
+      return NextResponse.redirect(new URL(policyTarget, request.url), 307);
+    }
+  }
 
   if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);
