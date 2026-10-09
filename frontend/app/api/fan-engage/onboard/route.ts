@@ -295,8 +295,7 @@ export async function POST(request: NextRequest) {
           console.warn("onboard: claim_founding_fan_status failed", foundingErr);
         } else if (
           typeof foundingNumber === "number" &&
-          foundingNumber >= 1 &&
-          foundingNumber <= 100
+          foundingNumber >= 1
         ) {
           const { error: awardErr } = await admin.rpc("award_community_badge", {
             p_fan_id: user.id,
