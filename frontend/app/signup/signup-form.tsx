@@ -28,6 +28,10 @@ import {
 } from "@/lib/signup-outcome";
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
 import { CONSENT_VERSION } from "@/lib/consent";
+import { persistSignupChannelOptIn } from "@/lib/channel-opt-in";
+import { publicSmsOptIn, type PublicSmsOptIn } from "@/lib/sms-public-opt-in";
+import { PHONE_INPUT_PATTERN } from "@/lib/phone";
+import { SmsConsentCopy } from "@/components/sms-consent-copy";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
@@ -90,6 +94,9 @@ export function SignupForm({
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [smsConsent, setSmsConsent] = useState(false);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -192,9 +199,11 @@ export function SignupForm({
     // generic "Unable to create account."
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
+    const sms = publicSmsOptIn(smsConsent, phone);
     setEmailError(eErr);
     setPasswordError(pErr);
-    if (eErr || pErr) {
+    setPhoneError(sms.error);
+    if (eErr || pErr || sms.error) {
       setStatus("error");
       setMessage("");
       return;
@@ -210,10 +219,10 @@ export function SignupForm({
     setMessage("");
     const ok = await ensureCaptcha();
     if (!ok) return;
-    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined);
+    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined, sms);
   }
 
-  async function createAccount(consentVersion?: string) {
+  async function createAccount(consentVersion: string | undefined, sms: PublicSmsOptIn) {
     setStatus("loading");
     setMessage("");
 
@@ -231,6 +240,8 @@ export function SignupForm({
           turnstileConfigured,
           turnstileToken,
           consentVersion,
+          phone: sms.phone,
+          smsOptedIn: sms.smsOptedIn,
         }),
       });
       resetChallenge();
@@ -264,6 +275,8 @@ export function SignupForm({
         setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
         return;
       }
+
+      if (data.user?.id) await persistSignupChannelOptIn(supabase, data.user.id, sms);
 
       router.push(onboardingHref);
       router.refresh();
@@ -461,6 +474,56 @@ export function SignupForm({
               );
             })()}
           </div>
+
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wide text-white/60">
+              Mobile phone <span className="normal-case tracking-normal text-white/40">(optional)</span>
+            </span>
+            <input
+              type="tel"
+              name="phone"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              pattern={PHONE_INPUT_PATTERN}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (phoneError) setPhoneError(publicSmsOptIn(smsConsent, e.target.value).error);
+              }}
+              onBlur={() => setPhoneError(publicSmsOptIn(smsConsent, phone).error)}
+              aria-invalid={!!phoneError}
+              className={
+                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none " +
+                (phoneError
+                  ? "border-rose-500/60 focus:border-rose-400"
+                  : "border-white/10 focus:border-white/40")
+              }
+              placeholder="+1 (615) 555-0123"
+            />
+            {phoneError ? (
+              <span className="text-xs text-rose-300">{phoneError}</span>
+            ) : (
+              <span className="text-xs text-white/45">
+                Optional. Leave it blank and you can still create your account.
+              </span>
+            )}
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+            <input
+              type="checkbox"
+              name="sms-consent"
+              checked={smsConsent}
+              onChange={(e) => setSmsConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+            />
+            <SmsConsentCopy linkClassName="text-white/85 underline underline-offset-4 hover:text-white" />
+          </label>
+          {smsConsent && !phone.trim() && (
+            <p className="text-xs text-white/45">
+              Add a mobile number if you want texts. The box does not opt you in without one, and you can still create your account.
+            </p>
+          )}
 
           {turnstileConfigured && (
             <div className="space-y-2">

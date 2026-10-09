@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAdminContext } from "@/lib/admin";
+import { guestAdminPolicyRedirect } from "@/lib/admin-policy-redirect";
 import { getCommunity } from "@/lib/community";
 import { countPendingRedemptions } from "@/lib/data/rewards";
 
@@ -32,7 +34,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const ctx = await getAdminContext();
-  if (!ctx) redirect("/login?next=/admin");
+  if (!ctx) {
+    const pathname = (await headers()).get("x-pathname") ?? "";
+    const policyTarget = guestAdminPolicyRedirect(pathname);
+    if (policyTarget) redirect(policyTarget);
+    redirect("/login?next=/admin");
+  }
 
   // If somehow no community resolved (no communities in DB at all),
   // the admin can still use the switcher to understand the state.

@@ -40,6 +40,10 @@ export interface FanProfile {
   current_tier: TierSlug;
   sms_opted_in: boolean;
   email_opted_in: boolean;
+  /** Last false → true SMS consent time. Null until that transition is recorded. */
+  sms_opted_in_at?: string | null;
+  /** Last false → true email consent time. Null until that transition is recorded. */
+  email_opted_in_at?: string | null;
   avatar_url: string | null;
   monthly_credit_cents?: number | null;
 }

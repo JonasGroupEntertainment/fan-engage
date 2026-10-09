@@ -37,6 +37,29 @@ describe("buildSignupAuthOptions", () => {
     );
   });
 
+  it("stores an E.164 phone and SMS consent only when the box counts", () => {
+    const withSms = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      phone: "+16155550123",
+      smsOptedIn: true,
+    });
+    assert.deepEqual(withSms.data, {
+      phone: "+16155550123",
+      sms_opted_in: "true",
+    });
+
+    const phoneOnly = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      phone: "+16155550123",
+      smsOptedIn: false,
+    });
+    assert.deepEqual(phoneOnly.data, { phone: "+16155550123" });
+  });
+
   it("omits captcha and consent metadata when those features are absent", () => {
     assert.deepEqual(
       buildSignupAuthOptions({
