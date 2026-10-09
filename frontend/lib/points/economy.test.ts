@@ -45,10 +45,10 @@ describe("founding claim remaining is cap minus claimed", () => {
     assert.equal(over.closed, true);
   });
 
-  it("counts only founding numbers 1–100", () => {
+  it("counts awarded founding numbers and skips empty or non-positive ones", () => {
     assert.equal(
       countFoundingFanNumbers([1, 50, 99, 100, null, 0, 101, undefined, -4]),
-      4,
+      5,
     );
     assert.equal(countFoundingFanNumbers([]), 0);
     assert.equal(countFoundingFanNumbers([50]), 1);
@@ -56,11 +56,12 @@ describe("founding claim remaining is cap minus claimed", () => {
 });
 
 describe("Founding Fan 1.5× writer contract", () => {
-  it("applies 1.5× for founding numbers 1–100 and not for 101", () => {
+  it("applies 1.5× for any awarded founding number, including above 100", () => {
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 1 }), 15);
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 100 }), 15);
-    assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 101 }), 10);
+    assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 101 }), 15);
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: null }), 10);
+    assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 0 }), 10);
     assert.equal(applyFoundingMultiplier(100, { foundingFanNumber: 3 }), 150);
   });
 
@@ -83,6 +84,14 @@ describe("Founding Fan 1.5× writer contract", () => {
     assert.match(onboardTs, /claim_founding_fan_status/);
     assert.match(onboardTs, /resolveOnboardCommunityId/);
     assert.match(migrationSql, /create or replace function public\.claim_founding_fan_status/);
+    const internalSql = readRepo(
+      "../../../supabase/migrations/0071_internal_founding_fan_flag.sql",
+    );
+    assert.match(internalSql, /founding_fan_number >= 1/);
+    assert.doesNotMatch(internalSql, /founding_fan_number <= 100/);
+    assert.match(internalSql, /coalesce\(f\.is_internal, false\) = false/);
+    assert.match(internalSql, /max\(founding_fan_number\)/);
+    assert.doesNotMatch(internalSql, /v_taken \+ 1/);
     assert.match(migrationSql, /perform public\.try_award_comment_points\(new\.id\)/);
     assert.match(migrationSql, /perform public\.try_award_poll_points\(new\.post_id, new\.fan_id\)/);
     const claimAt = onboardTs.indexOf("claim_founding_fan_status");

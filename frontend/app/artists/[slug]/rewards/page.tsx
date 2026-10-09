@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { isUnpublishedArtistSlug } from "@/lib/artists";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getArtistFromDb } from "@/lib/data/artists";
@@ -47,6 +48,7 @@ export default async function RewardsPage({
   searchParams: Promise<{ dismiss_rec?: string }>;
 }) {
   const { slug } = await params;
+  if (isUnpublishedArtistSlug(slug)) notFound();
   const sp = await searchParams;
   const dismissRec = sp?.dismiss_rec === "1";
   const supabase = await createClient();

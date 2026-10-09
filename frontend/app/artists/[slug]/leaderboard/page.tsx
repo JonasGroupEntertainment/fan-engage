@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { isUnpublishedArtistSlug } from "@/lib/artists";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
@@ -25,6 +26,7 @@ export default async function LeaderboardPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  if (isUnpublishedArtistSlug(slug)) notFound();
   const supabase = await createClient();
   const {
     data: { user },

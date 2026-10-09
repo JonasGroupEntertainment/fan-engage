@@ -118,74 +118,42 @@ export default function ForArtistsPage() {
         </div>
       </section>
 
-      {/* ─── Featured artists (real proof) ────────────────────────────────── */}
+      {/* ─── Live fan experience (RaeLynn only until other hubs are ready) ─ */}
       <section className="space-y-6">
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.3em] text-white/60">
-            Featured artists
+            Live fan experience
           </p>
           <h2
             className="mt-2 text-3xl font-semibold md:text-4xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Real fan experiences, real artists.
+            See a live fan experience.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-white/70">
-            A handful of the artists who built their fan experience on Fan Engage.
-            Click through to see what their hub actually looks like.
+            RaeLynn&apos;s fan experience is live on Fan Engage. Click through
+            to see what the hub actually looks like.
           </p>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              slug: "raelynn",
-              name: "RaeLynn",
-              tagline: "Country, heart-first. On tour with Luke Bryan.",
-              accent: "#fde68a",
-            },
-            {
-              slug: "danger-twins",
-              name: "Danger Twins",
-              tagline: "Pop duo. High-energy fans, high-stakes drops.",
-              accent: "#f0abfc",
-            },
-            {
-              slug: "dan-marshall",
-              name: "Dan Marshall",
-              tagline: "Indie singer-songwriter. Founders-only EP.",
-              accent: "#a78bfa",
-            },
-            {
-              slug: "hunter-hawkins",
-              name: "Hunter Hawkins",
-              tagline: "Country newcomer. Tour route built around the fans.",
-              accent: "#7dd3fc",
-            },
-          ].map((a) => (
-            <Link
-              key={a.slug}
-              href={`/artists/${a.slug}`}
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-white/25 hover:bg-white/5"
-            >
-              <div
-                aria-hidden
-                className="absolute inset-x-0 top-0 h-1"
-                style={{ backgroundColor: a.accent }}
-              />
-              <p className="mt-2 text-base font-semibold">{a.name}</p>
-              <p className="mt-2 text-xs text-white/60 line-clamp-3">
-                {a.tagline}
-              </p>
-              <p className="mt-4 text-xs text-white/55 transition group-hover:text-white/85">
-                See their fan experience →
-              </p>
-            </Link>
-          ))}
+        <div className="mx-auto max-w-sm">
+          <Link
+            href="/artists/raelynn"
+            className="group relative block overflow-hidden rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-white/25 hover:bg-white/5"
+          >
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-1"
+              style={{ backgroundColor: "#fde68a" }}
+            />
+            <p className="mt-2 text-base font-semibold">RaeLynn</p>
+            <p className="mt-2 text-xs text-white/60 line-clamp-3">
+              Country, heart-first.
+            </p>
+            <p className="mt-4 text-xs text-white/55 transition group-hover:text-white/85">
+              See this fan experience →
+            </p>
+          </Link>
         </div>
-        {/* TODO(kevin): when we have real testimonial quotes from these
-            artists or their managers, replace the tagline strings above
-            with pull-quotes. Keep slugs + names so the cards still link
-            through to /artists/<slug>. */}
       </section>
 
       {/* ─── What artists can launch ───────────────────────────────────────── */}
@@ -209,7 +177,7 @@ export default function ForArtistsPage() {
             },
             {
               title: "AI-drafted comment replies",
-              body: "Your fans comment, you reply at scale. Claude drafts your tone-perfect response — keep them, edit them, ignore them.",
+              body: "Your fans comment, you reply at scale. AI drafts a reply in your tone — keep them, edit them, ignore them.",
             },
             {
               title: "Smart event matching",

@@ -18,17 +18,16 @@ const founderSlotsUiSrc = readRepo("../../app/premium/founder-slots-counter.tsx"
 const foundersWallSrc = readRepo("../../app/artists/[slug]/founders/page.tsx");
 
 describe("guest founding counters share one source", () => {
-  it("helper query is founding_fan_number 1 through FOUNDING_FAN_CAP", () => {
-    const queryFn = helperSrc.slice(
-      helperSrc.indexOf("export async function getFoundingFanClaimState"),
-    );
+  it("helper query counts awarded founding numbers and skips internal fans", () => {
     assert.match(helperSrc, /foundingClaimStateFromCount/);
-    assert.match(queryFn, /founding_fan_number/);
-    assert.match(queryFn, /gte\("founding_fan_number"/);
-    assert.match(queryFn, /lte\("founding_fan_number"/);
+    assert.match(helperSrc, /gte\("founding_fan_number", 1\)/);
+    assert.doesNotMatch(helperSrc, /lte\("founding_fan_number"/);
+    assert.match(helperSrc, /isHiddenFromPublicFoundingRoster/);
+    assert.match(helperSrc, /is_internal/);
     assert.match(helperSrc, /listFoundingFans/);
-    assert.doesNotMatch(queryFn, /is_founder/);
-    assert.doesNotMatch(queryFn, /founder_cap/);
+    assert.match(helperSrc, /loadFoundingMemberships/);
+    assert.doesNotMatch(helperSrc, /is_founder/);
+    assert.doesNotMatch(helperSrc, /founder_cap/);
   });
 
   it("homepage, artist campaign, and /premium read getFoundingFanClaimState", () => {

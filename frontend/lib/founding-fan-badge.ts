@@ -10,8 +10,10 @@ export function isFoundingFanBadgeSlug(slug: string): slug is FoundingFanBadgeSl
 }
 
 /**
- * Founding Fan is a free first-100 join badge. Unlock from
- * `founding_fan_number` 1–100 — never from paid Premium.
+ * Founding Fan is a free join badge for the first 100 public fans.
+ * Unlock from any awarded `founding_fan_number` — never from paid Premium.
+ * Internal accounts can hold low numbers without consuming a spot, so a
+ * later public fan may be numbered above 100.
  */
 export function foundingFanBadgeEarned(opts: {
   slug: string;

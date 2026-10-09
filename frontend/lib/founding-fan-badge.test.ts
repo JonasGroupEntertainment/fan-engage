@@ -47,7 +47,7 @@ describe("Founding Fan free badge (first 100, not Premium)", () => {
     );
   });
 
-  it("stays locked without a first-100 number and is not Premium-gated", () => {
+  it("unlocks numbers above 100 and stays locked without an awarded number", () => {
     assert.equal(
       foundingFanBadgeEarned({
         slug: "founding-fan",
@@ -60,9 +60,17 @@ describe("Founding Fan free badge (first 100, not Premium)", () => {
       foundingFanBadgeEarned({
         slug: "founding-fan",
         alreadyEarned: false,
-        foundingFanNumber: 101,
+        foundingFanNumber: 0,
       }),
       false,
+    );
+    assert.equal(
+      foundingFanBadgeEarned({
+        slug: "founding-fan",
+        alreadyEarned: false,
+        foundingFanNumber: 101,
+      }),
+      true,
     );
     assert.equal(
       foundingFanBadgeEarned({

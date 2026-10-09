@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAdminContext } from "@/lib/admin";
-import { listArtists } from "@/lib/artists";
+import { listArtistRecords } from "@/lib/artists";
 import { seedCommunityAction, getArtistSeedStatus } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export default async function CommunitySeedPage() {
     );
   }
 
-  const artists = listArtists();
+  const artists = listArtistRecords();
   const slugs = artists.map((a) => a.slug);
   const postCounts = await getArtistSeedStatus(slugs);
 

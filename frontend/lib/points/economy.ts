@@ -24,8 +24,14 @@ export type LedgerEntry = {
   sourceRef?: string | null;
 };
 
+/**
+ * An awarded founding number. The public cap of 100 is a count of fans
+ * who are not internal, enforced when the number is issued. Internal
+ * accounts keep their original numbers, so a later public fan can be
+ * above 100 and still be a Founding Fan. 0 and empty are not.
+ */
 export function isFoundingFanNumber(n: number | null | undefined): boolean {
-  return typeof n === "number" && n >= 1 && n <= FOUNDING_FAN_CAP;
+  return typeof n === "number" && n >= 1;
 }
 
 export type FoundingFanClaimState = {
@@ -49,7 +55,7 @@ export function foundingClaimStateFromCount(
   };
 }
 
-/** Same 1–100 filter as `isFoundingFanNumber` / the points writer. */
+/** Same awarded-number filter as `isFoundingFanNumber` / the points writer. */
 export function countFoundingFanNumbers(
   numbers: Array<number | null | undefined>,
 ): number {
