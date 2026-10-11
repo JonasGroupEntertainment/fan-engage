@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ARTISTS as FALLBACK_ARTISTS, type Artist } from "@/lib/artists";
+import {
+  ARTISTS as FALLBACK_ARTISTS,
+  isUnpublishedArtistSlug,
+  listFallbackArtists,
+  type Artist,
+} from "@/lib/artists";
 
 export type { Artist } from "@/lib/artists";
 
@@ -91,9 +96,11 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
  * — so dev previews without DB creds still render.
  */
 export async function getArtistFromDb(slug: string): Promise<Artist | null> {
+  const normalized = slug.toLowerCase();
+  // Unpublished hubs 404. Do not fall through to the placeholder bios.
+  if (isUnpublishedArtistSlug(normalized)) return null;
   try {
     const supabase = await createClient();
-    const normalized = slug.toLowerCase();
 
     const [{ data: artist, error: aErr }, { data: events, error: eErr }] = await Promise.all([
       supabase
@@ -115,7 +122,7 @@ export async function getArtistFromDb(slug: string): Promise<Artist | null> {
     }
     return rowToArtist(artist as ArtistRow, (events ?? []) as ArtistEvent[]);
   } catch {
-    return FALLBACK_ARTISTS[slug.toLowerCase()] ?? null;
+    return FALLBACK_ARTISTS[normalized] ?? null;
   }
 }
 
@@ -129,7 +136,7 @@ export async function listArtistsFromDb(): Promise<Artist[]> {
       .eq("active", true)
       .order("sort_order");
     if (error || !artists || artists.length === 0) {
-      return Object.values(FALLBACK_ARTISTS);
+      return listFallbackArtists();
     }
 
     const slugs = artists.map((a) => a.slug as string);
@@ -147,11 +154,11 @@ export async function listArtistsFromDb(): Promise<Artist[]> {
       byArtist.set(e.artist_slug as string, arr);
     }
 
-    return (artists as ArtistRow[]).map((a) =>
-      rowToArtist(a, byArtist.get(a.slug) ?? []),
-    );
+    return (artists as ArtistRow[])
+      .filter((a) => !isUnpublishedArtistSlug(a.slug))
+      .map((a) => rowToArtist(a, byArtist.get(a.slug) ?? []));
   } catch {
-    return Object.values(FALLBACK_ARTISTS);
+    return listFallbackArtists();
   }
 }
 

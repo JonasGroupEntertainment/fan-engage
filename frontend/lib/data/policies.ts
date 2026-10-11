@@ -9,6 +9,11 @@ import {
   applyPrivacyCounselScrub,
   privacyCounselEffectiveDate,
 } from "@/lib/legal/scrub-privacy-policy";
+import {
+  applyCancellationFoundingStatus,
+  CANCELLATION_REFUND_EFFECTIVE_DATE,
+  CANCELLATION_REFUND_UPDATED_AT,
+} from "@/lib/legal/cancellation-refund-founding-status";
 
 export type PolicySlug =
   | "terms"
@@ -55,13 +60,20 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
   contentMd = applyTermsColoradoEntityFacts(policy.slug, contentMd);
   contentMd = applyTermsSupportContact(policy.slug, contentMd);
   let effectiveDate = policy.effective_date;
+  let updatedAt = policy.updated_at;
   if (policy.slug === "privacy") {
     contentMd = applyPrivacyCounselScrub(contentMd);
     effectiveDate = privacyCounselEffectiveDate(effectiveDate);
+  }
+  if (policy.slug === "cancellation_refund") {
+    contentMd = applyCancellationFoundingStatus(contentMd);
+    effectiveDate = CANCELLATION_REFUND_EFFECTIVE_DATE;
+    updatedAt = CANCELLATION_REFUND_UPDATED_AT;
   }
   return {
     ...policy,
     content_md: contentMd,
     effective_date: effectiveDate,
+    updated_at: updatedAt,
   };
 }

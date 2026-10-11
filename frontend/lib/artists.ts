@@ -175,12 +175,52 @@ export const ARTISTS: Record<string, Artist> = {
   },
 };
 
+/**
+ * Public hubs that must not render until bios and imagery are ready.
+ * Hunter Hawkins stays unpublished through Q1 2027.
+ *
+ * The database rows already have `artists.active = false`. The hardcoded
+ * map below was still served as a fallback, which kept the placeholder
+ * pages live. These slugs 404 instead of redirecting to /artists: the
+ * pages are unpublished, not moved, and the directory should not present
+ * them as live fan experiences.
+ *
+ * To bring one back: remove its slug here and set `artists.active = true`
+ * once the hub has final copy and imagery. Leaving the slug in this list
+ * keeps the page down even if `active` is flipped early.
+ */
+export const UNPUBLISHED_ARTIST_SLUGS = [
+  "danger-twins",
+  "dan-marshall",
+  "hunter-hawkins",
+] as const;
+
+export function isUnpublishedArtistSlug(slug: string): boolean {
+  return (UNPUBLISHED_ARTIST_SLUGS as readonly string[]).includes(
+    slug.toLowerCase(),
+  );
+}
+
 export function getArtist(slug: string): Artist | null {
-  return ARTISTS[slug.toLowerCase()] ?? null;
+  const normalized = slug.toLowerCase();
+  if (isUnpublishedArtistSlug(normalized)) return null;
+  return ARTISTS[normalized] ?? null;
+}
+
+/** Every hardcoded artist record, including unpublished hubs. Admin seed only. */
+export function listArtistRecords(): Artist[] {
+  return Object.values(ARTISTS);
 }
 
 export function listArtists(): Artist[] {
   // amy-stroup is an inactive invite/community pool only — keep it out of
   // this hardcoded map so /artists/amy-stroup is not generated or listed.
-  return Object.values(ARTISTS);
+  // Unpublished slugs stay in ARTISTS for admin seed copy, but public
+  // static params and lookups must not surface the placeholder hubs.
+  return listArtistRecords().filter((a) => !isUnpublishedArtistSlug(a.slug));
+}
+
+/** Hardcoded hubs used when the database is unreachable. Never includes unpublished slugs. */
+export function listFallbackArtists(): Artist[] {
+  return listArtists();
 }
