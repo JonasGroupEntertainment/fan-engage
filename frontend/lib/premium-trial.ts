@@ -40,3 +40,17 @@ export function isTrialConversion(
 export function invoiceGrantsCredit(amountPaidCents: number | null | undefined): boolean {
   return typeof amountPaidCents === "number" && amountPaidCents > 0;
 }
+
+/**
+ * A fan who checked out at the founder price but did not get a founder
+ * slot (the cap filled during their trial, or in the seconds before the
+ * webhook ran) moves to the standard price, so nobody keeps a founder
+ * price without the founder slot that goes with it.
+ */
+export function shouldMoveOffFounderPrice(
+  tier: string | null | undefined,
+  claimedSlot: unknown,
+): boolean {
+  if (tier !== "founder") return false;
+  return !(typeof claimedSlot === "number" && claimedSlot > 0);
+}
