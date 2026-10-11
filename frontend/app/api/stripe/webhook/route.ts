@@ -22,6 +22,7 @@ import {
   shouldMoveOffFounderPrice,
 } from "@/lib/premium-trial";
 import { pickPriceId } from "@/lib/stripe-helpers";
+import { founderFallbackNotice } from "@/lib/founder-fallback-notice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -274,7 +275,7 @@ async function grantConversionPerks(
     // moving the fan off the founder price.
     throwIfDbError({ error: slotErr }, "founder slot claim");
     if (shouldMoveOffFounderPrice(tier, slot)) {
-      await moveToStandardPrice(sub, communityId, billingPeriod, admin);
+      await moveToStandardPrice(sub, fanId, communityId, billingPeriod, admin);
       return;
     }
     if (typeof slot === "number" && slot > 0) {
@@ -299,10 +300,13 @@ async function grantConversionPerks(
  * often during a 7-day trial). Switch the subscription to the standard
  * price from the next renewal, so they are not billed the founder price
  * without a founder slot. The payment already taken stays as is. Retag
- * the metadata so a replayed event does not try the claim again.
+ * the metadata so a replayed event does not try the claim again, then
+ * tell the fan in their inbox. The notice is deduped per subscription, so
+ * a replay that finds the price already moved only retries a lost notice.
  */
 async function moveToStandardPrice(
   sub: Stripe.Subscription,
+  fanId: string,
   communityId: string,
   billingPeriod: "monthly" | "annual",
   admin: SupabaseClient,
@@ -310,7 +314,7 @@ async function moveToStandardPrice(
   const { data: community, error: readErr } = await admin
     .from("communities")
     .select(
-      "stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual",
+      "display_name, stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual",
     )
     .eq("slug", communityId)
     .maybeSingle();
@@ -322,14 +326,54 @@ async function moveToStandardPrice(
       `founder fallback: no standard ${billingPeriod} price or subscription item for ${communityId} (${sub.id})`,
     );
   }
-  if (item.price?.id === standardPrice && sub.metadata?.tier === "standard") return;
+  let moved = sub;
+  if (item.price?.id !== standardPrice || sub.metadata?.tier !== "standard") {
+    moved = await getStripe().subscriptions.update(sub.id, {
+      items: [{ id: item.id, price: standardPrice }],
+      proration_behavior: "none",
+      metadata: { ...sub.metadata, tier: "standard", founder_cap_fallback: "true" },
+    });
+    console.info("founder cap full: moved subscription to standard price", sub.id);
+  }
 
-  await getStripe().subscriptions.update(sub.id, {
-    items: [{ id: item.id, price: standardPrice }],
-    proration_behavior: "none",
-    metadata: { ...sub.metadata, tier: "standard", founder_cap_fallback: "true" },
+  await sendFounderFallbackNotice(moved, fanId, communityId, community?.display_name, admin);
+}
+
+/**
+ * Inbox notice for a fan moved off the founder price. A failed notice is
+ * logged, never thrown: the price move already happened, and a retry
+ * from Stripe must not be needed just to send a message.
+ */
+async function sendFounderFallbackNotice(
+  sub: Stripe.Subscription,
+  fanId: string,
+  communityId: string,
+  displayName: string | null | undefined,
+  admin: SupabaseClient,
+) {
+  const price = sub.items?.data?.[0]?.price;
+  const notice = founderFallbackNotice({
+    subscriptionId: sub.id,
+    communityName: displayName || communityId,
+    unitAmount: price?.unit_amount,
+    currency: price?.currency,
+    interval: price?.recurring?.interval,
+    renewsAtIso: subscriptionPeriodEndIso(sub),
   });
-  console.info("founder cap full: moved subscription to standard price", sub.id);
+  const { error } = await admin.from("notifications").insert({
+    fan_id: fanId,
+    community_id: communityId,
+    kind: notice.kind,
+    title: notice.title,
+    body: notice.body,
+    url: notice.url,
+    icon: notice.icon,
+    dedup_key: notice.dedupKey,
+  });
+  // A duplicate dedup_key means the fan already has this notice.
+  if (error && !`${error.message}`.toLowerCase().includes("duplicate")) {
+    console.warn("founder fallback notice failed", sub.id, error.message);
+  }
 }
 
 async function handleSubscriptionUpdated(
