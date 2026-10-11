@@ -163,12 +163,9 @@ export default async function PremiumWelcomePage({
                     #{founderNumber}
                   </p>
                   <p className="mt-6 text-white/75">
-                    One of the first 100 paying fans of{" "}
-                    <span className="text-white">
-                      {community?.display_name ?? "this community"}
-                    </span>
-                    . Your {billingPeriod === "annual" ? "annual" : "monthly"}{" "}
-                    price is locked in — forever.
+                    Founding Fan is a free badge with 1.5× points while your
+                    account stays active. Premium is billed at the rate shown
+                    at checkout.
                   </p>
                   <div
                     className="mx-auto mt-6 inline-flex items-center gap-3 rounded-full border px-5 py-2 text-xs font-semibold uppercase tracking-widest"
@@ -178,7 +175,7 @@ export default async function PremiumWelcomePage({
                       backgroundColor: "rgba(255,255,255,0.03)",
                     }}
                   >
-                    🌟 Founding Fan badge · +500 pts
+                    🌟 Founding Fan badge · 1.5× points
                   </div>
                   {customerEmail && (
                     <p className="mt-6 text-xs text-white/50">
@@ -193,13 +190,12 @@ export default async function PremiumWelcomePage({
                     className="text-4xl font-semibold md:text-5xl"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
-                    Claiming your founder slot…
+                    Welcome to Premium.
                   </h1>
                   <p className="mt-4 text-white/70">
-                    Stripe confirmed your payment and we&apos;re assigning your
-                    Founding Fan number. Refresh in a moment to see which slot
-                    you got — your badge and locked-in pricing are already
-                    yours.
+                    Founding Fan is a free badge with 1.5× points while your
+                    account stays active. Premium is billed at the rate shown
+                    at checkout.
                   </p>
                   {customerEmail && (
                     <p className="mt-6 text-xs text-white/50">
@@ -268,8 +264,8 @@ export default async function PremiumWelcomePage({
           </Link>
           {isFounder && status === "complete" && founderNumber !== null && community?.slug && (
             <ShareButton
-              title={`I'm Founder #${founderNumber} for ${community.display_name ?? community.slug}`}
-              text={`Just claimed Founder #${founderNumber} on Fan Engage. One of 100. ${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
+              title={`I'm Founding Fan #${founderNumber} for ${community.display_name ?? community.slug}`}
+              text={`Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout. ${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
               url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
               label="Share my badge"
               variant="ghost"
@@ -293,7 +289,7 @@ export default async function PremiumWelcomePage({
 
         {isFounder && status === "complete" && founderNumber !== null && (
           <p className="mt-12 text-xs uppercase tracking-widest text-white/45">
-            Locked-in pricing for life
+            Free badge · 1.5× points while your account stays active
           </p>
         )}
       </div>
