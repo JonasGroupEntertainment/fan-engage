@@ -22,6 +22,8 @@ export type LandingNextEvent = {
   title: string;
   date: string;
   location: string | null;
+  /** ISO start time, used for the countdown. Null when not scheduled. */
+  startsAt: string | null;
 };
 
 export type LandingStats = {
@@ -98,6 +100,7 @@ export async function getLandingStats(): Promise<LandingStats> {
             title: nextRow.title,
             date: nextRow.event_date ?? nextRow.starts_at ?? "Date TBA",
             location: nextRow.location,
+            startsAt: nextRow.starts_at,
           }
         : null,
     };
