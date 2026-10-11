@@ -19,7 +19,9 @@ import {
   invoiceGrantsCredit,
   isTrialConversion,
   isTrialing,
+  shouldMoveOffFounderPrice,
 } from "@/lib/premium-trial";
+import { pickPriceId } from "@/lib/stripe-helpers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +38,10 @@ export const dynamic = "force-dynamic";
  *                                    assign founder slot if applicable,
  *                                    award Founding Fan badge
  *   customer.subscription.updated  → sync status (past_due / cancelled /
- *                                    active), period end, cancel-at-end
+ *                                    active), period end, cancel-at-end;
+ *                                    at trial conversion grants perks, or
+ *                                    moves to the standard price if the
+ *                                    founder cap filled during the trial
  *   customer.subscription.deleted  → revert to 'free', clear sub id
  *   invoice.paid                   → extend current_period_end, refresh
  *                                    $5 monthly credit if Premium
@@ -224,7 +229,7 @@ async function handleSubscriptionCreated(
   // trial converts, so a canceled trial never takes a founder slot.
   if (isTrialing(sub.status)) return;
 
-  await grantConversionPerks(fanId, communityId, tier, admin);
+  await grantConversionPerks(sub, fanId, communityId, tier, billingPeriod, admin);
 }
 
 /**
@@ -234,9 +239,11 @@ async function handleSubscriptionCreated(
  * conversion for trial starts. Safe to run twice.
  */
 async function grantConversionPerks(
+  sub: Stripe.Subscription,
   fanId: string,
   communityId: string,
   tier: string | null,
+  billingPeriod: "monthly" | "annual",
   admin: SupabaseClient,
 ) {
   // Referral conversion — award 500 points to the referrer if this fan
@@ -259,10 +266,17 @@ async function grantConversionPerks(
     throwIfDbError({ error: existingErr }, "founder slot read");
     if (existing?.founder_number != null) return;
 
-    const { data: slot } = await admin.rpc("claim_founder_slot", {
+    const { data: slot, error: slotErr } = await admin.rpc("claim_founder_slot", {
       p_fan_id: fanId,
       p_community_id: communityId,
     });
+    // A failed call is not a full cap. Throw so Stripe retries instead of
+    // moving the fan off the founder price.
+    throwIfDbError({ error: slotErr }, "founder slot claim");
+    if (shouldMoveOffFounderPrice(tier, slot)) {
+      await moveToStandardPrice(sub, communityId, billingPeriod, admin);
+      return;
+    }
     if (typeof slot === "number" && slot > 0) {
       // Phase 5e: route through award_community_badge so the fan also
       // gets the +500 pts ledger entry AND the in-app notification.
@@ -278,6 +292,44 @@ async function grantConversionPerks(
       }
     }
   }
+}
+
+/**
+ * The founder cap filled before this fan's slot could be claimed (most
+ * often during a 7-day trial). Switch the subscription to the standard
+ * price from the next renewal, so they are not billed the founder price
+ * without a founder slot. The payment already taken stays as is. Retag
+ * the metadata so a replayed event does not try the claim again.
+ */
+async function moveToStandardPrice(
+  sub: Stripe.Subscription,
+  communityId: string,
+  billingPeriod: "monthly" | "annual",
+  admin: SupabaseClient,
+) {
+  const { data: community, error: readErr } = await admin
+    .from("communities")
+    .select(
+      "stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual",
+    )
+    .eq("slug", communityId)
+    .maybeSingle();
+  throwIfDbError({ error: readErr }, "founder fallback price read");
+  const standardPrice = community ? pickPriceId(community, billingPeriod, false) : null;
+  const item = sub.items?.data?.[0];
+  if (!standardPrice || !item) {
+    throw new Error(
+      `founder fallback: no standard ${billingPeriod} price or subscription item for ${communityId} (${sub.id})`,
+    );
+  }
+  if (item.price?.id === standardPrice && sub.metadata?.tier === "standard") return;
+
+  await getStripe().subscriptions.update(sub.id, {
+    items: [{ id: item.id, price: standardPrice }],
+    proration_behavior: "none",
+    metadata: { ...sub.metadata, tier: "standard", founder_cap_fallback: "true" },
+  });
+  console.info("founder cap full: moved subscription to standard price", sub.id);
 }
 
 async function handleSubscriptionUpdated(
@@ -320,7 +372,7 @@ async function handleSubscriptionUpdated(
   // Trial just turned into a paid subscription: grant the perks that
   // subscription.created held back.
   if (isTrialConversion(sub.status, previous?.status)) {
-    await grantConversionPerks(fanId, communityId, meta.tier, admin);
+    await grantConversionPerks(sub, fanId, communityId, meta.tier, meta.billingPeriod, admin);
   }
 }
 

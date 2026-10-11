@@ -6,6 +6,7 @@ import {
   isTrialConversion,
   isTrialEligible,
   isTrialing,
+  shouldMoveOffFounderPrice,
 } from "./premium-trial.ts";
 
 describe("isTrialEligible", () => {
@@ -55,5 +56,22 @@ describe("invoiceGrantsCredit", () => {
 
   it("grants on a real payment", () => {
     assert.equal(invoiceGrantsCredit(499), true);
+  });
+});
+
+describe("shouldMoveOffFounderPrice", () => {
+  it("moves a founder-price fan who got no slot", () => {
+    assert.equal(shouldMoveOffFounderPrice("founder", null), true);
+    assert.equal(shouldMoveOffFounderPrice("founder", undefined), true);
+    assert.equal(shouldMoveOffFounderPrice("founder", 0), true);
+  });
+
+  it("keeps a founder-price fan who got a slot", () => {
+    assert.equal(shouldMoveOffFounderPrice("founder", 42), false);
+  });
+
+  it("never touches standard-price fans", () => {
+    assert.equal(shouldMoveOffFounderPrice("standard", null), false);
+    assert.equal(shouldMoveOffFounderPrice(null, null), false);
   });
 });
