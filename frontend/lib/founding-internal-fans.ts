@@ -8,10 +8,9 @@
  * is the reversible flag for these people and for anyone added later.
  * Either signal hides the fan.
  *
- * Intentionally not listed, pending owner confirmation:
+ * Intentionally not listed, left public at Kevin's call (2026-10-11):
  *   Founding Fan #8 (no display name)
  *   Founding Fan #12 (no display name)
- *   Morgan wallen, Founding Fan #15
  */
 export const INTERNAL_FOUNDING_FAN_IDS = [
   // Staff / team. Hidden. Badge numbers stay.
@@ -27,6 +26,8 @@ export const INTERNAL_FOUNDING_FAN_IDS = [
   "44038dc7-7fb4-431c-86a3-02553a534c35", // atsh, #16
   "4b83c23e-775b-455f-b792-e31601e85e5b", // Launch Test, #17
   "e2e3d3ef-824a-4951-8cdc-70ed574c6544", // Hana QA, #20
+  // Hidden at Kevin's call (2026-10-11). Not deleted.
+  "c52e1b95-8399-4379-a4ea-fef1ef1153db", // Morgan wallen, #15
 ] as const;
 
 export const INTERNAL_FOUNDING_FAN_ID_SET: ReadonlySet<string> = new Set(

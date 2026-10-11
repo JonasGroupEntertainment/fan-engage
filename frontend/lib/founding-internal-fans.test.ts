@@ -28,17 +28,21 @@ const TESTS = [
   "e2e3d3ef-824a-4951-8cdc-70ed574c6544",
 ];
 
-// Left public until Kevin confirms. Not hidden by id.
-const LEFT_PUBLIC = [
-  "d658254b-0f1f-47b1-8bff-d9f2d5ffc817", // Founding Fan #8
-  "b393a127-6b96-4d48-8aa3-5ffc8f8cbffd", // Founding Fan #12
+// Hidden at Kevin's call (2026-10-11).
+const ON_REQUEST = [
   "c52e1b95-8399-4379-a4ea-fef1ef1153db", // Morgan wallen #15
 ];
 
+// Left public at Kevin's call (2026-10-11). Not hidden by id.
+const LEFT_PUBLIC = [
+  "d658254b-0f1f-47b1-8bff-d9f2d5ffc817", // Founding Fan #8
+  "b393a127-6b96-4d48-8aa3-5ffc8f8cbffd", // Founding Fan #12
+];
+
 describe("public founding roster exclusions", () => {
-  it("hides the seven staff accounts and four test accounts only", () => {
-    assert.equal(INTERNAL_FOUNDING_FAN_IDS.length, 11);
-    for (const id of [...STAFF, ...TESTS]) {
+  it("hides the seven staff, four test accounts, and #15 only", () => {
+    assert.equal(INTERNAL_FOUNDING_FAN_IDS.length, 12);
+    for (const id of [...STAFF, ...TESTS, ...ON_REQUEST]) {
       assert.equal(isHiddenFromPublicFoundingRoster(id, false), true);
     }
     for (const id of LEFT_PUBLIC) {

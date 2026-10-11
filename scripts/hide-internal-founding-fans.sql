@@ -11,10 +11,9 @@
 -- 0073_internal_founding_fan_flag.sql, or the public wall and claim cap
 -- will keep excluding them.
 --
--- Not in this list, left public on purpose pending owner confirmation:
+-- Not in this list, left public at Kevin's call (2026-10-11):
 --   Founding Fan #8  (no display name)  d658254b-0f1f-47b1-8bff-d9f2d5ffc817
 --   Founding Fan #12 (no display name)  b393a127-6b96-4d48-8aa3-5ffc8f8cbffd
---   Morgan wallen #15                   c52e1b95-8399-4379-a4ea-fef1ef1153db
 
 -- ─── PREVIEW (run this statement alone first) ────────────────────────────
 select
@@ -37,7 +36,8 @@ where f.id in (
   '234f4222-fe96-46e2-b403-9ca5fe3ac905',
   '44038dc7-7fb4-431c-86a3-02553a534c35',
   '4b83c23e-775b-455f-b792-e31601e85e5b',
-  'e2e3d3ef-824a-4951-8cdc-70ed574c6544'
+  'e2e3d3ef-824a-4951-8cdc-70ed574c6544',
+  'c52e1b95-8399-4379-a4ea-fef1ef1153db'
 )
 order by m.founding_fan_number;
 
@@ -55,7 +55,8 @@ order by m.founding_fan_number;
 --   '234f4222-fe96-46e2-b403-9ca5fe3ac905',
 --   '44038dc7-7fb4-431c-86a3-02553a534c35',
 --   '4b83c23e-775b-455f-b792-e31601e85e5b',
---   'e2e3d3ef-824a-4951-8cdc-70ed574c6544'
+--   'e2e3d3ef-824a-4951-8cdc-70ed574c6544',
+--   'c52e1b95-8399-4379-a4ea-fef1ef1153db'
 -- );
 
 -- ─── REVERSE (run alone only to undo APPLY) ──────────────────────────────
@@ -72,5 +73,6 @@ order by m.founding_fan_number;
 --   '234f4222-fe96-46e2-b403-9ca5fe3ac905',
 --   '44038dc7-7fb4-431c-86a3-02553a534c35',
 --   '4b83c23e-775b-455f-b792-e31601e85e5b',
---   'e2e3d3ef-824a-4951-8cdc-70ed574c6544'
+--   'e2e3d3ef-824a-4951-8cdc-70ed574c6544',
+--   'c52e1b95-8399-4379-a4ea-fef1ef1153db'
 -- );

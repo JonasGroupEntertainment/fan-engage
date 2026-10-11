@@ -53,7 +53,8 @@ declare
     '234f4222-fe96-46e2-b403-9ca5fe3ac905',
     '44038dc7-7fb4-431c-86a3-02553a534c35',
     '4b83c23e-775b-455f-b792-e31601e85e5b',
-    'e2e3d3ef-824a-4951-8cdc-70ed574c6544'
+    'e2e3d3ef-824a-4951-8cdc-70ed574c6544',
+    'c52e1b95-8399-4379-a4ea-fef1ef1153db'
   ]::uuid[];
 begin
   if v_role = 'authenticated' and auth.uid() is distinct from p_fan_id then
