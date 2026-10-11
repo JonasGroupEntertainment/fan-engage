@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   isStripeEventReplay,
   monthlyCreditGrantRow,
+  referralLedgerOutcome,
   stripeEventCompletionPatch,
   stripeEventInsertOutcome,
   throwIfDbError,
@@ -48,6 +49,21 @@ describe("stripeEventInsertOutcome", () => {
   it("fails on any other insert error so Stripe retries instead of processing untracked", () => {
     assert.equal(stripeEventInsertOutcome({ code: "42501", message: "denied" }), "failed");
     assert.equal(stripeEventInsertOutcome({ message: "network" }), "failed");
+  });
+});
+
+describe("referralLedgerOutcome", () => {
+  it("treats a clean insert as the one award", () => {
+    assert.equal(referralLedgerOutcome(null), "inserted");
+  });
+
+  it("treats a unique violation as the other Stripe event already awarding", () => {
+    assert.equal(referralLedgerOutcome({ code: "23505", message: "dup" }), "duplicate");
+  });
+
+  it("fails closed on any other error so the referral is not marked verified", () => {
+    assert.equal(referralLedgerOutcome({ code: "08006", message: "down" }), "failed");
+    assert.equal(referralLedgerOutcome({ message: "network" }), "failed");
   });
 });
 

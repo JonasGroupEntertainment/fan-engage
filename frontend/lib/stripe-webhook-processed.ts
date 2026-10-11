@@ -45,6 +45,21 @@ export function stripeEventInsertOutcome(error: DbError): StripeEventInsertOutco
   return "failed";
 }
 
+export type ReferralLedgerOutcome = "inserted" | "duplicate" | "failed";
+
+/**
+ * A referral-conversion ledger insert. A unique violation means the other
+ * Stripe event (invoice.paid and subscription.updated can both grant)
+ * already wrote the row — do not add the points again. Any other error
+ * must fail the handler so Stripe retries before the referral is marked
+ * verified.
+ */
+export function referralLedgerOutcome(error: DbError): ReferralLedgerOutcome {
+  if (!error) return "inserted";
+  if (error.code === UNIQUE_VIOLATION) return "duplicate";
+  return "failed";
+}
+
 /**
  * Throws when a Supabase write failed, so the handler fails, the event
  * keeps processed_at null, and Stripe retries.
