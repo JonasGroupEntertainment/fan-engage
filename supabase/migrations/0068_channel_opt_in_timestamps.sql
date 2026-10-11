@@ -1,4 +1,4 @@
--- Not yet applied to production.
+-- Applied to production 2026-10-09 (ledger version 20261009012409).
 --
 -- 0068_channel_opt_in_timestamps.sql
 --

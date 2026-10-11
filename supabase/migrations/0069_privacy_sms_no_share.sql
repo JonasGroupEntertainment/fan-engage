@@ -1,4 +1,4 @@
--- Not yet applied to production.
+-- Applied to production 2026-10-09 (ledger version 20261009012410).
 --
 -- 0069_privacy_sms_no_share.sql
 --

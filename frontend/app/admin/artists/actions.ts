@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
 import { sendEventReminder, type ReminderWindowEvent } from "@/lib/reminders";
