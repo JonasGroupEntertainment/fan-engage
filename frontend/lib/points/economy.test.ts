@@ -85,7 +85,7 @@ describe("Founding Fan 1.5× writer contract", () => {
     assert.match(onboardTs, /resolveOnboardCommunityId/);
     assert.match(migrationSql, /create or replace function public\.claim_founding_fan_status/);
     const internalSql = readRepo(
-      "../../../supabase/migrations/0071_internal_founding_fan_flag.sql",
+      "../../../supabase/migrations/0073_internal_founding_fan_flag.sql",
     );
     assert.match(internalSql, /founding_fan_number >= 1/);
     assert.doesNotMatch(internalSql, /founding_fan_number <= 100/);

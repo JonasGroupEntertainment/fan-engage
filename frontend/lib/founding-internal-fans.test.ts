@@ -56,7 +56,7 @@ describe("public founding roster exclusions", () => {
 
   it("keeps the same ids in the manual script and the claim migration", () => {
     const script = readRepo("../../scripts/hide-internal-founding-fans.sql");
-    const migration = readRepo("../../supabase/migrations/0071_internal_founding_fan_flag.sql");
+    const migration = readRepo("../../supabase/migrations/0073_internal_founding_fan_flag.sql");
     assert.match(script, /DO NOT put this file in supabase\/migrations/);
     assert.match(script, /is_internal = true/);
     assert.doesNotMatch(script, /delete from/i);

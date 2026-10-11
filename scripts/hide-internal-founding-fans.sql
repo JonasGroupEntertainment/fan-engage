@@ -8,7 +8,7 @@
 --
 -- Reversible: run REVERSE as its own paste. Also remove the fan id from
 -- frontend/lib/founding-internal-fans.ts and from the v_hidden array in
--- 0071_internal_founding_fan_flag.sql, or the public wall and claim cap
+-- 0073_internal_founding_fan_flag.sql, or the public wall and claim cap
 -- will keep excluding them.
 --
 -- Not in this list, left public on purpose pending owner confirmation:
