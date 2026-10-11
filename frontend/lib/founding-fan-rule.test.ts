@@ -28,6 +28,18 @@ describe("one Founding Fan rule", () => {
     );
   });
 
+  it("premium welcome matches the Oct 12 Founding Fan policy", () => {
+    const welcome = readRepo("../app/premium/welcome/page.tsx");
+    assert.match(
+      welcome,
+      /Founding Fan is a free badge with 1\.5× points while your account stays active\./,
+    );
+    assert.match(welcome, /Premium is billed at the rate shown at checkout\./);
+    assert.doesNotMatch(welcome, /locked-in pricing/i);
+    assert.doesNotMatch(welcome, /locked in/i);
+    assert.doesNotMatch(welcome, /paying fans/i);
+  });
+
   it("/rewards states the one rule and has no pre-Jul 15 contradiction", () => {
     const rewards = readRepo("../app/rewards/page.tsx");
     assert.match(rewards, /FOUNDING_FAN_RULE|first 100/);
