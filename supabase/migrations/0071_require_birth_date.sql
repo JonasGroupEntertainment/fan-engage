@@ -1,4 +1,4 @@
--- Not yet applied to production.
+-- Applied to production 2026-10-11 (ledger version 20261011160557).
 --
 -- 0071_require_birth_date.sql
 --

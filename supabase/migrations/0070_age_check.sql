@@ -1,4 +1,4 @@
--- Not yet applied to production.
+-- Applied to production 2026-10-11 (ledger version 20261011154001).
 --
 -- 0070_age_check.sql
 --

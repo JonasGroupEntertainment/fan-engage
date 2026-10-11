@@ -27,8 +27,6 @@ import type {
  *  This is the safety cap we enforce locally to avoid surprising anyone. */
 const MAX_HTML_LENGTH = 6000;
 
-const UTM_BASE = "?utm_source=digest&utm_medium=email&utm_campaign=weekly";
-
 /** Add UTM params to a URL, preserving any existing query string. */
 function withUtm(url: string, communityId: string): string {
   const sep = url.includes("?") ? "&" : "?";

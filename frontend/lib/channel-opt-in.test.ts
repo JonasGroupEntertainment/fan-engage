@@ -110,7 +110,7 @@ describe("signup channel update", () => {
 describe("channel opt-in migrations", () => {
   it("0068 adds both timestamps, keeps the flags, and does not clear them on opt-out", () => {
     const sql = readRepo("../../supabase/migrations/0068_channel_opt_in_timestamps.sql");
-    assert.match(sql, /Not yet applied to production/);
+    assert.match(sql, /Applied to production 2026-10-09 \(ledger version 20261009012409\)/);
     assert.match(sql, /add column if not exists sms_opted_in_at timestamptz/);
     assert.match(sql, /add column if not exists email_opted_in_at timestamptz/);
     assert.match(sql, /fans\.sms_opted_in and fans\.email_opted_in flags stay/);
@@ -132,7 +132,7 @@ describe("channel opt-in migrations", () => {
 
   it("0069 updates privacy only and includes the no-share sentence", () => {
     const sql = readRepo("../../supabase/migrations/0069_privacy_sms_no_share.sql");
-    assert.match(sql, /Not yet applied to production/);
+    assert.match(sql, /Applied to production 2026-10-09 \(ledger version 20261009012410\)/);
     assert.match(sql, /where slug = 'privacy'/);
     assert.equal(sql.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
     assert.match(sql, /sign up for our text\\s\+messages;/);
