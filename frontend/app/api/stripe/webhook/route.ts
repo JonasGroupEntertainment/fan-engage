@@ -15,6 +15,14 @@ import {
   stripeEventInsertOutcome,
   throwIfDbError,
 } from "@/lib/stripe-webhook-processed";
+import {
+  invoiceGrantsCredit,
+  isTrialConversion,
+  isTrialing,
+  shouldMoveOffFounderPrice,
+} from "@/lib/premium-trial";
+import { pickPriceId } from "@/lib/stripe-helpers";
+import { founderFallbackNotice } from "@/lib/founder-fallback-notice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +39,10 @@ export const dynamic = "force-dynamic";
  *                                    assign founder slot if applicable,
  *                                    award Founding Fan badge
  *   customer.subscription.updated  → sync status (past_due / cancelled /
- *                                    active), period end, cancel-at-end
+ *                                    active), period end, cancel-at-end;
+ *                                    at trial conversion grants perks, or
+ *                                    moves to the standard price if the
+ *                                    founder cap filled during the trial
  *   customer.subscription.deleted  → revert to 'free', clear sub id
  *   invoice.paid                   → extend current_period_end, refresh
  *                                    $5 monthly credit if Premium
@@ -117,6 +128,9 @@ export async function POST(request: Request) {
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(
           event.data.object as Stripe.Subscription,
+          event.data.previous_attributes as
+            | Partial<Stripe.Subscription>
+            | undefined,
           admin,
         );
         break;
@@ -211,6 +225,28 @@ async function handleSubscriptionCreated(
     .eq("community_id", communityId);
   throwIfDbError({ error: updErr }, "subscription.created membership update");
 
+  // Free trial: hold the paid perks (referral points, founder slot) until
+  // the first real payment. subscription.updated grants them when the
+  // trial converts, so a canceled trial never takes a founder slot.
+  if (isTrialing(sub.status)) return;
+
+  await grantConversionPerks(sub, fanId, communityId, tier, billingPeriod, admin);
+}
+
+/**
+ * Perks earned by a paying subscriber: referral points for whoever
+ * referred them, and a founder slot plus badge if they bought at the
+ * founder price. Runs at checkout for paid starts, or at trial
+ * conversion for trial starts. Safe to run twice.
+ */
+async function grantConversionPerks(
+  sub: Stripe.Subscription,
+  fanId: string,
+  communityId: string,
+  tier: string | null,
+  billingPeriod: "monthly" | "annual",
+  admin: SupabaseClient,
+) {
   // Referral conversion — award 500 points to the referrer if this fan
   // was referred and their referral is still pending.
   await awardReferralPoints(fanId, admin);
@@ -220,10 +256,28 @@ async function handleSubscriptionCreated(
   // claims per community via advisory lock and returns null if the cap
   // is hit.
   if (tier === "founder") {
-    const { data: slot } = await admin.rpc("claim_founder_slot", {
+    // claim_founder_slot hands out a new number on every call, so skip
+    // it when this fan already holds one (Stripe retry, replayed event).
+    const { data: existing, error: existingErr } = await admin
+      .from("fan_community_memberships")
+      .select("founder_number")
+      .eq("fan_id", fanId)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    throwIfDbError({ error: existingErr }, "founder slot read");
+    if (existing?.founder_number != null) return;
+
+    const { data: slot, error: slotErr } = await admin.rpc("claim_founder_slot", {
       p_fan_id: fanId,
       p_community_id: communityId,
     });
+    // A failed call is not a full cap. Throw so Stripe retries instead of
+    // moving the fan off the founder price.
+    throwIfDbError({ error: slotErr }, "founder slot claim");
+    if (shouldMoveOffFounderPrice(tier, slot)) {
+      await moveToStandardPrice(sub, fanId, communityId, billingPeriod, admin);
+      return;
+    }
     if (typeof slot === "number" && slot > 0) {
       // Phase 5e: route through award_community_badge so the fan also
       // gets the +500 pts ledger entry AND the in-app notification.
@@ -241,11 +295,95 @@ async function handleSubscriptionCreated(
   }
 }
 
-async function handleSubscriptionUpdated(
+/**
+ * The founder cap filled before this fan's slot could be claimed (most
+ * often during a 7-day trial). Switch the subscription to the standard
+ * price from the next renewal, so they are not billed the founder price
+ * without a founder slot. The payment already taken stays as is. Retag
+ * the metadata so a replayed event does not try the claim again, then
+ * tell the fan in their inbox. The notice is deduped per subscription, so
+ * a replay that finds the price already moved only retries a lost notice.
+ */
+async function moveToStandardPrice(
   sub: Stripe.Subscription,
+  fanId: string,
+  communityId: string,
+  billingPeriod: "monthly" | "annual",
   admin: SupabaseClient,
 ) {
-  const { fanId, communityId } = parseSubMetadata(sub);
+  const { data: community, error: readErr } = await admin
+    .from("communities")
+    .select(
+      "display_name, stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual",
+    )
+    .eq("slug", communityId)
+    .maybeSingle();
+  throwIfDbError({ error: readErr }, "founder fallback price read");
+  const standardPrice = community ? pickPriceId(community, billingPeriod, false) : null;
+  const item = sub.items?.data?.[0];
+  if (!standardPrice || !item) {
+    throw new Error(
+      `founder fallback: no standard ${billingPeriod} price or subscription item for ${communityId} (${sub.id})`,
+    );
+  }
+  let moved = sub;
+  if (item.price?.id !== standardPrice || sub.metadata?.tier !== "standard") {
+    moved = await getStripe().subscriptions.update(sub.id, {
+      items: [{ id: item.id, price: standardPrice }],
+      proration_behavior: "none",
+      metadata: { ...sub.metadata, tier: "standard", founder_cap_fallback: "true" },
+    });
+    console.info("founder cap full: moved subscription to standard price", sub.id);
+  }
+
+  await sendFounderFallbackNotice(moved, fanId, communityId, community?.display_name, admin);
+}
+
+/**
+ * Inbox notice for a fan moved off the founder price. A failed notice is
+ * logged, never thrown: the price move already happened, and a retry
+ * from Stripe must not be needed just to send a message.
+ */
+async function sendFounderFallbackNotice(
+  sub: Stripe.Subscription,
+  fanId: string,
+  communityId: string,
+  displayName: string | null | undefined,
+  admin: SupabaseClient,
+) {
+  const price = sub.items?.data?.[0]?.price;
+  const notice = founderFallbackNotice({
+    subscriptionId: sub.id,
+    communityName: displayName || communityId,
+    unitAmount: price?.unit_amount,
+    currency: price?.currency,
+    interval: price?.recurring?.interval,
+    renewsAtIso: subscriptionPeriodEndIso(sub),
+  });
+  const { error } = await admin.from("notifications").insert({
+    fan_id: fanId,
+    community_id: communityId,
+    kind: notice.kind,
+    title: notice.title,
+    body: notice.body,
+    url: notice.url,
+    icon: notice.icon,
+    dedup_key: notice.dedupKey,
+  });
+  // A duplicate dedup_key means the fan already has this notice.
+  if (error && !`${error.message}`.toLowerCase().includes("duplicate")) {
+    console.warn("founder fallback notice failed", sub.id, error.message);
+  }
+}
+
+async function handleSubscriptionUpdated(
+  sub: Stripe.Subscription,
+  previous: Partial<Stripe.Subscription> | undefined,
+  admin: SupabaseClient,
+) {
+  const meta = parseSubMetadata(sub);
+  let fanId = meta.fanId;
+  let communityId = meta.communityId;
   if (!fanId || !communityId) {
     // Metadata stripped somehow — fall back to lookup by subscription id.
     const { data: row, error: readErr } = await admin
@@ -259,11 +397,12 @@ async function handleSubscriptionUpdated(
       return;
     }
     // Found via sub id — fall through to the UPDATE below.
+    fanId = row.fan_id as string;
+    communityId = row.community_id as string;
   }
 
-  const tier = mapStripeStatus(sub.status);
   const updates: Record<string, unknown> = {
-    subscription_tier: tier,
+    subscription_tier: mapStripeStatus(sub.status),
     current_period_end: subPeriodEnd(sub),
     cancel_at_period_end: sub.cancel_at_period_end ?? false,
   };
@@ -273,6 +412,12 @@ async function handleSubscriptionUpdated(
     .update(updates)
     .eq("stripe_subscription_id", sub.id);
   throwIfDbError(result, "subscription.updated membership update");
+
+  // Trial just turned into a paid subscription: grant the perks that
+  // subscription.created held back.
+  if (isTrialConversion(sub.status, previous?.status)) {
+    await grantConversionPerks(sub, fanId, communityId, meta.tier, meta.billingPeriod, admin);
+  }
 }
 
 async function handleSubscriptionDeleted(
@@ -325,7 +470,8 @@ async function handleInvoicePaid(
     ? new Date(membership.monthly_credit_refreshed_at as string).getTime()
     : 0;
   const daysSince = (Date.now() - lastRefreshed) / (1000 * 60 * 60 * 24);
-  const refreshCredit = daysSince >= 25;
+  // A $0 invoice (the start of a free trial) does not earn the credit.
+  const refreshCredit = invoiceGrantsCredit(invoice.amount_paid) && daysSince >= 25;
   if (refreshCredit) {
     updates.monthly_credit_cents = MONTHLY_CREDIT_CENTS;
     updates.monthly_credit_refreshed_at = new Date().toISOString();

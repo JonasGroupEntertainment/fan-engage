@@ -7,6 +7,7 @@ import {
   smsOptInFromSettings,
   smsTierAllowed,
 } from "@/lib/sms-send-gate";
+import { adultGate } from "@/lib/age-gate";
 import { TOGGLE_KEYS, type Prefs } from "./prefs";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
@@ -33,7 +34,7 @@ export async function savePreferencesAction(
   const [{ data: fan }, { data: current }] = await Promise.all([
     supabase
       .from("fans")
-      .select("current_tier, phone")
+      .select("current_tier, phone, birth_date")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -43,7 +44,11 @@ export async function savePreferencesAction(
       .maybeSingle(),
   ]);
 
-  const tierAllowsSms = smsTierAllowed(fan?.current_tier as string | null);
+  // A new SMS turn-on needs Gold tier and a known adult birth date (COPPA).
+  // Fans already on SMS keep it until they turn it off (grandfathered).
+  const tierAllowsSms =
+    smsTierAllowed(fan?.current_tier as string | null) &&
+    adultGate((fan?.birth_date as string | null) ?? null) === "ok";
   const sms = resolveSmsSwitch(
     !!prefs.sms_enabled,
     !!current?.sms_enabled,

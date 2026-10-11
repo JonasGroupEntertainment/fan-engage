@@ -2,12 +2,15 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
-import { fmtPrice } from "@/lib/stripe-helpers";
+import { fmtPrice, isFanTrialEligible } from "@/lib/stripe-helpers";
+import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
 import { PREMIUM_CTA, isPremium as isPremiumSignal } from "@/lib/entitlements";
+import { AGE_ADULT_ONLY_MESSAGE } from "@/lib/age-gate";
+import { BirthDateForm } from "@/components/birth-date-form";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,7 @@ export default async function PremiumPage({
   searchParams?: Promise<{
     canceled?: string;
     already_active?: string;
+    age?: string;
   }>;
 }) {
   const params = (await searchParams) ?? {};
@@ -72,6 +76,11 @@ export default async function PremiumPage({
   }
   const isPremium = isPremiumSignal(tier);
 
+  // One free trial per account. Checkout runs the same check, so this only
+  // decides the button copy. Fails closed to the normal buttons.
+  const trialEligible =
+    user && !isPremium ? await isFanTrialEligible(user.id) : false;
+
   const founder = await getFoundingFanClaimState(communityId);
 
   const monthly = community.monthly_price_cents;
@@ -83,18 +92,14 @@ export default async function PremiumPage({
   const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
 
-  // comingSoon marks perks that are promised but not built yet. Keep them
-  // listed so fans know what is planned, but never sell them as live.
-  const perks: Array<{ icon: string; title: string; body: string; comingSoon?: boolean }> = [
+  // Only perks that are live today. Planned perks go in the single
+  // "On the way" line under the grid so nothing unbuilt is sold as live.
+  const perks: Array<{ icon: string; title: string; body: string }> = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
-    { icon: "🎁", title: "Exclusive digital drops", body: "Premium-only digital unlocks inside the app.", comingSoon: true },
-    { icon: "🎬", title: "Behind-the-song clips", body: "In-app clips when a track is ready. Digital only.", comingSoon: true },
     { icon: "📱", title: "Phone & lyric wallpapers", body: "Exclusive wallpapers you redeem with points inside the app." },
-    { icon: "💬", title: "Monthly AMA", body: "Live Q&A with the artist. Ask anything.", comingSoon: true },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
     { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points — not a Premium purchase." },
-    { icon: "🛍️", title: "Merch drops coming soon", body: "Physical merch is not live yet. Premium today is the in-app community, rewards, and backstage access." },
   ];
 
   return (
@@ -120,6 +125,17 @@ export default async function PremiumPage({
           <div className="mb-8 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             You&apos;re already a Premium fan of {community.display_name} —
             welcome back.
+          </div>
+        )}
+
+        {params.age === "adult_only" && (
+          <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/75">
+            {AGE_ADULT_ONLY_MESSAGE}
+          </div>
+        )}
+        {params.age === "required" && user && (
+          <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-4">
+            <BirthDateForm next="/premium" />
           </div>
         )}
 
@@ -342,7 +358,9 @@ export default async function PremiumPage({
                     backgroundImage: `linear-gradient(90deg, ${community.accent_from}, ${community.accent_to})`,
                   }}
                 >
-                  Choose monthly →
+                  {trialEligible
+                    ? `Start ${TRIAL_DAYS}-day free trial →`
+                    : "Choose monthly →"}
                 </span>
               </button>
             </form>
@@ -379,10 +397,19 @@ export default async function PremiumPage({
                     backgroundImage: `linear-gradient(90deg, ${community.accent_from}, ${community.accent_to})`,
                   }}
                 >
-                  Choose annual →
+                  {trialEligible
+                    ? `Start ${TRIAL_DAYS}-day free trial →`
+                    : "Choose annual →"}
                 </span>
               </button>
             </form>
+            {trialEligible && (
+              <p className="text-xs text-white/55 md:col-span-2">
+                Your first {TRIAL_DAYS} days are free. You won&apos;t be
+                charged until day {TRIAL_DAYS}, and you can cancel anytime
+                before then. One free trial per account.
+              </p>
+            )}
           </section>
         )}
 
@@ -414,18 +441,16 @@ export default async function PremiumPage({
                 className="rounded-2xl border border-white/10 bg-black/30 p-5"
               >
                 <p className="text-2xl">{p.icon}</p>
-                <p className="mt-2 flex flex-wrap items-center gap-2 font-semibold">
-                  {p.title}
-                  {p.comingSoon && (
-                    <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70">
-                      Coming soon
-                    </span>
-                  )}
-                </p>
+                <p className="mt-2 font-semibold">{p.title}</p>
                 <p className="mt-1 text-sm text-white/60">{p.body}</p>
               </div>
             ))}
           </div>
+          <p className="mt-6 text-sm text-white/60">
+            <span className="font-medium text-white/80">On the way:</span>{" "}
+            digital drops, behind-the-song clips, a monthly AMA, and merch.
+            They are not live yet and are not part of what you pay for today.
+          </p>
         </section>
 
         <p className="mt-12 text-xs text-white/50">

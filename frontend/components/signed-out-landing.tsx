@@ -1,15 +1,18 @@
 import Link from "next/link";
 import type { Artist } from "@/lib/artists";
-import type { LandingStats } from "@/lib/data/landing-stats";
+import type { LandingNextEvent, LandingStats } from "@/lib/data/landing-stats";
 import FoundingFanBlock from "@/components/founding-fan-block";
 import { getArtistKeyArt } from "@/lib/artist-keyart";
 import { Icon, type IconName } from "@/components/icon";
+import FanProfilePhone from "@/components/fan-profile-phone";
+import { countdownLabel, daysUntil, shouldShowProofTiles } from "@/lib/landing-display";
 
 /**
  * Public-facing marketing landing rendered at `/` for signed-out visitors.
  *
  * Funnel order:
- *   hero → founding-fan urgency → live proof tiles → how-it-works →
+ *   hero → founding-fan urgency → next show countdown → live proof tiles
+ *   (only once the numbers help) → how-it-works →
  *   feature pillars → featured artists → closing CTA.
  *
  * Signed-in fans never see this — they hit the personalized Fan Home
@@ -89,79 +92,13 @@ export default function SignedOutLanding({
             </p>
           </div>
 
-          {/* Hero visual — live hub data, or an explicitly labeled sample */}
-          <div className="relative hidden lg:block">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative h-[440px] w-[360px]">
-                <div className="absolute left-8 top-12 h-[380px] w-[320px] rotate-3 rounded-3xl border border-white/10 bg-gradient-to-br from-ember/25 via-slate-900 to-aurora/25 shadow-glass">
-                  <div className="p-6 text-white/70">
-                    <p className="text-xs uppercase tracking-widest">
-                      {stats.nextEvent ? "Next show" : "Sample preview"}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-white">
-                      {stats.nextEvent?.title ?? "Tour date — coming soon"}
-                    </p>
-                    <p className="mt-1 text-xs text-white/60">
-                      {stats.nextEvent
-                        ? [stats.nextEvent.date, stats.nextEvent.location].filter(Boolean).join(" · ")
-                        : "No dated show on the hub yet"}
-                    </p>
-                  </div>
-                </div>
-                <div className="absolute left-0 top-0 h-[380px] w-[320px] -rotate-2 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/40 via-slate-900 to-black p-6 shadow-glass">
-                  <video
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="auto"
-                  >
-                    <source src="/videos/fan-profile-holo-loop.mp4" type="video/mp4" />
-                  </video>
-                  <div className="relative">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-widest text-white/60">
-                        {stats.foundingFans > 0 ? "Founding Fan" : "Sample preview"}
-                      </p>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
-                        Bronze start
-                      </span>
-                    </div>
-                    <p
-                      className="mt-6 text-4xl font-semibold text-white"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {stats.foundingSpotsRemaining.toLocaleString("en-US")}
-                    </p>
-                    <p className="text-xs text-white/50">
-                      founding spots left of {stats.foundingTarget}
-                    </p>
-                    <div className="mt-6 space-y-2">
-                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                        <span className="flex items-center gap-2">
-                          <Icon name="trophy" size={16} /> Phone Wallpaper
-                        </span>
-                        <span className="text-emerald-300">250 pts</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                        <span className="flex items-center gap-2">
-                          <Icon name="ticket" size={16} /> Lyric Wallpaper
-                        </span>
-                        <span className="text-emerald-300">500 pts</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl bg-black/30 px-3 py-2 text-xs">
-                        <span className="flex items-center gap-2">
-                          <Icon name="handshake" size={16} /> Fan Spotlight
-                        </span>
-                        <span className="text-emerald-300">1,000 pts</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Hero visual: phone mockup of the fan profile, labeled as a sample */}
+          <div className="relative flex items-center justify-center">
+            <FanProfilePhone
+              foundingSpotsRemaining={stats.foundingSpotsRemaining}
+              foundingTarget={stats.foundingTarget}
+              foundingClosed={stats.foundingClosed}
+            />
           </div>
         </div>
       </section>
@@ -169,37 +106,42 @@ export default function SignedOutLanding({
       {/* ─── Founding-fan urgency ─────────────────────────────────────────── */}
       <FoundingFanBlock stats={stats} />
 
-      {/* ─── Live proof tiles ─────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div
-          className={`grid gap-3 sm:grid-cols-2 ${
-            stats.foundingClosed ? "lg:grid-cols-3" : "lg:grid-cols-4"
-          }`}
-        >
-          <ProofTile
-            label={stats.activeArtists === 1 ? "Active artist" : "Active artists"}
-            value={stats.activeArtists}
-            icon="mic"
-          />
-          <ProofTile
-            label={stats.activeEvents === 1 ? "Live show lined up" : "Live shows lined up"}
-            value={stats.activeEvents}
-            icon="ticket"
-          />
-          <ProofTile
-            label="Founding fans claimed"
-            value={stats.foundingFans}
-            icon="medal"
-          />
-          {!stats.foundingClosed && (
+      {/* ─── Next show countdown ──────────────────────────────────────────── */}
+      {stats.nextEvent && <NextShowCard event={stats.nextEvent} />}
+
+      {/* ─── Live proof tiles (hidden until the numbers help) ─────────────── */}
+      {shouldShowProofTiles(stats) && (
+        <section className="mx-auto max-w-6xl px-6 py-12">
+          <div
+            className={`grid gap-3 sm:grid-cols-2 ${
+              stats.foundingClosed ? "lg:grid-cols-3" : "lg:grid-cols-4"
+            }`}
+          >
             <ProofTile
-              label="Founding spots left"
-              value={stats.foundingSpotsRemaining}
-              icon="hourglass"
+              label={stats.activeArtists === 1 ? "Active artist" : "Active artists"}
+              value={stats.activeArtists}
+              icon="mic"
             />
-          )}
-        </div>
-      </section>
+            <ProofTile
+              label={stats.activeEvents === 1 ? "Live show lined up" : "Live shows lined up"}
+              value={stats.activeEvents}
+              icon="ticket"
+            />
+            <ProofTile
+              label="Founding fans claimed"
+              value={stats.foundingFans}
+              icon="medal"
+            />
+            {!stats.foundingClosed && (
+              <ProofTile
+                label="Founding spots left"
+                value={stats.foundingSpotsRemaining}
+                icon="hourglass"
+              />
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ─── How it works ─────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-20">
@@ -404,6 +346,12 @@ export default function SignedOutLanding({
               Browse artists
             </Link>
           </div>
+          <p className="relative mt-6 text-sm text-white/60">
+            Are you an artist?{" "}
+            <Link href="/for-artists" className="font-medium text-white underline-offset-4 hover:underline">
+              See how Fan Engage works for artists →
+            </Link>
+          </p>
         </div>
       </section>
     </main>
@@ -434,5 +382,40 @@ function ProofTile({
         {label}
       </p>
     </div>
+  );
+}
+
+function NextShowCard({ event }: { event: LandingNextEvent }) {
+  const label = countdownLabel(daysUntil(event.startsAt));
+  const details = [event.date, event.location].filter(Boolean).join(" · ");
+  return (
+    <section className="mx-auto max-w-6xl px-6 pt-12">
+      <Link
+        href="/artists/raelynn"
+        className="group flex flex-col gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-ember/20 via-slate-900 to-aurora/20 p-6 shadow-glass transition hover:border-white/25 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex items-center gap-4">
+          <Icon name="ticket" size={32} />
+          <div>
+            <p className="text-xs uppercase tracking-widest text-white/55">Next show</p>
+            <p className="mt-1 text-lg font-semibold text-white">{event.title}</p>
+            {details && <p className="text-sm text-white/60">{details}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {label && (
+            <span
+              className="text-2xl font-semibold text-white"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {label}
+            </span>
+          )}
+          <span className="text-sm text-white/60 transition group-hover:text-white">
+            See the show →
+          </span>
+        </div>
+      </Link>
+    </section>
   );
 }

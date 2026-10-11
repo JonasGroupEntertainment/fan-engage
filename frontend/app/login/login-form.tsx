@@ -15,7 +15,11 @@ import {
   signedInLoginRedirectPath,
 } from "@/lib/session-presence";
 import { buildPasswordAuthCredentials } from "@/lib/password-auth-credentials";
-import { buildMagicLinkAuthOptions } from "@/lib/magic-link-auth-options";
+import {
+  MAGIC_LINK_SENT_MESSAGE,
+  buildMagicLinkAuthOptions,
+  isNoAccountMagicLinkError,
+} from "@/lib/magic-link-auth-options";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
@@ -247,12 +251,12 @@ export function LoginForm({
           turnstileToken: token,
         }),
       });
-      if (error) throw error;
+      // No account for this email: show the same text as a real send so the
+      // page does not reveal who is signed up.
+      if (error && !isNoAccountMagicLinkError(error)) throw error;
       pendingMagicSend.current = false;
       setStatus("magic-sent");
-      setMessage(
-        "Magic link sent. Check your email — use the newest link; requesting another one invalidates the previous one.",
-      );
+      setMessage(MAGIC_LINK_SENT_MESSAGE);
       startMagicLinkCooldown();
     } catch (err) {
       pendingMagicSend.current = false;

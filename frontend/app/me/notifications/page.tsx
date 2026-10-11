@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { smsTierAllowed } from "@/lib/sms-send-gate";
+import { AGE_ADULT_ONLY_MESSAGE, adultGate } from "@/lib/age-gate";
+import { BirthDateForm } from "@/components/birth-date-form";
 import { pointsToGold } from "@/lib/tier-thresholds";
 import { PreferencesForm } from "./preferences-form";
 import { DEFAULT_PREFS, TOGGLE_KEYS, type Prefs } from "./prefs";
@@ -38,7 +40,7 @@ export default async function NotificationPreferencesPage() {
       .limit(1),
     supabase
       .from("fans")
-      .select("phone, current_tier, total_points")
+      .select("phone, current_tier, total_points, birth_date")
       .eq("id", user.id)
       .maybeSingle(),
   ]);
@@ -57,10 +59,17 @@ export default async function NotificationPreferencesPage() {
   const hasEmail = !!user.email;
   const hasSms = !!fan?.phone;
 
-  const smsAllowed = smsTierAllowed(fan?.current_tier as string | null);
-  const smsCopy = `Reach Gold tier (${pointsToGold(
-    Number(fan?.total_points) || 0,
-  )} pts to go) to unlock SMS alerts.`;
+  // SMS needs Gold tier and a known adult birth date (COPPA, 0070).
+  const tierAllowsSms = smsTierAllowed(fan?.current_tier as string | null);
+  const ageGate = adultGate((fan?.birth_date as string | null) ?? null);
+  const smsAllowed = tierAllowsSms && ageGate === "ok";
+  const smsCopy = !tierAllowsSms
+    ? `Reach Gold tier (${pointsToGold(
+        Number(fan?.total_points) || 0,
+      )} pts to go) to unlock SMS alerts.`
+    : ageGate === "required"
+      ? "Add your date of birth above to unlock SMS alerts."
+      : AGE_ADULT_ONLY_MESSAGE;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
@@ -86,6 +95,12 @@ export default async function NotificationPreferencesPage() {
           </span>
         </p>
       </header>
+
+      {tierAllowsSms && ageGate === "required" && (
+        <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-4">
+          <BirthDateForm next="/me/notifications" />
+        </div>
+      )}
 
       <PreferencesForm
         initial={prefs}

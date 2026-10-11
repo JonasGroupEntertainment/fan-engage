@@ -124,7 +124,7 @@ describe("channel opt-in migrations", () => {
 
   it("onboard stamps timestamps from the previous flags and still writes the booleans", () => {
     const route = readRepo("../app/api/fan-engage/onboard/route.ts");
-    assert.match(route, /sms_opted_in: consent\.smsOptedIn/);
+    assert.match(route, /sms_opted_in: smsOptedIn,/);
     assert.match(route, /channelOptInTimestampPatch\(/);
     assert.match(route, /isMissingOptInTimestampColumn\(updateErr\)/);
     assert.match(route, /omitOptInTimestamps\(updates\)/);

@@ -349,7 +349,7 @@ describe("premium upgrade prompt: wiring", () => {
     assert.equal(PREMIUM_UPGRADE_PROMPT_COPY.dismiss, "Not now");
     const premiumPage = readRepo("../app/premium/page.tsx");
     assert.doesNotMatch(premiumPage, /grab merch/i);
-    assert.match(premiumPage, /Merch drops coming soon/);
+    assert.match(premiumPage, /and merch\.\s+They are not live yet/);
   });
 
   it("passes signed-in state from the layout and waits out the cookie banner", () => {
