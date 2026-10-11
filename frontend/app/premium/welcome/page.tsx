@@ -163,9 +163,7 @@ export default async function PremiumWelcomePage({
                     #{founderNumber}
                   </p>
                   <p className="mt-6 text-white/75">
-                    Founding Fan is a free badge with 1.5× points while your
-                    account stays active. Premium is billed at the rate shown
-                    at checkout.
+                    Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout.
                   </p>
                   <div
                     className="mx-auto mt-6 inline-flex items-center gap-3 rounded-full border px-5 py-2 text-xs font-semibold uppercase tracking-widest"
@@ -193,9 +191,7 @@ export default async function PremiumWelcomePage({
                     Welcome to Premium.
                   </h1>
                   <p className="mt-4 text-white/70">
-                    Founding Fan is a free badge with 1.5× points while your
-                    account stays active. Premium is billed at the rate shown
-                    at checkout.
+                    Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout.
                   </p>
                   {customerEmail && (
                     <p className="mt-6 text-xs text-white/50">
@@ -265,7 +261,7 @@ export default async function PremiumWelcomePage({
           {isFounder && status === "complete" && founderNumber !== null && community?.slug && (
             <ShareButton
               title={`I'm Founding Fan #${founderNumber} for ${community.display_name ?? community.slug}`}
-              text={`Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout. ${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
+              text={`I'm Founding Fan #${founderNumber} for ${community.display_name ?? community.slug} on Fan Engage! ${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
               url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
               label="Share my badge"
               variant="ghost"
