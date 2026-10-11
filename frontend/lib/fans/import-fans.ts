@@ -59,6 +59,9 @@ async function importNewFan(
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
+    // 0071 requires a birth date at signup. This flag (service role only)
+    // is the one exemption, so imported fans can still be created.
+    app_metadata: { fan_import: true },
   });
   if (authError) {
     // The auth user may already exist without a fans row.
