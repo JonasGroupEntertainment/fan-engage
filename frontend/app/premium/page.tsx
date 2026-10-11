@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
-import { fmtPrice } from "@/lib/stripe-helpers";
+import { fmtPrice, isFanTrialEligible } from "@/lib/stripe-helpers";
+import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
@@ -71,6 +72,11 @@ export default async function PremiumPage({
     tier = (membership?.subscription_tier as string | null) ?? null;
   }
   const isPremium = isPremiumSignal(tier);
+
+  // One free trial per account. Checkout runs the same check, so this only
+  // decides the button copy. Fails closed to the normal buttons.
+  const trialEligible =
+    user && !isPremium ? await isFanTrialEligible(user.id) : false;
 
   const founder = await getFoundingFanClaimState(communityId);
 
@@ -338,7 +344,9 @@ export default async function PremiumPage({
                     backgroundImage: `linear-gradient(90deg, ${community.accent_from}, ${community.accent_to})`,
                   }}
                 >
-                  Choose monthly →
+                  {trialEligible
+                    ? `Start ${TRIAL_DAYS}-day free trial →`
+                    : "Choose monthly →"}
                 </span>
               </button>
             </form>
@@ -375,10 +383,19 @@ export default async function PremiumPage({
                     backgroundImage: `linear-gradient(90deg, ${community.accent_from}, ${community.accent_to})`,
                   }}
                 >
-                  Choose annual →
+                  {trialEligible
+                    ? `Start ${TRIAL_DAYS}-day free trial →`
+                    : "Choose annual →"}
                 </span>
               </button>
             </form>
+            {trialEligible && (
+              <p className="text-xs text-white/55 md:col-span-2">
+                Your first {TRIAL_DAYS} days are free. You won&apos;t be
+                charged until day {TRIAL_DAYS}, and you can cancel anytime
+                before then. One free trial per account.
+              </p>
+            )}
           </section>
         )}
 

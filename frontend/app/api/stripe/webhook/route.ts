@@ -15,6 +15,11 @@ import {
   stripeEventInsertOutcome,
   throwIfDbError,
 } from "@/lib/stripe-webhook-processed";
+import {
+  invoiceGrantsCredit,
+  isTrialConversion,
+  isTrialing,
+} from "@/lib/premium-trial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,6 +122,9 @@ export async function POST(request: Request) {
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(
           event.data.object as Stripe.Subscription,
+          event.data.previous_attributes as
+            | Partial<Stripe.Subscription>
+            | undefined,
           admin,
         );
         break;
@@ -211,6 +219,26 @@ async function handleSubscriptionCreated(
     .eq("community_id", communityId);
   throwIfDbError({ error: updErr }, "subscription.created membership update");
 
+  // Free trial: hold the paid perks (referral points, founder slot) until
+  // the first real payment. subscription.updated grants them when the
+  // trial converts, so a canceled trial never takes a founder slot.
+  if (isTrialing(sub.status)) return;
+
+  await grantConversionPerks(fanId, communityId, tier, admin);
+}
+
+/**
+ * Perks earned by a paying subscriber: referral points for whoever
+ * referred them, and a founder slot plus badge if they bought at the
+ * founder price. Runs at checkout for paid starts, or at trial
+ * conversion for trial starts. Safe to run twice.
+ */
+async function grantConversionPerks(
+  fanId: string,
+  communityId: string,
+  tier: string | null,
+  admin: SupabaseClient,
+) {
   // Referral conversion — award 500 points to the referrer if this fan
   // was referred and their referral is still pending.
   await awardReferralPoints(fanId, admin);
@@ -220,6 +248,17 @@ async function handleSubscriptionCreated(
   // claims per community via advisory lock and returns null if the cap
   // is hit.
   if (tier === "founder") {
+    // claim_founder_slot hands out a new number on every call, so skip
+    // it when this fan already holds one (Stripe retry, replayed event).
+    const { data: existing, error: existingErr } = await admin
+      .from("fan_community_memberships")
+      .select("founder_number")
+      .eq("fan_id", fanId)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    throwIfDbError({ error: existingErr }, "founder slot read");
+    if (existing?.founder_number != null) return;
+
     const { data: slot } = await admin.rpc("claim_founder_slot", {
       p_fan_id: fanId,
       p_community_id: communityId,
@@ -243,9 +282,12 @@ async function handleSubscriptionCreated(
 
 async function handleSubscriptionUpdated(
   sub: Stripe.Subscription,
+  previous: Partial<Stripe.Subscription> | undefined,
   admin: SupabaseClient,
 ) {
-  const { fanId, communityId } = parseSubMetadata(sub);
+  const meta = parseSubMetadata(sub);
+  let fanId = meta.fanId;
+  let communityId = meta.communityId;
   if (!fanId || !communityId) {
     // Metadata stripped somehow — fall back to lookup by subscription id.
     const { data: row, error: readErr } = await admin
@@ -259,11 +301,12 @@ async function handleSubscriptionUpdated(
       return;
     }
     // Found via sub id — fall through to the UPDATE below.
+    fanId = row.fan_id as string;
+    communityId = row.community_id as string;
   }
 
-  const tier = mapStripeStatus(sub.status);
   const updates: Record<string, unknown> = {
-    subscription_tier: tier,
+    subscription_tier: mapStripeStatus(sub.status),
     current_period_end: subPeriodEnd(sub),
     cancel_at_period_end: sub.cancel_at_period_end ?? false,
   };
@@ -273,6 +316,12 @@ async function handleSubscriptionUpdated(
     .update(updates)
     .eq("stripe_subscription_id", sub.id);
   throwIfDbError(result, "subscription.updated membership update");
+
+  // Trial just turned into a paid subscription: grant the perks that
+  // subscription.created held back.
+  if (isTrialConversion(sub.status, previous?.status)) {
+    await grantConversionPerks(fanId, communityId, meta.tier, admin);
+  }
 }
 
 async function handleSubscriptionDeleted(
@@ -325,7 +374,8 @@ async function handleInvoicePaid(
     ? new Date(membership.monthly_credit_refreshed_at as string).getTime()
     : 0;
   const daysSince = (Date.now() - lastRefreshed) / (1000 * 60 * 60 * 24);
-  const refreshCredit = daysSince >= 25;
+  // A $0 invoice (the start of a free trial) does not earn the credit.
+  const refreshCredit = invoiceGrantsCredit(invoice.amount_paid) && daysSince >= 25;
   if (refreshCredit) {
     updates.monthly_credit_cents = MONTHLY_CREDIT_CENTS;
     updates.monthly_credit_refreshed_at = new Date().toISOString();

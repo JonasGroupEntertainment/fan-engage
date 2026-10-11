@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { isTrialEligible } from "@/lib/premium-trial";
 
 /**
  * Server-only helpers for the Stripe Checkout + subscription flow.
@@ -108,4 +109,48 @@ export function pickPriceId(
 export function fmtPrice(cents: number): string {
   const dollars = cents / 100;
   return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+}
+
+/**
+ * Has this fan never had a subscription anywhere? Checks both Stripe (any
+ * status, so a canceled trial still counts) and our membership rows (a
+ * period end means they once had a subscription). Fails closed: any lookup
+ * error returns false, so nobody gets a second trial by accident.
+ */
+export async function isFanTrialEligible(fanId: string): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { count, error } = await admin
+      .from("fan_community_memberships")
+      .select("fan_id", { count: "exact", head: true })
+      .eq("fan_id", fanId)
+      .or("current_period_end.not.is.null,stripe_subscription_id.not.is.null");
+    if (error) throw new Error(error.message);
+
+    const { data: fan, error: fanErr } = await admin
+      .from("fans")
+      .select("stripe_customer_id")
+      .eq("id", fanId)
+      .maybeSingle();
+    if (fanErr) throw new Error(fanErr.message);
+
+    let stripeSubscriptionCount = 0;
+    const customerId = fan?.stripe_customer_id as string | null;
+    if (customerId) {
+      const subs = await getStripe().subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 1,
+      });
+      stripeSubscriptionCount = subs.data.length;
+    }
+
+    return isTrialEligible({
+      stripeSubscriptionCount,
+      pastPaidMemberships: count ?? 0,
+    });
+  } catch (err) {
+    console.warn("isFanTrialEligible: lookup failed, no trial", err);
+    return false;
+  }
 }
