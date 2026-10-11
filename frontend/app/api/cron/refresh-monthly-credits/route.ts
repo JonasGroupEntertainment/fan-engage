@@ -1,6 +1,7 @@
 import { verifyCronAuth } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cronShouldRefreshCredit } from "@/lib/premium-trial";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,10 @@ export const dynamic = "force-dynamic";
  *   2. Premium members whose invoice.paid webhook failed — Stripe retries
  *      on 5xx but eventually gives up. This is the belt-and-suspenders
  *      safety net that catches anyone who slipped through.
+ *
+ * A trialing membership is stored as premium, but first_paid_at stays
+ * null until an invoice with amount_paid > 0 succeeds. Those rows are
+ * skipped so the $5 credit is not granted during the free trial.
  *
  * Matches the same 25-day threshold the webhook uses (see
  * handleInvoicePaid in /api/stripe/webhook/route.ts) so the two paths
@@ -44,7 +49,7 @@ export async function GET(request: Request) {
   const { data: candidates, error: fetchErr } = await admin
     .from("fan_community_memberships")
     .select(
-      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at",
+      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at",
     )
     .in("subscription_tier", ["premium", "comped"])
     .or(
@@ -70,7 +75,20 @@ export async function GET(request: Request) {
     const fanId = row.fan_id as string;
     const communityId = row.community_id as string;
     const tier = row.subscription_tier as string;
-    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+
+    // Trialing fans are premium in our table but have not paid yet.
+    if (
+      !cronShouldRefreshCredit({
+        tier,
+        firstPaidAt: (row.first_paid_at as string | null) ?? null,
+        refreshedAt: (row.monthly_credit_refreshed_at as string | null) ?? null,
+        nowMs,
+      })
+    ) {
+      continue;
+    }
 
     try {
       // Set credit + timestamp in one UPDATE — atomic with any concurrent

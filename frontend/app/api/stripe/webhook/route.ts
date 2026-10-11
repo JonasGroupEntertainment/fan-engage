@@ -11,14 +11,14 @@ import {
   isStripeEventReplay,
   monthlyCreditGrantRow,
   MONTHLY_CREDIT_CENTS,
+  referralLedgerOutcome,
   stripeEventCompletionPatch,
   stripeEventInsertOutcome,
   throwIfDbError,
 } from "@/lib/stripe-webhook-processed";
 import {
-  invoiceGrantsCredit,
-  isTrialConversion,
-  isTrialing,
+  invoiceShouldRefreshCredit,
+  shouldGrantConversionPerks,
   shouldMoveOffFounderPrice,
 } from "@/lib/premium-trial";
 import { pickPriceId } from "@/lib/stripe-helpers";
@@ -35,18 +35,24 @@ export const dynamic = "force-dynamic";
  * for idempotency — successful deliveries are replay no-ops.
  * Failed handlers leave processed_at null so Stripe retries re-run.
  *
- *   customer.subscription.created  → flip membership to 'premium',
- *                                    assign founder slot if applicable,
- *                                    award Founding Fan badge
+ *   customer.subscription.created  → flip membership to 'premium'.
+ *                                    Paid perks only if already active
+ *                                    (no trial). A trial waits.
  *   customer.subscription.updated  → sync status (past_due / cancelled /
- *                                    active), period end, cancel-at-end;
- *                                    at trial conversion grants perks, or
- *                                    moves to the standard price if the
- *                                    founder cap filled during the trial
- *   customer.subscription.deleted  → revert to 'free', clear sub id
+ *                                    active), period end, cancel-at-end.
+ *                                    First time it becomes active after
+ *                                    trialing, past_due, unpaid, or
+ *                                    incomplete, grant paid perks (or
+ *                                    move off the founder price if the
+ *                                    cap filled).
+ *   customer.subscription.deleted  → revert to 'free', clear sub id.
+ *                                    No perks if it never paid.
  *   invoice.paid                   → extend current_period_end, refresh
- *                                    $5 monthly credit if Premium
- *   invoice.payment_failed         → tier → 'past_due' (retry grace)
+ *                                    $5 monthly credit when money was
+ *                                    collected. The first invoice with
+ *                                    amount_paid > 0 also grants paid perks.
+ *   invoice.payment_failed         → tier → 'past_due' (retry grace).
+ *                                    Does not grant perks.
  *
  * Configure the endpoint in Stripe dashboard:
  *   URL:      https://<host>/api/stripe/webhook
@@ -218,6 +224,14 @@ async function handleSubscriptionCreated(
     billing_period: billingPeriod,
   };
 
+  const { data: prior, error: priorErr } = await admin
+    .from("fan_community_memberships")
+    .select("first_paid_at")
+    .eq("fan_id", fanId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+  throwIfDbError({ error: priorErr }, "subscription.created membership read");
+
   const { error: updErr } = await admin
     .from("fan_community_memberships")
     .update(updates)
@@ -225,19 +239,27 @@ async function handleSubscriptionCreated(
     .eq("community_id", communityId);
   throwIfDbError({ error: updErr }, "subscription.created membership update");
 
-  // Free trial: hold the paid perks (referral points, founder slot) until
-  // the first real payment. subscription.updated grants them when the
-  // trial converts, so a canceled trial never takes a founder slot.
-  if (isTrialing(sub.status)) return;
-
-  await grantConversionPerks(sub, fanId, communityId, tier, billingPeriod, admin);
+  // A trial (and any subscription that is not yet active) holds the paid
+  // perks until the first real payment. A fan who already paid once does
+  // not earn them again.
+  if (
+    shouldGrantConversionPerks({
+      event: "customer.subscription.created",
+      status: sub.status,
+      alreadyPaid: prior?.first_paid_at != null,
+    })
+  ) {
+    await grantConversionPerks(sub, fanId, communityId, tier, billingPeriod, admin);
+  }
 }
 
 /**
  * Perks earned by a paying subscriber: referral points for whoever
  * referred them, and a founder slot plus badge if they bought at the
- * founder price. Runs at checkout for paid starts, or at trial
- * conversion for trial starts. Safe to run twice.
+ * founder price. Runs for an already-active checkout, when a trial's
+ * first charge succeeds, and when a declined first charge later
+ * succeeds. Safe to run twice: the referral ledger is unique, and
+ * claim_founder_slot returns the number this fan already holds.
  */
 async function grantConversionPerks(
   sub: Stripe.Subscription,
@@ -255,42 +277,62 @@ async function grantConversionPerks(
   // potential founder. The Postgres function serializes concurrent
   // claims per community via advisory lock and returns null if the cap
   // is hit.
-  if (tier === "founder") {
-    // claim_founder_slot hands out a new number on every call, so skip
-    // it when this fan already holds one (Stripe retry, replayed event).
-    const { data: existing, error: existingErr } = await admin
-      .from("fan_community_memberships")
-      .select("founder_number")
-      .eq("fan_id", fanId)
-      .eq("community_id", communityId)
-      .maybeSingle();
-    throwIfDbError({ error: existingErr }, "founder slot read");
-    if (existing?.founder_number != null) return;
+  if (tier !== "founder") return;
 
-    const { data: slot, error: slotErr } = await admin.rpc("claim_founder_slot", {
+  // claim_founder_slot returns the number this fan already holds, but
+  // skip the call when we can see it here so a replay does not depend
+  // on that. A missing badge from an earlier partial run is still awarded.
+  const { data: existing, error: existingErr } = await admin
+    .from("fan_community_memberships")
+    .select("founder_number")
+    .eq("fan_id", fanId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+  throwIfDbError({ error: existingErr }, "founder slot read");
+
+  let slot: unknown = existing?.founder_number ?? null;
+  if (slot == null) {
+    const { data: claimed, error: slotErr } = await admin.rpc("claim_founder_slot", {
       p_fan_id: fanId,
       p_community_id: communityId,
     });
     // A failed call is not a full cap. Throw so Stripe retries instead of
     // moving the fan off the founder price.
     throwIfDbError({ error: slotErr }, "founder slot claim");
-    if (shouldMoveOffFounderPrice(tier, slot)) {
-      await moveToStandardPrice(sub, fanId, communityId, billingPeriod, admin);
-      return;
-    }
-    if (typeof slot === "number" && slot > 0) {
-      // Phase 5e: route through award_community_badge so the fan also
-      // gets the +500 pts ledger entry AND the in-app notification.
-      // Idempotent — ON CONFLICT DO NOTHING, returns false if already
-      // earned in this community (e.g. Stripe retry after a 5xx).
-      const { error: awardErr } = await admin.rpc("award_community_badge", {
-        p_fan_id: fanId,
-        p_slug: "founding-fan",
-        p_community_id: communityId,
-      });
-      if (awardErr) {
-        console.warn("founding-fan badge award failed", awardErr);
+    if (shouldMoveOffFounderPrice(tier, claimed)) {
+      // A concurrent grant may have claimed the slot between the read
+      // above and this call. The old claim function returns null when
+      // the cap is full even if this fan just received the last number.
+      // Re-read before giving up the founder price.
+      const { data: raced, error: racedErr } = await admin
+        .from("fan_community_memberships")
+        .select("founder_number")
+        .eq("fan_id", fanId)
+        .eq("community_id", communityId)
+        .maybeSingle();
+      throwIfDbError({ error: racedErr }, "founder slot reread");
+      if (typeof raced?.founder_number === "number" && raced.founder_number > 0) {
+        slot = raced.founder_number;
+      } else {
+        await moveToStandardPrice(sub, fanId, communityId, billingPeriod, admin);
+        return;
       }
+    } else {
+      slot = claimed;
+    }
+  }
+  if (typeof slot === "number" && slot > 0) {
+    // Phase 5e: route through award_community_badge so the fan also
+    // gets the +500 pts ledger entry AND the in-app notification.
+    // Idempotent — ON CONFLICT DO NOTHING, returns false if already
+    // earned in this community (e.g. Stripe retry after a 5xx).
+    const { error: awardErr } = await admin.rpc("award_community_badge", {
+      p_fan_id: fanId,
+      p_slug: "founding-fan",
+      p_community_id: communityId,
+    });
+    if (awardErr) {
+      console.warn("founding-fan badge award failed", awardErr);
     }
   }
 }
@@ -384,21 +426,33 @@ async function handleSubscriptionUpdated(
   const meta = parseSubMetadata(sub);
   let fanId = meta.fanId;
   let communityId = meta.communityId;
+
+  const { data: bySub, error: readErr } = await admin
+    .from("fan_community_memberships")
+    .select("fan_id, community_id, first_paid_at")
+    .eq("stripe_subscription_id", sub.id)
+    .maybeSingle();
+  throwIfDbError({ error: readErr }, "subscription.updated membership read");
+
+  let row = bySub;
   if (!fanId || !communityId) {
-    // Metadata stripped somehow — fall back to lookup by subscription id.
-    const { data: row, error: readErr } = await admin
-      .from("fan_community_memberships")
-      .select("fan_id, community_id")
-      .eq("stripe_subscription_id", sub.id)
-      .maybeSingle();
-    throwIfDbError({ error: readErr }, "subscription.updated membership read");
     if (!row) {
       console.warn("subscription.updated: no matching membership", sub.id);
       return;
     }
-    // Found via sub id — fall through to the UPDATE below.
     fanId = row.fan_id as string;
     communityId = row.community_id as string;
+  } else if (!row) {
+    // New subscription id not written yet (updated raced ahead of created).
+    // Read the membership directly so a fan who already paid is not granted again.
+    const { data: byFan, error: fanReadErr } = await admin
+      .from("fan_community_memberships")
+      .select("fan_id, community_id, first_paid_at")
+      .eq("fan_id", fanId)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    throwIfDbError({ error: fanReadErr }, "subscription.updated membership read");
+    row = byFan;
   }
 
   const updates: Record<string, unknown> = {
@@ -413,9 +467,18 @@ async function handleSubscriptionUpdated(
     .eq("stripe_subscription_id", sub.id);
   throwIfDbError(result, "subscription.updated membership update");
 
-  // Trial just turned into a paid subscription: grant the perks that
-  // subscription.created held back.
-  if (isTrialConversion(sub.status, previous?.status)) {
+  // First time this subscription becomes active after a trial or a
+  // failed charge. past_due → active is the dunning / card-update path
+  // that trialing → active does not cover. Already-paid memberships
+  // skip this so a later renewal recovery does not grant again.
+  if (
+    shouldGrantConversionPerks({
+      event: "customer.subscription.updated",
+      status: sub.status,
+      previousStatus: previous?.status ?? null,
+      alreadyPaid: row?.first_paid_at != null,
+    })
+  ) {
     await grantConversionPerks(sub, fanId, communityId, meta.tier, meta.billingPeriod, admin);
   }
 }
@@ -426,6 +489,8 @@ async function handleSubscriptionDeleted(
 ) {
   // Stripe fires this when the subscription ends (after cancel_at_period_end
   // runs out, or after payment_failed retries exhaust). Revert to free.
+  // Do not grant paid perks here. A trial or a declined first charge that
+  // ends without a successful payment keeps first_paid_at null.
   const result = await admin
     .from("fan_community_memberships")
     .update({
@@ -453,32 +518,58 @@ async function handleInvoicePaid(
   const { data: membership, error: readErr } = await admin
     .from("fan_community_memberships")
     .select(
-      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at",
+      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at",
     )
     .eq("stripe_subscription_id", subId)
     .maybeSingle();
   throwIfDbError({ error: readErr }, "invoice.paid membership read");
   if (!membership) return;
 
+  const alreadyPaid = membership.first_paid_at != null;
+  // First invoice with money collected. Covers a clean trial conversion
+  // and a charge that failed, then succeeded on retry or a new card.
+  // Runs before first_paid_at is stamped so a thrown grant is retried.
+  const firstRealPayment = shouldGrantConversionPerks({
+    event: "invoice.paid",
+    amountPaidCents: invoice.amount_paid,
+    alreadyPaid,
+  });
+  if (firstRealPayment) {
+    const stripeSub = await getStripe().subscriptions.retrieve(subId);
+    const meta = parseSubMetadata(stripeSub);
+    await grantConversionPerks(
+      stripeSub,
+      (meta.fanId ?? membership.fan_id) as string,
+      (meta.communityId ?? membership.community_id) as string,
+      meta.tier,
+      meta.billingPeriod,
+      admin,
+    );
+  }
+
+  const nowMs = Date.now();
   const updates: Record<string, unknown> = {
     subscription_tier: "premium",
   };
 
-  // Monthly credit refresh — only if >25 days since last refresh (prevents
+  // Monthly credit refresh — only if 25 days since last refresh (prevents
   // abuse where a user churns + re-subscribes to re-grant credit).
-  const lastRefreshed = membership.monthly_credit_refreshed_at
-    ? new Date(membership.monthly_credit_refreshed_at as string).getTime()
-    : 0;
-  const daysSince = (Date.now() - lastRefreshed) / (1000 * 60 * 60 * 24);
   // A $0 invoice (the start of a free trial) does not earn the credit.
-  const refreshCredit = invoiceGrantsCredit(invoice.amount_paid) && daysSince >= 25;
+  const refreshCredit = invoiceShouldRefreshCredit(
+    invoice.amount_paid,
+    membership.monthly_credit_refreshed_at as string | null,
+    nowMs,
+  );
   if (refreshCredit) {
     updates.monthly_credit_cents = MONTHLY_CREDIT_CENTS;
-    updates.monthly_credit_refreshed_at = new Date().toISOString();
+    updates.monthly_credit_refreshed_at = new Date(nowMs).toISOString();
+  }
+  if (firstRealPayment) {
+    updates.first_paid_at = new Date(nowMs).toISOString();
   }
 
   // Membership first: if this fails we throw and Stripe retries, and no
-  // ledger row has been written yet.
+  // ledger row has been written yet. Perks above are idempotent.
   const result = await admin
     .from("fan_community_memberships")
     .update(updates)
@@ -508,9 +599,11 @@ async function handleInvoicePaymentFailed(
 ) {
   // Card declined — Stripe enters its retry schedule (3-4 attempts over
   // ~14 days). Flip to past_due so the UI can nudge the fan to update
-  // their card, but keep access alive during the grace window. When
-  // retries are exhausted, Stripe fires subscription.deleted and we
-  // revert to 'free'.
+  // their card, but keep access alive during the grace window. Do not
+  // grant the credit, founder slot, or referral points. When a later
+  // attempt succeeds, invoice.paid and past_due → active grant them
+  // once. If retries are exhausted, Stripe fires subscription.deleted
+  // and we revert to 'free' with nothing granted.
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
@@ -549,12 +642,13 @@ async function awardReferralPoints(
   fanId: string,
   admin: SupabaseClient,
 ): Promise<void> {
-  const { data: referral } = await admin
+  const { data: referral, error: referralErr } = await admin
     .from("referrals")
     .select("id, referrer_id")
     .eq("referred_id", fanId)
     .eq("status", "pending")
     .maybeSingle();
+  throwIfDbError({ error: referralErr }, "referral read");
 
   if (!referral) return;
 
@@ -562,11 +656,12 @@ async function awardReferralPoints(
   const sourceRef = `referral_conversion:${referral.id}`;
 
   // Guard: skip if we already awarded points for this referral.
-  const { data: existing } = await admin
+  const { data: existing, error: existingErr } = await admin
     .from("points_ledger")
     .select("id")
     .eq("source_ref", sourceRef)
     .maybeSingle();
+  throwIfDbError({ error: existingErr }, "referral ledger read");
 
   if (!existing) {
     const { error: ledgerErr } = await admin.from("points_ledger").insert({
@@ -577,28 +672,41 @@ async function awardReferralPoints(
       note: "Referred fan went Premium",
     });
 
-    if (ledgerErr) {
-      console.warn("referral points_ledger insert failed", ledgerErr.message);
-    } else {
+    const outcome = referralLedgerOutcome(ledgerErr);
+    if (outcome === "failed") {
+      throw new Error(
+        `referral points_ledger insert failed: ${ledgerErr?.message ?? "unknown"}`,
+      );
+    }
+    if (outcome === "inserted") {
       // Mirror the pattern used in award_community_badge: fetch then update.
-      const { data: fanRow } = await admin
+      const { data: fanRow, error: fanReadErr } = await admin
         .from("fans")
         .select("total_points")
         .eq("id", referral.referrer_id)
         .maybeSingle();
+      throwIfDbError({ error: fanReadErr }, "referral fan read");
 
       if (fanRow !== null) {
-        await admin
+        const { error: bumpErr } = await admin
           .from("fans")
           .update({ total_points: (fanRow.total_points ?? 0) + REFERRAL_POINTS })
           .eq("id", referral.referrer_id);
+        // The ledger row is the idempotency key. A failed total bump is
+        // logged; throwing would retry, see the ledger row, and skip the
+        // bump again. The unique index still stops a second award.
+        if (bumpErr) {
+          console.warn("referral total_points update failed", bumpErr.message);
+        }
       }
     }
   }
 
   // Mark converted. Use verified_at (existing schema column) — the status
   // moves to 'verified' which also triggers the award_referral_badges trigger.
-  await admin
+  // Only reached after the ledger row exists, so a retry cannot pay twice
+  // and a failed insert cannot mark the referral done with no points.
+  const { error: verifyErr } = await admin
     .from("referrals")
     .update({
       status: "verified",
@@ -606,6 +714,7 @@ async function awardReferralPoints(
       verified_at: new Date().toISOString(),
     })
     .eq("id", referral.id);
+  throwIfDbError({ error: verifyErr }, "referral verify");
 }
 
 /**
