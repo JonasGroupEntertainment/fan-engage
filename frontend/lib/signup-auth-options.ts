@@ -8,6 +8,8 @@ export type SignupAuthOptionsInput = {
   phone?: string | null;
   /** True only when the SMS box was ticked and a phone is present. */
   smsOptedIn?: boolean;
+  /** Date of birth as YYYY-MM-DD. The database refuses under-13 sign-ups. */
+  birthDate?: string | null;
 };
 
 export type SignupAuthOptions = {
@@ -33,6 +35,7 @@ export function buildSignupAuthOptions(input: SignupAuthOptionsInput): SignupAut
   }
   if (input.phone) data.phone = input.phone;
   if (input.smsOptedIn === true) data.sms_opted_in = "true";
+  if (input.birthDate) data.birth_date = input.birthDate;
   if (Object.keys(data).length > 0) options.data = data;
 
   return options;

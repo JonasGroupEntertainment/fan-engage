@@ -14,6 +14,7 @@ import {
 import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getCurrentCommunityId } from "@/lib/community";
 import { isPremium } from "@/lib/entitlements";
+import { adultGate } from "@/lib/age-gate";
 
 /**
  * Start a Stripe Checkout Session for Premium. Reads the current
@@ -49,8 +50,19 @@ export async function createCheckoutSessionAction(formData: FormData) {
     redirect(`/signup?ref=${ref}&next=${nextPath}`);
   }
 
-  // 2) Which community?
   const admin = createAdminClient();
+
+  // Paid tiers are 18+. Fans who joined before the age check are asked
+  // for a date of birth first (COPPA, 0070_age_check.sql).
+  const { data: ageRow } = await admin
+    .from("fans")
+    .select("birth_date")
+    .eq("id", user.id)
+    .maybeSingle();
+  const gate = adultGate((ageRow?.birth_date as string | null) ?? null);
+  if (gate !== "ok") redirect(`/premium?age=${gate}`);
+
+  // 2) Which community?
   const { data: community } = await admin
     .from("communities")
     .select(
