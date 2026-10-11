@@ -8,10 +8,13 @@ import { getStripe } from "@/lib/stripe";
 import {
   getOrCreateStripeCustomer,
   getFounderState,
+  isFanTrialEligible,
   pickPriceId,
 } from "@/lib/stripe-helpers";
+import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getCurrentCommunityId } from "@/lib/community";
 import { isPremium } from "@/lib/entitlements";
+import { adultGate } from "@/lib/age-gate";
 
 /**
  * Start a Stripe Checkout Session for Premium. Reads the current
@@ -47,8 +50,19 @@ export async function createCheckoutSessionAction(formData: FormData) {
     redirect(`/signup?ref=${ref}&next=${nextPath}`);
   }
 
-  // 2) Which community?
   const admin = createAdminClient();
+
+  // Paid tiers are 18+. Fans who joined before the age check are asked
+  // for a date of birth first (COPPA, 0070_age_check.sql).
+  const { data: ageRow } = await admin
+    .from("fans")
+    .select("birth_date")
+    .eq("id", user.id)
+    .maybeSingle();
+  const gate = adultGate((ageRow?.birth_date as string | null) ?? null);
+  if (gate !== "ok") redirect(`/premium?age=${gate}`);
+
+  // 2) Which community?
   const { data: community } = await admin
     .from("communities")
     .select(
@@ -117,7 +131,11 @@ export async function createCheckoutSessionAction(formData: FormData) {
     firstName: (fanRow?.first_name as string | null) ?? null,
   });
 
-  // 7) Create the Checkout Session
+  // 7) One free trial per account. Checked after the customer exists so
+  //    the Stripe history lookup sees the right customer.
+  const withTrial = await isFanTrialEligible(user.id);
+
+  // 8) Create the Checkout Session
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
@@ -131,14 +149,17 @@ export async function createCheckoutSessionAction(formData: FormData) {
       community_slug: communityId,
       tier: asFounder ? "founder" : "standard",
       billing_period: billingPeriod,
+      trial: withTrial ? "1" : "0",
     },
     subscription_data: {
+      ...(withTrial ? { trial_period_days: TRIAL_DAYS } : {}),
       metadata: {
         fan_id: user.id,
         community_id: communityId,
         community_slug: communityId,
         tier: asFounder ? "founder" : "standard",
         billing_period: billingPeriod,
+        trial: withTrial ? "1" : "0",
       },
     },
     success_url: `${APP_URL}/premium/welcome?session_id={CHECKOUT_SESSION_ID}`,

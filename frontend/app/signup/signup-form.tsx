@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { signupOnboardingHref } from "@/lib/signup-destination";
 import { PasswordInput } from "@/components/password-input";
@@ -28,10 +28,36 @@ import {
 } from "@/lib/signup-outcome";
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
 import { CONSENT_VERSION } from "@/lib/consent";
+import { persistSignupChannelOptIn } from "@/lib/channel-opt-in";
+import { publicSmsOptIn, type PublicSmsOptIn } from "@/lib/sms-public-opt-in";
+import { PHONE_INPUT_PATTERN } from "@/lib/phone";
+import { SmsConsentCopy } from "@/components/sms-consent-copy";
+import {
+  AGE_BLOCKED_MESSAGE,
+  AGE_BLOCK_STORAGE_KEY,
+  ageBand,
+  parseBirthDate,
+  toIsoDate,
+} from "@/lib/age-gate";
 import {
   COOKIE_CONSENT_EVENT,
   hasAcceptedCookieConsent,
 } from "@/components/cookie-banner";
+
+// A blocked attempt keeps the form closed for this browser session so the
+// date cannot simply be changed and resubmitted.
+function readAgeBlock(): boolean {
+  try {
+    return window.sessionStorage.getItem(AGE_BLOCK_STORAGE_KEY) === "1";
+  } catch {
+    // Storage can be unavailable (private mode); the database check still applies.
+    return false;
+  }
+}
+
+function noopSubscribe(): () => void {
+  return () => {};
+}
 
 export type ConsentDoc = {
   slug: string;
@@ -90,6 +116,19 @@ export function SignupForm({
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const [birthError, setBirthError] = useState<string | null>(null);
+  const [ageBlockedNow, setAgeBlocked] = useState(false);
+  const ageBlockedEarlier = useSyncExternalStore(noopSubscribe, readAgeBlock, () => false);
+  const ageBlocked = ageBlockedNow || ageBlockedEarlier;
+  const birthDate = parseBirthDate(birthYear, birthMonth, birthDay);
+  // Texts are 18+. Until a full adult date is entered, the box stays off.
+  const smsAllowed = birthDate != null && ageBand(birthDate) === "adult";
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -190,11 +229,16 @@ export function SignupForm({
     // Inline validation BEFORE we hit Supabase. Surface field-specific
     // errors so a 6-character password isn't silently rejected as a
     // generic "Unable to create account."
+    if (ageBlocked) return;
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
+    const bErr = birthDate ? null : "Enter a valid date of birth.";
+    const sms = publicSmsOptIn(smsConsent && smsAllowed, phone);
     setEmailError(eErr);
     setPasswordError(pErr);
-    if (eErr || pErr) {
+    setBirthError(bErr);
+    setPhoneError(sms.error);
+    if (eErr || pErr || bErr || sms.error || !birthDate) {
       setStatus("error");
       setMessage("");
       return;
@@ -206,14 +250,43 @@ export function SignupForm({
       return;
     }
 
+    // Under 13: stop here. Nothing is sent to the server and the typed
+    // details are cleared from the page.
+    if (ageBand(birthDate) === "under13") {
+      blockForAge();
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     const ok = await ensureCaptcha();
     if (!ok) return;
-    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined);
+    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined, sms, toIsoDate(birthDate));
   }
 
-  async function createAccount(consentVersion?: string) {
+  function blockForAge() {
+    try {
+      window.sessionStorage.setItem(AGE_BLOCK_STORAGE_KEY, "1");
+    } catch {
+      // Ignore: the block still applies for this page view.
+    }
+    setEmail("");
+    setPassword("");
+    setPhone("");
+    setSmsConsent(false);
+    setBirthMonth("");
+    setBirthDay("");
+    setBirthYear("");
+    setAgeBlocked(true);
+    setStatus("idle");
+    setMessage("");
+  }
+
+  async function createAccount(
+    consentVersion: string | undefined,
+    sms: PublicSmsOptIn,
+    birthDateIso: string,
+  ) {
     setStatus("loading");
     setMessage("");
 
@@ -231,6 +304,9 @@ export function SignupForm({
           turnstileConfigured,
           turnstileToken,
           consentVersion,
+          phone: sms.phone,
+          smsOptedIn: sms.smsOptedIn,
+          birthDate: birthDateIso,
         }),
       });
       resetChallenge();
@@ -264,6 +340,8 @@ export function SignupForm({
         setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
         return;
       }
+
+      if (data.user?.id) await persistSignupChannelOptIn(supabase, data.user.id, sms);
 
       router.push(onboardingHref);
       router.refresh();
@@ -384,6 +462,11 @@ export function SignupForm({
           </div>
         )}
 
+        {ageBlocked ? (
+          <p role="status" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/75">
+            {AGE_BLOCKED_MESSAGE}
+          </p>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wide text-white/60">Email</span>
@@ -461,6 +544,96 @@ export function SignupForm({
               );
             })()}
           </div>
+
+          <fieldset className="space-y-1">
+            <legend className="text-xs uppercase tracking-wide text-white/60">Date of birth</legend>
+            <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2">
+              {[
+                { label: "Month", value: birthMonth, set: setBirthMonth, max: 2, auto: "bday-month", ph: "MM" },
+                { label: "Day", value: birthDay, set: setBirthDay, max: 2, auto: "bday-day", ph: "DD" },
+                { label: "Year", value: birthYear, set: setBirthYear, max: 4, auto: "bday-year", ph: "YYYY" },
+              ].map((f) => (
+                <input
+                  key={f.label}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete={f.auto}
+                  aria-label={`Birth ${f.label.toLowerCase()}`}
+                  maxLength={f.max}
+                  value={f.value}
+                  onChange={(e) => {
+                    f.set(e.target.value.replace(/\D/g, ""));
+                    if (birthError) setBirthError(null);
+                  }}
+                  aria-invalid={!!birthError}
+                  className={
+                    "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none " +
+                    (birthError
+                      ? "border-rose-500/60 focus:border-rose-400"
+                      : "border-white/10 focus:border-white/40")
+                  }
+                  placeholder={f.ph}
+                />
+              ))}
+            </div>
+            {birthError && <span className="text-xs text-rose-300">{birthError}</span>}
+          </fieldset>
+
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wide text-white/60">
+              Mobile phone <span className="normal-case tracking-normal text-white/40">(optional)</span>
+            </span>
+            <input
+              type="tel"
+              name="phone"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              pattern={PHONE_INPUT_PATTERN}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (phoneError) setPhoneError(publicSmsOptIn(smsConsent, e.target.value).error);
+              }}
+              onBlur={() => setPhoneError(publicSmsOptIn(smsConsent, phone).error)}
+              aria-invalid={!!phoneError}
+              className={
+                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none " +
+                (phoneError
+                  ? "border-rose-500/60 focus:border-rose-400"
+                  : "border-white/10 focus:border-white/40")
+              }
+              placeholder="+1 (615) 555-0123"
+            />
+            {phoneError ? (
+              <span className="text-xs text-rose-300">{phoneError}</span>
+            ) : (
+              <span className="text-xs text-white/45">
+                Optional. Leave it blank and you can still create your account.
+              </span>
+            )}
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+            <input
+              type="checkbox"
+              name="sms-consent"
+              checked={smsConsent && smsAllowed}
+              disabled={!smsAllowed}
+              onChange={(e) => setSmsConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+            />
+            <SmsConsentCopy linkClassName="text-white/85 underline underline-offset-4 hover:text-white" />
+          </label>
+          {!smsAllowed && (
+            <p className="text-xs text-white/45">
+              Text alerts are for fans 18 and older.
+            </p>
+          )}
+          {smsAllowed && smsConsent && !phone.trim() && (
+            <p className="text-xs text-white/45">
+              Add a mobile number if you want texts. The box does not opt you in without one, and you can still create your account.
+            </p>
+          )}
 
           {turnstileConfigured && (
             <div className="space-y-2">
@@ -586,6 +759,7 @@ export function SignupForm({
             </div>
           )}
         </form>
+        )}
 
         {status === "need-signin" && (
           <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">

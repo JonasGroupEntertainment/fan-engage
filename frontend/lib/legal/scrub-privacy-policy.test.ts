@@ -10,7 +10,9 @@ import {
 } from "./official-contact.ts";
 import {
   applyPrivacyCounselScrub,
+  applyPrivacySmsDisclosure,
   privacyCounselEffectiveDate,
+  SMS_PRIVACY_NO_SHARE_SENTENCE,
 } from "./scrub-privacy-policy.ts";
 
 function readRepo(relFromLib: string): string {
@@ -63,6 +65,29 @@ describe("applyPrivacyCounselScrub", () => {
     const commercial =
       "We use Stripe to process purchases for fan rewards. Points have no cash value.";
     assert.equal(applyPrivacyCounselScrub(commercial), commercial);
+  });
+});
+
+describe("applyPrivacySmsDisclosure", () => {
+  const wrapped =
+    "- To allow you to request services;\n\n- To provide you with communications when you sign up for our text\n  messages;\n\n- To administer our Website, including by monitoring and analyzing our\n  Website traffic and usage patterns;";
+
+  it("joins the cut-off text bullet and adds the no-share sentence once", () => {
+    const fixed = applyPrivacySmsDisclosure(wrapped);
+    const bullet = fixed.split("\n").find((line) => line.includes("sign up for our text"));
+    assert.match(bullet ?? "", /our text messages;/);
+    assert.equal(fixed.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(applyPrivacySmsDisclosure(fixed), fixed);
+    assert.match(fixed, /To allow you to request services;/);
+    assert.match(fixed, /To administer our Website/);
+  });
+
+  it("runs as part of the privacy scrub and leaves text without that bullet unchanged", () => {
+    const commercial = "We use Stripe to process purchases for fan rewards.";
+    assert.equal(applyPrivacySmsDisclosure(commercial), commercial);
+    const scrubbed = applyPrivacyCounselScrub(wrapped);
+    assert.equal(scrubbed.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(applyPrivacyCounselScrub(scrubbed), scrubbed);
   });
 });
 

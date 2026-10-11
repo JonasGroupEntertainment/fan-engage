@@ -14,6 +14,7 @@ import {
   hasSendablePhone,
   smsSendBlockedReason,
 } from "@/lib/sms-send-gate";
+import { SmsConsentCopy } from "@/components/sms-consent-copy";
 
 type Field = {
   label: string;
@@ -115,9 +116,14 @@ const steps: { title: string; description: string; fields: Field[] }[] = [
 
 export default function OnboardingWizard({
   initialEmail = "",
+  initialPhone = "",
+  initialSmsConsent = false,
   sessionConfirmed = false,
 }: {
   initialEmail?: string;
+  initialPhone?: string;
+  /** True when this fan already opted in (for example on the public signup form). */
+  initialSmsConsent?: boolean;
   sessionConfirmed?: boolean;
 }) {
   const router = useRouter();
@@ -131,18 +137,25 @@ export default function OnboardingWizard({
   const [signupHref, setSignupHref] = useState("/signup?ref=raelynn&next=%2Fonboarding");
   const [loginHref, setLoginHref] = useState("/login?next=/onboarding");
   const [stepIndex, setStepIndex] = useState(0);
-  const [formState, setFormState] = useState<Record<string, string>>(
-    initialEmail ? { email: initialEmail } : {},
-  );
+  const [formState, setFormState] = useState<Record<string, string>>(() => {
+    const state: Record<string, string> = {};
+    if (initialEmail) state.email = initialEmail;
+    if (initialPhone) state.phone = initialPhone;
+    return state;
+  });
   const [smsStatus, setSmsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [smsMessage, setSmsMessage] = useState(EMPTY_PHONE_SMS_MESSAGE);
+  const [smsMessage, setSmsMessage] = useState(
+    hasSendablePhone(initialPhone)
+      ? "Ready to send the confirmation text."
+      : EMPTY_PHONE_SMS_MESSAGE,
+  );
   const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
   const [finishMessage, setFinishMessage] = useState(GENERIC_FINISH_ERROR);
   const [tosConsent, setTosConsent] = useState(false);
   // The moment the fan ticked the Terms box. Sent as the consent time so
   // the server never has to invent one.
   const [tosConsentAt, setTosConsentAt] = useState<string | null>(null);
-  const [smsConsent, setSmsConsent] = useState(false);
+  const [smsConsent, setSmsConsent] = useState(initialSmsConsent);
   // Tracks whether the email field was successfully auto-prefilled from
   // auth.users. When true, the field stays readOnly (no risk of typo
   // changing what's already on the account). When false, the field is
@@ -615,7 +628,7 @@ export default function OnboardingWizard({
                   </span>
                 </label>
                 {formState.phone && (
-                  <label className="flex items-center gap-3 py-1">
+                  <label className="flex items-start gap-3 py-1">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center">
                       <input
                         type="checkbox"
@@ -624,10 +637,7 @@ export default function OnboardingWizard({
                         className="h-5 w-5 accent-aurora"
                       />
                     </span>
-                    <span>
-                      I consent to receive SMS from Fan Engage about artist drops, events, and
-                      rewards. Msg &amp; data rates may apply. Reply STOP to opt out.
-                    </span>
+                    <SmsConsentCopy linkClassName="text-aurora underline" />
                   </label>
                 )}
               </div>
@@ -677,11 +687,7 @@ export default function OnboardingWizard({
                 {isLastStep ? (
                   <button
                     onClick={handleFinish}
-                    disabled={
-                      finishStatus === "saving" ||
-                      !tosConsent ||
-                      (hasSendablePhone(formState.phone) && !smsConsent)
-                    }
+                    disabled={finishStatus === "saving" || !tosConsent}
                     className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110 disabled:opacity-50"
                   >
                     {finishStatus === "saving" ? "Saving…" : "Finish onboarding"}

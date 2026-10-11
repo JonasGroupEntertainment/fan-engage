@@ -37,6 +37,29 @@ describe("buildSignupAuthOptions", () => {
     );
   });
 
+  it("stores an E.164 phone and SMS consent only when the box counts", () => {
+    const withSms = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      phone: "+16155550123",
+      smsOptedIn: true,
+    });
+    assert.deepEqual(withSms.data, {
+      phone: "+16155550123",
+      sms_opted_in: "true",
+    });
+
+    const phoneOnly = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      phone: "+16155550123",
+      smsOptedIn: false,
+    });
+    assert.deepEqual(phoneOnly.data, { phone: "+16155550123" });
+  });
+
   it("omits captcha and consent metadata when those features are absent", () => {
     assert.deepEqual(
       buildSignupAuthOptions({
@@ -46,5 +69,15 @@ describe("buildSignupAuthOptions", () => {
       }),
       { emailRedirectTo: "http://localhost:3000/auth/callback" },
     );
+  });
+
+  it("passes the date of birth through as metadata", () => {
+    const options = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      birthDate: "1990-05-01",
+    });
+    assert.deepEqual(options.data, { birth_date: "1990-05-01" });
   });
 });

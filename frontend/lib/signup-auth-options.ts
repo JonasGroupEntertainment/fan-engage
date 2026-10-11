@@ -4,6 +4,12 @@ export type SignupAuthOptionsInput = {
   turnstileToken: string | null;
   consentVersion?: string;
   acceptedAt?: string;
+  /** E.164 phone from the optional public signup field. */
+  phone?: string | null;
+  /** True only when the SMS box was ticked and a phone is present. */
+  smsOptedIn?: boolean;
+  /** Date of birth as YYYY-MM-DD. The database refuses under-13 sign-ups. */
+  birthDate?: string | null;
 };
 
 export type SignupAuthOptions = {
@@ -22,12 +28,15 @@ export function buildSignupAuthOptions(input: SignupAuthOptionsInput): SignupAut
     options.captchaToken = captchaToken;
   }
 
+  const data: Record<string, string> = {};
   if (input.consentVersion) {
-    options.data = {
-      consent_accepted_at: input.acceptedAt ?? new Date().toISOString(),
-      consent_version: input.consentVersion,
-    };
+    data.consent_accepted_at = input.acceptedAt ?? new Date().toISOString();
+    data.consent_version = input.consentVersion;
   }
+  if (input.phone) data.phone = input.phone;
+  if (input.smsOptedIn === true) data.sms_opted_in = "true";
+  if (input.birthDate) data.birth_date = input.birthDate;
+  if (Object.keys(data).length > 0) options.data = data;
 
   return options;
 }
