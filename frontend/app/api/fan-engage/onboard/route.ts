@@ -9,6 +9,7 @@ import { normalizePhoneE164 } from "@/lib/phone";
 import { setPreferences } from "@/lib/notifications/preferences";
 import { smsEnabledFromOnboarding } from "@/lib/sms-send-gate";
 import { onboardConsentUpdates } from "@/lib/consent";
+import { adultSmsOptIn } from "@/lib/age-gate";
 import {
   channelOptInTimestampPatch,
   isMissingOptInTimestampColumn,
@@ -107,9 +108,17 @@ export async function POST(request: NextRequest) {
     // fans.profile_slug, is owned by the BEFORE INSERT trigger.
     const { data: existingFan } = await supabase
       .from("fans")
-      .select("socials, sms_opted_in, email_opted_in")
+      .select("socials, sms_opted_in, email_opted_in, birth_date")
       .eq("id", user.id)
       .maybeSingle();
+
+    // Texts are 18+ (COPPA, 0070). A new SMS opt-in needs a known adult
+    // birth date; a fan already opted in with no birth date keeps it.
+    const smsOptedIn = adultSmsOptIn(
+      consent.smsOptedIn,
+      existingFan?.birth_date as string | null,
+      existingFan?.sms_opted_in === true,
+    );
 
     let socialsMerge: Record<string, unknown> | undefined = undefined;
     if (typeof payload.handle === "string" && payload.handle.trim()) {
@@ -127,7 +136,7 @@ export async function POST(request: NextRequest) {
       phone: phoneResult.phone,
       music_outlet: payload.musicOutlet ?? null,
       interest: payload.interest ?? null,
-      sms_opted_in: consent.smsOptedIn,
+      sms_opted_in: smsOptedIn,
       email_opted_in: nextEmailOptedIn,
       // Stamp the channel time only on a false → true flip. Opt-out leaves
       // the previous timestamp in place (see lib/channel-opt-in.ts).
@@ -136,7 +145,7 @@ export async function POST(request: NextRequest) {
           smsOptedIn: existingFan?.sms_opted_in === true,
           emailOptedIn: existingFan?.email_opted_in === true,
         },
-        { smsOptedIn: consent.smsOptedIn, emailOptedIn: nextEmailOptedIn },
+        { smsOptedIn, emailOptedIn: nextEmailOptedIn },
       ),
       // Only written when the fan ticked the Terms box this time, so a
       // re-submit never blanks or back-dates an earlier consent.
@@ -177,7 +186,7 @@ export async function POST(request: NextRequest) {
     //     so without this an opted-in fan never gets a text.
     try {
       await setPreferences(user.id, {
-        sms_enabled: smsEnabledFromOnboarding(consent.smsOptedIn, phoneResult.phone),
+        sms_enabled: smsEnabledFromOnboarding(smsOptedIn, phoneResult.phone),
       });
     } catch (err) {
       console.warn("onboard: failed to sync SMS preference", err);

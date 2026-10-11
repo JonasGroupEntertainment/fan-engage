@@ -9,6 +9,8 @@ import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
 import { PREMIUM_CTA, isPremium as isPremiumSignal } from "@/lib/entitlements";
+import { AGE_ADULT_ONLY_MESSAGE } from "@/lib/age-gate";
+import { BirthDateForm } from "@/components/birth-date-form";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,7 @@ export default async function PremiumPage({
   searchParams?: Promise<{
     canceled?: string;
     already_active?: string;
+    age?: string;
   }>;
 }) {
   const params = (await searchParams) ?? {};
@@ -122,6 +125,17 @@ export default async function PremiumPage({
           <div className="mb-8 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             You&apos;re already a Premium fan of {community.display_name} —
             welcome back.
+          </div>
+        )}
+
+        {params.age === "adult_only" && (
+          <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/75">
+            {AGE_ADULT_ONLY_MESSAGE}
+          </div>
+        )}
+        {params.age === "required" && user && (
+          <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-4">
+            <BirthDateForm next="/premium" />
           </div>
         )}
 
