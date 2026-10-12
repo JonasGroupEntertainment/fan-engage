@@ -19,6 +19,16 @@ export const PRIVACY_COUNSEL_EFFECTIVE_DATE = "2026-09-24";
 export const SMS_PRIVACY_NO_SHARE_SENTENCE =
   "We do not sell, rent, or share mobile phone numbers or SMS opt-in data and consent with third parties or affiliates for their marketing or promotional purposes.";
 
+/**
+ * Exact phrase Mailchimp case 15164101807 requires on the public privacy
+ * page, kept as its own sentence after SMS_PRIVACY_NO_SHARE_SENTENCE.
+ * The phrase itself stays lowercase so a literal match succeeds.
+ */
+export const SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE =
+  "We confirm that mobile opt-in data will not be shared with third parties.";
+
+const SMS_DISCLOSURE_PARAGRAPH = `${SMS_PRIVACY_NO_SHARE_SENTENCE} ${SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE}`;
+
 const TEXT_MESSAGE_BULLET =
   "To provide you with communications when you sign up for our text messages;";
 
@@ -26,17 +36,25 @@ const TEXT_MESSAGE_BULLET =
  * The stored policy wraps "messages;" onto the next line, and the policy
  * renderer only keeps lines that start a list item, so /privacy shows a
  * sentence that stops at "text". Join that bullet onto one line and add
- * the no-share sentence once. Terms are never passed through here.
+ * the no-share sentences once. Terms are never passed through here.
  */
 export function applyPrivacySmsDisclosure(content: string): string {
   let next = content.replace(
     /To provide you with communications when you sign up for our text\s+messages;/g,
     TEXT_MESSAGE_BULLET,
   );
-  if (next.includes(TEXT_MESSAGE_BULLET) && !next.includes(SMS_PRIVACY_NO_SHARE_SENTENCE)) {
+  if (
+    next.includes(SMS_PRIVACY_NO_SHARE_SENTENCE) &&
+    !next.includes(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE)
+  ) {
+    next = next.replace(SMS_PRIVACY_NO_SHARE_SENTENCE, SMS_DISCLOSURE_PARAGRAPH);
+  } else if (
+    next.includes(TEXT_MESSAGE_BULLET) &&
+    !next.includes(SMS_PRIVACY_NO_SHARE_SENTENCE)
+  ) {
     next = next.replace(
       TEXT_MESSAGE_BULLET,
-      `${TEXT_MESSAGE_BULLET}\n\n${SMS_PRIVACY_NO_SHARE_SENTENCE}`,
+      `${TEXT_MESSAGE_BULLET}\n\n${SMS_DISCLOSURE_PARAGRAPH}`,
     );
   }
   return next;
