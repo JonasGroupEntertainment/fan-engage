@@ -15,6 +15,7 @@ function readRepo(relFromLib: string): string {
 describe("one Founding Fan rule", () => {
   it("is first-100 free, not a July 15 window or paid pricing", () => {
     assert.match(FOUNDING_FAN_RULE, /first 100/i);
+    assert.match(FOUNDING_FAN_RULE, /numbered badge and 1\.5× points, plus 48-hour early RSVP/i);
     assert.match(FOUNDING_FAN_RULE, /not a Premium purchase/i);
     assert.doesNotMatch(FOUNDING_FAN_RULE, /July/);
     assert.equal(isLegacyFoundingCopy("before July 15, 2026"), true);

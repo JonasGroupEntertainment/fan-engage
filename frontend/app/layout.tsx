@@ -177,7 +177,7 @@ export default async function RootLayout({
                   className="text-lg font-semibold"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
-                  Fan Engage
+                  Fan Engage Pro
                 </span>
               </Link>
               <MobileNav navItems={navItems} isSignedIn={Boolean(user)} />
