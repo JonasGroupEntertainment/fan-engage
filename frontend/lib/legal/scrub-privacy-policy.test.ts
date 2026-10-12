@@ -12,6 +12,7 @@ import {
   applyPrivacyCounselScrub,
   applyPrivacySmsDisclosure,
   privacyCounselEffectiveDate,
+  SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE,
   SMS_PRIVACY_NO_SHARE_SENTENCE,
 } from "./scrub-privacy-policy.ts";
 
@@ -77,9 +78,35 @@ describe("applyPrivacySmsDisclosure", () => {
     const bullet = fixed.split("\n").find((line) => line.includes("sign up for our text"));
     assert.match(bullet ?? "", /our text messages;/);
     assert.equal(fixed.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(fixed.includes(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE), true);
+    assert.equal(
+      fixed.includes("mobile opt-in data will not be shared with third parties"),
+      true,
+    );
     assert.equal(applyPrivacySmsDisclosure(fixed), fixed);
     assert.match(fixed, /To allow you to request services;/);
     assert.match(fixed, /To administer our Website/);
+  });
+
+  it("adds the Mailchimp phrase after the sentence already stored by 0069", () => {
+    const stored = `- To provide you with communications when you sign up for our text messages;\n\n${SMS_PRIVACY_NO_SHARE_SENTENCE}\n\n- To administer our Website;`;
+    const fixed = applyPrivacySmsDisclosure(stored);
+    assert.equal(fixed.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(fixed.includes(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE), true);
+    assert.equal(fixed.indexOf(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE) > fixed.indexOf(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(
+      (fixed.match(/mobile opt-in data will not be shared with third parties\./g) ?? []).length,
+      1,
+    );
+    assert.equal(applyPrivacySmsDisclosure(fixed), fixed);
+  });
+
+  it("0075 stores the exact Mailchimp phrase on the privacy row only", () => {
+    const sql = readRepo("../../../supabase/migrations/0075_privacy_sms_exact_no_share.sql");
+    assert.equal(sql.includes(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE), true);
+    assert.equal(sql.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.match(sql, /where slug = 'privacy'/);
+    assert.doesNotMatch(sql, /slug = 'terms'/);
   });
 
   it("runs as part of the privacy scrub and leaves text without that bullet unchanged", () => {
@@ -87,6 +114,7 @@ describe("applyPrivacySmsDisclosure", () => {
     assert.equal(applyPrivacySmsDisclosure(commercial), commercial);
     const scrubbed = applyPrivacyCounselScrub(wrapped);
     assert.equal(scrubbed.includes(SMS_PRIVACY_NO_SHARE_SENTENCE), true);
+    assert.equal(scrubbed.includes(SMS_MOBILE_OPT_IN_NO_SHARE_SENTENCE), true);
     assert.equal(applyPrivacyCounselScrub(scrubbed), scrubbed);
   });
 });
