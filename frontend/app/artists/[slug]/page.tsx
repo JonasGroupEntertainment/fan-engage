@@ -208,13 +208,24 @@ export default async function ArtistPage({
             >
               Community →
             </Link>
-            <Link
-              href={secondaryCta.href}
-              className="rounded-full border border-white/30 bg-black/30 px-6 py-3 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/10"
-            >
-              {secondaryCta.label}
-            </Link>
-            {/* Soft launch: hide Shopify until marketplace provider is ready */}
+            {!marketplaceLive && artist.merchUrl ? (
+              <a
+                href={artist.merchUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="rounded-full border border-white/30 bg-black/30 px-6 py-3 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/10"
+              >
+                Merch
+              </a>
+            ) : (
+              <Link
+                href={secondaryCta.href}
+                className="rounded-full border border-white/30 bg-black/30 px-6 py-3 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/10"
+              >
+                {secondaryCta.label}
+              </Link>
+            )}
+            {/* Official store link shown alongside marketplace once it is live */}
             {marketplaceLive && artist.merchUrl ? (
               <a
                 href={artist.merchUrl}
@@ -445,11 +456,11 @@ export default async function ArtistPage({
               className="mt-1 text-xl font-semibold"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {marketplaceLive
+              {marketplaceLive || artist.merchUrl
                 ? `Shop ${artist.name} merch`
                 : `${artist.name} merch — coming soon`}
             </h2>
-            {!marketplaceLive ? (
+            {!marketplaceLive && !artist.merchUrl ? (
               <p className="mt-2 max-w-xl text-sm text-white/65">
                 Physical merch and signed gear stay Coming soon. Signed-in fans
                 can already spend points on digital unlocks.
@@ -457,12 +468,23 @@ export default async function ArtistPage({
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/marketplace"
-              className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
-            >
-              {marketplaceLive ? "Browse marketplace" : "Coming soon"}
-            </Link>
+            {!marketplaceLive && artist.merchUrl ? (
+              <a
+                href={artist.merchUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+              >
+                Merch
+              </a>
+            ) : (
+              <Link
+                href="/marketplace"
+                className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 hover:border-white/40 hover:text-white transition"
+              >
+                {marketplaceLive ? "Browse marketplace" : "Coming soon"}
+              </Link>
+            )}
             {marketplaceLive && artist.merchUrl ? (
               <a
                 href={artist.merchUrl}
