@@ -29,6 +29,7 @@ import {
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
 import { CONSENT_VERSION } from "@/lib/consent";
 import { persistSignupChannelOptIn } from "@/lib/channel-opt-in";
+import { tagInternalAccountOnSignup } from "@/app/signup/tag-internal-account";
 import { publicSmsOptIn, type PublicSmsOptIn } from "@/lib/sms-public-opt-in";
 import { PHONE_INPUT_PATTERN } from "@/lib/phone";
 import { SmsConsentCopy } from "@/components/sms-consent-copy";
@@ -341,7 +342,10 @@ export function SignupForm({
         return;
       }
 
-      if (data.user?.id) await persistSignupChannelOptIn(supabase, data.user.id, sms);
+      if (data.user?.id) {
+        await persistSignupChannelOptIn(supabase, data.user.id, sms);
+        await tagInternalAccountOnSignup();
+      }
 
       router.push(onboardingHref);
       router.refresh();
