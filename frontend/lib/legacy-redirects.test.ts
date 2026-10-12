@@ -35,6 +35,15 @@ describe("pricing / plans aliases", () => {
   });
 });
 
+describe("help aliases", () => {
+  it("redirects /support, /contact, and /faq to /help", () => {
+    assert.match(nextConfig, /source:\s*"\/support"/);
+    assert.match(nextConfig, /source:\s*"\/contact"/);
+    assert.match(nextConfig, /source:\s*"\/faq"/);
+    assert.match(nextConfig, /destination:\s*"\/help"/);
+  });
+});
+
 describe("settings alias", () => {
   it("redirects /settings to /me", () => {
     assert.match(nextConfig, /source:\s*"\/settings"/);
