@@ -86,7 +86,7 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
         tier: (e.tier ?? "public") as "public" | "premium",
       })),
     merch: fallback?.merch ?? [],
-    merchUrl: row.merch_url ?? null,
+    merchUrl: row.merch_url ?? fallback?.merchUrl ?? null,
   };
 }
 

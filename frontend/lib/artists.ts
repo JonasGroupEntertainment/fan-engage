@@ -57,6 +57,8 @@ export const ARTISTS: Record<string, Artist> = {
       // Official X is @RaeLynn. Do not use raelynnofficial on X (wrong account).
       { label: "X", href: "https://x.com/RaeLynn" },
     ],
+    // Official Shopify store (from Carla, 2026-10-12).
+    merchUrl: "https://shop.raelynn.com/",
   },
   bailee: {
     slug: "bailee",
