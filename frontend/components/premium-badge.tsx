@@ -43,7 +43,7 @@ export default function PremiumBadge({
   const label = isFounder ? "Founder" : "Premium";
   const icon = isFounder ? "👑" : "⭐";
   const tooltip = isFounder
-    ? `Founding Fan${founderNumber ? ` #${founderNumber}` : ""} — locked-in pricing for life`
+    ? `Founding Fan${founderNumber ? ` #${founderNumber}` : ""} — free badge, 1.5× points`
     : "Premium fan";
 
   const className =

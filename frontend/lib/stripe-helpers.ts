@@ -50,10 +50,9 @@ export interface FounderState {
 }
 
 /**
- * Paid Premium founder-pricing eligibility (checkout / webhook).
- * Counts `is_founder` — a different flag from public Founding Fan
- * numbers 1–100. Guest counters on homepage, /artists/[slug], and
- * /premium MUST use `getFoundingFanClaimState`, not this helper.
+ * Count of existing paid `is_founder` holders. Checkout and the webhook
+ * do not use this to pick a price or grant a slot. Public Founding Fan
+ * numbers 1–100 come from `getFoundingFanClaimState`.
  */
 export async function getFounderState(communityId: string): Promise<FounderState> {
   const admin = createAdminClient();
@@ -82,24 +81,17 @@ export async function getFounderState(communityId: string): Promise<FounderState
 }
 
 /**
- * Pick the right Stripe price_id for a given billing period + founder
- * eligibility. Returns null if the community isn't seeded yet.
+ * Standard Premium price for a new checkout ($10/mo or $99/yr on the
+ * seeded community). Never returns a founder price ID. Subscriptions
+ * already on a founder price are left on that price.
  */
 export function pickPriceId(
   community: {
     stripe_price_id_monthly: string | null;
     stripe_price_id_annual: string | null;
-    stripe_price_id_founder_monthly: string | null;
-    stripe_price_id_founder_annual: string | null;
   },
   billingPeriod: "monthly" | "annual",
-  asFounder: boolean,
 ): string | null {
-  if (asFounder) {
-    return billingPeriod === "monthly"
-      ? community.stripe_price_id_founder_monthly
-      : community.stripe_price_id_founder_annual;
-  }
   return billingPeriod === "monthly"
     ? community.stripe_price_id_monthly
     : community.stripe_price_id_annual;

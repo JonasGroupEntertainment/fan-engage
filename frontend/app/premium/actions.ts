@@ -7,7 +7,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import {
   getOrCreateStripeCustomer,
-  getFounderState,
   isFanTrialEligible,
   pickPriceId,
 } from "@/lib/stripe-helpers";
@@ -19,15 +18,12 @@ import { adultGate } from "@/lib/age-gate";
 /**
  * Start a Stripe Checkout Session for Premium. Reads the current
  * community from request context, resolves the fan, gets-or-creates
- * their Stripe customer, picks the right price_id (founder vs
- * standard × monthly vs annual), creates the session, and redirects
- * the browser to Stripe.
+ * their Stripe customer, picks the standard price ($10/mo or $99/yr),
+ * creates the session, and redirects the browser to Stripe.
  *
- * Founder slot assignment is atomic at webhook time — we only PICK
- * the founder price here if slots are still available, but a race at
- * the boundary means two users might both get a founder price_id; the
- * webhook handler (Phase 5c) re-checks the count before assigning
- * is_founder=true + founder_number.
+ * Founding Fan is a free badge claimed when the fan joins or finishes
+ * onboarding. Checkout does not select a founder price, and the webhook
+ * does not grant or revoke a founder slot from a charge.
  */
 export async function createCheckoutSessionAction(formData: FormData) {
   const billingPeriod = (formData.get("billing_period") ?? "monthly") as
@@ -66,7 +62,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
   const { data: community } = await admin
     .from("communities")
     .select(
-      "slug, display_name, stripe_product_id, stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual, active",
+      "slug, display_name, stripe_product_id, stripe_price_id_monthly, stripe_price_id_annual, active",
     )
     .eq("slug", communityId)
     .maybeSingle();
@@ -108,14 +104,12 @@ export async function createCheckoutSessionAction(formData: FormData) {
     .select()
     .maybeSingle();
 
-  // 5) Founder eligibility (advisory — webhook re-checks atomically)
-  const founderState = await getFounderState(communityId);
-  const asFounder = !founderState.isFull;
-
-  const priceId = pickPriceId(community, billingPeriod, asFounder);
+  // 5) Standard price only. Founder price IDs stay in Stripe for
+  //    subscriptions that already use them; new checkouts do not.
+  const priceId = pickPriceId(community, billingPeriod);
   if (!priceId) {
     throw new Error(
-      `No Stripe price_id configured for ${billingPeriod}/${asFounder ? "founder" : "standard"} in ${communityId}`,
+      `No Stripe price_id configured for ${billingPeriod} in ${communityId}`,
     );
   }
 
@@ -147,7 +141,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
       fan_id: user.id,
       community_id: communityId,
       community_slug: communityId,
-      tier: asFounder ? "founder" : "standard",
+      tier: "standard",
       billing_period: billingPeriod,
       trial: withTrial ? "1" : "0",
     },
@@ -157,7 +151,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
         fan_id: user.id,
         community_id: communityId,
         community_slug: communityId,
-        tier: asFounder ? "founder" : "standard",
+        tier: "standard",
         billing_period: billingPeriod,
         trial: withTrial ? "1" : "0",
       },

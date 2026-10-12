@@ -19,10 +19,7 @@ import {
 import {
   invoiceShouldRefreshCredit,
   shouldGrantConversionPerks,
-  shouldMoveOffFounderPrice,
 } from "@/lib/premium-trial";
-import { pickPriceId } from "@/lib/stripe-helpers";
-import { founderFallbackNotice } from "@/lib/founder-fallback-notice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,23 +33,25 @@ export const dynamic = "force-dynamic";
  * Failed handlers leave processed_at null so Stripe retries re-run.
  *
  *   customer.subscription.created  → flip membership to 'premium'.
- *                                    Paid perks only if already active
+ *                                    Referral points only if already active
  *                                    (no trial). A trial waits.
  *   customer.subscription.updated  → sync status (past_due / cancelled /
  *                                    active), period end, cancel-at-end.
  *                                    First time it becomes active after
  *                                    trialing, past_due, unpaid, or
- *                                    incomplete, grant paid perks (or
- *                                    move off the founder price if the
- *                                    cap filled).
+ *                                    incomplete, grant referral points.
  *   customer.subscription.deleted  → revert to 'free', clear sub id.
  *                                    No perks if it never paid.
- *   invoice.paid                   → extend current_period_end, refresh
- *                                    $5 monthly credit when money was
- *                                    collected. The first invoice with
- *                                    amount_paid > 0 also grants paid perks.
+ *   invoice.paid                   → refresh the $5 monthly credit when
+ *                                    money was collected. The first invoice
+ *                                    with amount_paid > 0 also grants
+ *                                    referral points.
  *   invoice.payment_failed         → tier → 'past_due' (retry grace).
  *                                    Does not grant perks.
+ *
+ * Founding Fan is claimed on join/onboarding, not here. This handler
+ * does not grant or clear founder slots, and it does not change a
+ * subscription's price.
  *
  * Configure the endpoint in Stripe dashboard:
  *   URL:      https://<host>/api/stripe/webhook
@@ -208,7 +207,7 @@ async function handleSubscriptionCreated(
   sub: Stripe.Subscription,
   admin: SupabaseClient,
 ) {
-  const { fanId, communityId, tier, billingPeriod } = parseSubMetadata(sub);
+  const { fanId, communityId, billingPeriod } = parseSubMetadata(sub);
   if (!fanId || !communityId) {
     console.warn("subscription.created: missing metadata", sub.id);
     return;
@@ -249,173 +248,20 @@ async function handleSubscriptionCreated(
       alreadyPaid: prior?.first_paid_at != null,
     })
   ) {
-    await grantConversionPerks(sub, fanId, communityId, tier, billingPeriod, admin);
+    await grantConversionPerks(fanId, admin);
   }
 }
 
 /**
- * Perks earned by a paying subscriber: referral points for whoever
- * referred them, and a founder slot plus badge if they bought at the
- * founder price. Runs for an already-active checkout, when a trial's
- * first charge succeeds, and when a declined first charge later
- * succeeds. Safe to run twice: the referral ledger is unique, and
- * claim_founder_slot returns the number this fan already holds.
+ * Referral points for whoever referred this fan. Runs for an already-active
+ * checkout, when a trial's first charge succeeds, and when a declined first
+ * charge later succeeds. Safe to run twice: the referral ledger is unique.
+ *
+ * Does not claim or clear a Founding Fan slot, and does not change the
+ * subscription price. The free badge is claimed on join/onboarding.
  */
-async function grantConversionPerks(
-  sub: Stripe.Subscription,
-  fanId: string,
-  communityId: string,
-  tier: string | null,
-  billingPeriod: "monthly" | "annual",
-  admin: SupabaseClient,
-) {
-  // Referral conversion — award 500 points to the referrer if this fan
-  // was referred and their referral is still pending.
+async function grantConversionPerks(fanId: string, admin: SupabaseClient) {
   await awardReferralPoints(fanId, admin);
-
-  // Founder slot — only if subscription metadata marks them as a
-  // potential founder. The Postgres function serializes concurrent
-  // claims per community via advisory lock and returns null if the cap
-  // is hit.
-  if (tier !== "founder") return;
-
-  // claim_founder_slot returns the number this fan already holds, but
-  // skip the call when we can see it here so a replay does not depend
-  // on that. A missing badge from an earlier partial run is still awarded.
-  const { data: existing, error: existingErr } = await admin
-    .from("fan_community_memberships")
-    .select("founder_number")
-    .eq("fan_id", fanId)
-    .eq("community_id", communityId)
-    .maybeSingle();
-  throwIfDbError({ error: existingErr }, "founder slot read");
-
-  let slot: unknown = existing?.founder_number ?? null;
-  if (slot == null) {
-    const { data: claimed, error: slotErr } = await admin.rpc("claim_founder_slot", {
-      p_fan_id: fanId,
-      p_community_id: communityId,
-    });
-    // A failed call is not a full cap. Throw so Stripe retries instead of
-    // moving the fan off the founder price.
-    throwIfDbError({ error: slotErr }, "founder slot claim");
-    if (shouldMoveOffFounderPrice(tier, claimed)) {
-      // A concurrent grant may have claimed the slot between the read
-      // above and this call. The old claim function returns null when
-      // the cap is full even if this fan just received the last number.
-      // Re-read before giving up the founder price.
-      const { data: raced, error: racedErr } = await admin
-        .from("fan_community_memberships")
-        .select("founder_number")
-        .eq("fan_id", fanId)
-        .eq("community_id", communityId)
-        .maybeSingle();
-      throwIfDbError({ error: racedErr }, "founder slot reread");
-      if (typeof raced?.founder_number === "number" && raced.founder_number > 0) {
-        slot = raced.founder_number;
-      } else {
-        await moveToStandardPrice(sub, fanId, communityId, billingPeriod, admin);
-        return;
-      }
-    } else {
-      slot = claimed;
-    }
-  }
-  if (typeof slot === "number" && slot > 0) {
-    // Phase 5e: route through award_community_badge so the fan also
-    // gets the +500 pts ledger entry AND the in-app notification.
-    // Idempotent — ON CONFLICT DO NOTHING, returns false if already
-    // earned in this community (e.g. Stripe retry after a 5xx).
-    const { error: awardErr } = await admin.rpc("award_community_badge", {
-      p_fan_id: fanId,
-      p_slug: "founding-fan",
-      p_community_id: communityId,
-    });
-    if (awardErr) {
-      console.warn("founding-fan badge award failed", awardErr);
-    }
-  }
-}
-
-/**
- * The founder cap filled before this fan's slot could be claimed (most
- * often during a 7-day trial). Switch the subscription to the standard
- * price from the next renewal, so they are not billed the founder price
- * without a founder slot. The payment already taken stays as is. Retag
- * the metadata so a replayed event does not try the claim again, then
- * tell the fan in their inbox. The notice is deduped per subscription, so
- * a replay that finds the price already moved only retries a lost notice.
- */
-async function moveToStandardPrice(
-  sub: Stripe.Subscription,
-  fanId: string,
-  communityId: string,
-  billingPeriod: "monthly" | "annual",
-  admin: SupabaseClient,
-) {
-  const { data: community, error: readErr } = await admin
-    .from("communities")
-    .select(
-      "display_name, stripe_price_id_monthly, stripe_price_id_annual, stripe_price_id_founder_monthly, stripe_price_id_founder_annual",
-    )
-    .eq("slug", communityId)
-    .maybeSingle();
-  throwIfDbError({ error: readErr }, "founder fallback price read");
-  const standardPrice = community ? pickPriceId(community, billingPeriod, false) : null;
-  const item = sub.items?.data?.[0];
-  if (!standardPrice || !item) {
-    throw new Error(
-      `founder fallback: no standard ${billingPeriod} price or subscription item for ${communityId} (${sub.id})`,
-    );
-  }
-  let moved = sub;
-  if (item.price?.id !== standardPrice || sub.metadata?.tier !== "standard") {
-    moved = await getStripe().subscriptions.update(sub.id, {
-      items: [{ id: item.id, price: standardPrice }],
-      proration_behavior: "none",
-      metadata: { ...sub.metadata, tier: "standard", founder_cap_fallback: "true" },
-    });
-    console.info("founder cap full: moved subscription to standard price", sub.id);
-  }
-
-  await sendFounderFallbackNotice(moved, fanId, communityId, community?.display_name, admin);
-}
-
-/**
- * Inbox notice for a fan moved off the founder price. A failed notice is
- * logged, never thrown: the price move already happened, and a retry
- * from Stripe must not be needed just to send a message.
- */
-async function sendFounderFallbackNotice(
-  sub: Stripe.Subscription,
-  fanId: string,
-  communityId: string,
-  displayName: string | null | undefined,
-  admin: SupabaseClient,
-) {
-  const price = sub.items?.data?.[0]?.price;
-  const notice = founderFallbackNotice({
-    subscriptionId: sub.id,
-    communityName: displayName || communityId,
-    unitAmount: price?.unit_amount,
-    currency: price?.currency,
-    interval: price?.recurring?.interval,
-    renewsAtIso: subscriptionPeriodEndIso(sub),
-  });
-  const { error } = await admin.from("notifications").insert({
-    fan_id: fanId,
-    community_id: communityId,
-    kind: notice.kind,
-    title: notice.title,
-    body: notice.body,
-    url: notice.url,
-    icon: notice.icon,
-    dedup_key: notice.dedupKey,
-  });
-  // A duplicate dedup_key means the fan already has this notice.
-  if (error && !`${error.message}`.toLowerCase().includes("duplicate")) {
-    console.warn("founder fallback notice failed", sub.id, error.message);
-  }
 }
 
 async function handleSubscriptionUpdated(
@@ -479,7 +325,7 @@ async function handleSubscriptionUpdated(
       alreadyPaid: row?.first_paid_at != null,
     })
   ) {
-    await grantConversionPerks(sub, fanId, communityId, meta.tier, meta.billingPeriod, admin);
+    await grantConversionPerks(fanId, admin);
   }
 }
 
@@ -535,16 +381,7 @@ async function handleInvoicePaid(
     alreadyPaid,
   });
   if (firstRealPayment) {
-    const stripeSub = await getStripe().subscriptions.retrieve(subId);
-    const meta = parseSubMetadata(stripeSub);
-    await grantConversionPerks(
-      stripeSub,
-      (meta.fanId ?? membership.fan_id) as string,
-      (meta.communityId ?? membership.community_id) as string,
-      meta.tier,
-      meta.billingPeriod,
-      admin,
-    );
+    await grantConversionPerks(membership.fan_id as string, admin);
   }
 
   const nowMs = Date.now();
@@ -600,10 +437,10 @@ async function handleInvoicePaymentFailed(
   // Card declined — Stripe enters its retry schedule (3-4 attempts over
   // ~14 days). Flip to past_due so the UI can nudge the fan to update
   // their card, but keep access alive during the grace window. Do not
-  // grant the credit, founder slot, or referral points. When a later
-  // attempt succeeds, invoice.paid and past_due → active grant them
-  // once. If retries are exhausted, Stripe fires subscription.deleted
-  // and we revert to 'free' with nothing granted.
+  // grant the credit or referral points. When a later attempt succeeds,
+  // invoice.paid and past_due → active grant them once. If retries are
+  // exhausted, Stripe fires subscription.deleted and we revert to 'free'
+  // with nothing granted. Founding Fan is not granted or cleared here.
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 

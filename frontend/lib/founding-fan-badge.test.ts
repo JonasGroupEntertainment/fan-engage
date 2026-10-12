@@ -112,4 +112,12 @@ describe("award path matches free founding_fan_number counters", () => {
     const badges = readRepo("./data/badges.ts");
     assert.match(badges, /foundingFanBadgeEarned/);
   });
+
+  it("the live claim is race-safe, capped at 100, and ignores payment", () => {
+    const claim = readRepo("../../supabase/migrations/0073_internal_founding_fan_flag.sql");
+    assert.match(claim, /pg_advisory_xact_lock/);
+    assert.match(claim, /v_cap\s+integer := 100/);
+    assert.match(claim, /if v_taken >= v_cap then return null/);
+    assert.doesNotMatch(claim, /stripe|subscription|payment|trial/i);
+  });
 });

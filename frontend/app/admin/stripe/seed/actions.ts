@@ -15,10 +15,9 @@ import type { Community } from "@/lib/community";
  *   - 1 Product (name = display_name, metadata includes the slug)
  *   - 4 Prices: standard × monthly/annual + founder × monthly/annual
  *
- * Founder prices start identical to standard (same $10/$99) but live as
- * separate price_ids so we can raise the standard price later without
- * migrating the founder cohort — they keep their locked-in pricing
- * because their Stripe Subscription is tied to the founder price_id.
+ * Founder price IDs are created so subscriptions already on them stay
+ * put. New checkouts use the standard monthly and annual prices only
+ * and do not select the founder price IDs.
  */
 export async function seedStripeProductsAction(formData: FormData): Promise<void> {
   const ctx = await getAdminContext();

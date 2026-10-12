@@ -1,7 +1,7 @@
 /**
- * In-app notice for a fan whose founder-price subscription was moved to
- * the standard price because the founder cap filled before their trial
- * ended. Pure module, no imports, so the copy can be unit tested.
+ * Copy for a price-change notice this app no longer sends. Checkout does
+ * not select a founder price, and the webhook does not move a subscription
+ * or insert this notice. Existing inbox rows keep this shape.
  */
 
 export const FOUNDER_FALLBACK_NOTICE_KIND = "price_change";

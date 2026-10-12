@@ -62,8 +62,11 @@ describe("guest founding counters share one source", () => {
     );
   });
 
-  it("checkout still uses paid is_founder eligibility separately", () => {
-    assert.match(checkoutSrc, /getFounderState/);
+  it("checkout does not sell a paid founder slot", () => {
+    assert.doesNotMatch(checkoutSrc, /getFounderState/);
+    assert.doesNotMatch(checkoutSrc, /stripe_price_id_founder/);
+    assert.match(checkoutSrc, /pickPriceId\(community, billingPeriod\)/);
+    assert.match(checkoutSrc, /tier: "standard"/);
   });
 
   it("founders wall never calls free joiners paying fans or locked-in pricing", () => {

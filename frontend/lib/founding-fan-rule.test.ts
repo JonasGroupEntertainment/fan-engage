@@ -38,6 +38,10 @@ describe("one Founding Fan rule", () => {
     assert.doesNotMatch(welcome, /locked-in pricing/i);
     assert.doesNotMatch(welcome, /locked in/i);
     assert.doesNotMatch(welcome, /paying fans/i);
+    assert.match(welcome, /founding_fan_number/);
+    assert.doesNotMatch(welcome, /founder_number/);
+    assert.doesNotMatch(welcome, /claim_founder_slot/);
+    assert.doesNotMatch(welcome, /tier === "founder"/);
   });
 
   it("/rewards states the one rule and has no pre-Jul 15 contradiction", () => {
