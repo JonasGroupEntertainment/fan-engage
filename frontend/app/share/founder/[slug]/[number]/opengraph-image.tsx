@@ -165,7 +165,7 @@ export default async function FounderOpengraphImage({
           }}
         >
           <div style={{ maxWidth: 720 }}>
-            One of 100 founding fans. 1.5x points and a numbered badge. Founder drops coming soon.
+            Free badge for the first 100 who join. 1.5× points. Not a paid plan.
           </div>
           <div
             style={{
@@ -177,7 +177,7 @@ export default async function FounderOpengraphImage({
               border: "1px solid rgba(255,255,255,0.25)",
             }}
           >
-            Claim yours →
+            Join free →
           </div>
         </div>
       </div>

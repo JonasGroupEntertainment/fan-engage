@@ -66,8 +66,8 @@ export default async function StripeSeedPage() {
           Creates one Stripe Product per community + four Prices per Product
           (monthly / annual × standard / founder). Runs once per community,
           idempotent — re-running on an already-seeded community is a no-op.
-          Founder prices are separate from standard so raising standard
-          pricing later doesn&apos;t migrate the founder cohort.
+          Founder price IDs stay so existing subscriptions are left alone.
+          New checkouts use the standard monthly and annual prices only.
         </p>
       </div>
 

@@ -30,7 +30,6 @@ export default async function PremiumWelcomePage({
   let status: "complete" | "pending" | "unknown" = "unknown";
   let customerEmail: string | null = null;
   let billingPeriod: string | null = null;
-  let isFounder = false;
 
   try {
     const stripe = getStripe();
@@ -48,19 +47,16 @@ export default async function PremiumWelcomePage({
     customerEmail = session.customer_details?.email ?? null;
     const meta = session.metadata ?? {};
     billingPeriod = (meta.billing_period as string | undefined) ?? null;
-    isFounder = meta.tier === "founder";
   } catch (err) {
     console.warn("PremiumWelcomePage: failed to fetch session", err);
   }
 
-  // Phase 5e: for founder checkouts, fetch founder_number from the
-  // membership so we can celebrate with their actual slot (e.g. "#47").
-  // The webhook is async, so we briefly retry — if claim_founder_slot()
-  // hasn't run yet, founder_number is null and we show a pending state.
+  // Founding Fan is claimed on join/onboarding, not by this checkout.
+  // Read the free number once. Do not wait on the webhook.
   let founderNumber: number | null = null;
   let fanFirstName: string | null = null;
   let fanHandle: string | null = null;
-  if (isFounder && status === "complete" && community) {
+  if (status === "complete" && community) {
     try {
       const supabase = await createClient();
       const {
@@ -68,22 +64,14 @@ export default async function PremiumWelcomePage({
       } = await supabase.auth.getUser();
       if (user) {
         const admin = createAdminClient();
-        // Up to 3 attempts, 800ms apart — generous enough to catch the
-        // webhook on typical paths, short enough to not block the render.
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const { data } = await admin
-            .from("fan_community_memberships")
-            .select("founder_number")
-            .eq("fan_id", user.id)
-            .eq("community_id", community.slug)
-            .maybeSingle();
-          const n = (data?.founder_number as number | null) ?? null;
-          if (n !== null) {
-            founderNumber = n;
-            break;
-          }
-          if (attempt < 2) await new Promise((r) => setTimeout(r, 800));
-        }
+        const { data } = await admin
+          .from("fan_community_memberships")
+          .select("founding_fan_number")
+          .eq("fan_id", user.id)
+          .eq("community_id", community.slug)
+          .maybeSingle();
+        const n = (data?.founding_fan_number as number | null) ?? null;
+        if (typeof n === "number" && n >= 1) founderNumber = n;
         const { data: fan } = await admin
           .from("fans")
           .select("first_name, profile_slug")
@@ -93,7 +81,7 @@ export default async function PremiumWelcomePage({
         fanHandle = (fan?.profile_slug as string | null) ?? null;
       }
     } catch (err) {
-      console.warn("PremiumWelcomePage: founder lookup failed", err);
+      console.warn("PremiumWelcomePage: founding fan lookup failed", err);
     }
   }
 
@@ -117,14 +105,8 @@ export default async function PremiumWelcomePage({
         </div>
 
         {status === "complete" ? (
-          isFounder ? (
+          founderNumber !== null ? (
             <>
-              {/* Phase 5e: Founder celebration.
-                  When founderNumber is set, show the big slot reveal.
-                  When it's still null (webhook race), show a pending state
-                  that lets the fan refresh once the webhook lands. */}
-              {founderNumber !== null ? (
-                <>
                   <p
                     className="text-xs font-semibold uppercase tracking-[0.4em]"
                     style={{
@@ -181,26 +163,6 @@ export default async function PremiumWelcomePage({
                       <span className="text-white/80">{customerEmail}</span>.
                     </p>
                   )}
-                </>
-              ) : (
-                <>
-                  <h1
-                    className="text-4xl font-semibold md:text-5xl"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    Welcome to Premium.
-                  </h1>
-                  <p className="mt-4 text-white/70">
-                    Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout.
-                  </p>
-                  {customerEmail && (
-                    <p className="mt-6 text-xs text-white/50">
-                      Receipt on its way to{" "}
-                      <span className="text-white/80">{customerEmail}</span>.
-                    </p>
-                  )}
-                </>
-              )}
             </>
           ) : (
             <>
@@ -230,6 +192,9 @@ export default async function PremiumWelcomePage({
                   </>
                 )}
               </p>
+              <p className="mt-4 text-white/75">
+                Founding Fan is a free badge with 1.5× points while your account stays active. Premium is billed at the rate shown at checkout.
+              </p>
             </>
           )
         ) : (
@@ -258,7 +223,7 @@ export default async function PremiumWelcomePage({
           >
             Go to community →
           </Link>
-          {isFounder && status === "complete" && founderNumber !== null && community?.slug && (
+          {founderNumber !== null && community?.slug && (
             <ShareButton
               title={`I'm Founding Fan #${founderNumber} for ${community.display_name ?? community.slug}`}
               text={`I'm Founding Fan #${founderNumber} for ${community.display_name ?? community.slug} on Fan Engage! ${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/share/founder/${community.slug}/${founderNumber}`}
@@ -283,7 +248,7 @@ export default async function PremiumWelcomePage({
           </Link>
         </div>
 
-        {isFounder && status === "complete" && founderNumber !== null && (
+        {founderNumber !== null && (
           <p className="mt-12 text-xs uppercase tracking-widest text-white/45">
             Free badge · 1.5× points while your account stays active
           </p>

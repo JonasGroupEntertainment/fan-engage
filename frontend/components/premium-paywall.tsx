@@ -49,7 +49,15 @@ export default function PremiumPaywall({
   const loginHref = communityId
     ? `/login?next=${encodeURIComponent(`/artists/${communityId}/community`)}`
     : "/login";
-  const ctaHref = reason === "signed-out" ? signupHref : upgradeHref;
+  const foundersHref = communityId
+    ? `/artists/${communityId}/founders`
+    : "/artists";
+  const ctaHref =
+    reason === "signed-out"
+      ? signupHref
+      : reason === "needs-founder"
+        ? foundersHref
+        : upgradeHref;
 
   let ctaLabel: string;
   let featureCopy: string;
@@ -58,8 +66,8 @@ export default function PremiumPaywall({
     ctaLabel = "Create your fan profile";
     featureCopy = "Create your fan profile and claim a Founding Fan badge";
   } else if (reason === "needs-founder") {
-    ctaLabel = "Become a Founding Fan";
-    featureCopy = `${feature} is for Founders only`;
+    ctaLabel = "See Founding Fans";
+    featureCopy = `${feature} is for fans who already hold a Founder spot`;
   } else {
     // needs-premium — locked v1 copy
     ctaLabel = PREMIUM_CTA.upgrade;
@@ -89,7 +97,7 @@ export default function PremiumPaywall({
           className="flex-none rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-glass transition hover:brightness-110"
           style={{ backgroundImage: `linear-gradient(90deg, ${from}, ${to})` }}
         >
-          {reason === "signed-out" ? "Create your fan profile" : reason === "needs-founder" ? "Founders" : "Upgrade"}
+          {reason === "signed-out" ? "Create your fan profile" : reason === "needs-founder" ? "Founding Fans" : "Upgrade"}
         </Link>
       </div>
     );
@@ -105,7 +113,7 @@ export default function PremiumPaywall({
           <div>
             <p className="text-sm font-semibold text-white/90">
               {reason === "needs-founder"
-                ? "Paid Premium only — separate from the free Founding Fan badge"
+                ? "Free Founding Fan badge — this post is not for sale"
                 : reason === "signed-out"
                   ? "Free Founding Fan badge"
                   : PREMIUM_CTA.available}
@@ -124,12 +132,13 @@ export default function PremiumPaywall({
           {reason === "needs-founder" ? (
             <>
               <p className="text-xs text-white/60">
-                Be one of the first 100 fans to support this artist directly. Founders get:
+                Founding Fan is a free badge for the first 100 fans who join.
+                It is not a paid plan and Premium does not include it.
               </p>
               <ul className="space-y-1 text-xs text-white/70">
-                <li>✓ Exclusive founder-only posts & events</li>
-                <li>✓ Direct support of your favorite artist</li>
-                <li>✓ Lifetime founder status & badge</li>
+                <li>✓ Join free to claim a numbered badge while spots remain</li>
+                <li>✓ This post stays with fans who already hold a Founder spot</li>
+                <li>✓ Premium is a separate subscription</li>
               </ul>
             </>
           ) : reason === "signed-out" ? (

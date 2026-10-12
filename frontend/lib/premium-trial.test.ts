@@ -12,7 +12,6 @@ import {
   isTrialEligible,
   isTrialing,
   shouldGrantConversionPerks,
-  shouldMoveOffFounderPrice,
 } from "./premium-trial.ts";
 
 function readRepo(relFromHere: string): string {
@@ -299,9 +298,11 @@ describe("monthly credit timing", () => {
 describe("paid perk wiring", () => {
   const webhook = readRepo("../app/api/stripe/webhook/route.ts");
   const cron = readRepo("../app/api/cron/refresh-monthly-credits/route.ts");
+  const checkout = readRepo("../app/premium/actions.ts");
 
-  it("grants from the payment events and not from failure or deletion", () => {
+  it("grants referral points from the payment events and not from failure or deletion", () => {
     assert.match(webhook, /shouldGrantConversionPerks/);
+    assert.match(webhook, /awardReferralPoints/);
     assert.match(cron, /cronShouldRefreshCredit/);
 
     const failed = webhook.slice(webhook.indexOf("async function handleInvoicePaymentFailed"));
@@ -313,6 +314,24 @@ describe("paid perk wiring", () => {
     assert.doesNotMatch(deleted, /grantConversionPerks/);
     assert.match(webhook, /first_paid_at/);
   });
+
+  it("does not grant or revoke a founder slot from a charge", () => {
+    assert.doesNotMatch(webhook, /claim_founder_slot/);
+    assert.doesNotMatch(webhook, /shouldMoveOffFounderPrice/);
+    assert.doesNotMatch(webhook, /founderFallbackNotice/);
+    assert.doesNotMatch(webhook, /subscriptions\.update/);
+    assert.doesNotMatch(webhook, /founder_cap_fallback/);
+    assert.match(webhook, /awardReferralPoints/);
+  });
+
+  it("checkout sells the standard price and still offers the 7-day trial", () => {
+    assert.match(checkout, /pickPriceId\(community, billingPeriod\)/);
+    assert.match(checkout, /tier: "standard"/);
+    assert.match(checkout, /trial_period_days: TRIAL_DAYS/);
+    assert.doesNotMatch(checkout, /getFounderState/);
+    assert.doesNotMatch(checkout, /stripe_price_id_founder/);
+    assert.doesNotMatch(checkout, /asFounder/);
+  });
 });
 
 describe("invoiceGrantsCredit", () => {
@@ -323,22 +342,5 @@ describe("invoiceGrantsCredit", () => {
 
   it("grants on a real payment", () => {
     assert.equal(invoiceGrantsCredit(499), true);
-  });
-});
-
-describe("shouldMoveOffFounderPrice", () => {
-  it("moves a founder-price fan who got no slot", () => {
-    assert.equal(shouldMoveOffFounderPrice("founder", null), true);
-    assert.equal(shouldMoveOffFounderPrice("founder", undefined), true);
-    assert.equal(shouldMoveOffFounderPrice("founder", 0), true);
-  });
-
-  it("keeps a founder-price fan who got a slot", () => {
-    assert.equal(shouldMoveOffFounderPrice("founder", 42), false);
-  });
-
-  it("never touches standard-price fans", () => {
-    assert.equal(shouldMoveOffFounderPrice("standard", null), false);
-    assert.equal(shouldMoveOffFounderPrice(null, null), false);
   });
 });

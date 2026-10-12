@@ -69,4 +69,15 @@ describe("onboard always joins RaeLynn then claims founding", () => {
     assert.match(wizard, /communitySlug:/);
     assert.match(wizard, /raelynn/);
   });
+
+  it("Finish onboarding claims the free slot with no payment or trial", () => {
+    assert.match(wizard, /Finish onboarding/);
+    assert.match(wizard, /\/api\/fan-engage\/onboard/);
+    const claimAt = onboard.indexOf("claim_founding_fan_status");
+    const region = onboard.slice(Math.max(0, claimAt - 250), claimAt + 700);
+    assert.ok(claimAt > 0);
+    assert.match(region, /award_community_badge/);
+    assert.match(region, /founding-fan/);
+    assert.doesNotMatch(region, /stripe|trial|payment|subscription_tier|claim_founder_slot|getFounderState/i);
+  });
 });

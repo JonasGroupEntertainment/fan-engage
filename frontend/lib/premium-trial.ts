@@ -6,11 +6,14 @@
  * ever held a paid membership in any community, pays from day one.
  *
  * Paid perks wait for the first real payment. A trialing fan gets Premium
- * access, but not the monthly credit, a founder slot, or referral points
- * for their referrer. Those land the first time the subscription is
- * genuinely paid: the trial invoice clears, or a declined first charge
- * later succeeds (Stripe dunning, or the fan updates their card). A
+ * access, but not the monthly credit or referral points for their
+ * referrer. Those land the first time the subscription is genuinely
+ * paid: the trial invoice clears, or a declined first charge later
+ * succeeds (Stripe dunning, or the fan updates their card). A
  * subscription that ends without a successful charge never gets them.
+ *
+ * Founding Fan is not one of these perks. The free badge is claimed
+ * when the fan joins or finishes onboarding.
  */
 
 export const TRIAL_DAYS = 7;
@@ -54,8 +57,8 @@ export type PaidPerkEvent =
   | "invoice.payment_failed";
 
 /**
- * Whether this Stripe event should grant the one-time paid perks
- * (founder slot and referral points). Callers must still be idempotent:
+ * Whether this Stripe event should grant the one-time paid perk
+ * (referral points). Callers must still be idempotent:
  * a clean conversion fires both `customer.subscription.updated`
  * (trialing → active) and `invoice.paid`, and a recovered decline fires
  * both `past_due → active` and `invoice.paid`.
@@ -141,18 +144,4 @@ export function cronShouldRefreshCredit(input: {
   if (input.tier !== "premium") return false;
   if (!input.firstPaidAt) return false;
   return creditRefreshDue(input.refreshedAt, input.nowMs);
-}
-
-/**
- * A fan who checked out at the founder price but did not get a founder
- * slot (the cap filled during their trial, or in the seconds before the
- * webhook ran) moves to the standard price, so nobody keeps a founder
- * price without the founder slot that goes with it.
- */
-export function shouldMoveOffFounderPrice(
-  tier: string | null | undefined,
-  claimedSlot: unknown,
-): boolean {
-  if (tier !== "founder") return false;
-  return !(typeof claimedSlot === "number" && claimedSlot > 0);
 }
