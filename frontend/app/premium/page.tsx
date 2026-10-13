@@ -99,7 +99,7 @@ export default async function PremiumPage({
     { icon: "📱", title: "Phone & lyric wallpapers", body: "Exclusive wallpapers you redeem with points inside the app." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
-    { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points — not a Premium purchase." },
+    { icon: "🏅", title: "Founding Fan is free", body: "First 100 fans who join get a numbered badge and 1.5× points, plus 48-hour early RSVP — not a Premium purchase." },
   ];
 
   return (
