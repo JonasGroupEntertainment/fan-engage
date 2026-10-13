@@ -20,6 +20,7 @@ import {
   invoiceShouldRefreshCredit,
   shouldGrantConversionPerks,
 } from "@/lib/premium-trial";
+import { stripeSignatureFailureWarning } from "@/lib/stripe-webhook-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,8 +82,9 @@ export async function POST(request: Request) {
     const stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, sig, secret);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("stripe/webhook: signature verification failed", msg);
+    // Event type is unknown: the body failed verification. Log a fixed
+    // warning only — never the secret, signature header, or payload.
+    console.warn(stripeSignatureFailureWarning(err));
     return NextResponse.json({ error: "bad signature" }, { status: 400 });
   }
 
