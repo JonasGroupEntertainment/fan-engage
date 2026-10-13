@@ -133,6 +133,21 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        source: "/support",
+        destination: "/help",
+        permanent: false,
+      },
+      {
+        source: "/contact",
+        destination: "/help",
+        permanent: false,
+      },
+      {
+        source: "/faq",
+        destination: "/help",
+        permanent: false,
+      },
+      {
         source: "/settings",
         destination: "/me",
         permanent: false,
