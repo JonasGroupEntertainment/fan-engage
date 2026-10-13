@@ -11,6 +11,7 @@ import {
 import { isForgotPasswordEnabled } from "@/lib/auth-doors";
 import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createCallbackSupabase } from "@/lib/supabase/callback-server";
+import { tagFanInternalIfNeeded } from "@/lib/internal-account-tag";
 
 /**
  * Handles:
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
         token_hash: parsed.tokenHash,
       });
       if (error) return fail(authCallbackUserMessage(parsed.next));
+      await tagSessionFan(supabase);
       return applyCookies(redirectTo(parsed.next));
     }
 
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest) {
         }
         return fail(authCallbackUserMessage(parsed.next));
       }
+      await tagSessionFan(supabase);
       return applyCookies(redirectTo(parsed.next));
     }
 
@@ -96,5 +99,21 @@ export async function GET(request: NextRequest) {
       );
     }
     return fail(authCallbackUserMessage(parsed.next));
+  }
+}
+
+async function tagSessionFan(supabase: {
+  auth: {
+    getUser: () => Promise<{
+      data: { user: { id: string; email?: string | null } | null };
+    }>;
+  };
+}): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    await tagFanInternalIfNeeded({ id: data.user.id, email: data.user.email });
+  } catch {
+    console.warn("signup: internal account tag was not saved");
   }
 }
