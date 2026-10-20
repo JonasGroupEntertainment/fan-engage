@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
+import { membershipGrantsPremium } from "@/lib/entitlements-core";
 import type { Badge, FanProfile } from "./types";
 
 export interface FanHomeFollowedArtist {
@@ -245,11 +246,17 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   const premiumCommunitiesPromise = followedSlugs.length
     ? admin
         .from("fan_community_memberships")
-        .select("community_id, subscription_tier")
+        .select("community_id, subscription_tier, current_period_end")
         .eq("fan_id", user.id)
         .in("community_id", followedSlugs)
         .in("subscription_tier", ["premium", "comped", "past_due"])
-    : Promise.resolve({ data: [] as Array<{ community_id: string; subscription_tier: string }> });
+    : Promise.resolve({
+        data: [] as Array<{
+          community_id: string;
+          subscription_tier: string;
+          current_period_end: string | null;
+        }>,
+      });
 
   // Phase 5e: viewer's founder status across followed communities.
   // Used to decide which founder-only posts to body-reveal in Recent Activity.
@@ -344,7 +351,16 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
 
   const premiumCommunities = ((premiumCommunitiesRes.data ?? []) as Array<{
     community_id: string;
-  }>).map((r) => r.community_id);
+    subscription_tier: string | null;
+    current_period_end: string | null;
+  }>)
+    .filter((r) =>
+      membershipGrantsPremium({
+        tier: r.subscription_tier,
+        currentPeriodEnd: r.current_period_end,
+      }),
+    )
+    .map((r) => r.community_id);
   const founderCommunities = ((founderCommunitiesRes.data ?? []) as Array<{
     community_id: string;
   }>).map((r) => r.community_id);

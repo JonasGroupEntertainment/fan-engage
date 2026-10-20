@@ -292,6 +292,26 @@ describe("monthly credit timing", () => {
       }),
       true,
     );
+    assert.equal(
+      cronShouldRefreshCredit({
+        tier: "comped",
+        firstPaidAt: null,
+        refreshedAt: null,
+        currentPeriodEnd: null,
+        nowMs: NOW,
+      }),
+      true,
+    );
+    assert.equal(
+      cronShouldRefreshCredit({
+        tier: "comped",
+        firstPaidAt: null,
+        refreshedAt: null,
+        currentPeriodEnd: new Date(NOW + 7 * DAY).toISOString(),
+        nowMs: NOW,
+      }),
+      false,
+    );
   });
 });
 
@@ -304,6 +324,7 @@ describe("paid perk wiring", () => {
     assert.match(webhook, /shouldGrantConversionPerks/);
     assert.match(webhook, /awardReferralPoints/);
     assert.match(cron, /cronShouldRefreshCredit/);
+    assert.match(cron, /currentPeriodEnd/);
 
     const failed = webhook.slice(webhook.indexOf("async function handleInvoicePaymentFailed"));
     const deleted = webhook.slice(

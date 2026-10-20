@@ -8,7 +8,11 @@ import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
 import { createCheckoutSessionAction } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
-import { PREMIUM_CTA, isPremium as isPremiumSignal } from "@/lib/entitlements";
+import {
+  PREMIUM_CTA,
+  formatUtcTimestamp,
+  membershipGrantsPremium,
+} from "@/lib/entitlements";
 import { AGE_ADULT_ONLY_MESSAGE } from "@/lib/age-gate";
 import { BirthDateForm } from "@/components/birth-date-form";
 
@@ -65,16 +69,23 @@ export default async function PremiumPage({
 
   // Membership state — needed to show the right CTA (Upgrade / Manage / etc.)
   let tier: string | null = null;
+  let periodEnd: string | null = null;
   if (user) {
     const { data: membership } = await admin
       .from("fan_community_memberships")
-      .select("subscription_tier")
+      .select("subscription_tier, current_period_end")
       .eq("fan_id", user.id)
       .eq("community_id", communityId)
       .maybeSingle();
     tier = (membership?.subscription_tier as string | null) ?? null;
+    periodEnd = (membership?.current_period_end as string | null) ?? null;
   }
-  const isPremium = isPremiumSignal(tier);
+  const isPremium = membershipGrantsPremium({
+    tier,
+    currentPeriodEnd: periodEnd,
+  });
+  const compEndsLabel =
+    tier === "comped" && periodEnd && isPremium ? formatUtcTimestamp(periodEnd) : null;
 
   // One free trial per account. Checkout runs the same check, so this only
   // decides the button copy. Fails closed to the normal buttons.
@@ -209,14 +220,18 @@ export default async function PremiumPage({
               You&apos;re in
             </p>
             <h2 className="mt-1 text-2xl font-semibold">
-              Premium is active{tier === "comped" && " (comped access)"}
+              Premium is active
+              {tier === "comped" &&
+                (compEndsLabel ? " (complimentary access)" : " (comped access)")}
               {tier === "past_due" && " — card needs attention"}
             </h2>
             <p className="mt-2 text-sm text-white/70">
               {tier === "past_due"
                 ? "Your most recent payment failed and Stripe is retrying. Update your card to keep access when the grace period ends."
                 : tier === "comped"
-                  ? "Your Premium access was granted directly by the Jonas Group team. You get every perk below at no charge."
+                  ? compEndsLabel
+                    ? `Your complimentary access lasts until ${compEndsLabel}. After that, Premium is a paid plan.`
+                    : "Your Premium access was granted directly by the Jonas Group team. You get every perk below at no charge."
                   : "All perks below are unlocked. Thanks for being one of us."}
             </p>
             <div className="mt-4 flex gap-3">

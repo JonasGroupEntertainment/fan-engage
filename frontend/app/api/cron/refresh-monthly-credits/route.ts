@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic";
  * premium/comped memberships whose credit is stale (>25 days since last
  * refresh). Two cases this catches:
  *
- *   1. COMPED members — they never hit invoice.paid, so the Stripe webhook
- *      never refreshes their credit. Without this cron, they'd perpetually
- *      stay at whatever credit balance they were comped with.
+ *   1. COMPED members with no period end — they never hit invoice.paid,
+ *      so the Stripe webhook never refreshes their credit. A comp with
+ *      current_period_end is a fixed window (RAELYNNVIP is 7 days) and
+ *      does not earn this credit.
  *
  *   2. Premium members whose invoice.paid webhook failed — Stripe retries
  *      on 5xx but eventually gives up. This is the belt-and-suspenders
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
   const { data: candidates, error: fetchErr } = await admin
     .from("fan_community_memberships")
     .select(
-      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at",
+      "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at, current_period_end",
     )
     .in("subscription_tier", ["premium", "comped"])
     .or(
@@ -84,6 +85,7 @@ export async function GET(request: Request) {
         tier,
         firstPaidAt: (row.first_paid_at as string | null) ?? null,
         refreshedAt: (row.monthly_credit_refreshed_at as string | null) ?? null,
+        currentPeriodEnd: (row.current_period_end as string | null) ?? null,
         nowMs,
       })
     ) {

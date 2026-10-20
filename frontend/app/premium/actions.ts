@@ -10,9 +10,9 @@ import {
   isFanTrialEligible,
   pickPriceId,
 } from "@/lib/stripe-helpers";
+import { membershipGrantsPremium } from "@/lib/entitlements-core";
 import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getCurrentCommunityId } from "@/lib/community";
-import { isPremium } from "@/lib/entitlements";
 import { adultGate } from "@/lib/age-gate";
 
 /**
@@ -82,11 +82,16 @@ export async function createCheckoutSessionAction(formData: FormData) {
   // 3) Already subscribed? Don't let them create a second subscription.
   const { data: existing } = await admin
     .from("fan_community_memberships")
-    .select("subscription_tier")
+    .select("subscription_tier, current_period_end")
     .eq("fan_id", user.id)
     .eq("community_id", communityId)
     .maybeSingle();
-  if (isPremium(existing?.subscription_tier as string | null)) {
+  if (
+    membershipGrantsPremium({
+      tier: existing?.subscription_tier as string | null,
+      currentPeriodEnd: (existing?.current_period_end as string | null) ?? null,
+    })
+  ) {
     redirect(`/premium?already_active=1`);
   }
 

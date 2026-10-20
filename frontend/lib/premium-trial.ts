@@ -129,18 +129,25 @@ export function invoiceShouldRefreshCredit(
 }
 
 /**
- * Daily credit cron. Comped fans have no Stripe invoice, so they refresh
- * here. Premium fans refresh only after a real payment (`firstPaidAt`);
- * a trialing row is stored as premium and must not earn the credit early.
- * past_due waits for the invoice that actually clears.
+ * Daily credit cron. Standing comps (no period end) have no Stripe
+ * invoice, so they refresh here. A comp with current_period_end is a
+ * fixed window, such as the 7-day RAELYNNVIP grant, and does not earn
+ * the $5 credit. Premium fans refresh only after a real payment
+ * (`firstPaidAt`); a trialing row is stored as premium and must not
+ * earn the credit early. past_due waits for the invoice that clears.
  */
 export function cronShouldRefreshCredit(input: {
   tier: string | null | undefined;
   firstPaidAt: string | null | undefined;
   refreshedAt: string | null | undefined;
   nowMs: number;
+  /** Set on a time-boxed comp. Null or omitted is a standing comp. */
+  currentPeriodEnd?: string | null;
 }): boolean {
-  if (input.tier === "comped") return creditRefreshDue(input.refreshedAt, input.nowMs);
+  if (input.tier === "comped") {
+    if (input.currentPeriodEnd) return false;
+    return creditRefreshDue(input.refreshedAt, input.nowMs);
+  }
   if (input.tier !== "premium") return false;
   if (!input.firstPaidAt) return false;
   return creditRefreshDue(input.refreshedAt, input.nowMs);

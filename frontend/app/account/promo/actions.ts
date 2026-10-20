@@ -5,10 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
 import { authorizeAdmin } from "@/lib/admin-guard";
+import { membershipGrantsPremium } from "@/lib/entitlements-core";
 import {
   effectivePromoLimits,
   promoExpired,
+  promoGrant,
   promoLimitReached,
+  redeemSuccessMessage,
 } from "@/lib/raelynn-vip-code";
 
 /**
@@ -96,21 +99,40 @@ export async function redeemPromoCode(
   // 3. Check the fan isn't already on a paid/comped tier
   const { data: membership } = await admin
     .from("fan_community_memberships")
-    .select("subscription_tier")
+    .select("subscription_tier, current_period_end")
     .eq("fan_id", user.id)
     .eq("community_id", targetCommunityId)
     .maybeSingle();
 
   const currentTier = (membership?.subscription_tier as string | null) ?? "free";
-  if (currentTier === "premium" || currentTier === "comped") {
+  const currentPeriodEnd = (membership?.current_period_end as string | null) ?? null;
+  // An expired complimentary window is not current access, so a later
+  // code can still apply. Paid premium is unchanged.
+  if (
+    membershipGrantsPremium({
+      tier: currentTier,
+      currentPeriodEnd,
+    }) &&
+    (currentTier === "premium" || currentTier === "comped")
+  ) {
     return { ok: false, error: "You already have premium access to this community." };
   }
 
-  // 4. Grant access: upsert membership to 'comped'
+  // 4. Grant access. RAELYNNVIP writes a 7-day current_period_end.
+  //    Other codes write null so the comp stays open-ended, including
+  //    when an older paid period end is still on the row.
+  //    A fan who already redeemed returned above, so this does not
+  //    rewrite an existing redemption.
+  const grant = promoGrant(raw, new Date());
   await admin
     .from("fan_community_memberships")
     .upsert(
-      { fan_id: user.id, community_id: targetCommunityId, subscription_tier: "comped" },
+      {
+        fan_id: user.id,
+        community_id: targetCommunityId,
+        subscription_tier: "comped",
+        current_period_end: grant.currentPeriodEnd,
+      },
       { onConflict: "fan_id,community_id" },
     );
 
@@ -127,8 +149,13 @@ export async function redeemPromoCode(
   revalidatePath("/premium");
   revalidatePath("/account/billing");
 
-  const desc = (code.description as string | null) ?? "premium access";
-  return { ok: true, message: `Code applied! You now have complimentary ${desc}.` };
+  return {
+    ok: true,
+    message: redeemSuccessMessage({
+      description: (code.description as string | null) ?? null,
+      grant,
+    }),
+  };
 }
 
 // ── Admin actions ──────────────────────────────────────────────────────────

@@ -139,6 +139,50 @@ export function isPremiumTier(
   return tier === "premium" || tier === "comped" || tier === "past_due";
 }
 
+/**
+ * A comp with no period end is open-ended (standing comps, and anyone
+ * who redeemed RAELYNNVIP before the 7-day window). A future end is
+ * still inside the window. A past end has finished. An unreadable end
+ * stays open so a bad timestamp cannot lock a standing comp out.
+ */
+export function compedAccessOpen(
+  currentPeriodEnd: string | null | undefined,
+  nowMs: number,
+): boolean {
+  if (currentPeriodEnd == null || currentPeriodEnd === "") return true;
+  const end = Date.parse(currentPeriodEnd);
+  if (Number.isNaN(end)) return true;
+  return nowMs < end;
+}
+
+/**
+ * Premium and past_due follow Stripe status, even if current_period_end
+ * is in the past. Comped follows the access window above.
+ */
+export function membershipGrantsPremium(input: {
+  tier: string | null | undefined;
+  currentPeriodEnd?: string | null;
+  nowMs?: number;
+}): boolean {
+  if (input.tier === "premium" || input.tier === "past_due") return true;
+  if (input.tier === "comped") {
+    return compedAccessOpen(input.currentPeriodEnd, input.nowMs ?? Date.now());
+  }
+  return false;
+}
+
+/** UTC clock time for a complimentary access end. */
+export function formatUtcTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hh}:${mm} UTC`;
+}
+
 type PremiumSignal =
   | SubscriptionTier
   | string
@@ -148,21 +192,30 @@ type PremiumSignal =
       isPremium?: boolean;
       tier?: SubscriptionTier | string | null;
       subscription_tier?: SubscriptionTier | string | null;
+      currentPeriodEnd?: string | null;
+      current_period_end?: string | null;
     };
 
 /**
  * Shared Premium helper. Accepts a membership row, entitlement object, or
  * raw subscription_tier string. Null/undefined is Free.
+ *
+ * A raw tier string has no period end, so "comped" stays Premium. Pass
+ * current_period_end (or use entitlementFromMembershipRow) to honor a
+ * finished complimentary window.
  */
-export function isPremium(source: PremiumSignal): boolean {
+export function isPremium(source: PremiumSignal, nowMs: number = Date.now()): boolean {
   if (source == null) return false;
   if (typeof source === "string") return isPremiumTier(source);
   if (typeof source.isPremium === "boolean") return source.isPremium;
-  if (source.tier != null) return isPremiumTier(source.tier);
-  if (source.subscription_tier != null) {
-    return isPremiumTier(source.subscription_tier);
-  }
-  return false;
+  const tier = source.tier ?? source.subscription_tier;
+  if (tier == null) return false;
+  const hasPeriod =
+    Object.prototype.hasOwnProperty.call(source, "currentPeriodEnd") ||
+    Object.prototype.hasOwnProperty.call(source, "current_period_end");
+  if (!hasPeriod) return isPremiumTier(tier);
+  const period = source.currentPeriodEnd ?? source.current_period_end ?? null;
+  return membershipGrantsPremium({ tier, currentPeriodEnd: period, nowMs });
 }
 
 export function entitlementFromMembershipRow(row: {
@@ -181,7 +234,10 @@ export function entitlementFromMembershipRow(row: {
     fanId: row.fan_id,
     communityId: row.community_id,
     tier,
-    isPremium: isPremium(tier),
+    isPremium: membershipGrantsPremium({
+      tier,
+      currentPeriodEnd: row.current_period_end ?? null,
+    }),
     isFounder: Boolean(row.is_founder),
     founderNumber: row.founder_number ?? null,
     currentPeriodEnd: row.current_period_end ?? null,

@@ -7,11 +7,13 @@ import {
   canAccess,
   canUseFeature,
   canUsePremiumFeature,
+  compedAccessOpen,
   entitlementFromMembershipRow,
   isFreeFeature,
   isMerchDropReward,
   isPremium,
   isPremiumTier,
+  membershipGrantsPremium,
   paywallReason,
   premiumPath,
   merchAccess,
@@ -69,6 +71,87 @@ describe("shared isPremium helper", () => {
       })),
       true,
     );
+  });
+
+  it("keeps an open-ended comp and ends a comp whose window has passed", () => {
+    const now = Date.parse("2026-10-20T18:00:00.000Z");
+    assert.equal(compedAccessOpen(null, now), true);
+    assert.equal(compedAccessOpen("", now), true);
+    assert.equal(compedAccessOpen("not-a-date", now), true);
+    assert.equal(compedAccessOpen("2026-10-27T18:00:00.000Z", now), true);
+    assert.equal(compedAccessOpen("2026-10-20T18:00:00.000Z", now), false);
+
+    assert.equal(
+      membershipGrantsPremium({
+        tier: "comped",
+        currentPeriodEnd: null,
+        nowMs: now,
+      }),
+      true,
+    );
+    assert.equal(
+      membershipGrantsPremium({
+        tier: "comped",
+        currentPeriodEnd: "2026-10-27T17:59:59.000Z",
+        nowMs: now,
+      }),
+      true,
+    );
+    assert.equal(
+      membershipGrantsPremium({
+        tier: "comped",
+        currentPeriodEnd: "2020-01-01T00:00:00.000Z",
+        nowMs: now,
+      }),
+      false,
+    );
+    assert.equal(
+      membershipGrantsPremium({
+        tier: "premium",
+        currentPeriodEnd: "2020-01-01T00:00:00.000Z",
+        nowMs: now,
+      }),
+      true,
+    );
+    assert.equal(
+      membershipGrantsPremium({
+        tier: "past_due",
+        currentPeriodEnd: "2020-01-01T00:00:00.000Z",
+        nowMs: now,
+      }),
+      true,
+    );
+    assert.equal(
+      membershipGrantsPremium({ tier: "cancelled", currentPeriodEnd: "2099-01-01T00:00:00.000Z", nowMs: now }),
+      false,
+    );
+
+    assert.equal(
+      entitlementFromMembershipRow({
+        fan_id: "a",
+        community_id: "raelynn",
+        subscription_tier: "comped",
+        current_period_end: null,
+      }).isPremium,
+      true,
+    );
+    assert.equal(
+      entitlementFromMembershipRow({
+        fan_id: "a",
+        community_id: "raelynn",
+        subscription_tier: "comped",
+        current_period_end: "2020-01-01T00:00:00.000Z",
+      }).isPremium,
+      false,
+    );
+    assert.equal(
+      isPremium({
+        tier: "comped",
+        currentPeriodEnd: "2020-01-01T00:00:00.000Z",
+      }, now),
+      false,
+    );
+    assert.equal(isPremium({ tier: "comped", currentPeriodEnd: null }, now), true);
   });
 });
 

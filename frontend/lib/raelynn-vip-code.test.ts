@@ -3,12 +3,15 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  RAELYNN_VIP_ACCESS_DAYS,
   RAELYNN_VIP_CODE,
   RAELYNN_VIP_EXPIRES_AT,
   RAELYNN_VIP_MAX_USES,
   effectivePromoLimits,
   promoExpired,
+  promoGrant,
   promoLimitReached,
+  redeemSuccessMessage,
 } from "./raelynn-vip-code.ts";
 
 function readRepo(relFromHere: string): string {
@@ -17,6 +20,9 @@ function readRepo(relFromHere: string): string {
 
 const redeemTs = readRepo("../app/account/promo/actions.ts");
 const migrationSql = readRepo("../../supabase/migrations/0076_raelynnvip_comp_cap.sql");
+const accessSql = readRepo("../../supabase/migrations/0078_raelynnvip_seven_day_access.sql");
+const premiumPage = readRepo("../app/premium/page.tsx");
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe("RAELYNNVIP limits", () => {
   it("caps uses at 10 and expiry at the end of 2026-12-31 UTC", () => {
@@ -90,5 +96,61 @@ describe("RAELYNNVIP redeem and migration", () => {
     assert.doesNotMatch(migrationSql, /delete from/i);
     assert.doesNotMatch(migrationSql, /uses_count\s*=\s*0/);
     assert.match(migrationSql, /where not exists/);
+  });
+});
+
+describe("RAELYNNVIP 7-day access", () => {
+  const start = new Date("2026-10-20T18:00:00.000Z");
+
+  it("grants exactly 7 days on a new redemption and leaves other codes open-ended", () => {
+    assert.equal(RAELYNN_VIP_ACCESS_DAYS, 7);
+    const grant = promoGrant("raelynnvip", start);
+    assert.equal(grant.accessDays, 7);
+    assert.equal(grant.currentPeriodEnd, new Date(start.getTime() + 7 * DAY_MS).toISOString());
+    assert.equal(grant.currentPeriodEnd, "2026-10-27T18:00:00.000Z");
+
+    const other = promoGrant("PRESS2026", start);
+    assert.equal(other.accessDays, null);
+    assert.equal(other.currentPeriodEnd, null);
+  });
+
+  it("tells the fan the window ends, and keeps the open-ended message for other codes", () => {
+    const grant = promoGrant(RAELYNN_VIP_CODE, start);
+    assert.equal(
+      redeemSuccessMessage({ description: "RaeLynn VIP", grant }),
+      "Code applied! You have 7 days of complimentary RaeLynn VIP, until 2026-10-27 18:00 UTC.",
+    );
+    assert.match(
+      redeemSuccessMessage({ description: null, grant: promoGrant("OTHER", start) }),
+      /You now have complimentary premium access/,
+    );
+  });
+
+  it("writes the window only after the already-redeemed return, and does not rewrite old rows", () => {
+    const already = redeemTs.indexOf("You've already redeemed this code.");
+    const grant = redeemTs.indexOf("promoGrant(");
+    assert.ok(already !== -1 && grant !== -1 && already < grant);
+    assert.match(redeemTs, /current_period_end: grant.currentPeriodEnd/);
+    assert.match(redeemTs, /redeemSuccessMessage/);
+    assert.doesNotMatch(redeemTs, /from\("promo_code_redemptions"\)\s*\.update\(/);
+    assert.doesNotMatch(redeemTs, /from\("fan_community_memberships"\)\s*\.update\(/);
+  });
+
+  it("migration records 7 days and expires dated comps without touching existing memberships", () => {
+    assert.match(accessSql, /access_days = least\(coalesce\(access_days, 7\), 7\)/);
+    assert.match(accessSql, /where upper\(code\) = 'RAELYNNVIP'/);
+    assert.match(accessSql, /current_period_end is null/);
+    assert.match(accessSql, /current_period_end > now\(\)/);
+    assert.match(accessSql, /subscription_tier in \('premium', 'past_due'\)/);
+    assert.doesNotMatch(accessSql, /update\s+public\.fan_community_memberships/i);
+    assert.doesNotMatch(accessSql, /update\s+public\.promo_code_redemptions/i);
+    assert.doesNotMatch(accessSql, /delete\s+from/i);
+    assert.doesNotMatch(accessSql, /uses_count\s*=/);
+  });
+
+  it("the Premium page explains a dated comp and still treats a null end as open-ended", () => {
+    assert.match(premiumPage, /membershipGrantsPremium/);
+    assert.match(premiumPage, /complimentary access lasts until/);
+    assert.match(premiumPage, /granted directly by the Jonas Group team/);
   });
 });

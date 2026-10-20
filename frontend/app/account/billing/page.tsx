@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeOrNull } from "@/lib/stripe";
 import { openBillingPortalAction } from "./actions";
-import { PREMIUM_CTA, isPremium } from "@/lib/entitlements";
+import { PREMIUM_CTA, membershipGrantsPremium } from "@/lib/entitlements";
 import PremiumCta from "@/components/premium-cta";
 
 export const metadata = { title: "Billing" };
@@ -34,7 +34,10 @@ export default async function BillingPage() {
   const hasStripe = getStripeOrNull() !== null;
   const hasCustomer = Boolean(fan?.stripe_customer_id);
   const isPremiumFan = (memberships ?? []).some((m) =>
-    isPremium(m.subscription_tier as string | null),
+    membershipGrantsPremium({
+      tier: m.subscription_tier as string | null,
+      currentPeriodEnd: (m.current_period_end as string | null) ?? null,
+    }),
   );
 
   return (
@@ -106,9 +109,11 @@ export default async function BillingPage() {
                         {m.subscription_tier as string}
                         {m.billing_period ? ` · ${m.billing_period}` : ""}
                         {periodEnd
-                          ? (m.cancel_at_period_end
+                          ? m.subscription_tier === "comped"
+                            ? ` · Access through ${periodEnd}`
+                            : m.cancel_at_period_end
                               ? ` · Cancels ${periodEnd}`
-                              : ` · Renews ${periodEnd}`)
+                              : ` · Renews ${periodEnd}`
                           : ""}
                       </p>
                     </div>
