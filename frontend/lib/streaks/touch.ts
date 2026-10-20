@@ -147,7 +147,6 @@ export async function touchStreak(
     const milestoneHit = MILESTONES[currentStreak] ?? null;
     const milestoneBonus = milestoneHit ? MILESTONES[currentStreak] : 0;
 
-    const totalAwarded = dailyBonus + milestoneBonus;
     const newLongest = Math.max(longestSoFar, currentStreak);
 
     // 1. Update fan streak fields (not points — awardPoints handles that)
@@ -161,9 +160,12 @@ export async function touchStreak(
     }
     await admin.from("fans").update(updates).eq("id", fanId);
 
-    // 2. Award points via shared utility (updates fans + fan_community_memberships)
-    if (totalAwarded > 0) {
-      await awardPoints(admin, {
+    // 2. Award the base amounts. apply_points_award multiplies once and
+    // returns the points actually credited.
+    let dailyAwarded = 0;
+    let milestoneAwarded = 0;
+    if (dailyBonus > 0 || milestoneBonus > 0) {
+      dailyAwarded = await awardPoints(admin, {
         fanId,
         delta: dailyBonus,
         source: "daily_checkin",
@@ -172,7 +174,7 @@ export async function touchStreak(
         ...(communityId ? { communityId } : {}),
       });
       if (milestoneBonus > 0 && milestoneHit) {
-        await awardPoints(admin, {
+        milestoneAwarded = await awardPoints(admin, {
           fanId,
           delta: milestoneBonus,
           source: "manual_adjustment",
@@ -183,13 +185,13 @@ export async function touchStreak(
       }
     }
 
-    // 3. Audit log
+    // 3. Audit log records the credited amount, after the multiplier.
     await admin.from("streak_log").insert([
       {
         fan_id: fanId,
         event_type: eventType,
         streak_days: currentStreak,
-        points_awarded: dailyBonus,
+        points_awarded: dailyAwarded,
         metadata: { kind: "daily_bonus" },
       },
       ...(milestoneHit
@@ -198,7 +200,7 @@ export async function touchStreak(
               fan_id: fanId,
               event_type: "milestone" as const,
               streak_days: currentStreak,
-              points_awarded: milestoneBonus,
+              points_awarded: milestoneAwarded,
               milestone_days: milestoneHit,
               metadata: { badge_slug: `streak-${milestoneHit}` },
             },
@@ -241,7 +243,7 @@ export async function touchStreak(
       currentStreakDays: currentStreak,
       longestStreakDays: newLongest,
       lastActiveDate: todayDateStr,
-      pointsAwardedThisVisit: totalAwarded,
+      pointsAwardedThisVisit: dailyAwarded + milestoneAwarded,
       newMilestone: milestoneHit,
       isNewToday,
     };
