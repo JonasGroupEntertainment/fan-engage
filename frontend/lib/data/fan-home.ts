@@ -1,6 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
+import { getAdminContext } from "@/lib/admin";
+import { roleAtLeast } from "@/lib/admin-authz";
+import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
+import {
+  evaluateRsvpWindow,
+  grantManagesEventRsvps,
+  rsvpWindowView,
+  type RsvpAdminGrant,
+} from "@/lib/rsvp-window";
 import type { Badge, FanProfile } from "./types";
 
 export interface FanHomeFollowedArtist {
@@ -31,6 +40,11 @@ export interface FanHomeUpcomingEvent {
   url: string | null;
   rsvped: boolean;
   has_scheduled_reminder: boolean;
+  /**
+   * "Early access" during a Founding Fan head start, or the sentence
+   * that says when RSVP opens. Null when RSVP is open now.
+   */
+  rsvpStatusLabel: string | null;
 }
 
 /**
@@ -174,28 +188,7 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   // RSVP not required. Limit slightly higher than 3 so we have headroom if
   // any rows get filtered out post-fetch (e.g. starts_at NULL placeholders).
   const nowIso = new Date().toISOString();
-  const upcomingEventsPromise = followedSlugs.length
-    ? admin
-        .from("artist_events")
-        .select("id, artist_slug, title, starts_at, event_date, location, url, tier, active")
-        .in("artist_slug", followedSlugs)
-        .eq("active", true)
-        .eq("tier", "public")
-        .not("starts_at", "is", null)
-        .gt("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .limit(8)
-    : Promise.resolve({ data: [] as Array<{
-        id: string;
-        artist_slug: string;
-        title: string;
-        starts_at: string | null;
-        event_date: string | null;
-        location: string | null;
-        url: string | null;
-        tier: string;
-        active: boolean;
-      }> });
+  const upcomingEventsPromise = loadHomeUpcomingEvents(admin, followedSlugs, nowIso);
 
   // Fan's RSVPs — used to compute `rsvped` flag on the upcoming events.
   const myRsvpsPromise = admin
@@ -262,6 +255,18 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
         .in("community_id", followedSlugs)
     : Promise.resolve({ data: [] as Array<{ community_id: string }> });
 
+  const foundingNumbersPromise = admin
+    .from("fan_community_memberships")
+    .select("community_id, founding_fan_number")
+    .eq("fan_id", user.id);
+
+  const adminGrantsPromise = admin
+    .from("admin_users")
+    .select("community_id, role")
+    .eq("user_id", user.id);
+
+  const adminCtxPromise = getAdminContext().catch(() => null);
+
   // Badge progress — get all badges + earned set + compute progress for
   // count-based ones that aren't earned yet.
   const badgesPromise = admin
@@ -323,6 +328,9 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     remindersRes,
     premiumCommunitiesRes,
     founderCommunitiesRes,
+    foundingNumbersRes,
+    adminGrantsRes,
+    adminCtx,
   ] = await Promise.all([
     artistsPromise,
     upcomingEventsPromise,
@@ -340,6 +348,9 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     remindersPromise,
     premiumCommunitiesPromise,
     founderCommunitiesPromise,
+    foundingNumbersPromise,
+    adminGrantsPromise,
+    adminCtxPromise,
   ]);
 
   const premiumCommunities = ((premiumCommunitiesRes.data ?? []) as Array<{
@@ -364,18 +375,38 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     remindersByEvent.get(r.event_id)!.add(r.kind);
   }
 
-  const upcomingEvents: FanHomeUpcomingEvent[] = ((upcomingEventsRes.data ?? []) as Array<{
-    id: string;
-    artist_slug: string;
-    title: string;
-    starts_at: string | null;
-    event_date: string | null;
-    location: string | null;
-    url: string | null;
-  }>)
+  const foundingNumberByCommunity = new Map<string, number | null>();
+  for (const row of (foundingNumbersRes.data ?? []) as Array<{
+    community_id: string;
+    founding_fan_number: number | null;
+  }>) {
+    foundingNumberByCommunity.set(row.community_id, row.founding_fan_number);
+  }
+  const rsvpGrants: RsvpAdminGrant[] = (
+    (adminGrantsRes.data ?? []) as Array<{ community_id: string; role: string | null }>
+  ).map((row) => ({ communityId: row.community_id, role: row.role }));
+  const superAdminManages =
+    Boolean(adminCtx?.isSuperAdmin) && roleAtLeast(adminCtx?.role ?? null, "editor");
+
+  const upcomingEvents: FanHomeUpcomingEvent[] = upcomingEventsRes
     .slice(0, 3)
     .map((e) => {
       const reminderKinds = remindersByEvent.get(e.id) ?? new Set<string>();
+      const view = rsvpWindowView(
+        evaluateRsvpWindow({
+          now: new Date(),
+          rsvpOpensAt: e.rsvp_opens_at,
+          foundingFanNumber: foundingNumberByCommunity.get(e.artist_slug) ?? null,
+          isAdmin:
+            superAdminManages || grantManagesEventRsvps(rsvpGrants, e.artist_slug),
+        }),
+      );
+      const rsvpStatusLabel =
+        view.state === "early-access"
+          ? "Early access"
+          : view.state === "closed"
+            ? view.closedMessage
+            : null;
       return {
         id: e.id,
         artist_slug: e.artist_slug,
@@ -388,6 +419,7 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
         rsvped: myRsvpedIds.has(e.id),
         has_scheduled_reminder:
           reminderKinds.has("reminder_24h") || reminderKinds.has("reminder_1h"),
+        rsvpStatusLabel,
       };
     });
 
@@ -508,4 +540,52 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     premiumCommunities,
     founderCommunities,
   };
+}
+
+type HomeUpcomingRow = {
+  id: string;
+  artist_slug: string;
+  title: string;
+  starts_at: string | null;
+  event_date: string | null;
+  location: string | null;
+  url: string | null;
+  rsvp_opens_at: string | null;
+};
+
+async function loadHomeUpcomingEvents(
+  admin: ReturnType<typeof createAdminClient>,
+  followedSlugs: string[],
+  nowIso: string,
+): Promise<HomeUpcomingRow[]> {
+  if (followedSlugs.length === 0) return [];
+  const columns =
+    "id, artist_slug, title, starts_at, event_date, location, url, tier, active";
+  const { data, error } = await selectWithOptionalRsvpOpens(
+    (cols) =>
+      admin
+        .from("artist_events")
+        .select(cols)
+        .in("artist_slug", followedSlugs)
+        .eq("active", true)
+        .eq("tier", "public")
+        .not("starts_at", "is", null)
+        .gt("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(8),
+    columns,
+  );
+  if (error || !data) return [];
+  return (data as unknown as Array<Omit<HomeUpcomingRow, "rsvp_opens_at"> & { rsvp_opens_at?: string | null }>).map(
+    (row) => ({
+      id: row.id,
+      artist_slug: row.artist_slug,
+      title: row.title,
+      starts_at: row.starts_at,
+      event_date: row.event_date,
+      location: row.location,
+      url: row.url,
+      rsvp_opens_at: row.rsvp_opens_at ?? null,
+    }),
+  );
 }

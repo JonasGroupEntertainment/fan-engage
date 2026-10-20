@@ -4,6 +4,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
 import { sendEventReminder, type ReminderWindowEvent } from "@/lib/reminders";
 import { parseSocialLines } from "@/lib/socials/parse";
+import { isMissingRsvpOpensColumn } from "@/lib/rsvp-window";
+
+const RSVP_OPENS_MIGRATION_ERROR =
+  "Apply migration 0078_founding_rsvp_window.sql before setting an RSVP open time. It is not applied yet.";
+
+/** Blank clears the schedule (RSVP stays open). A value is stored as UTC. */
+function rsvpOpensAtFromForm(
+  formData: FormData,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  const raw = String(formData.get("rsvp_opens_at") ?? "").trim();
+  if (!raw) return { ok: true, value: null };
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false, error: "RSVP open time is not a valid date." };
+  }
+  return { ok: true, value: parsed.toISOString() };
+}
 
 const EDIT_ROLE = "admin" as const;
 
@@ -119,9 +136,11 @@ export async function createEventAction(formData: FormData) {
   const capacityRaw = String(formData.get("capacity") ?? "").trim();
   const capacity = capacityRaw ? parseInt(capacityRaw, 10) : null;
   const sortOrder = parseInt(String(formData.get("sort_order") ?? "0"), 10) || 0;
+  const opensAt = rsvpOpensAtFromForm(formData);
+  if (!opensAt.ok) return { error: opensAt.error };
 
   const supa = createAdminClient();
-  const { error } = await supa.from("artist_events").insert({
+  const row = {
     artist_slug: artistSlug,
     title,
     detail: detail || null,
@@ -131,7 +150,15 @@ export async function createEventAction(formData: FormData) {
     url: url || null,
     capacity: Number.isFinite(capacity) ? capacity : null,
     sort_order: sortOrder,
+  };
+  let { error } = await supa.from("artist_events").insert({
+    ...row,
+    rsvp_opens_at: opensAt.value,
   });
+  if (error && isMissingRsvpOpensColumn(error)) {
+    if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
+    ({ error } = await supa.from("artist_events").insert(row));
+  }
   if (error) {
     return { error: error.message };
   }
@@ -181,23 +208,34 @@ export async function updateEventAction(formData: FormData) {
   const sortOrder = parseInt(String(formData.get("sort_order") ?? "0"), 10) || 0;
   // Checkbox: present + "true" means active. Missing means unchecked.
   const active = String(formData.get("active") ?? "") === "true";
+  const opensAt = rsvpOpensAtFromForm(formData);
+  if (!opensAt.ok) return { error: opensAt.error };
 
   const supa = createAdminClient();
-  const { error } = await supa
+  const row = {
+    title,
+    detail: detail || null,
+    event_date: eventDate || null,
+    starts_at: startsAt || null,
+    location: location || null,
+    url: url || null,
+    capacity: Number.isFinite(capacity) ? capacity : null,
+    sort_order: sortOrder,
+    active,
+  };
+  let { error } = await supa
     .from("artist_events")
-    .update({
-      title,
-      detail: detail || null,
-      event_date: eventDate || null,
-      starts_at: startsAt || null,
-      location: location || null,
-      url: url || null,
-      capacity: Number.isFinite(capacity) ? capacity : null,
-      sort_order: sortOrder,
-      active,
-    })
+    .update({ ...row, rsvp_opens_at: opensAt.value })
     .eq("id", eventId)
     .eq("artist_slug", artistSlug);
+  if (error && isMissingRsvpOpensColumn(error)) {
+    if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
+    ({ error } = await supa
+      .from("artist_events")
+      .update(row)
+      .eq("id", eventId)
+      .eq("artist_slug", artistSlug));
+  }
 
   if (error) {
     return { error: error.message };

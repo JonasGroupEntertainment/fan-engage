@@ -25,6 +25,8 @@ import ShareButton from "@/components/share-button";
 import InlineShareButton from "@/components/inline-share-button";
 import RsvpButton from "./rsvp-button";
 import { ExpandableEventGrid } from "./expandable-event-grid";
+import { viewerFoundingFanNumber, viewerManagesEventRsvps } from "@/lib/rsvp-access";
+import { evaluateRsvpWindow, rsvpWindowView } from "@/lib/rsvp-window";
 import { focalPointStyle } from "@/lib/images/focal-point";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 
@@ -86,7 +88,13 @@ export default async function ArtistPage({
   // Only events with a real DB id participate; fallback hardcoded events
   // (no id) remain read-only.
   const eventIds = artist.upcoming.filter((e) => !!e.id).map((e) => e.id as string);
-  const { counts: rsvpCounts, mine: myRsvps } = await getRsvpMetaForEvents(eventIds);
+  const [{ counts: rsvpCounts, mine: myRsvps }, foundingFanNumber, managesRsvps] =
+    await Promise.all([
+      getRsvpMetaForEvents(eventIds),
+      viewerFoundingFanNumber(slug),
+      viewerManagesEventRsvps(slug),
+    ]);
+  const rsvpNow = new Date();
 
   const heroGradient = `linear-gradient(to bottom right, ${artist.accentFrom}66, #0f172a, #000000)`;
   const ctaGradient = `linear-gradient(to right, ${artist.accentFrom}, ${artist.accentTo})`;
@@ -369,6 +377,14 @@ export default async function ArtistPage({
             const atCapacity =
               e.capacity != null && e.capacity > 0 && count >= e.capacity;
             const rsvped = eventId ? myRsvps.has(eventId) : false;
+            const rsvpView = rsvpWindowView(
+              evaluateRsvpWindow({
+                now: rsvpNow,
+                rsvpOpensAt: e.rsvpOpensAt ?? null,
+                foundingFanNumber,
+                isAdmin: managesRsvps,
+              }),
+            );
             return (
               <div
                 key={eventId ?? e.title}
@@ -397,7 +413,13 @@ export default async function ArtistPage({
                       artistSlug={artist.slug}
                       initialRsvped={rsvped}
                       atCapacity={atCapacity}
+                      windowView={rsvpView}
                     />
+                  )}
+                  {eventId && !isSignedIn && rsvpView.state === "closed" && (
+                    <p className="max-w-[14rem] text-right text-xs text-white/70">
+                      {rsvpView.closedMessage}
+                    </p>
                   )}
                 </div>
                 {eventId && (
