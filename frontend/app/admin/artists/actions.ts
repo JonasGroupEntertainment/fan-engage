@@ -7,7 +7,7 @@ import { parseSocialLines } from "@/lib/socials/parse";
 import { isMissingRsvpOpensColumn } from "@/lib/rsvp-window";
 
 const RSVP_OPENS_MIGRATION_ERROR =
-  "Apply migration 0078_founding_rsvp_window.sql before setting an RSVP open time. It is not applied yet.";
+  "Apply migration 0079_founding_rsvp_window.sql before setting an RSVP open time. It is not applied yet.";
 
 /** Blank clears the schedule (RSVP stays open). A value is stored as UTC. */
 function rsvpOpensAtFromForm(

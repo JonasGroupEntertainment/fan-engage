@@ -220,7 +220,7 @@ describe("who may manage RSVPs outside the window", () => {
 describe("window enforcement is on the server and in SQL", () => {
   const windowSrc = readRepo("./rsvp-window.ts");
   const actionSrc = readRepo("../app/artists/[slug]/rsvp-actions.ts");
-  const migrationSql = readRepo("../../supabase/migrations/0078_founding_rsvp_window.sql");
+  const migrationSql = readRepo("../../supabase/migrations/0079_founding_rsvp_window.sql");
 
   it("decides founding status with isFoundingFanNumber, not the paid founder flag", () => {
     assert.match(windowSrc, /isFoundingFanNumber/);

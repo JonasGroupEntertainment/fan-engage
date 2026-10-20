@@ -26,7 +26,7 @@ export interface ArtistEvent {
   active: boolean;
   /** Access tier from migration 0015: 'public' (default) | 'premium'. */
   tier: "public" | "premium";
-  /** Migration 0078. Absent until that column is applied; null means open now. */
+  /** Migration 0079. Absent until that column is applied; null means open now. */
   rsvp_opens_at?: string | null;
 }
 

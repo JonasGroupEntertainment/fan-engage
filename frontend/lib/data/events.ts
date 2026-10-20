@@ -16,7 +16,7 @@ export interface EventRow {
   ends_at: string | null;
   sort_order: number;
   active: boolean;
-  /** Migration 0078. Null or absent means RSVP is open now. */
+  /** Migration 0079. Null or absent means RSVP is open now. */
   rsvp_opens_at?: string | null;
 }
 

@@ -1,4 +1,5 @@
 -- Founding Fan 48-hour early RSVP.
+-- Numbered 0079. 0078 is already used by other open PRs.
 --
 -- artist_events.rsvp_opens_at is when RSVP opens for everyone else.
 -- A fan with founding_fan_number >= 1 (the same rule as

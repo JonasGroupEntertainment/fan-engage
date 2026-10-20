@@ -3,7 +3,7 @@ import { isMissingRsvpOpensColumn } from "@/lib/rsvp-window";
 type PostgrestError = { code?: string; message?: string } | null;
 
 /**
- * Select artist_events including `rsvp_opens_at` when migration 0078 is
+ * Select artist_events including `rsvp_opens_at` when migration 0079 is
  * present. If the column is not applied yet, retry without it so artist
  * pages keep rendering. Callers treat a missing value as "RSVP is open now".
  *
