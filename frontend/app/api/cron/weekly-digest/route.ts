@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -49,9 +49,10 @@ interface DigestRunSummary {
 }
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "weekly-digest", () => weeklyDigest(request));
+}
 
+async function weeklyDigest(request: Request) {
   // Don't 503 on missing ANTHROPIC_API_KEY — the digest still ships with
   // fallback summaries. But ANTHROPIC missing is a quality issue worth
   // surfacing, so include in the response.
@@ -183,11 +184,15 @@ export async function GET(request: Request) {
     }
 
     summary.durationMs = Date.now() - started;
-    return NextResponse.json({
-      ok: true,
-      aiAvailable,
-      summary,
-    });
+    const failed = Boolean(summary.campaignError);
+    return NextResponse.json(
+      {
+        ok: !failed,
+        aiAvailable,
+        summary,
+      },
+      { status: failed ? 500 : 200 },
+    );
   } catch (err) {
     return NextResponse.json(
       {

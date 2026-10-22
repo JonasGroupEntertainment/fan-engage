@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import {
   gatherAdminBriefMetrics,
@@ -28,9 +28,10 @@ export const dynamic = "force-dynamic";
  * narrative. The brief still ships, just less polished.
  */
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "daily-admin-brief", () => dailyAdminBrief());
+}
 
+async function dailyAdminBrief() {
   const started = Date.now();
   try {
     const metrics = await gatherAdminBriefMetrics(new Date());

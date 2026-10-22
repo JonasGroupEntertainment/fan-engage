@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  buildCronLog,
+  cronAuthProblem,
+  emitCronLog,
+} from "@/lib/cron-observability";
 
 /**
  * Shared cron authentication helper.
@@ -8,26 +13,29 @@ import { NextResponse } from "next/server";
  * accidental redeploy without the var set) we return 503 rather than
  * letting the job run unauthenticated.
  *
- * Usage:
- *   const authErr = verifyCronAuth(request);
+ * Usage (routes that are not on the Vercel cron schedule):
+ *   const authErr = verifyCronAuth(request, "payout-artists");
  *   if (authErr) return authErr;
+ *
+ * Scheduled routes use runCron() in lib/cron-run.ts, which also writes
+ * a digest_log or cron_runs row.
  */
-export function verifyCronAuth(request: Request): NextResponse | null {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.error(
-      "[cron] CRON_SECRET is not configured — refusing to run unauthenticated",
-    );
-    return NextResponse.json(
-      { error: "CRON_SECRET not configured" },
-      { status: 503 },
-    );
-  }
-  const auth = (request.headers as { get(h: string): string | null }).get(
-    "authorization",
-  ) ?? "";
-  if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return null;
+export function verifyCronAuth(
+  request: Request,
+  job = "cron",
+): NextResponse | null {
+  const problem = cronAuthProblem(request);
+  if (!problem) return null;
+  emitCronLog(
+    buildCronLog({
+      job,
+      event: "failure",
+      error: problem.error,
+      status: problem.status,
+    }),
+  );
+  return NextResponse.json(
+    { ok: false, error: problem.error },
+    { status: problem.status },
+  );
 }

@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { indexRow, type SourceTable } from "@/lib/embeddings";
@@ -40,21 +40,10 @@ interface BackfillSummary {
 }
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "embeddings-backfill", () => embeddingsBackfill());
+}
 
-  // Fail fast if the API key isn't configured. We surface this as a 503
-  // so Vercel's cron retry kicks in once the env var is set.
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json(
-      {
-        error:
-          "OPENAI_API_KEY not configured. Skipping backfill until the env var is set in Vercel.",
-      },
-      { status: 503 },
-    );
-  }
-
+async function embeddingsBackfill() {
   const started = Date.now();
   const summary: BackfillSummary = {
     totalCandidates: 0,

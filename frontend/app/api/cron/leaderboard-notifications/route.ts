@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
@@ -53,10 +53,13 @@ function yesterdayDateString(now: Date): string {
   return y.toISOString().slice(0, 10);
 }
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "leaderboard-notifications", () =>
+    leaderboardNotifications(),
+  );
+}
 
+async function leaderboardNotifications() {
   const admin = createAdminClient();
   const now = new Date();
   const today = todayDateString(now);
