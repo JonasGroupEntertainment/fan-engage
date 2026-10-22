@@ -21,6 +21,7 @@ import {
 } from "@/lib/premium-trial";
 import { stripeSignatureFailureWarning } from "@/lib/stripe-webhook-signature";
 import { awardPoints } from "@/lib/points/award";
+import { captureAppException } from "@/lib/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,10 @@ export async function POST(request: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     console.warn("stripe/webhook: STRIPE_WEBHOOK_SECRET not configured");
+    await captureAppException(new Error("STRIPE_WEBHOOK_SECRET not configured"), {
+      route: "/api/stripe/webhook",
+      step: "missing-secret",
+    });
     return NextResponse.json(
       { error: "webhook secret not configured" },
       { status: 500 },
@@ -85,6 +90,10 @@ export async function POST(request: Request) {
     // Event type is unknown: the body failed verification. Log a fixed
     // warning only — never the secret, signature header, or payload.
     console.warn(stripeSignatureFailureWarning(err));
+    await captureAppException(new Error(stripeSignatureFailureWarning(err)), {
+      route: "/api/stripe/webhook",
+      step: "verify-signature",
+    });
     return NextResponse.json({ error: "bad signature" }, { status: 400 });
   }
 
@@ -116,6 +125,13 @@ export async function POST(request: Request) {
     // Stripe to retry rather than processing it untracked.
     if (stripeEventInsertOutcome(insertErr) === "failed") {
       console.error("stripe/webhook: event insert failed", insertErr?.message);
+      await captureAppException(insertErr ?? new Error("stripe event insert failed"), {
+        route: "/api/stripe/webhook",
+        step: "insert-event",
+        fan_id: extractFanId(event),
+        event_type: event.type,
+        code: insertErr?.code,
+      });
       return NextResponse.json(
         { ok: false, error: "event log unavailable" },
         { status: 500 },
@@ -168,6 +184,12 @@ export async function POST(request: Request) {
   } catch (err) {
     processError = err instanceof Error ? err.message : String(err);
     console.error(`stripe/webhook: ${event.type} handler failed`, processError);
+    await captureAppException(err, {
+      route: "/api/stripe/webhook",
+      step: "handler",
+      fan_id: extractFanId(event),
+      event_type: event.type,
+    });
   }
 
   // Only stamp processed_at after a successful handler. A 500 with

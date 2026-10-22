@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authRateLimitSalt } from "@/lib/auth-rate-limit-policy";
 import { getClientIp } from "@/lib/rate-limit";
+import { captureAppException } from "@/lib/sentry";
 import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
 
 export const runtime = "nodejs";
@@ -23,11 +24,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[signup] rate limit unavailable", error);
+    await captureAppException(error, {
+      route: "/api/auth/signup-error",
+      step: "rate-limit",
+    });
     return NextResponse.json({ ok: false }, { status: 503 });
   }
 
   if (!rl.allowed) {
     if (rl.reason === "backend_unavailable") {
+      await captureAppException(new Error("signup error rate limit backend unavailable"), {
+        route: "/api/auth/signup-error",
+        step: "backend-unavailable",
+      });
       return NextResponse.json({ ok: false }, { status: 503 });
     }
     return NextResponse.json({ ok: false }, { status: 429 });
@@ -47,6 +56,11 @@ export async function POST(request: NextRequest) {
 
   if (message || code) {
     console.error("[signup] create failed", { code, message });
+    await captureAppException(new Error(message || "signup create failed"), {
+      route: "/api/auth/signup-error",
+      step: "create-failed",
+      code,
+    });
   }
 
   return NextResponse.json({ ok: true });
