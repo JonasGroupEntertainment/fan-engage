@@ -159,7 +159,7 @@ describe("signup form stays on /signup after a failed create", () => {
   it("sanitizes unexpected thrown errors instead of showing raw Error.message", () => {
     const signup = readRepo("../app/signup/signup-form.tsx");
     const createAt = signup.indexOf("async function createAccount");
-    const createFn = signup.slice(createAt, createAt + 2200);
+    const createFn = signup.slice(createAt, createAt + 2500);
     assert.match(createFn, /sanitizeSignupError/);
     assert.doesNotMatch(createFn, /setMessage\(err instanceof Error \? err\.message/);
   });

@@ -252,6 +252,14 @@ function UpcomingEventsList({
                   <span className="inline-flex rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
                     ✓ Going
                   </span>
+                ) : e.rsvpStatusLabel === "Early access" ? (
+                  <span className="inline-flex rounded-full bg-aurora/20 px-2 py-0.5 text-xs font-medium text-aurora">
+                    Early access
+                  </span>
+                ) : e.rsvpStatusLabel ? (
+                  <span className="block max-w-[9rem] text-right text-[11px] leading-snug text-white/60">
+                    {e.rsvpStatusLabel}
+                  </span>
                 ) : (
                   <span className="inline-flex text-xs text-white/50 group-hover:text-white/80">
                     RSVP →

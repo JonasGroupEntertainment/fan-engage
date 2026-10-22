@@ -5,6 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
 import { authorizeAdmin } from "@/lib/admin-guard";
+import {
+  effectivePromoLimits,
+  promoExpired,
+  promoLimitReached,
+} from "@/lib/raelynn-vip-code";
 
 /**
  * Promo codes grant comped premium access. A universal code ('*') works in
@@ -44,10 +49,30 @@ export async function redeemPromoCode(
 
   if (codeErr || !code) return { ok: false, error: "That code wasn't found. Double-check and try again." };
   if (!code.active) return { ok: false, error: "This code is no longer active." };
-  if (code.expires_at && new Date(code.expires_at as string) < new Date()) {
+
+  const limits = effectivePromoLimits({
+    code: raw,
+    maxUses: (code.max_uses as number | null) ?? null,
+    expiresAt: (code.expires_at as string | null) ?? null,
+  });
+  if (promoExpired(limits.expiresAt, new Date())) {
     return { ok: false, error: "This code has expired." };
   }
-  if (code.max_uses !== null && (code.uses_count as number) >= (code.max_uses as number)) {
+
+  let used = (code.uses_count as number) ?? 0;
+  // RAELYNNVIP counts redemption rows, so existing test redemptions
+  // consume the cap even when uses_count is behind.
+  if (limits.countRedemptions) {
+    const { count, error: countErr } = await admin
+      .from("promo_code_redemptions")
+      .select("id", { count: "exact", head: true })
+      .eq("promo_code_id", code.id as string);
+    if (countErr) {
+      return { ok: false, error: "This code could not be redeemed right now." };
+    }
+    used = Math.max(used, count ?? 0);
+  }
+  if (promoLimitReached(used, limits.maxUses)) {
     return { ok: false, error: "This code has reached its maximum number of uses." };
   }
 
@@ -96,7 +121,7 @@ export async function redeemPromoCode(
 
   await admin
     .from("promo_codes")
-    .update({ uses_count: (code.uses_count as number) + 1 })
+    .update({ uses_count: used + 1 })
     .eq("id", code.id as string);
 
   revalidatePath("/premium");

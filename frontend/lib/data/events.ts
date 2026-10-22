@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
 
 export interface EventRow {
   id: string;
@@ -15,6 +16,8 @@ export interface EventRow {
   ends_at: string | null;
   sort_order: number;
   active: boolean;
+  /** Migration 0079. Null or absent means RSVP is open now. */
+  rsvp_opens_at?: string | null;
 }
 
 /** Single event with RSVP count + whether the current fan has RSVPed. */
@@ -30,19 +33,18 @@ export async function getEventById(eventId: string): Promise<EventWithRsvp | nul
     const admin = createAdminClient();
 
     const [{ data: event }, { count }] = await Promise.all([
-      supabase
-        .from("artist_events")
-        .select(
-          "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active",
-        )
-        .eq("id", eventId)
-        .maybeSingle(),
+      selectWithOptionalRsvpOpens(
+        (columns) =>
+          supabase.from("artist_events").select(columns).eq("id", eventId).maybeSingle(),
+        "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active",
+      ),
       admin
         .from("event_rsvps")
         .select("event_id", { count: "exact", head: true })
         .eq("event_id", eventId),
     ]);
     if (!event) return null;
+    const eventRow = event as unknown as EventRow;
 
     const [{ data: artist }, {
       data: { user },
@@ -50,7 +52,7 @@ export async function getEventById(eventId: string): Promise<EventWithRsvp | nul
       supabase
         .from("artists")
         .select("name")
-        .eq("slug", event.artist_slug as string)
+        .eq("slug", eventRow.artist_slug)
         .maybeSingle(),
       supabase.auth.getUser(),
     ]);
@@ -67,7 +69,7 @@ export async function getEventById(eventId: string): Promise<EventWithRsvp | nul
     }
 
     return {
-      ...(event as EventRow),
+      ...eventRow,
       rsvp_count: count ?? 0,
       rsvp_by_me: rsvpByMe,
       artist_name: (artist?.name as string | null) ?? null,

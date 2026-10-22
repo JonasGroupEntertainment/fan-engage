@@ -62,7 +62,17 @@ describe("Founding Fan 1.5× writer contract", () => {
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 101 }), 15);
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: null }), 10);
     assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 0 }), 10);
+  });
+
+  it("rounds half away from zero, matching SQL round()", () => {
+    assert.equal(applyFoundingMultiplier(1, { foundingFanNumber: 1 }), 2);
+    assert.equal(applyFoundingMultiplier(3, { foundingFanNumber: 4 }), 5);
+    assert.equal(applyFoundingMultiplier(5, { foundingFanNumber: 12 }), 8);
+    assert.equal(applyFoundingMultiplier(7, { isPremium: true }), 11);
+    assert.equal(applyFoundingMultiplier(25, { foundingFanNumber: 101 }), 38);
+    assert.equal(applyFoundingMultiplier(10, { foundingFanNumber: 2 }), 15);
     assert.equal(applyFoundingMultiplier(100, { foundingFanNumber: 3 }), 150);
+    assert.equal(applyFoundingMultiplier(500, { foundingFanNumber: 1 }), 750);
   });
 
   it("does not multiply spends and does not stack premium + founding", () => {

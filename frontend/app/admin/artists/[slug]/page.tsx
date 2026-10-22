@@ -11,6 +11,7 @@ import {
   deleteEventAction,
   sendReminderNowAction,
 } from "../actions";
+import { formatRsvpOpensAt } from "@/lib/rsvp-window";
 import ModerationButton from "@/app/admin/community/moderation-button";
 
 type ReminderRow = {
@@ -145,6 +146,7 @@ export default async function AdminArtistEditPage({
                   capacity: e.capacity ?? null,
                   sort_order: e.sort_order ?? 0,
                   active: e.active ?? true,
+                  rsvp_opens_at: e.rsvp_opens_at ?? null,
                 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -170,6 +172,12 @@ export default async function AdminArtistEditPage({
                       {rsvps.length}
                       {e.capacity ? ` / ${e.capacity}` : ""} RSVPed
                     </p>
+                    {e.rsvp_opens_at && (
+                      <p className="mt-1 text-xs text-white/50">
+                        RSVP opens {formatRsvpOpensAt(new Date(e.rsvp_opens_at))}
+                        {" · "}Founding Fans 48h earlier
+                      </p>
+                    )}
                     {/* Reminder status */}
                     {(rem24 || rem1h || remindersScheduled) && (
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

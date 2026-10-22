@@ -75,6 +75,18 @@ export default function CreateEventForm({ slug }: { slug: string }) {
         placeholder="Capacity (blank = unlimited)"
         className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
       />
+      <label className="text-xs text-white/70 md:col-span-2">
+        RSVP opens for everyone (UTC)
+        <input
+          name="rsvp_opens_at"
+          type="datetime-local"
+          className="mt-1 w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+        />
+        <span className="mt-1 block text-[11px] text-white/45">
+          Founding Fans can RSVP 48 hours earlier. Leave blank to keep RSVP open now.
+          Same clock as the start time field. Fans see the time in Eastern.
+        </span>
+      </label>
       <input
         name="sort_order"
         type="number"

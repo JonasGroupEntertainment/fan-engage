@@ -11,7 +11,6 @@ import {
   isStripeEventReplay,
   monthlyCreditGrantRow,
   MONTHLY_CREDIT_CENTS,
-  referralLedgerOutcome,
   stripeEventCompletionPatch,
   stripeEventInsertOutcome,
   throwIfDbError,
@@ -20,6 +19,8 @@ import {
   invoiceShouldRefreshCredit,
   shouldGrantConversionPerks,
 } from "@/lib/premium-trial";
+import { stripeSignatureFailureWarning } from "@/lib/stripe-webhook-signature";
+import { awardPoints } from "@/lib/points/award";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,8 +82,9 @@ export async function POST(request: Request) {
     const stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, sig, secret);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("stripe/webhook: signature verification failed", msg);
+    // Event type is unknown: the body failed verification. Log a fixed
+    // warning only — never the secret, signature header, or payload.
+    console.warn(stripeSignatureFailureWarning(err));
     return NextResponse.json({ error: "bad signature" }, { status: 400 });
   }
 
@@ -248,7 +250,7 @@ async function handleSubscriptionCreated(
       alreadyPaid: prior?.first_paid_at != null,
     })
   ) {
-    await grantConversionPerks(fanId, admin);
+    await grantConversionPerks(fanId, communityId, admin);
   }
 }
 
@@ -260,8 +262,12 @@ async function handleSubscriptionCreated(
  * Does not claim or clear a Founding Fan slot, and does not change the
  * subscription price. The free badge is claimed on join/onboarding.
  */
-async function grantConversionPerks(fanId: string, admin: SupabaseClient) {
-  await awardReferralPoints(fanId, admin);
+async function grantConversionPerks(
+  fanId: string,
+  communityId: string | null,
+  admin: SupabaseClient,
+) {
+  await awardReferralPoints(fanId, communityId, admin);
 }
 
 async function handleSubscriptionUpdated(
@@ -325,7 +331,7 @@ async function handleSubscriptionUpdated(
       alreadyPaid: row?.first_paid_at != null,
     })
   ) {
-    await grantConversionPerks(fanId, admin);
+    await grantConversionPerks(fanId, communityId, admin);
   }
 }
 
@@ -381,7 +387,11 @@ async function handleInvoicePaid(
     alreadyPaid,
   });
   if (firstRealPayment) {
-    await grantConversionPerks(membership.fan_id as string, admin);
+    await grantConversionPerks(
+      membership.fan_id as string,
+      membership.community_id as string,
+      admin,
+    );
   }
 
   const nowMs = Date.now();
@@ -471,17 +481,20 @@ function subPeriodEnd(sub: Stripe.Subscription): string | null {
 }
 
 /**
- * When a referred fan goes Premium, credit 500 points to the referrer and
- * mark the referral as verified. Idempotent — a points_ledger row keyed on
- * source_ref guards against double-award on Stripe webhook replays.
+ * When a referred fan goes Premium, credit 500 base points to the referrer
+ * and mark the referral as verified. apply_points_award multiplies once
+ * for a Founding Fan or Premium referrer and syncs totals. Idempotent —
+ * a points_ledger row keyed on source_ref guards against double-award
+ * on Stripe webhook replays.
  */
 async function awardReferralPoints(
   fanId: string,
+  communityId: string | null,
   admin: SupabaseClient,
 ): Promise<void> {
   const { data: referral, error: referralErr } = await admin
     .from("referrals")
-    .select("id, referrer_id")
+    .select("id, referrer_id, community_id")
     .eq("referred_id", fanId)
     .eq("status", "pending")
     .maybeSingle();
@@ -491,63 +504,40 @@ async function awardReferralPoints(
 
   const REFERRAL_POINTS = 500;
   const sourceRef = `referral_conversion:${referral.id}`;
+  const resolvedCommunity =
+    communityId ?? (referral.community_id as string | null) ?? undefined;
 
-  // Guard: skip if we already awarded points for this referral.
-  const { data: existing, error: existingErr } = await admin
-    .from("points_ledger")
-    .select("id")
-    .eq("source_ref", sourceRef)
-    .maybeSingle();
-  throwIfDbError({ error: existingErr }, "referral ledger read");
+  // Throws on a real write failure so the referral stays pending and
+  // Stripe retries. A duplicate source_ref returns 0.
+  const awarded = await awardPoints(admin, {
+    fanId: referral.referrer_id,
+    delta: REFERRAL_POINTS,
+    source: "referral",
+    sourceRef,
+    note: "Referred fan went Premium",
+    ...(resolvedCommunity ? { communityId: resolvedCommunity } : {}),
+  });
 
-  if (!existing) {
-    const { error: ledgerErr } = await admin.from("points_ledger").insert({
-      fan_id: referral.referrer_id,
-      delta: REFERRAL_POINTS,
-      source: "referral",
-      source_ref: sourceRef,
-      note: "Referred fan went Premium",
-    });
-
-    const outcome = referralLedgerOutcome(ledgerErr);
-    if (outcome === "failed") {
-      throw new Error(
-        `referral points_ledger insert failed: ${ledgerErr?.message ?? "unknown"}`,
-      );
-    }
-    if (outcome === "inserted") {
-      // Mirror the pattern used in award_community_badge: fetch then update.
-      const { data: fanRow, error: fanReadErr } = await admin
-        .from("fans")
-        .select("total_points")
-        .eq("id", referral.referrer_id)
-        .maybeSingle();
-      throwIfDbError({ error: fanReadErr }, "referral fan read");
-
-      if (fanRow !== null) {
-        const { error: bumpErr } = await admin
-          .from("fans")
-          .update({ total_points: (fanRow.total_points ?? 0) + REFERRAL_POINTS })
-          .eq("id", referral.referrer_id);
-        // The ledger row is the idempotency key. A failed total bump is
-        // logged; throwing would retry, see the ledger row, and skip the
-        // bump again. The unique index still stops a second award.
-        if (bumpErr) {
-          console.warn("referral total_points update failed", bumpErr.message);
-        }
-      }
-    }
+  let pointsAwarded = awarded;
+  if (pointsAwarded === 0) {
+    const { data: existing, error: existingErr } = await admin
+      .from("points_ledger")
+      .select("delta")
+      .eq("source_ref", sourceRef)
+      .maybeSingle();
+    throwIfDbError({ error: existingErr }, "referral ledger read");
+    if (typeof existing?.delta === "number") pointsAwarded = existing.delta;
   }
 
   // Mark converted. Use verified_at (existing schema column) — the status
   // moves to 'verified' which also triggers the award_referral_badges trigger.
   // Only reached after the ledger row exists, so a retry cannot pay twice
-  // and a failed insert cannot mark the referral done with no points.
+  // and a failed award cannot mark the referral done with no points.
   const { error: verifyErr } = await admin
     .from("referrals")
     .update({
       status: "verified",
-      points_awarded: REFERRAL_POINTS,
+      ...(pointsAwarded > 0 ? { points_awarded: pointsAwarded } : {}),
       verified_at: new Date().toISOString(),
     })
     .eq("id", referral.id);

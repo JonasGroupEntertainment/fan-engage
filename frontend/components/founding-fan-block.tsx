@@ -37,9 +37,9 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               </span>
             </h2>
             <p className="mt-4 text-sm text-white/75">
-              Join now to lock a numbered Founding Fan badge. Founding Fans
-              #1–{stats.foundingTarget} earn 1.5× points — not a paid
-              subscription, and not just a badge.
+              Founding Fans lock a numbered badge and 1.5× points, plus
+              48-hour early RSVP. It is not a paid subscription, and not
+              just a badge.
             </p>
           </div>
 
