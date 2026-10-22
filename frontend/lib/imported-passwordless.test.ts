@@ -184,7 +184,7 @@ describe("imported-account handler", () => {
     });
     assert.equal(missed.status, 200);
     assert.equal(missed.body.outcome, "generic");
-    assert.deepEqual(sent, []);
+    assert.equal(sent.length, 0);
 
     const real = await handleImportedAccount({
       action: "classify",
@@ -199,7 +199,7 @@ describe("imported-account handler", () => {
       },
     });
     assert.equal(real.body.outcome, "generic");
-    assert.deepEqual(sent, []);
+    assert.equal(sent.length, 0);
   });
 
   it("sends resetPasswordForEmail only for the import, with the captcha token", async () => {
