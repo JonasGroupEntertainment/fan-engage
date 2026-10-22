@@ -62,7 +62,11 @@ export function countFoundingFanNumbers(
   return numbers.filter((n) => isFoundingFanNumber(n)).length;
 }
 
-/** Writer rule: Founding Fan #1–100 gets 1.5×. Not stacked with premium. */
+/**
+ * Writer rule: any awarded founding number, or Premium, gets 1.5×.
+ * Not stacked. Positive bases round half away from zero, matching
+ * SQL `round(base * 1.5)`. Spends and refunds are unchanged.
+ */
 export function applyFoundingMultiplier(
   baseDelta: number,
   opts: { foundingFanNumber?: number | null; isPremium?: boolean },
