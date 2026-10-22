@@ -12,6 +12,7 @@ import { isForgotPasswordEnabled } from "@/lib/auth-doors";
 import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createCallbackSupabase } from "@/lib/supabase/callback-server";
 import { tagFanInternalIfNeeded } from "@/lib/internal-account-tag";
+import { captureAppException } from "@/lib/sentry";
 
 /**
  * Handles:
@@ -112,8 +113,15 @@ async function tagSessionFan(supabase: {
   try {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
-    await tagFanInternalIfNeeded({ id: data.user.id, email: data.user.email });
-  } catch {
+    await tagFanInternalIfNeeded(
+      { id: data.user.id, email: data.user.email },
+      "/auth/callback",
+    );
+  } catch (error) {
     console.warn("signup: internal account tag was not saved");
+    await captureAppException(error, {
+      route: "/auth/callback",
+      step: "tag-internal-account",
+    });
   }
 }
