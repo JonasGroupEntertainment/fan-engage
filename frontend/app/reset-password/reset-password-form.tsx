@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ensureImportedFanMembership } from "@/app/auth/ensure-membership";
 import { isAuthEmailOtpType } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase/client";
 
@@ -48,6 +49,14 @@ export default function ResetPasswordForm({
         if (session && (code || tokenHash)) {
           window.history.replaceState(null, "", "/reset-password");
         }
+        if (session) {
+          try {
+            await ensureImportedFanMembership();
+          } catch {
+            // Setting a password still works if the membership repair cannot run.
+          }
+        }
+        if (cancelled) return;
         setSessionState(session ? "ready" : "missing");
       } catch {
         if (!cancelled) setSessionState("missing");
