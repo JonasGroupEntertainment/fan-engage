@@ -8,6 +8,7 @@ import {
   authCallbackUserMessage,
   parseAuthCallbackSearch,
 } from "@/lib/auth-callback";
+import { ensureImportedFanMembership } from "@/app/auth/ensure-membership";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthCompleteFallback() {
@@ -70,6 +71,12 @@ export default function AuthCompleteClient({
           }
         }
 
+        if (cancelled) return;
+        try {
+          await ensureImportedFanMembership();
+        } catch {
+          // The session is already valid; membership repair can retry on login.
+        }
         if (cancelled) return;
         window.location.replace(parsed.next);
       } catch {
