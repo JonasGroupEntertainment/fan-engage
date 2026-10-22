@@ -11,6 +11,7 @@ import {
 import { isForgotPasswordEnabled } from "@/lib/auth-doors";
 import { callbackRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createCallbackSupabase } from "@/lib/supabase/callback-server";
+import { ensureImportedFanRaelynnMembership } from "@/lib/ensure-raelynn-membership";
 import { tagFanInternalIfNeeded } from "@/lib/internal-account-tag";
 
 /**
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
       });
       if (error) return fail(authCallbackUserMessage(parsed.next));
       await tagSessionFan(supabase);
+      await ensureSessionMembership(supabase);
       return applyCookies(redirectTo(parsed.next));
     }
 
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
         return fail(authCallbackUserMessage(parsed.next));
       }
       await tagSessionFan(supabase);
+      await ensureSessionMembership(supabase);
       return applyCookies(redirectTo(parsed.next));
     }
 
@@ -115,5 +118,21 @@ async function tagSessionFan(supabase: {
     await tagFanInternalIfNeeded({ id: data.user.id, email: data.user.email });
   } catch {
     console.warn("signup: internal account tag was not saved");
+  }
+}
+
+async function ensureSessionMembership(supabase: {
+  auth: {
+    getUser: () => Promise<{
+      data: { user: { id: string } | null };
+    }>;
+  };
+}): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    await ensureImportedFanRaelynnMembership(data.user.id);
+  } catch {
+    console.warn("membership: raelynn join was not saved");
   }
 }
