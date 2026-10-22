@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
 import {
   ARTISTS as FALLBACK_ARTISTS,
   isUnpublishedArtistSlug,
@@ -25,7 +26,12 @@ export interface ArtistEvent {
   active: boolean;
   /** Access tier from migration 0015: 'public' (default) | 'premium'. */
   tier: "public" | "premium";
+  /** Migration 0079. Absent until that column is applied; null means open now. */
+  rsvp_opens_at?: string | null;
 }
+
+const ARTIST_EVENT_COLUMNS =
+  "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active, tier";
 
 type ArtistRow = {
   slug: string;
@@ -84,6 +90,7 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
         location: e.location ?? null,
         url: e.url ?? null,
         tier: (e.tier ?? "public") as "public" | "premium",
+        rsvpOpensAt: e.rsvp_opens_at ?? null,
       })),
     merch: fallback?.merch ?? [],
     merchUrl: row.merch_url ?? fallback?.merchUrl ?? null,
@@ -109,18 +116,22 @@ export async function getArtistFromDb(slug: string): Promise<Artist | null> {
         .eq("slug", normalized)
         .eq("active", true)
         .maybeSingle(),
-      supabase
-        .from("artist_events")
-        .select("id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active, tier")
-        .eq("artist_slug", normalized)
-        .eq("active", true)
-        .order("sort_order"),
+      selectWithOptionalRsvpOpens(
+        (columns) =>
+          supabase
+            .from("artist_events")
+            .select(columns)
+            .eq("artist_slug", normalized)
+            .eq("active", true)
+            .order("sort_order"),
+        ARTIST_EVENT_COLUMNS,
+      ),
     ]);
 
     if (aErr || eErr || !artist) {
       return FALLBACK_ARTISTS[normalized] ?? null;
     }
-    return rowToArtist(artist as ArtistRow, (events ?? []) as ArtistEvent[]);
+    return rowToArtist(artist as ArtistRow, (events ?? []) as unknown as ArtistEvent[]);
   } catch {
     return FALLBACK_ARTISTS[normalized] ?? null;
   }
@@ -140,18 +151,22 @@ export async function listArtistsFromDb(): Promise<Artist[]> {
     }
 
     const slugs = artists.map((a) => a.slug as string);
-    const { data: events } = await supabase
-      .from("artist_events")
-      .select("id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active, tier")
-      .in("artist_slug", slugs)
-      .eq("active", true)
-      .order("sort_order");
+    const { data: events } = await selectWithOptionalRsvpOpens(
+      (columns) =>
+        supabase
+          .from("artist_events")
+          .select(columns)
+          .in("artist_slug", slugs)
+          .eq("active", true)
+          .order("sort_order"),
+      ARTIST_EVENT_COLUMNS,
+    );
 
     const byArtist = new Map<string, ArtistEvent[]>();
-    for (const e of events ?? []) {
-      const arr = byArtist.get(e.artist_slug as string) ?? [];
-      arr.push(e as ArtistEvent);
-      byArtist.set(e.artist_slug as string, arr);
+    for (const e of (events ?? []) as unknown as ArtistEvent[]) {
+      const arr = byArtist.get(e.artist_slug) ?? [];
+      arr.push(e);
+      byArtist.set(e.artist_slug, arr);
     }
 
     return (artists as ArtistRow[])
@@ -198,12 +213,14 @@ export async function listArtistsForAdmin(): Promise<
 /** Admin-scoped: events for a single artist, including inactive. */
 export async function listEventsForAdmin(slug: string): Promise<ArtistEvent[]> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("artist_events")
-    .select("id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active")
-    .eq("artist_slug", slug)
-    .order("sort_order");
-  return (data ?? []) as ArtistEvent[];
+  const columns =
+    "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active";
+  const { data } = await selectWithOptionalRsvpOpens(
+    (cols) =>
+      admin.from("artist_events").select(cols).eq("artist_slug", slug).order("sort_order"),
+    columns,
+  );
+  return (data ?? []) as unknown as ArtistEvent[];
 }
 
 /** Returns true if the signed-in fan follows the given artist. */

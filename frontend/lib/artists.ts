@@ -26,6 +26,8 @@ export type Artist = {
      * entries leave this undefined and are treated as public.
      */
     tier?: "public" | "premium";
+    /** When RSVP opens for everyone. Null/absent means it is open now. */
+    rsvpOpensAt?: string | null;
   }[];
   merch: { title: string; tier: string; points: string }[];
   social: { label: string; href: string }[];
