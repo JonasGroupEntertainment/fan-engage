@@ -129,7 +129,7 @@ describe("re-engagement wiring", () => {
     const send = readRepo("./reengagement-send.ts");
     const env = readRepo("../.env.example");
     const vercel = readRepo("../vercel.json");
-    const migration = readRepo("../../supabase/migrations/0078_fan_reengagement_emails.sql");
+    const migration = readRepo("../../supabase/migrations/0080_fan_reengagement_emails.sql");
     const bundle = [route, email, send, env, vercel, migration].join("\n");
 
     assert.equal(bundle.includes("MAILCHIMP_BROADCAST_ENABLED"), false);
