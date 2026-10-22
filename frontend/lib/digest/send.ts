@@ -85,10 +85,14 @@ export async function prepareDigestForFan(
     const server = MAILCHIMP_SERVER();
     const listId = MAILCHIMP_LIST();
     if (!apiKey || !server || !listId) {
-      // No Mailchimp configured. We still rendered — return that so the
-      // cron persists html_body to digest_log for inspection.
+      const missing = [
+        !apiKey ? "MAILCHIMP_API_KEY" : null,
+        !server ? "MAILCHIMP_SERVER_PREFIX" : null,
+        !listId ? "MAILCHIMP_AUDIENCE_ID" : null,
+      ].filter((name): name is string => Boolean(name));
       return {
-        status: "rendered",
+        status: "error",
+        error: `Missing env: ${missing.join(", ")}`,
         htmlBody: html,
         textBody: text,
         payloadCommunities,

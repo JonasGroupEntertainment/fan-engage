@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -31,10 +31,11 @@ export const revalidate = 0;
 const LAUNCHED_LOOKBACK_MS = 30 * 60 * 1000;       // 30 min
 const EXPIRING_LOOKAHEAD_MS = 75 * 60 * 1000;      // 75 min
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "drops-notifier", () => dropsNotifier());
+}
 
+async function dropsNotifier() {
   const admin = createAdminClient();
   const now = new Date();
   const launchedAfter = new Date(now.getTime() - LAUNCHED_LOOKBACK_MS).toISOString();

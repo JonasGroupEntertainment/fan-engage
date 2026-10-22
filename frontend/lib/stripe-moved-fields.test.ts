@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  invoicePeriodEndIso,
   invoiceSubscriptionId,
   subscriptionPeriodEndIso,
   subscriptionPeriodEndSeconds,
@@ -42,12 +43,46 @@ describe("subscriptionPeriodEndSeconds", () => {
     assert.equal(subscriptionPeriodEndSeconds(sub), END);
   });
 
+  it("accepts a numeric string and an items array", () => {
+    assert.equal(
+      subscriptionPeriodEndSeconds({ items: [{ current_period_end: String(END) }] }),
+      END,
+    );
+  });
+
   it("returns null when no period end is present", () => {
     assert.equal(subscriptionPeriodEndSeconds({}), null);
     assert.equal(subscriptionPeriodEndSeconds({ items: { data: [] } }), null);
     assert.equal(subscriptionPeriodEndSeconds({ current_period_end: 0 }), null);
     assert.equal(subscriptionPeriodEndSeconds(null), null);
     assert.equal(subscriptionPeriodEndIso(undefined), null);
+  });
+});
+
+describe("invoicePeriodEndIso", () => {
+  it("prefers an expanded subscription item over the invoice line", () => {
+    assert.equal(
+      invoicePeriodEndIso({
+        period_end: END - 50,
+        lines: { data: [{ period: { end: END - 10 } }] },
+        parent: {
+          subscription_details: {
+            subscription: { items: { data: [{ current_period_end: END }] } },
+          },
+        },
+      }),
+      END_ISO,
+    );
+  });
+
+  it("uses the line period, then the legacy invoice period_end", () => {
+    assert.equal(
+      invoicePeriodEndIso({ lines: { data: [{ period: { end: END } }] } }),
+      END_ISO,
+    );
+    assert.equal(invoicePeriodEndIso({ period_end: END }), END_ISO);
+    assert.equal(invoicePeriodEndIso({}), null);
+    assert.equal(invoicePeriodEndIso(null), null);
   });
 });
 

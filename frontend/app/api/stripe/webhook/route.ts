@@ -4,9 +4,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import {
+  invoicePeriodEndIso,
   invoiceSubscriptionId,
-  subscriptionPeriodEndIso,
 } from "@/lib/stripe-moved-fields";
+import {
+  checkoutFanCommunity,
+  checkoutSubscriptionRef,
+  membershipPeriodColumns,
+  membershipPeriodPatch,
+  periodEndMissing,
+} from "@/lib/stripe-membership-period";
 import {
   isStripeEventReplay,
   monthlyCreditGrantRow,
@@ -33,6 +40,12 @@ export const dynamic = "force-dynamic";
  * for idempotency — successful deliveries are replay no-ops.
  * Failed handlers leave processed_at null so Stripe retries re-run.
  *
+ *   checkout.session.completed      → write stripe_subscription_id,
+ *                                    current_period_end, tier, and
+ *                                    cancel_at_period_end from the
+ *                                    session's subscription. This is the
+ *                                    event that carries fan metadata even
+ *                                    when the subscription payload does not.
  *   customer.subscription.created  → flip membership to 'premium'.
  *                                    Referral points only if already active
  *                                    (no trial). A trial waits.
@@ -56,7 +69,8 @@ export const dynamic = "force-dynamic";
  *
  * Configure the endpoint in Stripe dashboard:
  *   URL:      https://<host>/api/stripe/webhook
- *   Events:   customer.subscription.*, invoice.paid, invoice.payment_failed
+ *   Events:   checkout.session.completed, customer.subscription.*,
+ *             invoice.paid, invoice.payment_failed
  *   Secret:   copy into STRIPE_WEBHOOK_SECRET in Vercel env vars.
  */
 export async function POST(request: Request) {
@@ -126,6 +140,12 @@ export async function POST(request: Request) {
   let processError: string | null = null;
   try {
     switch (event.type) {
+      case "checkout.session.completed":
+        await handleCheckoutCompleted(
+          event.data.object as Stripe.Checkout.Session,
+          admin,
+        );
+        break;
       case "customer.subscription.created":
         await handleSubscriptionCreated(
           event.data.object as Stripe.Subscription,
@@ -211,19 +231,25 @@ async function handleSubscriptionCreated(
 ) {
   const { fanId, communityId, billingPeriod } = parseSubMetadata(sub);
   if (!fanId || !communityId) {
-    console.warn("subscription.created: missing metadata", sub.id);
+    console.error(
+      JSON.stringify({
+        source: "stripe-webhook",
+        event: "customer.subscription.created",
+        subscriptionId: sub.id,
+        error: "missing fan_id or community_id metadata",
+      }),
+    );
     return;
   }
 
-  const currentPeriodEnd = subPeriodEnd(sub);
-
+  const full = await subscriptionWithPeriod(sub);
   const updates: Record<string, unknown> = {
-    subscription_tier: mapStripeStatus(sub.status),
-    stripe_subscription_id: sub.id,
-    current_period_end: currentPeriodEnd,
-    cancel_at_period_end: sub.cancel_at_period_end ?? false,
+    ...membershipPeriodColumns(
+      membershipPeriodPatch(full, "customer.subscription.created"),
+    ),
     billing_period: billingPeriod,
   };
+  warnIfPeriodMissing(full, "customer.subscription.created");
 
   const { data: prior, error: priorErr } = await admin
     .from("fan_community_memberships")
@@ -246,7 +272,7 @@ async function handleSubscriptionCreated(
   if (
     shouldGrantConversionPerks({
       event: "customer.subscription.created",
-      status: sub.status,
+      status: full.status,
       alreadyPaid: prior?.first_paid_at != null,
     })
   ) {
@@ -289,7 +315,14 @@ async function handleSubscriptionUpdated(
   let row = bySub;
   if (!fanId || !communityId) {
     if (!row) {
-      console.warn("subscription.updated: no matching membership", sub.id);
+      console.error(
+        JSON.stringify({
+          source: "stripe-webhook",
+          event: "customer.subscription.updated",
+          subscriptionId: sub.id,
+          error: "no matching membership",
+        }),
+      );
       return;
     }
     fanId = row.fan_id as string;
@@ -307,17 +340,32 @@ async function handleSubscriptionUpdated(
     row = byFan;
   }
 
-  const updates: Record<string, unknown> = {
-    subscription_tier: mapStripeStatus(sub.status),
-    current_period_end: subPeriodEnd(sub),
-    cancel_at_period_end: sub.cancel_at_period_end ?? false,
-  };
+  const full = await subscriptionWithPeriod(sub);
+  warnIfPeriodMissing(full, "customer.subscription.updated");
+  const updates = membershipPeriodColumns(
+    membershipPeriodPatch(full, "customer.subscription.updated"),
+  );
 
-  const result = await admin
+  let result = await admin
     .from("fan_community_memberships")
     .update(updates)
-    .eq("stripe_subscription_id", sub.id);
+    .eq("stripe_subscription_id", sub.id)
+    .select("fan_id");
   throwIfDbError(result, "subscription.updated membership update");
+  if ((result.data?.length ?? 0) === 0 && fanId && communityId) {
+    result = await admin
+      .from("fan_community_memberships")
+      .update(updates)
+      .eq("fan_id", fanId)
+      .eq("community_id", communityId)
+      .select("fan_id");
+    throwIfDbError(result, "subscription.updated membership update");
+  }
+  if ((result.data?.length ?? 0) === 0) {
+    throw new Error(
+      `subscription.updated: no membership for ${sub.id}`,
+    );
+  }
 
   // First time this subscription becomes active after a trial or a
   // failed charge. past_due → active is the dunning / card-update path
@@ -326,7 +374,7 @@ async function handleSubscriptionUpdated(
   if (
     shouldGrantConversionPerks({
       event: "customer.subscription.updated",
-      status: sub.status,
+      status: full.status,
       previousStatus: previous?.status ?? null,
       alreadyPaid: row?.first_paid_at != null,
     })
@@ -343,15 +391,17 @@ async function handleSubscriptionDeleted(
   // runs out, or after payment_failed retries exhaust). Revert to free.
   // Do not grant paid perks here. A trial or a declined first charge that
   // ends without a successful payment keeps first_paid_at null.
+  const full = await subscriptionWithPeriod(sub, { required: false });
+  warnIfPeriodMissing(full, "customer.subscription.deleted");
+  // current_period_end is written when the subscription (or its items)
+  // still carry it. A null read does not wipe a value already stored.
   const result = await admin
     .from("fan_community_memberships")
-    .update({
-      subscription_tier: "free",
-      stripe_subscription_id: null,
-      cancel_at_period_end: false,
-      // Keep current_period_end as the historical end date; a future
-      // resubscribe will overwrite it.
-    })
+    .update(
+      membershipPeriodColumns(
+        membershipPeriodPatch(full, "customer.subscription.deleted"),
+      ),
+    )
     .eq("stripe_subscription_id", sub.id);
   throwIfDbError(result, "subscription.deleted membership update");
 }
@@ -367,7 +417,7 @@ async function handleInvoicePaid(
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return; // Non-subscription invoice — ignore.
 
-  const { data: membership, error: readErr } = await admin
+  const { data: bySub, error: readErr } = await admin
     .from("fan_community_memberships")
     .select(
       "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at",
@@ -375,7 +425,35 @@ async function handleInvoicePaid(
     .eq("stripe_subscription_id", subId)
     .maybeSingle();
   throwIfDbError({ error: readErr }, "invoice.paid membership read");
-  if (!membership) return;
+
+  let membership = bySub;
+  const matchedBySubscriptionId = Boolean(membership);
+  if (!membership) {
+    const keys = invoiceMembershipKeys(invoice);
+    if (keys.fanId && keys.communityId) {
+      const { data: byFan, error: fanErr } = await admin
+        .from("fan_community_memberships")
+        .select(
+          "fan_id, community_id, subscription_tier, monthly_credit_refreshed_at, first_paid_at",
+        )
+        .eq("fan_id", keys.fanId)
+        .eq("community_id", keys.communityId)
+        .maybeSingle();
+      throwIfDbError({ error: fanErr }, "invoice.paid membership read");
+      membership = byFan;
+    }
+  }
+  if (!membership) {
+    console.error(
+      JSON.stringify({
+        source: "stripe-webhook",
+        event: "invoice.paid",
+        subscriptionId: subId,
+        error: "no membership for subscription",
+      }),
+    );
+    return;
+  }
 
   const alreadyPaid = membership.first_paid_at != null;
   // First invoice with money collected. Covers a clean trial conversion
@@ -396,7 +474,7 @@ async function handleInvoicePaid(
 
   const nowMs = Date.now();
   const updates: Record<string, unknown> = {
-    subscription_tier: "premium",
+    ...(await invoicePeriodColumns(invoice, subId)),
   };
 
   // Monthly credit refresh — only if 25 days since last refresh (prevents
@@ -417,10 +495,12 @@ async function handleInvoicePaid(
 
   // Membership first: if this fails we throw and Stripe retries, and no
   // ledger row has been written yet. Perks above are idempotent.
-  const result = await admin
-    .from("fan_community_memberships")
-    .update(updates)
-    .eq("stripe_subscription_id", subId);
+  const write = admin.from("fan_community_memberships").update(updates);
+  const result = matchedBySubscriptionId
+    ? await write.eq("stripe_subscription_id", subId)
+    : await write
+        .eq("fan_id", membership.fan_id as string)
+        .eq("community_id", membership.community_id as string);
   throwIfDbError(result, "invoice.paid membership update");
 
   if (!refreshCredit) return;
@@ -474,10 +554,151 @@ function parseSubMetadata(sub: Stripe.Subscription) {
   };
 }
 
-function subPeriodEnd(sub: Stripe.Subscription): string | null {
-  // current_period_end moved onto subscription items in newer Stripe API
-  // versions; the helper reads the new spot and falls back to the old one.
-  return subscriptionPeriodEndIso(sub);
+async function handleCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  admin: SupabaseClient,
+) {
+  if (session.mode && session.mode !== "subscription") return;
+  if (session.status && session.status !== "complete") return;
+
+  const { fanId, communityId, billingPeriod } = checkoutFanCommunity(session);
+  const ref = checkoutSubscriptionRef(session);
+  if (!fanId || !communityId || !ref.id) {
+    console.error(
+      JSON.stringify({
+        source: "stripe-webhook",
+        event: "checkout.session.completed",
+        sessionId: session.id,
+        error: "missing fan, community, or subscription",
+      }),
+    );
+    return;
+  }
+
+  let sub = (ref.expanded as Stripe.Subscription | null) ?? null;
+  if (!sub || periodEndMissing(sub)) {
+    sub = await getStripe().subscriptions.retrieve(ref.id);
+  }
+  warnIfPeriodMissing(sub, "checkout.session.completed");
+
+  const updates: Record<string, unknown> = {
+    ...membershipPeriodColumns(
+      membershipPeriodPatch(sub, "checkout.session.completed"),
+    ),
+  };
+  if (billingPeriod) updates.billing_period = billingPeriod;
+
+  const result = await admin
+    .from("fan_community_memberships")
+    .update(updates)
+    .eq("fan_id", fanId)
+    .eq("community_id", communityId)
+    .select("fan_id");
+  throwIfDbError(result, "checkout.session.completed membership update");
+
+  if ((result.data?.length ?? 0) === 0) {
+    const insert = await admin.from("fan_community_memberships").insert({
+      fan_id: fanId,
+      community_id: communityId,
+      ...updates,
+    });
+    throwIfDbError(insert, "checkout.session.completed membership insert");
+  }
+}
+
+async function subscriptionWithPeriod(
+  sub: Stripe.Subscription,
+  opts?: { required?: boolean },
+): Promise<Stripe.Subscription> {
+  if (!periodEndMissing(sub)) return sub;
+  try {
+    return await getStripe().subscriptions.retrieve(sub.id);
+  } catch (err) {
+    if (opts?.required === false) {
+      console.error(
+        JSON.stringify({
+          source: "stripe-webhook",
+          event: "subscription.retrieve",
+          subscriptionId: sub.id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      return sub;
+    }
+    throw err;
+  }
+}
+
+async function invoicePeriodColumns(
+  invoice: Stripe.Invoice,
+  subId: string,
+): Promise<Record<string, unknown>> {
+  try {
+    const sub = await getStripe().subscriptions.retrieve(subId);
+    warnIfPeriodMissing(sub, "invoice.paid");
+    const columns = membershipPeriodColumns(
+      membershipPeriodPatch(sub, "invoice.paid"),
+    );
+    if (!columns.current_period_end) {
+      const fallback = invoicePeriodEndIso(invoice);
+      if (fallback) columns.current_period_end = fallback;
+    }
+    return columns;
+  } catch (err) {
+    const fallback = invoicePeriodEndIso(invoice);
+    if (!fallback) throw err;
+    console.error(
+      JSON.stringify({
+        source: "stripe-webhook",
+        event: "invoice.paid",
+        subscriptionId: subId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return {
+      subscription_tier: "premium",
+      current_period_end: fallback,
+      stripe_subscription_id: subId,
+    };
+  }
+}
+
+function warnIfPeriodMissing(sub: { id?: string }, event: string): void {
+  if (!periodEndMissing(sub)) return;
+  console.error(
+    JSON.stringify({
+      source: "stripe-webhook",
+      event,
+      subscriptionId: sub.id ?? null,
+      error: "current_period_end missing on subscription and on subscription items",
+    }),
+  );
+}
+
+function invoiceMembershipKeys(invoice: Stripe.Invoice): {
+  fanId: string | null;
+  communityId: string | null;
+} {
+  const loose = invoice as unknown as {
+    metadata?: { fan_id?: string; community_id?: string };
+    parent?: {
+      subscription_details?: {
+        metadata?: { fan_id?: string; community_id?: string };
+      } | null;
+    } | null;
+    subscription_details?: {
+      metadata?: { fan_id?: string; community_id?: string };
+    } | null;
+  };
+  const meta =
+    loose.parent?.subscription_details?.metadata ??
+    loose.subscription_details?.metadata ??
+    loose.metadata ??
+    {};
+  return {
+    fanId: meta.fan_id ?? null,
+    communityId: meta.community_id ?? null,
+  };
 }
 
 /**
@@ -544,25 +765,3 @@ async function awardReferralPoints(
   throwIfDbError({ error: verifyErr }, "referral verify");
 }
 
-/**
- * Map Stripe subscription.status → our enum. Stripe statuses:
- * trialing | active | past_due | canceled | unpaid | incomplete |
- * incomplete_expired | paused
- */
-function mapStripeStatus(status: Stripe.Subscription.Status): string {
-  switch (status) {
-    case "active":
-    case "trialing":
-      return "premium";
-    case "past_due":
-    case "unpaid":
-      return "past_due";
-    case "canceled":
-      return "cancelled";
-    default:
-      // 'incomplete' / 'incomplete_expired' / 'paused' — conservative
-      // fallback leaves the current tier (use a sentinel and caller can
-      // decide). Treat as cancelled for now.
-      return "cancelled";
-  }
-}
