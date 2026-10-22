@@ -86,14 +86,15 @@ export async function claimDailyDrop(
     // source filter would miss them.
     const { data: existing, error: lookupErr } = await admin
       .from("points_ledger")
-      .select("id")
+      .select("id, delta")
       .eq("source_ref", sourceRef)
       .limit(1)
       .maybeSingle();
     if (lookupErr) throw lookupErr;
 
     if (existing) {
-      return { points, rarity, claimedToday: false, alreadyClaimed: true };
+      const credited = typeof existing.delta === "number" ? existing.delta : points;
+      return { points: credited, rarity, claimedToday: false, alreadyClaimed: true };
     }
 
     const awarded = await awardPoints(admin, {
@@ -109,7 +110,7 @@ export async function claimDailyDrop(
     if (awarded === 0) {
       return { points, rarity, claimedToday: false, alreadyClaimed: true };
     }
-    return { points, rarity, claimedToday: true, alreadyClaimed: false };
+    return { points: awarded, rarity, claimedToday: true, alreadyClaimed: false };
   } catch (err) {
     console.warn("claimDailyDrop failed (non-blocking):", err);
     return benign;

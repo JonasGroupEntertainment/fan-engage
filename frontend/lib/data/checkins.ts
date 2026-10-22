@@ -31,7 +31,7 @@ export async function recordCheckin(
     points_awarded: CHECKIN_POINTS,
   });
 
-  await awardPoints(admin, {
+  const awarded = await awardPoints(admin, {
     fanId,
     delta: CHECKIN_POINTS,
     source: "daily_checkin",
@@ -39,8 +39,16 @@ export async function recordCheckin(
     note: `Daily check-in at ${artistSlug}`,
     communityId: artistSlug,
   });
+  if (awarded > 0) {
+    await admin
+      .from("checkins")
+      .update({ points_awarded: awarded })
+      .eq("fan_id", fanId)
+      .eq("artist_slug", artistSlug)
+      .gte("created_at", `${today}T00:00:00-05:00`);
+  }
 
-  return { alreadyCheckedIn: false, pointsAwarded: CHECKIN_POINTS };
+  return { alreadyCheckedIn: false, pointsAwarded: awarded };
 }
 
 export async function getFanCheckinCount(

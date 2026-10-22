@@ -5,7 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * point grants in the platform.
  *
  * Delegates to apply_points_award(): ledger is the source of truth,
- * Founding Fan 1.5× is applied there, and denorm totals are synced.
+ * Founding Fan or Premium 1.5× is applied there once (half away from
+ * zero), the factor is stored on points_ledger.multiplier, and denorm
+ * totals are synced. Pass the base amount. Do not pre-multiply.
  *
  * Returns the delta actually written (0 when the award was a duplicate).
  *
