@@ -6,6 +6,7 @@ import {
   fireDigestCampaign,
   recordDigestSent,
 } from "@/lib/digest/send";
+import { unsentCampaignError } from "@/lib/digest/outcomes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,23 +139,16 @@ async function weeklyDigest(request: Request) {
 
       if (result.status === "error" && result.error) {
         summary.errors.push({ fan_id: r.fan_id, error: result.error });
+        logFanError(r.fan_id, result.error);
       }
 
       // Always write digest_log so we have a record of every attempt
-      // (including no-payload skips and errors).
-      const logStatus =
-        result.status === "merge_fields_updated"
-          ? "merge_fields_updated"
-          : result.status === "rendered"
-            ? "rendered"
-            : result.status === "skipped_no_payload"
-              ? "skipped_no_payload"
-              : "error";
-
-      await recordDigestSent({
+      // (including no-payload skips and errors). Skip reasons use the
+      // allowed status "skipped"; the reason stays in error_message.
+      const recorded = await recordDigestSent({
         fan_id: r.fan_id,
         week_start: weekStart,
-        status: logStatus as "merge_fields_updated" | "rendered" | "skipped_no_payload" | "error",
+        status: result.status,
         campaign_id: null, // filled in after the campaign fires
         html_body: result.htmlBody ?? null,
         text_body: result.textBody ?? null,
@@ -163,6 +157,10 @@ async function weeklyDigest(request: Request) {
         payload_post_ids: result.payloadPostIds ?? null,
         error_message: result.error ?? null,
       });
+      if (!recorded.ok) {
+        summary.errors.push({ fan_id: r.fan_id, error: recorded.error });
+        logFanError(r.fan_id, recorded.error);
+      }
     }
 
     // Fire the campaign — only if at least one fan got merge fields set.
@@ -179,8 +177,14 @@ async function weeklyDigest(request: Request) {
       } else {
         summary.campaignError = campaign.error;
       }
-    } else if (summary.totalCandidates > 0) {
-      summary.campaignError = "No fans had merge fields successfully updated; skipping campaign send.";
+    } else {
+      // No merge-field writes. That is a failure only when a fan errored
+      // (query, Mailchimp, or digest_log). An all-skip week is success
+      // with nothing to send.
+      summary.campaignError = unsentCampaignError({
+        totalCandidates: summary.totalCandidates,
+        errors: summary.errors,
+      });
     }
 
     summary.durationMs = Date.now() - started;
@@ -202,6 +206,18 @@ async function weeklyDigest(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function logFanError(fanId: string, error: string): void {
+  console.error(
+    JSON.stringify({
+      source: "cron",
+      job: "weekly-digest",
+      event: "fan_error",
+      fan_id: fanId,
+      error: error.slice(0, 800),
+    }),
+  );
 }
 
 /** Returns YYYY-MM-DD for Monday 00:00 UTC of the current week. */

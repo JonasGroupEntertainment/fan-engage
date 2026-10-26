@@ -169,6 +169,28 @@ describe("cron log rows", () => {
       }),
       "Mailchimp campaigns POST 401: no",
     );
+    assert.match(
+      errorTextFromBody({
+        ok: false,
+        summary: {
+          campaignError: "No fans had merge fields successfully updated; skipping campaign send.",
+          errors: [{ fan_id: "fan-1", error: "fan_artist_following: column created_at does not exist" }],
+        },
+      }) ?? "",
+      /fan_artist_following: column created_at does not exist/,
+    );
+    const already =
+      "No fans had merge fields successfully updated; skipping campaign send. fan-1: fan_artist_following: column created_at does not exist";
+    assert.equal(
+      errorTextFromBody({
+        ok: false,
+        summary: {
+          campaignError: already,
+          errors: [{ fan_id: "fan-1", error: "fan_artist_following: column created_at does not exist" }],
+        },
+      }),
+      already,
+    );
     assert.equal(
       errorTextFromBody({ ok: true, errors: ["launched: boom"] }),
       "launched: boom",
