@@ -303,6 +303,9 @@ export function finishDetail(body: unknown): Record<string, unknown> | undefined
       detail.campaignError = clip(s.campaignError);
     }
     if (Array.isArray(s.errors)) detail.errorCount = s.errors.length;
+    if (Array.isArray(s.skippedOrphans)) {
+      detail.skippedOrphans = s.skippedOrphans.length;
+    }
   }
   if (Array.isArray(record.errors)) detail.errorCount = record.errors.length;
   return Object.keys(detail).length > 0 ? detail : undefined;
