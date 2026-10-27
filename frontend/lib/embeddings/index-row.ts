@@ -18,6 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedText, EmbeddingError, pgvectorLiteral } from "./client";
+import { isMissingCommunityError, orphanSkipLog } from "./orphans";
 import { contentHash, SOURCES, type SourceTable } from "./sources";
 
 export type IndexResult =
@@ -25,6 +26,7 @@ export type IndexResult =
   | { status: "skipped_unchanged" }
   | { status: "skipped_empty" }
   | { status: "skipped_no_row" }
+  | { status: "skipped_orphan"; communityId: string }
   | { status: "error"; error: string };
 
 /**
@@ -101,6 +103,26 @@ export async function indexRow(
 
     if (!row) return { status: "skipped_no_row" };
 
+    // Tenant key is written to content_embeddings.community_id, which
+    // references communities(slug). Resolve it before calling OpenAI so a
+    // missing community is a skip, not a failed embedding request.
+    const meta = descriptor.extractMeta(row);
+    const communityId = meta.community_id.trim();
+    if (!communityId) {
+      console.error(orphanSkipLog({ table, rowId, communityId }));
+      return { status: "skipped_orphan", communityId };
+    }
+    const { data: community, error: communityErr } = await admin
+      .from("communities")
+      .select("slug")
+      .eq("slug", communityId)
+      .maybeSingle();
+    if (communityErr) return { status: "error", error: communityErr.message };
+    if (!community) {
+      console.error(orphanSkipLog({ table, rowId, communityId }));
+      return { status: "skipped_orphan", communityId };
+    }
+
     // 2. Build the embeddable text.
     const text = descriptor.buildText(row);
     if (!text || !text.trim()) return { status: "skipped_empty" };
@@ -108,7 +130,6 @@ export async function indexRow(
 
     // 3. Idempotency check — if we already have an embedding for this
     //    source row with the same content_hash, skip the API call.
-    const meta = descriptor.extractMeta(row);
     const { data: existing } = await admin
       .from("content_embeddings")
       .select("id, content_hash")
@@ -132,7 +153,7 @@ export async function indexRow(
         {
           source_table: table,
           source_id: meta.source_id,
-          community_id: meta.community_id,
+          community_id: communityId,
           visibility: meta.visibility,
           embedding: pgvectorLiteral(vector),
           content_hash: hash,
@@ -140,7 +161,13 @@ export async function indexRow(
         },
         { onConflict: "source_table,source_id" },
       );
-    if (upsertError) return { status: "error", error: upsertError.message };
+    if (upsertError) {
+      if (isMissingCommunityError(upsertError.message)) {
+        console.error(orphanSkipLog({ table, rowId, communityId }));
+        return { status: "skipped_orphan", communityId };
+      }
+      return { status: "error", error: upsertError.message };
+    }
 
     return { status: "indexed", tokensEmbedded: text.length };
   } catch (err) {
@@ -150,6 +177,10 @@ export async function indexRow(
         : err instanceof Error
           ? err.message
           : String(err);
+    if (isMissingCommunityError(message)) {
+      console.error(orphanSkipLog({ table, rowId, communityId: "unknown" }));
+      return { status: "skipped_orphan", communityId: "unknown" };
+    }
     console.error(`[embeddings] indexRow ${table}/${rowId} failed:`, message);
     return { status: "error", error: message };
   }
