@@ -12,7 +12,7 @@ export type {
   DigestPayload,
 } from "./types";
 
-export { gatherDigestPayload } from "./gather";
+export { gatherDigestPayload, type DigestGatherResult } from "./gather";
 
 export {
   summarizeAllCommunities,

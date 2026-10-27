@@ -269,6 +269,13 @@ export function errorTextFromBody(body: unknown): string | null {
   if (summary && typeof summary === "object") {
     const s = summary as Record<string, unknown>;
     if (typeof s.campaignError === "string" && s.campaignError.trim()) {
+      const summaryErrors = listedErrors(s.errors);
+      if (
+        summaryErrors &&
+        !campaignErrorAlreadyLists(s.campaignError, s.errors)
+      ) {
+        return clip(`${s.campaignError} ${summaryErrors}`);
+      }
       return clip(s.campaignError);
     }
     const summaryErrors = listedErrors(s.errors);
@@ -309,6 +316,18 @@ export function finishDetail(body: unknown): Record<string, unknown> | undefined
   }
   if (Array.isArray(record.errors)) detail.errorCount = record.errors.length;
   return Object.keys(detail).length > 0 ? detail : undefined;
+}
+
+/** True when each per-fan error string is already inside campaignError. */
+function campaignErrorAlreadyLists(campaignError: string, errors: unknown): boolean {
+  if (!Array.isArray(errors) || errors.length === 0) return false;
+  return errors.every((entry) => {
+    if (!entry || typeof entry !== "object" || !("error" in entry)) return false;
+    const err = (entry as { error?: unknown }).error;
+    if (typeof err !== "string") return false;
+    const probe = err.replace(/\s+/g, " ").trim().slice(0, 40);
+    return probe.length > 0 && campaignError.includes(probe);
+  });
 }
 
 function listedErrors(value: unknown): string | null {
