@@ -13,6 +13,7 @@ import { notifyCommentOnMyPost } from "@/lib/notifications/triggers/comment-on-m
 
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
 import { withPointsProgress } from "@/lib/points/lifetime";
+import { resolveAuthorVisibility } from "@/lib/founder-gate/core";
 import type { PointsProgress } from "@/lib/points/progress";
 import {
   premiumPath,
@@ -94,6 +95,13 @@ export async function createPostAction(formData: FormData): Promise<PointsAction
 
   const { supabase, userId } = await requireUser();
   await requirePremiumCommunityWrite(userId, artistSlug, "community_post");
+  // Visibility: only a team author (admin_users grant for this community or
+  // '*' — the same rule the byline and new-post notification use) may make a
+  // post premium / founder-only. Everyone else is forced to 'public'.
+  const teamAuthor = await communityAdminUser(artistSlug, "editor");
+  const visibility = resolveAuthorVisibility(formData.get("visibility") as string | null, {
+    hasTeamGrant: teamAuthor !== null,
+  });
   const imageUrl = normalizeUrl(imageUrlRaw);
   const videoUrl = normalizeUrl(videoUrlRaw);
   const videoPosterUrl = normalizeUrl(videoPosterUrlRaw);
@@ -110,6 +118,7 @@ export async function createPostAction(formData: FormData): Promise<PointsAction
         author_id: userId,
         kind: "post",
         body,
+        visibility,
         image_url: imageUrl,
         video_url: videoUrl,
         video_poster_url: videoPosterUrl,

@@ -26,6 +26,7 @@ const adminNav = [
   { href: "/admin/policies", label: "Policies" },
   { href: "/admin/moderation", label: "Moderation" },
   { href: "/admin/briefs", label: "Briefs" },
+  { href: "/admin/ai-gates", label: "AI Gates", superAdminOnly: true },
 ];
 
 export default async function AdminLayout({
@@ -105,7 +106,9 @@ export default async function AdminLayout({
         </div>
 
         <nav className="mb-8 flex flex-wrap gap-2">
-          {adminNav.map((item) => (
+          {adminNav
+            .filter((item) => !("superAdminOnly" in item && item.superAdminOnly) || ctx.isSuperAdmin)
+            .map((item) => (
             <Link
               key={item.href}
               href={item.href}

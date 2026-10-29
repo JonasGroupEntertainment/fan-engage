@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
+import { selectWithOptionalEventGeo } from "@/lib/data/event-select";
 import {
   ARTISTS as FALLBACK_ARTISTS,
   isUnpublishedArtistSlug,
@@ -29,6 +29,11 @@ export interface ArtistEvent {
   tier: "public" | "premium";
   /** Migration 0079. Absent until that column is applied; null means open now. */
   rsvp_opens_at?: string | null;
+  /** Migration 0090 venue coordinates. Absent until applied; null until an admin fills them in. */
+  city?: string | null;
+  region?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 const ARTIST_EVENT_COLUMNS =
@@ -101,6 +106,10 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
         url: e.url ?? null,
         tier: (e.tier ?? "public") as "public" | "premium",
         rsvpOpensAt: e.rsvp_opens_at ?? null,
+        city: e.city ?? null,
+        region: e.region ?? null,
+        lat: typeof e.lat === "number" ? e.lat : null,
+        lng: typeof e.lng === "number" ? e.lng : null,
       })),
     merch: fallback?.merch ?? [],
     merchUrl: row.merch_url ?? fallback?.merchUrl ?? null,
@@ -129,7 +138,7 @@ export const getArtistFromDb = cache(async function getArtistFromDb(
         .eq("slug", normalized)
         .eq("active", true)
         .maybeSingle(),
-      selectWithOptionalRsvpOpens(
+      selectWithOptionalEventGeo(
         (columns) =>
           supabase
             .from("artist_events")
@@ -164,7 +173,7 @@ export async function listArtistsFromDb(): Promise<Artist[]> {
     }
 
     const slugs = artists.map((a) => a.slug as string);
-    const { data: events } = await selectWithOptionalRsvpOpens(
+    const { data: events } = await selectWithOptionalEventGeo(
       (columns) =>
         supabase
           .from("artist_events")
@@ -228,7 +237,7 @@ export async function listEventsForAdmin(slug: string): Promise<ArtistEvent[]> {
   const admin = createAdminClient();
   const columns =
     "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active";
-  const { data } = await selectWithOptionalRsvpOpens(
+  const { data } = await selectWithOptionalEventGeo(
     (cols) =>
       admin.from("artist_events").select(cols).eq("artist_slug", slug).order("sort_order"),
     columns,

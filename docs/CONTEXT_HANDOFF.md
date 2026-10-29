@@ -1,5 +1,7 @@
 # Fan Engage Pro — Context Handoff for Claude Code
 
+> **Updated 2026-10-29.** Body below is from 2026-06-15. Corrections since: repo is `JonasGroupEntertainment/fan-engage` (renamed 26 Jul 2026; old URL redirects); live URL is **fanengagepro.com**; local checkout is `~/Documents/GitHub/fan-engage`; migrations are applied through `0088` (0089–0092 pending, see `LAUNCH_CHECKLIST.md`); `middleware.ts` is now `frontend/proxy.ts`; `npm test` / `npm run test:types` exist, `npm run typecheck` does not. `CLAUDE.md` at the repo root carries the full corrections table.
+
 **Purpose.** Paste this file (or hand the path to Claude Code) at the start of a new session so the assistant gets a complete baseline before touching any code. Last updated 2026-06-15.
 
 **Companion docs to read after this one:**
@@ -15,8 +17,8 @@
 
 A multi-tenant fan engagement platform for recording artists. Members sign up for the platform, then join one or more artist communities. Per-community membership unlocks posts, events, rewards, leaderboards, and Premium ($-paid) perks. There is a sister product, **Brand Engage Pro (BEP)**, that runs the same code architecture for non-music brands (restaurants, retailers, hospitality). Most features ship FE-first then port to BEP via a "mirror bundle."
 
-**Live URL.** `https://fan-engage-pearl.vercel.app` (custom domain TBD).
-**Repo.** `KevinJonasSr/Superfan-platform`.
+**Live URL.** `https://fanengagepro.com` (Vercel project `jonas-group/fan-engage`; `fan-engage-pearl.vercel.app` still resolves).
+**Repo.** `JonasGroupEntertainment/fan-engage` (was `KevinJonasSr/Superfan-platform` until 26 Jul 2026; old URL redirects). Local checkout: `~/Documents/GitHub/fan-engage`.
 **Supabase project ID.** Stored in `reference_fan_engage_urls.md` memory.
 **Hosting.** Vercel (Jonas Group org). NOT Render — disregard any error that says "DATABASE_URL missing in Render."
 

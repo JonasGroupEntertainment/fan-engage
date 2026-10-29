@@ -17,6 +17,9 @@ export async function getPreferences(
     .eq("fan_id", fanId)
     .maybeSingle();
 
+  // The row comes back as stored. Nothing is patched in here: setPreferences
+  // upserts this object, and a column that is not applied yet (notify_streak
+  // before 0089) must not be written back.
   if (data) return data as NotificationPreferences;
 
   // Schema defaults — keep in sync with migration.sql
@@ -31,6 +34,7 @@ export async function getPreferences(
     notify_drops: true,
     notify_rsvp_confirmation: true,
     notify_leaderboard: true,
+    notify_streak: true,
     quiet_start: null,
     quiet_end: null,
     timezone: "America/Chicago",
@@ -66,7 +70,10 @@ export function isOptedIn(
   const channelEnabled = channel === "push" ? prefs.push_enabled : prefs.sms_enabled;
   if (!channelEnabled) return false;
   const col = preferenceColumnFor(type);
-  return Boolean(prefs[col]);
+  const value = prefs[col];
+  // A notify_* column missing from the row (migration not applied yet)
+  // reads as its schema default, true, the same as a fan with no row.
+  return value === undefined || value === null ? true : Boolean(value);
 }
 
 /**

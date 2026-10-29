@@ -1,5 +1,7 @@
 # Collaborating on Fan Engage + Brand Engage Pro
 
+> **Updated 2026-10-29.** Body below is from 2026-05-06; only the statements that became false were corrected in place. Repo: `JonasGroupEntertainment/fan-engage` (not `KevinJonasSr/Superfan-platform`); local path `~/Documents/GitHub/fan-engage` (not `~/fan-engage`); migrations live in root `supabase/migrations/` (not `frontend/supabase/migrations/`); there is no `npm run typecheck` — use `npm run build`, `npx tsc --noEmit`, `npm test`, `npm run test:types`. See `CLAUDE.md` for the full corrections table.
+
 Living guide for collaborators (humans and Claude agents). Last refreshed 2026-05-06 after the G.3 Mailchimp follow-through shipped.
 
 ---
@@ -8,10 +10,10 @@ Living guide for collaborators (humans and Claude agents). Last refreshed 2026-0
 
 | Product | Repo | Prod URL | Audience | Focus |
 |---|---|---|---|---|
-| **Fan Engage (FE)** | `git@github.com:KevinJonasSr/Superfan-platform.git` | https://fan-engage-pearl.vercel.app | Music + entertainment fans | Artists, performers, comedians, podcasts |
+| **Fan Engage (FE)** | `git@github.com:JonasGroupEntertainment/fan-engage.git` | https://fanengagepro.com | Music + entertainment fans | Artists, performers, comedians, podcasts |
 | **Brand Engage Pro (BEP)** | `git@github.com:KevinJonasSr/brand-engage-pro.git` | https://brand-engage-pro-jonas-group.vercel.app | B2C consumer member-club | Restaurant brands (Nellie's), Jonas Group brand entertainment |
 
-> **Naming note:** the FE GitHub repo is named `Superfan-platform` for historical reasons. The Vercel project is `jonas-group/fan-engage`. The local folder Kevin uses is `~/fan-engage`. All three refer to the same codebase.
+> **Naming note:** the FE GitHub repo was `KevinJonasSr/Superfan-platform` until 26 Jul 2026 and is now `JonasGroupEntertainment/fan-engage` (old URL redirects). The Vercel project is `jonas-group/fan-engage`. The local folder Kevin uses is `~/Documents/GitHub/fan-engage` (`~/fan-engage` exists but is empty). All refer to the same codebase.
 
 Both ship from the `main` branch through Vercel auto-deploy. Both run on Next.js 16 App Router, Supabase Postgres + Auth + Storage, Tailwind, shadcn/ui. BEP started as a fork of FE and went through a full `artist→brand` / `fan→member` rename; the schemas now diverge in many small ways (see §7).
 
@@ -21,7 +23,7 @@ Both ship from the `main` branch through Vercel auto-deploy. Both run on Next.js
 
 If anything below is missing, ping Kevin (kevinjonassr@gmail.com).
 
-- **GitHub** — write access to both repos under Kevin's `KevinJonasSr` account (`Superfan-platform` for FE, `brand-engage-pro` for BEP).
+- **GitHub** — write access to both repos (`JonasGroupEntertainment/fan-engage` for FE, `KevinJonasSr/brand-engage-pro` for BEP).
 - **Vercel** — `jonas-group` team, Developer role on both `fan-engage` and `brand-engage-pro`.
 - **Supabase** — KevinJonasSr's Org. Project IDs:
   - FE: `uhovonrljcauaoctypbg`
@@ -36,11 +38,11 @@ If anything below is missing, ping Kevin (kevinjonassr@gmail.com).
 
 ```bash
 # Clone
-git clone git@github.com:KevinJonasSr/Superfan-platform.git ~/fan-engage
+git clone git@github.com:JonasGroupEntertainment/fan-engage.git ~/Documents/GitHub/fan-engage
 git clone git@github.com:KevinJonasSr/brand-engage-pro.git ~/brand-engage-pro
 
 # Per repo
-cd ~/fan-engage/frontend         # or ~/brand-engage-pro/frontend
+cd ~/Documents/GitHub/fan-engage/frontend   # or ~/Documents/GitHub/brand-engage-pro/frontend
 npm install
 npx vercel link                   # pick jonas-group/<repo>
 npx vercel env pull .env.local --environment=development
@@ -64,7 +66,7 @@ Built around the constraint that the agent does not have direct write access to 
    ```
 3. The bundle:
    - Edits files via Python `replace`/anchor matching (idempotent — anchors check both `old` and `new` so re-runs don't double-apply)
-   - Runs `npm run typecheck`
+   - Runs `npm run build` (or `npx tsc --noEmit`) — there is no `typecheck` script
    - Stages and commits with a descriptive message
    - Prints `Push: git push` and stops
 4. **Kevin pushes** (`git push`) when ready. Vercel auto-deploys.
@@ -81,7 +83,7 @@ This pattern is tolerant of drift — apply.sh prints `! anchor not found` warni
 
 ## 5. Database changes — Supabase SQL editor
 
-Migrations live at `frontend/supabase/migrations/0001_*.sql` upward. To run a migration in production:
+Migrations live at root `supabase/migrations/00NN_*.sql` upward (`frontend/supabase/migrations/` holds stale duplicates — do not add there). To run a migration in production:
 
 1. Open the Supabase SQL editor for the right project (FE or BEP).
 2. Paste the migration SQL.
@@ -170,7 +172,7 @@ All crons share the same auth pattern: `Authorization: Bearer $CRON_SECRET`.
 The weekly-digest cron now accepts `?testEmail=foo@bar.com` to filter recipients to a single fan. Use it instead of running the cron raw on Tuesday — without the filter you'd blast everyone whose `last_digest_sent_at` is >6 days old.
 
 ```bash
-curl -X GET "https://fan-engage-pearl.vercel.app/api/cron/weekly-digest?testEmail=YOUR@EMAIL" \
+curl -X GET "https://fanengagepro.com/api/cron/weekly-digest?testEmail=YOUR@EMAIL" \
   -H "Authorization: Bearer $CRON_SECRET" -i
 ```
 
@@ -211,12 +213,12 @@ If you are an agent invoked by Raymond (or any collaborator) on this codebase:
 ### Workflow
 - Use the bundle pattern (§4). Write `apply.sh` files into your `outputs/` working directory; have your human run them.
 - Edit via Python anchor-replace, not full-file rewrite, when patching existing files. Print "anchor not found" warnings rather than aborting.
-- Run `npm run typecheck` inside `apply.sh` so type breakage gets caught before commit.
+- Run `npm run build` (or `npx tsc --noEmit` plus `npm test`) inside `apply.sh` so type breakage gets caught before commit. There is no `npm run typecheck`.
 - Commit messages: descriptive subject + body explaining the motivation. We reference task IDs (G.3, F.1.B, M-14, etc.) where relevant.
 - Stop at `git commit`. Do not push.
 
 ### Database changes
-- Prefer migrations (`frontend/supabase/migrations/00NN_<name>.sql`) over ad-hoc SQL editor edits — they survive future restores.
+- Prefer migrations (root `supabase/migrations/00NN_<name>.sql`) over ad-hoc SQL editor edits — they survive future restores. Make them idempotent and add a `frontend/lib/data/<name>.test.ts` shape test (run with `npm test`).
 - When you must run ad-hoc SQL via the Supabase editor (data backfills, one-off fixes), keep it single-statement or use `RETURNING` in the same statement. Multi-statement scripts can drop earlier statements silently.
 - The agent can drive the SQL editor via Chrome MCP if browser tools are connected. Use Monaco's `setValue` API to inject SQL, then Cmd+Return to run.
 

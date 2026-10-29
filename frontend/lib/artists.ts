@@ -28,6 +28,11 @@ export type Artist = {
     tier?: "public" | "premium";
     /** When RSVP opens for everyone. Null/absent means it is open now. */
     rsvpOpensAt?: string | null;
+    /** Migration 0090 venue city / state / coordinates. Null or absent when unknown. */
+    city?: string | null;
+    region?: string | null;
+    lat?: number | null;
+    lng?: number | null;
   }[];
   merch: { title: string; tier: string; points: string }[];
   social: { label: string; href: string }[];

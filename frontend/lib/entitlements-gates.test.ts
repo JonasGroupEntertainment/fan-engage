@@ -61,11 +61,13 @@ describe("v1 Premium gates on UI + APIs", () => {
     assert.match(card, /Sign in to react/);
   });
 
-  it("AI comment drafter is Premium unless AI_DRAFTER_FREE_COMMUNITIES opens the community", () => {
+  it("AI comment drafter is Premium unless the community gate (DB row, else AI_DRAFTER_FREE_COMMUNITIES) opens it", () => {
     const route = readRepo("../app/api/ai/draft-comment/route.ts");
     assert.match(route, /AI_DRAFTER_FREE_COMMUNITIES/);
-    assert.match(route, /isAiDrafterFreeForCommunity\(communityId\)/);
-    assert.match(route, /requirePremiumFeature\(user\.id, communityId, "ai_comment_drafter"\)/);
+    assert.match(route, /requireAiCommentDrafter\(user\.id, communityId\)/);
+    const ent = readRepo("./entitlements.ts");
+    assert.match(ent, /isFeatureEnabledForCommunity\("ai_comment_drafter", communityId\)/);
+    assert.match(ent, /requirePremiumFeature\(fanId, communityId, "ai_comment_drafter"\)/);
     assert.doesNotMatch(route, /"community_reply"/);
     assert.match(route, /apiRateLimiter\.check\(user\.id\)/);
   });

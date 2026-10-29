@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { savePreferencesAction } from "./actions";
-import type { Prefs, ToggleKey } from "./prefs";
+import type { PendingColumn, Prefs, ToggleKey } from "./prefs";
 
 export type { Prefs } from "./prefs";
 
@@ -92,6 +92,12 @@ const TYPE_ROWS: Array<{
     title: "Weekly digest",
     body: "A Sunday email with what you missed this week.",
   },
+  {
+    key: "notify_streak",
+    emoji: "🔥",
+    title: "Streak reminders",
+    body: "A 6 PM heads-up when your daily streak would end at midnight.",
+  },
 ];
 
 export function PreferencesForm({
@@ -99,11 +105,13 @@ export function PreferencesForm({
   hadRow,
   smsAllowed,
   smsCopy,
+  unavailable = [],
 }: {
   initial: Prefs;
   hadRow: boolean;
   smsAllowed: boolean; // false below Gold: SMS can be turned off, not on
   smsCopy?: string; // shown on the SMS row when smsAllowed is false
+  unavailable?: readonly PendingColumn[]; // columns prod does not have yet
 }) {
   const [prefs, setPrefs] = useState<Prefs>(initial);
   const [pending, startTransition] = useTransition();
@@ -171,14 +179,18 @@ export function PreferencesForm({
       </Section>
 
       <Section title="What to notify me about">
-        {TYPE_ROWS.map((row) => (
-          <PrefRow
-            key={row.key}
-            row={row}
-            on={prefs[row.key]}
-            onToggle={() => toggle(row.key)}
-          />
-        ))}
+        {TYPE_ROWS.map((row) => {
+          const soon = (unavailable as readonly string[]).includes(row.key);
+          return (
+            <PrefRow
+              key={row.key}
+              row={soon ? { ...row, body: `${row.body} Available soon.` } : row}
+              on={soon ? false : prefs[row.key]}
+              disabled={soon}
+              onToggle={() => toggle(row.key)}
+            />
+          );
+        })}
       </Section>
 
       <Section title="Quiet hours">

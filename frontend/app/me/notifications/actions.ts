@@ -8,7 +8,7 @@ import {
   smsTierAllowed,
 } from "@/lib/sms-send-gate";
 import { adultGate } from "@/lib/age-gate";
-import { TOGGLE_KEYS, type Prefs } from "./prefs";
+import { TOGGLE_KEYS, isMissingPendingColumn, type Prefs } from "./prefs";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
@@ -64,12 +64,26 @@ export async function savePreferencesAction(
   payload.quiet_start = cleanTime(prefs.quiet_start);
   payload.quiet_end = cleanTime(prefs.quiet_end);
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("notification_preferences")
     .upsert(
       { fan_id: user.id, ...payload, updated_at: new Date().toISOString() },
       { onConflict: "fan_id" },
     );
+  // notify_streak is migration 0089; until it is applied the upsert fails
+  // with 42703 (undefined column). Strip it and save the rest rather than
+  // failing every save on the page.
+  const missing = isMissingPendingColumn(error);
+  if (missing) {
+    const { [missing]: _skipped, ...rest } = payload;
+    void _skipped;
+    ({ error } = await supabase
+      .from("notification_preferences")
+      .upsert(
+        { fan_id: user.id, ...rest, updated_at: new Date().toISOString() },
+        { onConflict: "fan_id" },
+      ));
+  }
   if (error) {
     console.error("notifications: failed to save preferences", error);
     return { error: "Could not save your preferences. Please try again." };

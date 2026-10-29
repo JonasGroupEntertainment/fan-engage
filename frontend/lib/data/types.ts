@@ -48,6 +48,10 @@ export interface FanProfile {
   email_opted_in_at?: string | null;
   avatar_url: string | null;
   monthly_credit_cents?: number | null;
+  /** Migration 0090: home state/province + resolved coordinates. Absent until applied. */
+  home_region?: string | null;
+  home_lat?: number | null;
+  home_lng?: number | null;
 }
 
 export type BadgeCategory = "welcome" | "referral" | "community" | "tier";
@@ -120,7 +124,7 @@ export interface LeaderboardRow {
 
 export type CommunityPostKind = "post" | "announcement" | "poll" | "challenge";
 
-export type CommunityPostVisibility = "public" | "premium";
+export type CommunityPostVisibility = "public" | "premium" | "founder-only";
 
 export interface CommunityPost {
   id: string;
