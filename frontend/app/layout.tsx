@@ -154,7 +154,8 @@ export default async function RootLayout({
     { href: "/", label: "Fan Home" },
     { href: "/community", label: "Community" },
     { href: "/rewards", label: "Rewards" },
-    { href: merch.navHref, label: "Merch" },
+    // "Unlocks" until physical merch ships — /marketplace still says coming soon.
+    { href: merch.navHref, label: "Unlocks" },
     { href: "/premium", label: "Premium" },
     { href: "/referrals", label: "Referrals" },
     { href: "/artists", label: "Artists" },

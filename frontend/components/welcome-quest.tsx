@@ -46,23 +46,29 @@ export function WelcomeQuest({
     }
   };
 
+  // Amounts match the live awards: a post is +5 (award_community_post_points)
+  // and the first one also earns the +25 First post badge; check-in is +25;
+  // a verified referral pays the referrer +150.
   const quests = [
     {
       emoji: "💬",
       label: "Say hi in the community",
-      points: 50,
+      points: 5,
+      detail: "+25 First post badge",
       href: `/artists/${artistSlug}/community`,
     },
     {
       emoji: "📍",
       label: "Check in for today",
       points: 25,
+      detail: null,
       href: `/artists/${artistSlug}/checkin`,
     },
     {
       emoji: "🤝",
       label: "Invite a friend",
       points: 150,
+      detail: null,
       href: "/referrals",
     },
   ];
@@ -118,7 +124,7 @@ export function WelcomeQuest({
               {q.label}
             </p>
             <p className="mt-1 text-xs font-medium text-emerald-300">
-              +{q.points} pts
+              +{q.points} pts{q.detail ? ` · ${q.detail}` : ""}
             </p>
           </Link>
         ))}

@@ -1,6 +1,9 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePortalPage } from "@/lib/artist-portal/access";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Revenue · Artist Portal" };
 
 type PayoutRow = {
   id: string;
@@ -13,7 +16,8 @@ type PayoutRow = {
 };
 
 type CommunityPayoutInfo = {
-  payout_split_pct: number;
+  /** Platform-retained percentage; null when no split has been configured. */
+  payout_split_pct: number | null;
 };
 
 async function getPayoutData(communityId: string): Promise<{
@@ -59,23 +63,16 @@ function formatCents(cents: number): string {
 }
 
 export default async function ArtistPortalPayoutsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/artist-portal/payouts");
+  // Financial data: admin and owner only (PORTAL_MIN_ROLE.revenue).
+  const ctx = await requirePortalPage("revenue", "/artist-portal/payouts");
 
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) redirect("/artist-portal");
+  const { community, payouts } = await getPayoutData(ctx.communityId);
 
-  const { community, payouts } = await getPayoutData(adminRow.community_id);
-
-  const artistPct = community ? 100 - community.payout_split_pct : 80;
+  // Never assume a default percentage. A split only exists when the
+  // community row carries one; otherwise we say so.
+  const platformPct =
+    typeof community?.payout_split_pct === "number" ? community.payout_split_pct : null;
+  const artistPct = platformPct === null ? null : 100 - platformPct;
 
   return (
     <div className="space-y-8">
@@ -84,10 +81,12 @@ export default async function ArtistPortalPayoutsPage() {
           className="text-2xl font-semibold"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          Payouts
+          Revenue
         </h1>
         <p className="mt-1 text-sm text-white/60">
-          Your revenue share and payout history.
+          Your revenue share and payout history. Payouts are not automatic —
+          the accountant pays your share by bank transfer from Stripe reports
+          filtered to your community.
         </p>
       </div>
 
@@ -110,24 +109,30 @@ export default async function ArtistPortalPayoutsPage() {
           <p className="text-xs uppercase tracking-wide text-white/50 mb-3">
             Revenue split
           </p>
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-white">{artistPct}%</p>
-              <p className="text-xs text-white/50 mt-1">Your share</p>
+          {artistPct === null || platformPct === null ? (
+            <p className="text-sm text-white/60">
+              Split not set. Your revenue split hasn&apos;t been configured
+              yet — your Jonas Group manager will confirm it before the first
+              payout.
+            </p>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">{artistPct}%</p>
+                <p className="text-xs text-white/50 mt-1">Your share</p>
+              </div>
+              <div className="flex-1 rounded-full bg-white/10 h-2 overflow-hidden">
+                <div
+                  className="h-full bg-purple-500 rounded-full"
+                  style={{ width: `${artistPct}%` }}
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white/50">{platformPct}%</p>
+                <p className="text-xs text-white/30 mt-1">Platform</p>
+              </div>
             </div>
-            <div className="flex-1 rounded-full bg-white/10 h-2 overflow-hidden">
-              <div
-                className="h-full bg-purple-500 rounded-full"
-                style={{ width: `${artistPct}%` }}
-              />
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-white/50">
-                {community?.payout_split_pct ?? 20}%
-              </p>
-              <p className="text-xs text-white/30 mt-1">Platform</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

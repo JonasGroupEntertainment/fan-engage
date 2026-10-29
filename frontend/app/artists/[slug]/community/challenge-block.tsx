@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
 import type { ChallengeEntry } from "@/lib/data/types";
 import { submitEntryAction } from "./actions";
-import PremiumCta from "@/components/premium-cta";
 
 function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
@@ -69,9 +68,7 @@ export default function ChallengeBlock({
             {open ? "Cancel" : "Submit entry · +3 pts"}
           </button>
         )}
-        {currentUserId && !canEnter && !alreadyEntered && (
-          <PremiumCta copy="upgrade" communityId={artistSlug} variant="chip" />
-        )}
+        {/* Challenge entries are Free for every signed-in fan (+3 pts). */}
         {currentUserId && alreadyEntered && (
           <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-200">
             ✓ Entered

@@ -28,6 +28,13 @@ async function requireUser() {
   return { supabase, userId: user.id };
 }
 
+/**
+ * Premium gate for the top-level composer only. Replies, reactions, poll
+ * votes and challenge entries are Free (lib/entitlements-core FREE_V1_FEATURES);
+ * their per-day point caps are enforced by the SQL award triggers
+ * (try_award_comment_points / try_award_poll_points in 0053,
+ * award_challenge_entry_points in 0078), not here.
+ */
 async function requirePremiumCommunityWrite(
   userId: string,
   communityId: string,
@@ -133,7 +140,6 @@ export async function toggleReactionAction(formData: FormData) {
   if (!postId || !emoji || !artistSlug) return;
 
   const { supabase, userId } = await requireUser();
-  await requirePremiumCommunityWrite(userId, artistSlug, "community_react");
 
   // If the fan already reacted with this emoji, remove it (toggle off).
   // Otherwise insert.
@@ -171,7 +177,6 @@ export async function addCommentAction(formData: FormData) {
   if (body.length > 1000) return;
 
   const { supabase, userId } = await requireUser();
-  await requirePremiumCommunityWrite(userId, artistSlug, "community_reply");
 
   // Phase 3 #3: track AI-drafted comments for A/B analysis. Form sets
   // draft_used="1" when user picked from the drafter chips before
@@ -284,7 +289,6 @@ export async function votePollAction(formData: FormData) {
   if (!postId || !optionId || !artistSlug) return;
 
   const { supabase, userId } = await requireUser();
-  await requirePremiumCommunityWrite(userId, artistSlug, "community_react");
 
   // If fan already voted, replace their vote (delete + insert).
   await supabase
@@ -343,7 +347,6 @@ export async function submitEntryAction(formData: FormData) {
   if (!postId || !artistSlug || (!body && !imageUrlRaw)) return;
 
   const { supabase, userId } = await requireUser();
-  await requirePremiumCommunityWrite(userId, artistSlug, "community_post");
   const imageUrl = normalizeUrl(imageUrlRaw);
 
   await supabase.from("community_challenge_entries").insert({

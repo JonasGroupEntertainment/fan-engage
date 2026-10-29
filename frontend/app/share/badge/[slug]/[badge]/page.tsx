@@ -4,9 +4,27 @@ import Link from "next/link";
 import { getArtistFromDb } from "@/lib/data/artists";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ShareButton from "@/components/share-button";
+import { isFoundingFanBadgeSlug } from "@/lib/founding-fan-badge";
+import { publicFoundingFanDescription } from "@/lib/founding-fan-rule";
+import { TIER_MIN_POINTS, tierBadgeDescription } from "@/lib/tier-thresholds";
+import type { TierSlug } from "@/lib/data/types";
 
 export const dynamic = "force-static";
 export const revalidate = 3600;
+
+/**
+ * Same rewrite as `publicBadgeDescription` in lib/data/badges.ts: tier and
+ * Founding Fan rows still carry the old 2,500 / 10,000 / 25,000 copy, so
+ * the public share card must never print `badges.description` raw.
+ */
+function publicBadgeDescription(slug: string, raw: string | null): string | null {
+  if (isFoundingFanBadgeSlug(slug)) return publicFoundingFanDescription(raw);
+  const tierSlug = slug.replace(/^tier-/, "") as TierSlug;
+  if (tierSlug in TIER_MIN_POINTS) {
+    return tierBadgeDescription(slug, TIER_MIN_POINTS[tierSlug]) ?? raw;
+  }
+  return raw;
+}
 
 async function getBadge(badgeSlug: string) {
   const admin = createAdminClient();
@@ -15,7 +33,11 @@ async function getBadge(badgeSlug: string) {
     .select("name, description, icon")
     .eq("slug", badgeSlug)
     .maybeSingle();
-  return data;
+  if (!data) return data;
+  return {
+    ...data,
+    description: publicBadgeDescription(badgeSlug, (data.description as string | null) ?? null),
+  };
 }
 
 export async function generateMetadata({

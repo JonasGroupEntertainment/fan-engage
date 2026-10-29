@@ -5,11 +5,15 @@
  * the same isPremium signal the UI and APIs use.
  *
  * Free (always): browse artists/events, basic profile, read community,
- * legal pages, and limited points earn if already present.
+ * legal pages, and the whole engagement loop — replies, reactions, poll and
+ * prediction votes, challenge entries — with the daily point caps that live
+ * in SQL (see COMMUNITY_EARN_RULES below). Status is earned by engagement,
+ * not spend (PRODUCT.md), so none of that sits behind a paywall.
  *
- * Premium unlocks: community post/reply/react; rewards redeem; Premium
- * badge; referral extras if wired; Stripe billing portal; merch
- * (nav + /marketplace + merch drops).
+ * Premium unlocks: starting a top-level community post; rewards redeem;
+ * Premium badge; referral extras if wired; Stripe billing portal; merch
+ * (nav + /marketplace + merch drops); the AI comment drafter unless
+ * AI_DRAFTER_FREE_COMMUNITIES opens it for a community.
  */
 
 export type SubscriptionTier =
@@ -32,16 +36,22 @@ export interface MembershipEntitlement {
   billingPeriod: "monthly" | "annual" | null;
 }
 
-/** Locked v1 Premium capabilities. */
+/**
+ * Locked v1 Premium capabilities.
+ *
+ * `community_post` is the top-level composer only. Replies, reactions,
+ * votes and challenge entries moved to FREE_V1_FEATURES (Sprint 1) so the
+ * +30% comment-lift gate in LAUNCH_CHECKLIST.md is measured on real fans,
+ * not a Premium-only cohort.
+ */
 export const PREMIUM_V1_FEATURES = [
   "community_post",
-  "community_reply",
-  "community_react",
   "rewards_redeem",
   "premium_badge",
   "referral_extras",
   "billing_portal",
   "merch_drops",
+  "ai_comment_drafter",
 ] as const;
 
 export type PremiumV1Feature = (typeof PREMIUM_V1_FEATURES)[number];
@@ -54,9 +64,72 @@ export const FREE_V1_FEATURES = [
   "read_community",
   "legal_pages",
   "points_earn",
+  "community_reply",
+  "community_react",
+  "community_vote",
+  "challenge_entry",
 ] as const;
 
 export type FreeV1Feature = (typeof FREE_V1_FEATURES)[number];
+
+/**
+ * What a signed-in Free fan earns in the community, per action, with the
+ * per-fan daily caps. These mirror the SQL award path and are display
+ * copy only — the ledger triggers are the enforcement:
+ *   - comments:  try_award_comment_points   (0053) +10, cap 5 per ET day
+ *   - votes:     try_award_poll_points      (0053) +10, cap 3 per ET day;
+ *                prediction votes share community_poll_votes, same cap
+ *   - entries:   award_challenge_entry_points (0078) +3, one per challenge
+ *   - reactions: no points today (no award trigger on community_reactions)
+ * Posts (+5, award_community_post_points) stay Premium.
+ */
+export const COMMUNITY_EARN_RULES = {
+  reply: { points: 10, dailyCap: 5 },
+  vote: { points: 10, dailyCap: 3 },
+  challengeEntry: { points: 3, dailyCap: null },
+  react: { points: 0, dailyCap: null },
+  post: { points: 5, dailyCap: null, premium: true },
+} as const;
+
+/** One-line earn copy for the community header, built from the rules above. */
+export function freeCommunityEarnCopy(): string {
+  const r = COMMUNITY_EARN_RULES;
+  return (
+    `Free for every fan: comments +${r.reply.points} pts (up to ${r.reply.dailyCap}/day) · ` +
+    `poll & prediction votes +${r.vote.points} pts (up to ${r.vote.dailyCap}/day) · ` +
+    `challenge entries +${r.challengeEntry.points} pts · reactions. ` +
+    `Starting a post (+${r.post.points} pts) is Premium.`
+  );
+}
+
+/**
+ * AI comment drafter rollout flag.
+ *
+ * Env `AI_DRAFTER_FREE_COMMUNITIES` — comma-separated community slugs for
+ * which Free fans may use /api/ai/draft-comment (still auth + per-fan rate
+ * limited). `*` opens every community. Unset/empty keeps the drafter a
+ * Premium perk. Lets the +30% comment-lift hypothesis get a Free sample.
+ */
+export const AI_DRAFTER_FREE_COMMUNITIES_ENV = "AI_DRAFTER_FREE_COMMUNITIES";
+
+export function parseAiDrafterFreeCommunities(
+  raw: string | null | undefined,
+): { all: boolean; slugs: Set<string> } {
+  const parts = (raw ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+  return { all: parts.includes("*"), slugs: new Set(parts.filter((s) => s !== "*")) };
+}
+
+export function isAiDrafterFreeForCommunity(
+  communityId: string | null | undefined,
+  raw: string | null | undefined = process.env[AI_DRAFTER_FREE_COMMUNITIES_ENV],
+): boolean {
+  if (!communityId) return false;
+  const parsed = parseAiDrafterFreeCommunities(raw);
+  return parsed.all || parsed.slugs.has(communityId.trim().toLowerCase());
+}
 
 /**
  * Locked CTA copy. Upgrade links go to /premium. "Manage billing" is only

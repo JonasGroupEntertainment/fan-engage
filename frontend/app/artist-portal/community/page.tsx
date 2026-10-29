@@ -1,57 +1,44 @@
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  assertPortalRole,
+  requirePortalPage,
+  roleAtLeast,
+  PORTAL_MIN_ROLE,
+} from "@/lib/artist-portal/access";
+
+export const dynamic = "force-dynamic";
 
 async function deletePost(formData: FormData) {
   "use server";
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) return;
+  // Editors and above may manage posts; throws on a lower role.
+  const ctx = await assertPortalRole("communityPost");
 
   const postId = (formData.get("post_id") as string | null)?.trim();
   if (!postId) return;
 
-  await supabase
+  const admin = createAdminClient();
+  await admin
     .from("community_posts")
     .delete()
     .eq("id", postId)
-    .eq("artist_slug", adminRow.community_id);
+    .eq("artist_slug", ctx.communityId);
 
   revalidatePath("/artist-portal/community");
 }
 
 async function createPost(formData: FormData) {
   "use server";
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) return;
+  const ctx = await assertPortalRole("communityPost");
 
   const body = (formData.get("body") as string | null)?.trim();
   const title = (formData.get("title") as string | null)?.trim() || null;
   if (!body) return;
 
-  await supabase.from("community_posts").insert({
-    artist_slug: adminRow.community_id,
-    author_id: user.id,
+  const admin = createAdminClient();
+  await admin.from("community_posts").insert({
+    artist_slug: ctx.communityId,
+    author_id: ctx.user.id,
     kind: "post",
     title,
     body,
@@ -61,19 +48,9 @@ async function createPost(formData: FormData) {
 }
 
 export default async function ArtistPortalCommunityPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/artist-portal/community");
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) redirect("/artist-portal");
+  // Viewers can read the feed; posting/deleting needs editor or above.
+  const ctx = await requirePortalPage("community", "/artist-portal/community");
+  const canPost = roleAtLeast(ctx.role, PORTAL_MIN_ROLE.communityPost);
 
   const admin = createAdminClient();
   const { data: posts } = await admin
@@ -81,7 +58,7 @@ export default async function ArtistPortalCommunityPage() {
     .select(
       "id, title, body, created_at, author_id, fans(display_name)"
     )
-    .eq("artist_slug", adminRow.community_id)
+    .eq("artist_slug", ctx.communityId)
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -101,7 +78,8 @@ export default async function ArtistPortalCommunityPage() {
         </p>
       </div>
 
-      {/* Compose form */}
+      {/* Compose form — editors and above */}
+      {canPost && (
       <form
         action={createPost}
         className="rounded-2xl border border-white/10 bg-black/30 p-5 space-y-3"
@@ -132,12 +110,13 @@ export default async function ArtistPortalCommunityPage() {
           </button>
         </div>
       </form>
+      )}
 
       {/* Post list */}
       <div className="space-y-4">
         {recentPosts.length === 0 ? (
           <p className="text-sm text-white/50">
-            No posts yet. Write one above.
+            No posts yet.{canPost ? " Write one above." : ""}
           </p>
         ) : (
           recentPosts.map((p) => {
@@ -160,18 +139,18 @@ export default async function ArtistPortalCommunityPage() {
                     {author?.display_name ?? "Artist"} ·{" "}
                     {new Date(p.created_at as string).toLocaleString()}
                   </p>
+                  {canPost && (
                   <form action={deletePost}>
                     <input type="hidden" name="post_id" value={p.id as string} />
                     <button
                       type="submit"
                       className="text-xs text-white/30 hover:text-rose-300 transition-colors"
-                      onClick={(e) => {
-                        if (!confirm("Delete this post?")) e.preventDefault();
-                      }}
+                      title="Delete this post"
                     >
                       Delete
                     </button>
                   </form>
+                  )}
                 </div>
               </div>
             );

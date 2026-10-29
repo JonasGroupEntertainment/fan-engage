@@ -1,25 +1,14 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePortalPage } from "@/lib/artist-portal/access";
 import RedemptionRow from "./redemption-row";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Redemptions · Artist Portal" };
 
 export default async function ArtistPortalRedemptionsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/artist-portal/redemptions");
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) redirect("/artist-portal");
-
-  const communityId = adminRow.community_id as string;
+  // Redemptions is a management surface: editor and above.
+  const ctx = await requirePortalPage("redemptions", "/artist-portal/redemptions");
+  const communityId = ctx.communityId;
   const admin = createAdminClient();
 
   const { data: redemptions } = await admin

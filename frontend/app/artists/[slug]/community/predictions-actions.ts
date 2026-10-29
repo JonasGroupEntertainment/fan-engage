@@ -11,7 +11,6 @@ import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
 import { resolvePrediction } from "@/lib/predictions/resolve";
 import { notifyPredictionResolved } from "@/lib/notifications/triggers/prediction";
-import { premiumPath, requirePremiumFeature } from "@/lib/entitlements";
 
 type Visibility = "public" | "premium" | "founder-only";
 
@@ -117,11 +116,9 @@ export async function votePredictionAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const adminUser = await communityAdminUser(artistSlug, "viewer");
-  if (!adminUser) {
-    const gate = await requirePremiumFeature(user.id, artistSlug, "community_react");
-    if (!gate.allowed) redirect(premiumPath(artistSlug));
-  }
+  // Prediction votes are Free for every signed-in fan (community_vote in
+  // FREE_V1_FEATURES). Points: +10, cap 3/day, enforced by the SQL trigger
+  // on community_poll_votes (try_award_poll_points, 0053).
 
   // Confirm prediction is still open
   const { data: post } = await supabase

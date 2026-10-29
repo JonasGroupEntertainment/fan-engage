@@ -1,31 +1,22 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePortalPage } from "@/lib/artist-portal/access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leaderboard · Artist Portal" };
 
 export default async function ArtistPortalLeaderboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/artist-portal/leaderboard");
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) redirect("/artist-portal");
-
-  const communityId = adminRow.community_id as string;
+  // Read-only analytics: any portal role (viewer and above).
+  const ctx = await requirePortalPage("leaderboard", "/artist-portal/leaderboard");
+  const communityId = ctx.communityId;
   const admin = createAdminClient();
 
   const { data: members } = await admin
     .from("fan_community_memberships")
-    .select("fan_id, total_points, current_tier, joined_at, fans(first_name, avatar_url)")
+    // fans!inner + the is_internal filter drops staff/test accounts (0073).
+    .select("fan_id, total_points, current_tier, joined_at, fans!inner(first_name, avatar_url, is_internal)")
     .eq("community_id", communityId)
     .eq("status", "active")
+    .eq("fans.is_internal", false)
     .order("total_points", { ascending: false })
     .limit(50);
 

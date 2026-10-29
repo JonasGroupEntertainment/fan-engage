@@ -37,6 +37,8 @@ export interface FanProfile {
   referral_code: string | null;
   referred_by: string | null;
   total_points: number;
+  /** Lifetime earned points (0085). Optional until the migration is applied. */
+  lifetime_points?: number | null;
   current_tier: TierSlug;
   sms_opted_in: boolean;
   email_opted_in: boolean;
@@ -51,7 +53,14 @@ export interface FanProfile {
 export type BadgeCategory = "welcome" | "referral" | "community" | "tier";
 
 export interface FanKpis {
+  /** Spendable balance (ledger net). The wallet figure. */
   total_points: number;
+  /**
+   * Points earned over the fan's lifetime (fans.lifetime_points, 0085).
+   * Never decreases on redemption. Tier progress is computed from this, so
+   * spending points cannot push a fan back from the next tier.
+   */
+  lifetime_points: number;
   referral_count: number;
   badge_count: number;
   next_tier: Tier | null;

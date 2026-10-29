@@ -2,7 +2,8 @@ import Link from "next/link";
 import ShareButton from "@/components/share-button";
 import { redirect } from "next/navigation";
 import { getStripe } from "@/lib/stripe";
-import { getCurrentCommunity } from "@/lib/community";
+import { getCommunity } from "@/lib/community";
+import { resolvePremiumCommunityId } from "../actions";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -20,12 +21,14 @@ export const dynamic = "force-dynamic";
 export default async function PremiumWelcomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ session_id?: string }>;
+  searchParams?: Promise<{ session_id?: string; c?: string }>;
 }) {
   const params = (await searchParams) ?? {};
   if (!params.session_id) redirect("/premium");
 
-  const community = await getCurrentCommunity();
+  // The checkout success URL carries ?c=<slug> (see actions.ts); honour it
+  // so a Danger Twins upgrade does not land on a RaeLynn welcome page.
+  const community = await getCommunity(await resolvePremiumCommunityId(params.c));
 
   let status: "complete" | "pending" | "unknown" = "unknown";
   let customerEmail: string | null = null;

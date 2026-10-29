@@ -14,44 +14,6 @@ function fmtUSD(cents: number) {
   return "$" + (cents / 100).toFixed(2);
 }
 
-/** Tiny inline sparkline — 7 bars of varying heights */
-function Sparkline({ mrrCents }: { mrrCents: number }) {
-  // Deterministic pseudo-random bars seeded from mrrCents so they look
-  // plausible without needing historical data.
-  const seed = mrrCents || 1;
-  const heights = Array.from({ length: 7 }, (_, i) => {
-    const v = Math.abs(Math.sin(seed * (i + 1) * 0.37)) * 0.7 + 0.3;
-    return Math.round(v * 24);
-  });
-  const max = Math.max(...heights);
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        gap: "2px",
-        height: "28px",
-      }}
-      title="MRR trend (illustrative)"
-    >
-      {heights.map((h, i) => (
-        <div
-          key={i}
-          style={{
-            width: "6px",
-            height: `${Math.round((h / max) * 24)}px`,
-            borderRadius: "2px",
-            background:
-              i === heights.length - 1
-                ? "rgba(52,211,153,0.9)"
-                : "rgba(255,255,255,0.2)",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 interface StripeRevData {
   activeCount: number;
   pastDueCount: number;
@@ -228,12 +190,11 @@ export default async function StripeConnectPage() {
           const subs = countByCommunity[c.slug] ?? 0;
           const rev = stripeRev[c.slug] ?? { activeCount: 0, pastDueCount: 0, realMrrCents: 0 };
 
-          // Prefer real Stripe MRR; fall back to estimated if Stripe returns nothing
-          const displayMrr = rev.realMrrCents > 0
-            ? rev.realMrrCents
-            : subs * c.monthly_price_cents;
-          const mrrLabel = rev.realMrrCents > 0 ? "Real MRR" : "Est. MRR";
-          const artistShare = Math.round(displayMrr * (1 - c.payout_split_pct / 100));
+          // Only real Stripe MRR is shown; no estimates from list prices.
+          const hasRealMrr = rev.realMrrCents > 0;
+          const artistShare = hasRealMrr
+            ? Math.round(rev.realMrrCents * (1 - c.payout_split_pct / 100))
+            : null;
           const hasPastDue = rev.pastDueCount > 0;
 
           return (
@@ -274,20 +235,24 @@ export default async function StripeConnectPage() {
                   <p className="text-xs text-white/50">Past-due</p>
                 </div>
                 <div className="rounded-xl bg-white/5 p-3">
-                  <p className="text-lg font-bold text-white">{fmtUSD(displayMrr)}</p>
-                  <p className="text-xs text-white/50">{mrrLabel}</p>
+                  <p className="text-lg font-bold text-white">
+                    {hasRealMrr ? fmtUSD(rev.realMrrCents) : "No data yet"}
+                  </p>
+                  <p className="text-xs text-white/50">Real MRR (Stripe)</p>
                 </div>
                 <div className="rounded-xl bg-emerald-500/10 p-3">
-                  <p className="text-lg font-bold text-emerald-300">{fmtUSD(artistShare)}</p>
+                  <p className="text-lg font-bold text-emerald-300">
+                    {artistShare === null ? "No data yet" : fmtUSD(artistShare)}
+                  </p>
                   <p className="text-xs text-white/50">Artist share / mo</p>
                 </div>
               </div>
 
-              {/* Sparkline */}
-              <div className="flex items-center gap-3">
-                <Sparkline mrrCents={displayMrr} />
-                <p className="text-xs text-white/50">MRR trend (illustrative)</p>
-              </div>
+              {/* MRR trend — only real history earns a chart. Until we
+                  store monthly snapshots there is nothing honest to draw. */}
+              <p className="text-xs text-white/40">
+                MRR trend: No data yet — historical snapshots aren&apos;t recorded.
+              </p>
 
               {/* Pricing edit */}
               <details className="group">

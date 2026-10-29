@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "For Artists",
   description:
-    "Launch a branded fan experience on Fan Engage. Reward fans, activate drops, promote events, and build direct fan relationships your label can't take from you.",
+    "Launch a branded fan experience on Fan Engage. Reward fans, activate drops, promote events, and build direct fan relationships with the people who show up for you.",
   alternates: { canonical: "/for-artists" },
   openGraph: {
     type: "website",
@@ -213,7 +213,7 @@ export default function ForArtistsPage() {
           className="mt-3 text-3xl font-semibold md:text-4xl"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          The fans you build here stay yours.
+          A direct line to your fans.
         </h2>
         <p className="mt-5 max-w-3xl text-sm text-white/75">
           Fan Engage is built so artists strengthen direct fan relationships

@@ -123,8 +123,9 @@ export async function gatherArtistLeaderboard(opts: {
             .from("event_rsvps")
             .select("fan_id")
             .in("event_id", eventIds)
-            .gte("created_at", monthStartIso)
-            .lt("created_at", nextMonthIso)
+            // event_rsvps stamps `rsvp_at` (0007) — there is no created_at.
+            .gte("rsvp_at", monthStartIso)
+            .lt("rsvp_at", nextMonthIso)
         : Promise.resolve({ data: [] as Array<{ fan_id: string }> });
 
     // Redemptions are scoped via reward_redemptions.community_id == artistSlug.
@@ -189,12 +190,21 @@ export async function gatherArtistLeaderboard(opts: {
       return a[0].localeCompare(b[0]);
     });
 
-    // Resolve display names + avatars + tier in a single batch
-    const fanIds = sorted.map(([fanId]) => fanId);
+    // Resolve display names + avatars + tier in a single batch. Internal /
+    // test accounts (fans.is_internal, 0073) never chart: they are dropped
+    // here, before ranks are assigned, so public fans keep real positions.
+    const candidateIds = sorted.map(([fanId]) => fanId);
     const { data: fanRows } = await admin
       .from("fans")
-      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled")
-      .in("id", fanIds);
+      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled, is_internal")
+      .in("id", candidateIds)
+      .eq("is_internal", false);
+    const publicIds = new Set((fanRows ?? []).map((f) => f.id as string));
+    for (const id of candidateIds) if (!publicIds.has(id)) scores.delete(id);
+    const ranked = sorted.filter(([fanId]) => publicIds.has(fanId));
+    if (ranked.length === 0) {
+      return { ...empty, artistName };
+    }
     const fanInfoById = new Map<
       string,
       {
@@ -235,13 +245,13 @@ export async function gatherArtistLeaderboard(opts: {
       };
     }
 
-    const top: LeaderboardEntry[] = sorted
+    const top: LeaderboardEntry[] = ranked
       .slice(0, topN)
       .map(([fanId], idx) => buildEntry(idx + 1, fanId));
 
     let viewerEntry: LeaderboardEntry | null = null;
     if (opts.viewerFanId) {
-      const viewerIdx = sorted.findIndex(([id]) => id === opts.viewerFanId);
+      const viewerIdx = ranked.findIndex(([id]) => id === opts.viewerFanId);
       if (viewerIdx !== -1) {
         viewerEntry = buildEntry(viewerIdx + 1, opts.viewerFanId);
       }
@@ -254,7 +264,7 @@ export async function gatherArtistLeaderboard(opts: {
       artistName,
       top,
       viewerEntry,
-      totalFans: sorted.length,
+      totalFans: ranked.length,
     };
   } catch (err) {
     console.warn("gatherArtistLeaderboard failed (non-blocking):", err);
