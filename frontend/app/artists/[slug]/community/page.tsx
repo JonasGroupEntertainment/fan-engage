@@ -92,8 +92,12 @@ export default async function ArtistCommunityPage({
     ref: slug,
     next: `/artists/${slug}/community`,
   });
+  // Premium gates the top-level composer only. Replies, reactions, votes and
+  // challenge entries are Free for every signed-in fan; their daily point
+  // caps live in the SQL award triggers.
   const canWrite =
     isAdmin || canUsePremiumFeature("community_post", entitlement);
+  const canEngage = isSignedIn;
 
   const heroGradient = `linear-gradient(to bottom right, ${artist.accentFrom}40, #0f172a, #000000)`;
 
@@ -116,10 +120,14 @@ export default async function ArtistCommunityPage({
             >
               {artist.name} community
             </h1>
+            {/* Amounts and caps mirror the SQL award triggers — see
+                COMMUNITY_EARN_RULES in lib/entitlements-core.ts (tested). */}
             <p className="mt-3 text-sm text-white/75">
-              Posts +5 pts · comments +10 pts · poll votes +10 pts · challenge
-              entries +3 pts. Founding Fans #1–100 earn 1.5× points — not a
-              paid subscription, and not just a badge.
+              Free for every fan: comments +10 pts (up to 5/day) · poll &amp;
+              prediction votes +10 pts (up to 3/day) · challenge entries +3 pts
+              · reactions. Starting a post (+5 pts) is Premium.{" "}
+              Founding Fans #1–100 earn 1.5× points — not a paid subscription,
+              and not just a badge.
             </p>
           </div>
           <Link
@@ -172,7 +180,7 @@ export default async function ArtistCommunityPage({
             {isSignedIn
               ? canWrite
                 ? "Be the first to post — earn 5 pts and kick off the conversation."
-                : "Read along — posting is available with Premium."
+                : "Nothing to reply to yet. Starting a post is available with Premium; replies, reactions and votes are free for every fan."
               : "Create your fan profile to claim a Founding Fan badge and join the conversation."}
           </p>
         </section>
@@ -236,8 +244,8 @@ export default async function ArtistCommunityPage({
                 isAuthor={fan !== null && post.author_id === fan.id}
                 isAdmin={isAdmin}
                 currentUserId={fan?.id ?? null}
-                canReply={canWrite}
-                canReact={canWrite}
+                canReply={canEngage}
+                canReact={canEngage}
                 poll={pollByPost[i]}
                 challengeEntries={entriesByPost[i]}
               />

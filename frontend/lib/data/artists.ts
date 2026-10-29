@@ -51,11 +51,20 @@ type ArtistRow = {
 };
 
 /**
- * An event is past once its end (or start, when no end is set) is behind us.
- * Events with only a free-form `event_date` string can't be judged, so they
- * stay visible until an admin deactivates them or sets timestamps.
+ * An event is past once `ends_at ?? starts_at` is behind us, so an event
+ * that has started but not ended is still live and still listed. Shared by
+ * the artist hub and Fan Home so both surfaces agree.
+ *
+ * An event with neither timestamp stays listed on purpose: many rows only
+ * carry a free-form `event_date` string ("Summer 2026", "TBA") that cannot
+ * be compared to a clock, and hiding them would make a real announced show
+ * vanish. They leave the list when an admin deactivates them or fills in
+ * `starts_at` / `ends_at`.
  */
-function isPastEvent(e: ArtistEvent, now: number): boolean {
+export function isPastEvent(
+  e: { starts_at: string | null; ends_at: string | null },
+  now: number,
+): boolean {
   const ts = e.ends_at ?? e.starts_at;
   if (!ts) return false;
   const t = Date.parse(ts);

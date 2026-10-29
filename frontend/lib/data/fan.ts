@@ -15,6 +15,8 @@ export interface FanMembership {
   community_id: string;
   joined_at: string;
   total_points: number;
+  /** Lifetime earned points in this community (0085). Optional until applied. */
+  lifetime_points?: number | null;
   current_tier: TierSlug;
   referral_code: string | null;
   status: "active" | "suspended" | "pending";
@@ -214,7 +216,7 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     const communityId = await getCurrentCommunityId();
 
     const admin = createAdminClient();
-    const [membership, referralsRes, badgesRes, tiers, ledgerRes] = await Promise.all([
+    const [membership, referralsRes, badgesRes, tiers, ledgerRes, lifetimeRes] = await Promise.all([
       getCurrentMembership(communityId),
       supabase
         .from("referrals")
@@ -228,6 +230,13 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
         .eq("community_id", communityId),
       getTiers(),
       admin.rpc("fan_ledger_balance", { p_fan_id: user.id }),
+      // fans.lifetime_points (0085). Until that migration is applied the
+      // column does not exist and this select errors; we fall back below.
+      admin
+        .from("fans")
+        .select("lifetime_points")
+        .eq("id", user.id)
+        .maybeSingle(),
     ]);
 
     const total_points =
@@ -237,17 +246,29 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     const referral_count = referralsRes.count ?? 0;
     const badge_count = badgesRes.count ?? 0;
 
+    // Tier progress follows lifetime earned points, never the spendable
+    // balance, so redeeming a reward cannot move the "to next tier" figure
+    // backwards (0085 no-demotion tiers). Floor at the wallet so a DB that
+    // has not run 0085 yet behaves exactly as before.
+    const lifetimeRaw = (lifetimeRes.data as { lifetime_points?: number | null } | null)
+      ?.lifetime_points;
+    const lifetime_points = Math.max(
+      typeof lifetimeRaw === "number" ? lifetimeRaw : 0,
+      total_points,
+    );
+
     const next_tier =
       tiers
-        .filter((t) => t.min_points > total_points)
+        .filter((t) => t.min_points > lifetime_points)
         .sort((a, b) => a.min_points - b.min_points)[0] ?? null;
 
     const points_to_next_tier = next_tier
-      ? Math.max(0, next_tier.min_points - total_points)
+      ? Math.max(0, next_tier.min_points - lifetime_points)
       : null;
 
     return {
       total_points,
+      lifetime_points,
       referral_count,
       badge_count,
       next_tier: (next_tier ?? null) as Tier | null,

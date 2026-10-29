@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getPortalContext, roleAtLeast } from "@/lib/artist-portal/access";
+import {
+  getPortalContext,
+  canAccessPortalSurface,
+  type PortalSurface,
+} from "@/lib/artist-portal/access";
 
 export default async function ArtistPortalLayout({
   children,
@@ -24,18 +28,27 @@ export default async function ArtistPortalLayout({
       <div className="min-h-screen bg-midnight flex items-center justify-center px-6">
         <div className="max-w-md w-full rounded-2xl border border-white/10 bg-black/40 p-8 text-center">
           <p className="text-lg font-semibold text-white/80">
-            Not an artist account
+            You&apos;re not on an artist team yet
           </p>
           <p className="mt-2 text-sm text-white/50">
-            This portal is only available to verified artist accounts. Contact
-            your Jonas Group manager if you believe this is an error.
+            The artist portal is for artists and their teams. If you&apos;re an
+            artist, apply to launch your community; if you&apos;re on a team,
+            ask the community owner to add you from their Team page.
           </p>
-          <Link
-            href="/"
-            className="mt-6 inline-block rounded-lg bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20"
-          >
-            Back to fan site
-          </Link>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/for-artists/apply"
+              className="inline-block rounded-lg bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20"
+            >
+              Apply as an artist
+            </Link>
+            <Link
+              href="/"
+              className="inline-block rounded-lg border border-white/15 px-4 py-2 text-sm text-white/70 hover:text-white"
+            >
+              Back to fan site
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -48,18 +61,18 @@ export default async function ArtistPortalLayout({
     .eq("slug", ctx.communityId)
     .maybeSingle();
 
-  const nav = [
-    { href: "/artist-portal", label: "Dashboard" },
-    { href: "/artist-portal/copilot", label: "Copilot ✨" },
-    { href: "/artist-portal/events", label: "Events" },
-    { href: "/artist-portal/community", label: "Community" },
-    { href: "/artist-portal/redemptions", label: "Redemptions" },
-    { href: "/artist-portal/leaderboard", label: "Leaderboard" },
-    { href: "/artist-portal/payouts", label: "Payouts" },
-    ...(roleAtLeast(ctx.role, "owner")
-      ? [{ href: "/artist-portal/team", label: "Team" }]
-      : []),
+  // Only show surfaces the caller's role can open (PORTAL_MIN_ROLE).
+  const allNav: Array<{ href: string; label: string; surface: PortalSurface }> = [
+    { href: "/artist-portal", label: "Dashboard", surface: "dashboard" },
+    { href: "/artist-portal/copilot", label: "Copilot ✨", surface: "copilot" },
+    { href: "/artist-portal/events", label: "Events", surface: "events" },
+    { href: "/artist-portal/community", label: "Community", surface: "community" },
+    { href: "/artist-portal/redemptions", label: "Redemptions", surface: "redemptions" },
+    { href: "/artist-portal/leaderboard", label: "Leaderboard", surface: "leaderboard" },
+    { href: "/artist-portal/payouts", label: "Revenue", surface: "revenue" },
+    { href: "/artist-portal/team", label: "Team", surface: "team" },
   ];
+  const nav = allNav.filter((item) => canAccessPortalSurface(ctx.role, item.surface));
 
   return (
     <div className="min-h-screen bg-midnight">

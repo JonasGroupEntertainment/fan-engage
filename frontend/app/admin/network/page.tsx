@@ -5,6 +5,7 @@ import {
   getTopSuperfans,
 } from "@/lib/network/queries";
 import { LiveFeed } from "./live-feed";
+import { superAdminOnly } from "@/lib/admin-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ function formatDay(day: string): string {
 }
 
 export default async function AdminNetworkPage() {
+  // Cross-app network data spans every community: super-admin only.
+  await superAdminOnly("/admin/network");
+
   const [summary, initialEvents, superfans, publishers] = await Promise.all([
     getNetworkEventSummary(14),
     getRecentFanEvents(50),

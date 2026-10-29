@@ -75,6 +75,8 @@ describe("guest founding counters share one source", () => {
     assert.doesNotMatch(foundersWallSrc, /premium founders/i);
     assert.match(foundersWallSrc, /Free badge for the first/);
     assert.match(foundersWallSrc, /Not a paid purchase/);
-    assert.match(foundersWallSrc, /Premium \(\$10\/mo or \$99\/yr\) is a\s+separate plan/);
+    // Prices come from communities.monthly_price_cents / annual_price_cents, never a literal.
+    assert.match(foundersWallSrc, /Premium \(\$\{fmtPrice\(monthly\)\}\/mo or \$\{fmtPrice\(annual\)\}\/yr\) is a separate plan\./);
+    assert.doesNotMatch(foundersWallSrc, /\$10\/mo/);
   });
 });

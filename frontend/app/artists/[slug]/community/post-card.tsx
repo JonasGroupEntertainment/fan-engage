@@ -17,8 +17,6 @@ import {
 import PollBlock from "./poll-block";
 import ChallengeBlock from "./challenge-block";
 import { relativeTime } from "@/lib/format/relative-time";
-import PremiumCta from "@/components/premium-cta";
-import { PREMIUM_CTA, premiumPath } from "@/lib/entitlements-core";
 
 const REACTION_SET = ["❤️", "🔥", "👏", "💯", "😂"] as const;
 
@@ -202,17 +200,18 @@ export default function PostCard({
         </div>
       )}
 
-      {/* Reactions — counts stay visible on the Free read path. */}
+      {/* Reactions — Free for every signed-in fan; counts stay visible to
+          guests, who get a sign-in door instead of a Premium lock. */}
       <div className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
         {REACTION_SET.map((emoji) => {
           const count = post.reaction_counts[emoji] ?? 0;
           const mine = post.my_reactions.includes(emoji);
-          if (!canReact) {
+          if (!canReact || !currentUserId) {
             return (
               <a
                 key={emoji}
-                href={currentUserId ? premiumPath(post.artist_slug) : `/login?next=${encodeURIComponent(premiumPath(post.artist_slug))}`}
-                title={PREMIUM_CTA.available}
+                href={`/login?next=${encodeURIComponent(`/artists/${post.artist_slug}/community`)}`}
+                title="Sign in to react"
                 className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-sm text-white/70 hover:bg-black/50"
               >
                 <span>{emoji}</span>
@@ -277,18 +276,9 @@ export default function PostCard({
               </p>
             </div>
           ))}
+          {/* Replies are Free (+10 pts, up to 5/day via the SQL trigger). */}
           {currentUserId && canReply && (
             <CommentComposer postId={post.id} artistSlug={post.artist_slug} />
-          )}
-          {currentUserId && !canReply && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2">
-              <p className="text-xs text-white/70">{PREMIUM_CTA.unlock}</p>
-              <PremiumCta
-                copy="upgrade"
-                communityId={post.artist_slug}
-                variant="chip"
-              />
-            </div>
           )}
         </div>
       )}

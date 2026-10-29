@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { draftComment } from "@/lib/drafts";
 import { apiRateLimiter } from "@/lib/rate-limit";
 import { PREMIUM_CTA, requirePremiumFeature } from "@/lib/entitlements";
+import { isAiDrafterFreeForCommunity } from "@/lib/entitlements-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,8 +17,16 @@ export const dynamic = "force-dynamic";
  * signed-in users can call this. The user's own auth.uid() is used as
  * the userId for fetching their prior comment style.
  *
+ * Gating: Premium perk (`ai_comment_drafter`) unless the env flag
+ * `AI_DRAFTER_FREE_COMMUNITIES` lists the post's community slug
+ * (comma-separated; `*` = every community). When listed, Free fans may use
+ * it under the same per-fan rate limit, which gives the +30% comment-lift
+ * hypothesis (LAUNCH_CHECKLIST.md) a non-Premium sample. Replies themselves
+ * are always Free; only the AI drafts are gated.
+ *
  * Failure modes:
  *   401 — not signed in
+ *   403 — Premium required and community not in AI_DRAFTER_FREE_COMMUNITIES
  *   400 — missing postId
  *   503 — ANTHROPIC_API_KEY not set
  *   500 — anything else (logged for debugging)
@@ -58,8 +67,8 @@ export async function POST(request: Request) {
     .eq("id", postId)
     .maybeSingle();
   const communityId = (post?.artist_slug as string | null) ?? "";
-  if (communityId) {
-    const gate = await requirePremiumFeature(user.id, communityId, "community_reply");
+  if (communityId && !isAiDrafterFreeForCommunity(communityId)) {
+    const gate = await requirePremiumFeature(user.id, communityId, "ai_comment_drafter");
     if (!gate.allowed) {
       return NextResponse.json(
         { error: PREMIUM_CTA.unlock, upgrade: PREMIUM_CTA.href },

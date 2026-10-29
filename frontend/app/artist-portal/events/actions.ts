@@ -1,26 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { assertPortalRole } from "@/lib/artist-portal/access";
 
-async function requireOwner() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthenticated");
-
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-
-  if (!adminRow) throw new Error("Forbidden");
-  return { supabase, communityId: adminRow.community_id as string };
+/**
+ * Editors and above may manage events (PORTAL_MIN_ROLE.events). Throws
+ * "Unauthorized" / "Forbidden" rather than redirecting. Writes go through
+ * the service role because artist_events has no RLS write policies —
+ * the role check above is the authorization.
+ */
+async function requireEditor() {
+  const ctx = await assertPortalRole("events");
+  return { supabase: createAdminClient(), communityId: ctx.communityId };
 }
 
 export async function createPortalEventAction(formData: FormData) {
-  const { supabase, communityId } = await requireOwner();
+  const { supabase, communityId } = await requireEditor();
 
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Title is required." };
@@ -54,7 +50,7 @@ export async function createPortalEventAction(formData: FormData) {
 }
 
 export async function updatePortalEventAction(formData: FormData) {
-  const { supabase, communityId } = await requireOwner();
+  const { supabase, communityId } = await requireEditor();
 
   const eventId = String(formData.get("event_id") ?? "").trim();
   if (!eventId) return { error: "Missing event_id." };
@@ -94,7 +90,7 @@ export async function updatePortalEventAction(formData: FormData) {
 }
 
 export async function deletePortalEventAction(formData: FormData) {
-  const { supabase, communityId } = await requireOwner();
+  const { supabase, communityId } = await requireEditor();
 
   const eventId = String(formData.get("event_id") ?? "").trim();
   if (!eventId) return;

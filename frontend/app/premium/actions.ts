@@ -17,9 +17,47 @@ import { getCurrentCommunityId } from "@/lib/community";
 import { isPremium } from "@/lib/entitlements";
 import { adultGate } from "@/lib/age-gate";
 
+const COMMUNITY_SLUG_RE = /^[a-z0-9-]{1,64}$/;
+
 /**
- * Start a Stripe Checkout Session for Premium. Reads the current
- * community from request context, resolves the fan, gets-or-creates
+ * `/premium?c=<slug>` picks the community to upgrade in (the paywall and
+ * Premium CTAs link here with the artist's slug). Anything that isn't an
+ * active community slug falls back to the hostname community, so a typo
+ * or an unlaunched slug can never reach checkout.
+ */
+export async function resolvePremiumCommunityId(
+  requested: string | string[] | null | undefined,
+): Promise<string> {
+  const fallback = await getCurrentCommunityId();
+  const raw = Array.isArray(requested) ? requested[0] : requested;
+  const slug = (raw ?? "").trim().toLowerCase();
+  if (!slug || slug === fallback || !COMMUNITY_SLUG_RE.test(slug)) return fallback;
+  try {
+    const { data } = await createAdminClient()
+      .from("communities")
+      .select("slug, active")
+      .eq("slug", slug)
+      .eq("active", true)
+      .maybeSingle();
+    return data?.slug ? (data.slug as string) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** `/premium` for the hostname community, `/premium?c=<slug>` otherwise. */
+async function premiumPathFor(communityId: string, query?: Record<string, string>): Promise<string> {
+  const params = new URLSearchParams(query ?? {});
+  const hostCommunity = await getCurrentCommunityId();
+  if (communityId !== hostCommunity) params.set("c", communityId);
+  const qs = params.toString();
+  return qs ? `/premium?${qs}` : "/premium";
+}
+
+/**
+ * Start a Stripe Checkout Session for Premium. Reads the community from
+ * the form's `community` field (set from `/premium?c=`), falling back to
+ * the request's hostname community, resolves the fan, gets-or-creates
  * their Stripe customer, picks the standard price ($10/mo or $99/yr),
  * creates the session, and redirects the browser to Stripe.
  *
@@ -39,7 +77,10 @@ export async function createCheckoutSessionAction(formData: FormData) {
     }
 
     step = "community";
-    const communityId = await getCurrentCommunityId();
+    const communityId = await resolvePremiumCommunityId(
+      formData.get("community") as string | null,
+    );
+    const premiumPath = await premiumPathFor(communityId);
 
     // 1) Who's subscribing?
     step = "auth";
@@ -48,7 +89,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user?.email) {
-      const nextPath = encodeURIComponent("/premium");
+      const nextPath = encodeURIComponent(premiumPath);
       const ref = encodeURIComponent(communityId);
       redirect(`/signup?ref=${ref}&next=${nextPath}`);
     }
@@ -65,7 +106,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
       .eq("id", user.id)
       .maybeSingle();
     const gate = adultGate((ageRow?.birth_date as string | null) ?? null);
-    if (gate !== "ok") redirect(`/premium?age=${gate}`);
+    if (gate !== "ok") redirect(await premiumPathFor(communityId, { age: gate }));
 
     // 2) Which community?
     step = "load-community";
@@ -98,7 +139,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
       .eq("community_id", communityId)
       .maybeSingle();
     if (isPremium(existing?.subscription_tier as string | null)) {
-      redirect(`/premium?already_active=1`);
+      redirect(await premiumPathFor(communityId, { already_active: "1" }));
     }
 
     // 4) Make sure the fan has a membership row — the webhook handler will
@@ -172,8 +213,8 @@ export async function createCheckoutSessionAction(formData: FormData) {
           trial: withTrial ? "1" : "0",
         },
       },
-      success_url: `${APP_URL}/premium/welcome?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${APP_URL}/premium?canceled=1`,
+      success_url: `${APP_URL}/premium/welcome?session_id={CHECKOUT_SESSION_ID}&c=${encodeURIComponent(communityId)}`,
+      cancel_url: `${APP_URL}${await premiumPathFor(communityId, { canceled: "1" })}`,
     });
 
     if (!session.url) {

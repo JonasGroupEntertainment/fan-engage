@@ -4,6 +4,7 @@ import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import { getAdminContext } from "@/lib/admin";
 import { roleAtLeast } from "@/lib/admin-authz";
 import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
+import { isPastEvent } from "@/lib/data/artists";
 import {
   evaluateRsvpWindow,
   grantManagesEventRsvps,
@@ -184,9 +185,10 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
         hero_focal_y: number | null;
       }> });
 
-  // Upcoming public-tier events from followed artists. Discovery-style:
-  // RSVP not required. Limit slightly higher than 3 so we have headroom if
-  // any rows get filtered out post-fetch (e.g. starts_at NULL placeholders).
+  // Upcoming events from followed artists. Discovery-style: RSVP not
+  // required. Premium / founder-only events are kept when the fan is
+  // entitled in that community (filtered after the membership reads land).
+  // Limit is higher than 3 for headroom after that post-fetch filter.
   const nowIso = new Date().toISOString();
   const upcomingEventsPromise = loadHomeUpcomingEvents(admin, followedSlugs, nowIso);
 
@@ -389,6 +391,9 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     Boolean(adminCtx?.isSuperAdmin) && roleAtLeast(adminCtx?.role ?? null, "editor");
 
   const upcomingEvents: FanHomeUpcomingEvent[] = upcomingEventsRes
+    .filter((e) =>
+      homeEventVisible(e.tier, e.artist_slug, { premiumCommunities, founderCommunities }),
+    )
     .slice(0, 3)
     .map((e) => {
       const reminderKinds = remindersByEvent.get(e.id) ?? new Set<string>();
@@ -547,12 +552,36 @@ type HomeUpcomingRow = {
   artist_slug: string;
   title: string;
   starts_at: string | null;
+  ends_at: string | null;
   event_date: string | null;
   location: string | null;
   url: string | null;
+  tier: "public" | "premium" | "founder-only";
   rsvp_opens_at: string | null;
 };
 
+/**
+ * Same rule as the artist hub's `canAccess`: public events for everyone,
+ * premium events for fans with a Premium membership in that community,
+ * founder-only events for Founding Fans there. Gated events the fan is not
+ * entitled to are dropped from Fan Home (the hub shows the paywall instead).
+ */
+export function homeEventVisible(
+  tier: HomeUpcomingRow["tier"],
+  artistSlug: string,
+  viewer: { premiumCommunities: string[]; founderCommunities: string[] },
+): boolean {
+  if (tier === "public") return true;
+  if (tier === "founder-only") return viewer.founderCommunities.includes(artistSlug);
+  return viewer.premiumCommunities.includes(artistSlug);
+}
+
+/**
+ * Upcoming = not past by `ends_at ?? starts_at` (see `isPastEvent`), so an
+ * event that is in progress right now is still listed. Rows with neither
+ * timestamp are kept for the same reason the artist hub keeps them, and
+ * sort after dated rows.
+ */
 async function loadHomeUpcomingEvents(
   admin: ReturnType<typeof createAdminClient>,
   followedSlugs: string[],
@@ -560,7 +589,7 @@ async function loadHomeUpcomingEvents(
 ): Promise<HomeUpcomingRow[]> {
   if (followedSlugs.length === 0) return [];
   const columns =
-    "id, artist_slug, title, starts_at, event_date, location, url, tier, active";
+    "id, artist_slug, title, starts_at, ends_at, event_date, location, url, tier, active";
   const { data, error } = await selectWithOptionalRsvpOpens(
     (cols) =>
       admin
@@ -568,24 +597,27 @@ async function loadHomeUpcomingEvents(
         .select(cols)
         .in("artist_slug", followedSlugs)
         .eq("active", true)
-        .eq("tier", "public")
-        .not("starts_at", "is", null)
-        .gt("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .limit(8),
+        .or(
+          `ends_at.gt.${nowIso},and(ends_at.is.null,starts_at.gt.${nowIso}),and(ends_at.is.null,starts_at.is.null)`,
+        )
+        .order("starts_at", { ascending: true, nullsFirst: false })
+        .limit(16),
     columns,
   );
   if (error || !data) return [];
-  return (data as unknown as Array<Omit<HomeUpcomingRow, "rsvp_opens_at"> & { rsvp_opens_at?: string | null }>).map(
-    (row) => ({
+  const now = Date.parse(nowIso);
+  return (data as unknown as Array<Omit<HomeUpcomingRow, "rsvp_opens_at" | "tier"> & { tier?: string | null; rsvp_opens_at?: string | null }>)
+    .filter((row) => !isPastEvent(row, now))
+    .map((row) => ({
       id: row.id,
       artist_slug: row.artist_slug,
       title: row.title,
       starts_at: row.starts_at,
+      ends_at: row.ends_at ?? null,
       event_date: row.event_date,
       location: row.location,
       url: row.url,
+      tier: (row.tier === "premium" || row.tier === "founder-only" ? row.tier : "public") as HomeUpcomingRow["tier"],
       rsvp_opens_at: row.rsvp_opens_at ?? null,
-    }),
-  );
+    }));
 }

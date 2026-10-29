@@ -1,6 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPortalContext } from "@/lib/artist-portal/access";
+
+export const dynamic = "force-dynamic";
 
 async function getPortalData(communityId: string) {
   const admin = createAdminClient();
@@ -21,8 +25,10 @@ async function getPortalData(communityId: string) {
     // Top 5 fans by total_points in this community
     admin
       .from("fan_community_memberships")
-      .select("fan_id, total_points, current_tier, fans(display_name, avatar_url)")
+      // fans!inner + the is_internal filter drops staff/test accounts (0073).
+      .select("fan_id, total_points, current_tier, fans!inner(display_name, avatar_url, is_internal)")
       .eq("community_id", communityId)
+      .eq("fans.is_internal", false)
       .order("total_points", { ascending: false })
       .limit(5),
 
@@ -59,23 +65,42 @@ export default async function ArtistPortalDashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/artist-portal");
 
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
+  // Any admin_users role (owner/admin/editor/viewer) can see the dashboard.
+  // getPortalContext resolves one community even when the user holds
+  // several grants, so no `.maybeSingle()` ambiguity here.
+  const ctx = await getPortalContext();
+  if (!ctx) {
+    // Signed in but not on any artist team — never redirect back to this
+    // same route; explain and point at the application.
+    return (
+      <div className="rounded-2xl border border-white/10 bg-black/40 p-8 text-center">
+        <p className="text-lg font-semibold text-white/80">
+          You&apos;re not on an artist team yet
+        </p>
+        <p className="mt-2 text-sm text-white/50">
+          The artist portal is for artists and their teams. If you&apos;re an
+          artist, apply to launch your community; if you&apos;re on a team,
+          ask the community owner to add you from their Team page.
+        </p>
+        <Link
+          href="/for-artists/apply"
+          className="mt-6 inline-block rounded-lg bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20"
+        >
+          Apply as an artist
+        </Link>
+      </div>
+    );
+  }
 
-  if (!adminRow) redirect("/artist-portal");
-
-  const { data: community } = await supabase
+  const admin = createAdminClient();
+  const { data: community } = await admin
     .from("communities")
     .select("slug, display_name")
-    .eq("slug", adminRow.community_id)
+    .eq("slug", ctx.communityId)
     .maybeSingle();
 
   const { subscriberCount, topFans, recentPosts, nextEvents } =
-    await getPortalData(adminRow.community_id);
+    await getPortalData(ctx.communityId);
 
   return (
     <div className="space-y-8">

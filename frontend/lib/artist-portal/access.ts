@@ -1,24 +1,29 @@
 import type { User } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  PORTAL_MIN_ROLE,
+  PORTAL_ROLE_RANK,
+  roleAtLeast,
+  type PortalRole,
+  type PortalSurface,
+} from "./roles";
 
 /**
  * Artist-portal access resolution.
  *
  * A user can enter the portal if they hold ANY role on a community in
- * admin_users (owner / admin / editor / viewer) — not just owner. Roles:
- *
- *   owner   — the artist (or their manager of record). Full control,
- *             including team management.
- *   admin   — day-to-day team lead. Everything except team management.
- *   editor  — can post/manage content, events, redemptions.
- *   viewer  — read-only (analytics, leaderboard, community view).
+ * admin_users (owner / admin / editor / viewer) — not just owner. The role
+ * matrix lives in ./roles.ts (PORTAL_MIN_ROLE); this file resolves the
+ * caller's context from Supabase and offers page/action guards on top.
  *
  * Super-admins (community_id = '*') get portal access to the first active
  * community so JG staff can see what artists see.
  */
 
-export type PortalRole = "owner" | "admin" | "editor" | "viewer";
+export { PORTAL_MIN_ROLE, PORTAL_ROLE_RANK, roleAtLeast, canAccessPortalSurface } from "./roles";
+export type { PortalRole, PortalSurface } from "./roles";
 
 export interface PortalContext {
   user: User;
@@ -26,16 +31,7 @@ export interface PortalContext {
   role: PortalRole;
 }
 
-const ROLE_RANK: Record<PortalRole, number> = {
-  owner: 3,
-  admin: 2,
-  editor: 1,
-  viewer: 0,
-};
-
-export function roleAtLeast(role: PortalRole, min: PortalRole): boolean {
-  return ROLE_RANK[role] >= ROLE_RANK[min];
-}
+const ROLE_RANK = PORTAL_ROLE_RANK;
 
 export async function getPortalContext(): Promise<PortalContext | null> {
   let user: User | null = null;
@@ -78,4 +74,32 @@ export async function getPortalContext(): Promise<PortalContext | null> {
     .maybeSingle();
   if (!firstCommunity?.slug) return null;
   return { user, communityId: firstCommunity.slug as string, role: "owner" };
+}
+
+/**
+ * Page guard. Resolves the portal context and redirects when the caller
+ * is signed out (to login, back to `nextPath`) or holds a role below the
+ * surface's minimum (to the portal root, which never redirects again).
+ */
+export async function requirePortalPage(
+  surface: PortalSurface,
+  nextPath: string,
+): Promise<PortalContext> {
+  const ctx = await getPortalContext();
+  if (!ctx) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  if (!roleAtLeast(ctx.role, PORTAL_MIN_ROLE[surface])) redirect("/artist-portal");
+  return ctx;
+}
+
+/**
+ * Server-action guard. Throws instead of redirecting so the caller can
+ * surface an error. Role minimum comes from the same matrix as the page.
+ */
+export async function assertPortalRole(
+  surface: PortalSurface,
+): Promise<PortalContext> {
+  const ctx = await getPortalContext();
+  if (!ctx) throw new Error("Unauthorized");
+  if (!roleAtLeast(ctx.role, PORTAL_MIN_ROLE[surface])) throw new Error("Forbidden");
+  return ctx;
 }

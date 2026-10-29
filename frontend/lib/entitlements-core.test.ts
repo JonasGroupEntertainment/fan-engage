@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  COMMUNITY_EARN_RULES,
   FREE_V1_FEATURES,
+  freeCommunityEarnCopy,
+  isAiDrafterFreeForCommunity,
+  parseAiDrafterFreeCommunities,
   PREMIUM_CTA,
   PREMIUM_V1_FEATURES,
   canAccess,
@@ -90,6 +94,77 @@ describe("Free vs Premium v1 matrix", () => {
       assert.equal(canUsePremiumFeature(feature, "comped"), true);
       assert.equal(canUsePremiumFeature(feature, "past_due"), true);
     }
+  });
+
+  it("locks the exact Free and Premium sets (status is earned, not bought)", () => {
+    assert.deepEqual(
+      [...FREE_V1_FEATURES].sort(),
+      [
+        "basic_profile",
+        "browse_artists",
+        "browse_events",
+        "challenge_entry",
+        "community_react",
+        "community_reply",
+        "community_vote",
+        "legal_pages",
+        "points_earn",
+        "read_community",
+      ],
+    );
+    assert.deepEqual(
+      [...PREMIUM_V1_FEATURES].sort(),
+      [
+        "ai_comment_drafter",
+        "billing_portal",
+        "community_post",
+        "merch_drops",
+        "premium_badge",
+        "referral_extras",
+        "rewards_redeem",
+      ],
+    );
+    // Nothing is in both lists.
+    for (const f of FREE_V1_FEATURES) {
+      assert.equal((PREMIUM_V1_FEATURES as readonly string[]).includes(f), false);
+    }
+  });
+
+  it("replies, reactions, votes and challenge entries never need Premium", () => {
+    for (const feature of ["community_reply", "community_react", "community_vote", "challenge_entry"] as const) {
+      assert.equal(canUseFeature(feature, null), true);
+      assert.equal(canUseFeature(feature, "free"), true);
+      assert.equal(canUseFeature(feature, "cancelled"), true);
+    }
+    assert.equal(canUseFeature("community_post", "free"), false);
+    assert.equal(canUseFeature("community_post", "premium"), true);
+  });
+
+  it("earn copy mirrors the SQL caps and names what is Free", () => {
+    assert.deepEqual(COMMUNITY_EARN_RULES.reply, { points: 10, dailyCap: 5 });
+    assert.deepEqual(COMMUNITY_EARN_RULES.vote, { points: 10, dailyCap: 3 });
+    assert.equal(COMMUNITY_EARN_RULES.challengeEntry.points, 3);
+    assert.equal(COMMUNITY_EARN_RULES.post.premium, true);
+    const copy = freeCommunityEarnCopy();
+    assert.match(copy, /^Free for every fan:/);
+    assert.match(copy, /comments \+10 pts \(up to 5\/day\)/);
+    assert.match(copy, /votes \+10 pts \(up to 3\/day\)/);
+    assert.match(copy, /challenge entries \+3 pts/);
+    assert.match(copy, /Starting a post \(\+5 pts\) is Premium/);
+    assert.doesNotMatch(copy, /member|club|brand/i);
+  });
+
+  it("AI drafter flag parses slugs and wildcard", () => {
+    assert.deepEqual(parseAiDrafterFreeCommunities(undefined), { all: false, slugs: new Set() });
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", undefined), false);
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", ""), false);
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", "raelynn"), true);
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", " other , RaeLynn "), true);
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", "other"), false);
+    assert.equal(isAiDrafterFreeForCommunity("raelynn", "*"), true);
+    assert.equal(isAiDrafterFreeForCommunity("anything", "other,*"), true);
+    assert.equal(isAiDrafterFreeForCommunity("", "*"), false);
+    assert.equal(isAiDrafterFreeForCommunity(null, "*"), false);
   });
 
   it("marks merch drops as Premium-only catalog items", () => {

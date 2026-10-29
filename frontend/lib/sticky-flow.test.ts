@@ -35,7 +35,7 @@ describe("sticky-flow: marketplace guest digital path", () => {
     const market = readRepo("../app/marketplace/page.tsx");
     const soon = readRepo("../components/marketplace-coming-soon.tsx");
     const rewards = readRepo("../app/rewards/page.tsx");
-    assert.match(layout, /label: "Merch"/);
+    assert.match(layout, /label: "Unlocks"/);
     assert.match(layout, /merchAccess/);
     assert.match(market, /reason === "signed-out"/);
     assert.match(market, /redirect\(access\.navHref\)/);

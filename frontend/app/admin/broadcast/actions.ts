@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminContext } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import { broadcastSms, broadcastEmail } from "@/lib/broadcast";
 
 export type BroadcastFormResult = {
@@ -12,23 +13,55 @@ export type BroadcastFormResult = {
   error?: string;
 };
 
+export type BroadcastTarget = { slug: string; displayName: string };
+
+/**
+ * The community a broadcast from this admin session goes to: always the
+ * admin context's current community (never a value from the form).
+ */
+export async function getBroadcastTarget(): Promise<BroadcastTarget | null> {
+  const ctx = await getAdminContext();
+  if (!ctx?.currentCommunityId) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("communities")
+    .select("slug, display_name")
+    .eq("slug", ctx.currentCommunityId)
+    .maybeSingle();
+  return {
+    slug: ctx.currentCommunityId,
+    displayName: (data?.display_name as string | undefined) ?? ctx.currentCommunityId,
+  };
+}
+
 export async function sendBroadcast(
   formData: FormData,
 ): Promise<BroadcastFormResult> {
   const ctx = await getAdminContext();
   if (!ctx) return { ok: false, error: "Unauthorized" };
 
-  const artistSlug = String(formData.get("artist_slug") ?? "").trim();
+  // Target is the admin's current community — form input is ignored so a
+  // tampered field can't redirect a broadcast elsewhere.
+  const artistSlug = ctx.currentCommunityId ?? "";
   const message = String(formData.get("message") ?? "").trim();
   const tierFilter = String(formData.get("tier_filter") ?? "all");
   const channel = String(formData.get("channel") ?? "sms") as "sms" | "email" | "both";
 
-  if (!artistSlug || !message) {
-    return { ok: false, error: "Artist and message are required." };
+  if (!artistSlug) {
+    return { ok: false, error: "Pick a community in the admin switcher before broadcasting." };
+  }
+  if (!message) {
+    return { ok: false, error: "Message is required." };
   }
 
-  if (!ctx.isSuperAdmin && !ctx.communities.includes(artistSlug)) {
-    return { ok: false, error: "You can only broadcast to your own artist community." };
+  // Sending to every opted-in fan is a write with real-world blast radius:
+  // minimum role admin in the target community (super-admins pass).
+  const guard = await authorizeAdmin({ communityId: artistSlug, minRole: "admin" }, ctx);
+  if (!guard.ok) {
+    return {
+      ok: false,
+      error: "Only community admins and owners can send broadcasts.",
+    };
   }
 
   let allowedFanIds: string[] | null = null;
@@ -108,6 +141,10 @@ export async function previewRecipientCount(
   tierFilter: string,
   channel: "sms" | "email" | "both",
 ): Promise<number> {
+  // Exposed as a server action, so it needs the same gate as sending.
+  const guard = await authorizeAdmin({ communityId: artistSlug, minRole: "admin" });
+  if (!guard.ok) return 0;
+
   const admin = createAdminClient();
   const optCol = channel === "email" ? "email_opted_in" : "sms_opted_in";
 

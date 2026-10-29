@@ -20,24 +20,30 @@ import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { first72hFromFanState } from "@/lib/first-72h";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { sanitizeNextPath } from "@/lib/app-url";
+import { REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
 // ─── Signed-in dashboard content ──────────────────────────────────────────
 // Signed-out visitors render <SignedOutLanding/> earlier and never see any
 // of this.
 
+// Real award amounts only. A community post is +5 (award_community_post_points)
+// plus the +25 First post badge; a daily check-in is +25 (lib/data/checkins.ts);
+// a verified referral pays the referrer REFERRAL_JOIN_POINTS.referrer.
+// Following an artist awards nothing, so it is not listed here.
 const journeyCards = [
-  { title: "Follow your first artist", points: "+25 pts" },
-  { title: "Unlock your first badge", points: "+100 pts" },
-  { title: "Invite one friend in", points: "+150 pts" },
+  { title: "Share your first community post", points: "+5 pts, +25 badge" },
+  { title: "Check in today", points: "+25 pts" },
+  { title: "Invite one friend in", points: `+${REFERRAL_JOIN_POINTS.referrer} pts` },
 ];
 
+// One action per destination — "Share referral link" and "Invite a friend"
+// both went to /referrals, so only the invite remains.
 const quickActions: { label: string; href: string }[] = [
-  { label: "Share referral link", href: "/referrals" },
+  { label: "Invite a friend", href: "/referrals" },
   {
-    label: isMarketplaceLive() ? "Browse marketplace" : "Merch — coming soon",
+    label: isMarketplaceLive() ? "Browse marketplace" : "Unlocks — coming soon",
     href: "/marketplace",
   },
   { label: "Check rewards", href: "/rewards" },
-  { label: "Invite a friend", href: "/referrals" },
 ];
 
 function formatPts(n: number | null | undefined) {
@@ -99,15 +105,18 @@ export default async function Home({
     return <SignedOutLanding artists={artists} stats={stats} />;
   }
 
-  // Signed-in path — parallel-fetch everything the dashboard needs. Each
+  // Signed-in path. The streak touch writes points, so it must finish
+  // BEFORE the balance reads (KPIs, fan-home) start — running them in the
+  // same Promise.all showed the pre-award balance on this render while
+  // every other page showed the post-award one.
+  const streak = await (fan?.id ? touchStreak(fan.id) : Promise.resolve(null)).catch(() => null);
+
+  // Then parallel-fetch everything else the dashboard needs. Each
   // gracefully returns null / empty on error so the page never breaks.
-  const [kpis, featured, tiers, streak, recap, fanHome] = await Promise.all([
+  const [kpis, featured, tiers, recap, fanHome] = await Promise.all([
     getCurrentFanKpis().catch((err) => { console.error("[home] getCurrentFanKpis failed:", err); return null; }),
     getFeaturedOffers(3).catch((err) => { console.error("[home] getFeaturedOffers failed:", err); return []; }),
     getTiers().catch((err) => { console.error("[home] getTiers failed:", err); return []; }),
-    // Touch streak before reading fan-home data so the dashboard
-    // sees the freshly-incremented streak counter on the same render.
-    (fan?.id ? touchStreak(fan.id) : Promise.resolve(null)).catch(() => null),
     // Compute the past-7-day recap for the "Your week" tile. Returns a
     // benign empty recap on error so Fan Home never blocks.
     (fan?.id ? gatherWeeklyRecap(fan.id) : Promise.resolve(null)).catch(() => null),
@@ -135,7 +144,8 @@ export default async function Home({
       delta: "",
     },
     {
-      label: "Next Reward",
+      // This is the next tier on the points ladder, not a reward.
+      label: "Next tier",
       value: kpis?.next_tier?.display_name ?? "Max tier",
       delta:
         kpis?.points_to_next_tier != null
@@ -146,6 +156,7 @@ export default async function Home({
 
   // Show a "Finish profile" nudge when signed-in users have no first_name yet.
   const needsProfile = !fan.first_name;
+  const showsDashboard = !needsProfile && fanHome !== null;
   const first72h = first72hFromFanState({
     hasProfile: Boolean(fan.first_name),
     followCount: fanHome?.followedArtists.length ?? 0,
@@ -191,13 +202,15 @@ export default async function Home({
           {/* Personalized Fan Home dashboard — only for fans past
               onboarding. Still signed-in, so the marketing landing never
               appears here. */}
-          {!needsProfile && fanHome && <FanHomeDashboard data={fanHome} streak={streak} recap={recap} totalPoints={kpis?.total_points ?? null} />}
+          {showsDashboard && fanHome && <FanHomeDashboard data={fanHome} streak={streak} recap={recap} totalPoints={kpis?.total_points ?? null} />}
           <section className="glass-card p-6">
             <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-white/60">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
                 ★
               </span>
-              {fan?.first_name ? `Welcome back, ${fan.first_name}` : "Fan Momentum"}
+              {/* The dashboard header already says "Welcome back, <name>";
+                  only greet here when that header is not rendered. */}
+              {!showsDashboard && fan?.first_name ? `Welcome back, ${fan.first_name}` : "Fan Momentum"}
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {kpiCards.map((kpi) => (

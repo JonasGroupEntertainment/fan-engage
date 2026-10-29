@@ -9,6 +9,41 @@ import {
   getFoundingFanClaimState,
   listFoundingFans,
 } from "@/lib/data/founding-fans";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { fmtPrice } from "@/lib/stripe-helpers";
+
+/**
+ * Premium pricing comes from `communities.monthly_price_cents` /
+ * `annual_price_cents` (0013). Never hardcode a price here: the page is
+ * per-artist and the columns are the source of truth Stripe is seeded from.
+ * Returns null when the community has no usable prices, and the sentence
+ * is omitted.
+ */
+function premiumPriceSentence(
+  row: { monthly_price_cents?: number | null; annual_price_cents?: number | null } | null | undefined,
+): string | null {
+  const monthly = row?.monthly_price_cents ?? 0;
+  const annual = row?.annual_price_cents ?? 0;
+  if (monthly > 0 && annual > 0) {
+    return `Premium (${fmtPrice(monthly)}/mo or ${fmtPrice(annual)}/yr) is a separate plan.`;
+  }
+  if (monthly > 0) return `Premium (${fmtPrice(monthly)}/mo) is a separate plan.`;
+  if (annual > 0) return `Premium (${fmtPrice(annual)}/yr) is a separate plan.`;
+  return null;
+}
+
+async function loadPremiumPriceSentence(slug: string): Promise<string | null> {
+  try {
+    const { data } = await createAdminClient()
+      .from("communities")
+      .select("monthly_price_cents, annual_price_cents")
+      .eq("slug", slug)
+      .maybeSingle();
+    return premiumPriceSentence(data as { monthly_price_cents: number | null; annual_price_cents: number | null } | null);
+  } catch {
+    return null;
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -52,10 +87,11 @@ export default async function FounderWallPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [artist, claim, founders] = await Promise.all([
+  const [artist, claim, founders, priceSentence] = await Promise.all([
     getArtistFromDb(slug),
     getFoundingFanClaimState(slug),
     listFoundingFans(slug),
+    loadPremiumPriceSentence(slug),
   ]);
 
   if (!artist) notFound();
@@ -87,8 +123,8 @@ export default async function FounderWallPage({
         </h1>
         <p className="mt-3 max-w-2xl text-lg text-white/80">
           Free badge for the first {founderCap} joins — numbered status and
-          1.5× points. Not a paid purchase. Premium ($10/mo or $99/yr) is a
-          separate plan.
+          1.5× points. Not a paid purchase.
+          {priceSentence ? ` ${priceSentence}` : ""}
         </p>
       </section>
 
