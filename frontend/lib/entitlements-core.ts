@@ -15,6 +15,8 @@
  * (nav + /marketplace + merch drops); the AI comment drafter unless
  * AI_DRAFTER_FREE_COMMUNITIES opens it for a community.
  */
+import { DEFAULT_COMMUNITY_SLUG } from "./community-default.ts";
+
 
 export type SubscriptionTier =
   | "free"
@@ -152,8 +154,9 @@ export function premiumPath(communityId?: string | null): string {
 /** Merch lives at /marketplace. Do not rename the route. */
 export const MERCH_PATH = "/marketplace";
 
-export function merchGuestSignupHref(): string {
-  return `/signup?ref=raelynn&next=${encodeURIComponent(MERCH_PATH)}`;
+export function merchGuestSignupHref(communityId?: string | null): string {
+  const ref = communityId || DEFAULT_COMMUNITY_SLUG;
+  return `/signup?ref=${encodeURIComponent(ref)}&next=${encodeURIComponent(MERCH_PATH)}`;
 }
 
 export function merchGuestLoginHref(): string {
@@ -178,12 +181,14 @@ export type MerchAccess = {
 export function merchAccess(viewer: {
   signedIn: boolean;
   isPremium: boolean;
+  /** Resolved community for the guest signup `ref`; defaults to the launch community. */
+  communityId?: string | null;
 }): MerchAccess {
   if (!viewer.signedIn) {
     return {
       allowed: false,
       reason: "signed-out",
-      navHref: merchGuestSignupHref(),
+      navHref: merchGuestSignupHref(viewer.communityId),
       loginHref: merchGuestLoginHref(),
     };
   }

@@ -68,7 +68,7 @@ describe("Supabase auth cookie names", () => {
 
 describe("sign-out wiring", () => {
   it("middleware skips session refresh on sign-out so cookies can be cleared", () => {
-    const middleware = readRepo("../middleware.ts");
+    const middleware = readRepo("../proxy.ts");
     assert.match(middleware, /isSignOutPath/);
     assert.match(middleware, /SIGNOUT_PATHS|isSignOutPath\(/);
   });

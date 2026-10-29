@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPortalContext } from "@/lib/artist-portal/access";
+import { fanDisplayName, type FanNameParts } from "@/lib/format/fan-name";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ async function getPortalData(communityId: string) {
 
   const [
     { count: subscriberCount },
-    { data: topFans },
-    { data: recentPosts },
+    { data: topFans, error: topFansError },
+    { count: postCount },
+    { data: recentPosts, error: recentPostsError },
     { data: nextEvents },
   ] = await Promise.all([
     // Subscriber / follower count
@@ -22,20 +24,32 @@ async function getPortalData(communityId: string) {
       .eq("community_id", communityId)
       .eq("status", "active"),
 
-    // Top 5 fans by total_points in this community
+    // Top 5 fans by LIFETIME points in this community (0085): ranking by the
+    // spendable balance would drop a fan off the list the moment they
+    // redeemed a reward. total_points is still shown as the balance.
+    // fans!inner + the is_internal filter drops staff/test accounts (0073).
+    // NB: fans has first_name/last_name, not display_name — see lib/format/fan-name.
     admin
       .from("fan_community_memberships")
-      // fans!inner + the is_internal filter drops staff/test accounts (0073).
-      .select("fan_id, total_points, current_tier, fans!inner(display_name, avatar_url, is_internal)")
+      .select(
+        "fan_id, total_points, lifetime_points, current_tier, fans!inner(first_name, last_name, avatar_url, is_internal)",
+      )
       .eq("community_id", communityId)
       .eq("fans.is_internal", false)
+      .order("lifetime_points", { ascending: false })
       .order("total_points", { ascending: false })
       .limit(5),
+
+    // Total post count in this community (the KPI tile).
+    admin
+      .from("community_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("artist_slug", communityId),
 
     // Recent 3 posts in this community (artist_slug = communityId)
     admin
       .from("community_posts")
-      .select("id, title, body, created_at, author_id, fans(display_name)")
+      .select("id, title, body, created_at, author_id, fans(first_name, last_name)")
       .eq("artist_slug", communityId)
       .order("created_at", { ascending: false })
       .limit(3),
@@ -50,9 +64,15 @@ async function getPortalData(communityId: string) {
       .limit(3),
   ]);
 
+  // A rejected select used to fail silently and render "No fans yet" for a
+  // live community. Surface it in the server log so it cannot hide again.
+  if (topFansError) console.error("[artist-portal] top fans query failed", topFansError);
+  if (recentPostsError) console.error("[artist-portal] recent posts query failed", recentPostsError);
+
   return {
     subscriberCount: subscriberCount ?? 0,
     topFans: topFans ?? [],
+    postCount: postCount ?? 0,
     recentPosts: recentPosts ?? [],
     nextEvents: nextEvents ?? [],
   };
@@ -99,7 +119,7 @@ export default async function ArtistPortalDashboardPage() {
     .eq("slug", ctx.communityId)
     .maybeSingle();
 
-  const { subscriberCount, topFans, recentPosts, nextEvents } =
+  const { subscriberCount, topFans, postCount, recentPosts, nextEvents } =
     await getPortalData(ctx.communityId);
 
   return (
@@ -129,8 +149,8 @@ export default async function ArtistPortalDashboardPage() {
           <p className="text-xs uppercase tracking-wide text-white/50">
             Posts
           </p>
-          <p className="mt-2 text-4xl font-semibold">{recentPosts.length}</p>
-          <p className="mt-1 text-xs text-white/50">shown: last 3</p>
+          <p className="mt-2 text-4xl font-semibold">{postCount}</p>
+          <p className="mt-1 text-xs text-white/50">last 3 shown</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
           <p className="text-xs uppercase tracking-wide text-white/50">
@@ -152,21 +172,30 @@ export default async function ArtistPortalDashboardPage() {
           ) : (
             <ol className="space-y-3">
               {topFans.map((f, i) => {
-                const fan = (f.fans as unknown) as { display_name: string | null; avatar_url: string | null } | null;
+                const fan = (f.fans as unknown) as
+                  | (FanNameParts & { avatar_url: string | null })
+                  | null;
+                const name = fanDisplayName(fan, "Anonymous");
+                const balance = (f.total_points as number | null) ?? 0;
+                const lifetime = Math.max(
+                  (f.lifetime_points as number | null) ?? 0,
+                  balance,
+                );
                 return (
                   <li key={f.fan_id} className="flex items-center gap-3">
                     <span className="w-6 shrink-0 text-xs text-white/50">
                       {i + 1}.
                     </span>
                     <div className="h-8 w-8 shrink-0 rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-xs text-white/50">
-                      {fan?.display_name?.[0]?.toUpperCase() ?? "?"}
+                      {name[0]?.toUpperCase() ?? "?"}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-white">
-                        {fan?.display_name ?? "Anonymous"}
+                        {name}
                       </p>
                       <p className="text-xs text-white/50">
-                        {f.total_points.toLocaleString()} pts · {f.current_tier}
+                        {lifetime.toLocaleString()} lifetime ·{" "}
+                        {balance.toLocaleString()} balance · {f.current_tier}
                       </p>
                     </div>
                   </li>
@@ -186,7 +215,7 @@ export default async function ArtistPortalDashboardPage() {
           ) : (
             <ul className="space-y-4">
               {recentPosts.map((p) => {
-                const author = (p.fans as unknown) as { display_name: string | null } | null;
+                const author = (p.fans as unknown) as FanNameParts | null;
                 return (
                   <li key={p.id} className="border-b border-white/5 pb-4 last:border-0 last:pb-0">
                     {p.title && (
@@ -198,7 +227,7 @@ export default async function ArtistPortalDashboardPage() {
                       {p.body}
                     </p>
                     <p className="mt-1 text-xs text-white/50">
-                      by {author?.display_name ?? "Unknown"} ·{" "}
+                      by {fanDisplayName(author, "Unknown")} ·{" "}
                       {new Date(p.created_at as string).toLocaleDateString()}
                     </p>
                   </li>

@@ -3,6 +3,7 @@ import {
   getCommentsByPost,
   getPollData,
   getPostsByArtist,
+  getTeamAuthoredPostIds,
 } from "@/lib/data/community";
 import { getCurrentFan } from "@/lib/data/fan";
 import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
@@ -46,11 +47,12 @@ export default async function ArtistHubRoom({
 
   const posts = await getPostsByArtist(artistSlug, 8);
   const visible = posts.slice(0, 4);
-  const [commentsByPost, pollByPost] = await Promise.all([
+  const [commentsByPost, pollByPost, teamPostIds] = await Promise.all([
     Promise.all(visible.map((p) => getCommentsByPost(p.id))),
     Promise.all(
       visible.map((p) => (p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null))),
     ),
+    getTeamAuthoredPostIds(artistSlug, visible),
   ]);
 
   const hasPoll = visible.some((p) => p.kind === "poll");
@@ -90,6 +92,7 @@ export default async function ArtistHubRoom({
               currentUserId={fan.id}
               canReply={canWrite}
               canReact={canWrite}
+              teamByline={teamPostIds.has(post.id) ? artistName : null}
               poll={pollByPost[i]}
             />
           ))}

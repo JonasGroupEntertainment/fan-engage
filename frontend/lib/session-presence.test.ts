@@ -248,7 +248,7 @@ describe("signedInLoginRedirectPath", () => {
 
 describe("onboarding + middleware honor session cookies", () => {
   it("middleware uses shouldRedirectGuestFromOnboarding instead of bare !user", () => {
-    const middleware = readRepo("../middleware.ts");
+    const middleware = readRepo("../proxy.ts");
     assert.match(middleware, /shouldRedirectGuestFromOnboarding/);
     assert.match(middleware, /request\.cookies\.getAll\(\)/);
   });

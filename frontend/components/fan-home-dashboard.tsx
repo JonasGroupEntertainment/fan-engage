@@ -28,8 +28,9 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
     founderCommunities,
   } = data;
 
-  // Pick the first community for the rewards link (or fallback)
-  const primaryCommunity = followedArtists[0]?.slug || "raelynn";
+  // Resolved in getFanHomeData: host community if followed, else first
+  // followed artist, else host/default. Never a hard-coded artist.
+  const primaryCommunity = data.primaryCommunity;
 
   return (
     <section className="space-y-6">

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { awardPoints } from "@/lib/points/award";
+import { DEFAULT_COMMUNITY_SLUG } from "@/lib/community-default";
 
 /**
  * Daily streak touch — call once per Fan Home render.
@@ -210,12 +211,14 @@ export async function touchStreak(
 
     // 3. Award the badge if a milestone was hit. Table is `fan_badges`
     //    (verified against FE Supabase schema) with columns:
-    //    fan_id, badge_slug, earned_at, community_id (NOT NULL, default 'raelynn').
+    //    fan_id, badge_slug, earned_at, community_id (NOT NULL; the SQL
+    //    default is the launch community).
     //    Streak badges are platform-level, but the column requires a value
     //    so we use the fan's first followed community if known, else fall
     //    back to the seed default. Idempotent on (fan_id, badge_slug).
     if (milestoneHit) {
-      // Try to use the fan's first followed community, fallback to 'raelynn'.
+      // Try to use the fan's first followed community, fallback to the
+      // configured default community.
       const { data: firstFollow } = await admin
         .from("fan_artist_following")
         .select("artist_slug")
@@ -224,7 +227,7 @@ export async function touchStreak(
         .limit(1)
         .maybeSingle();
       const communityId =
-        (firstFollow?.artist_slug as string | undefined) ?? "raelynn";
+        (firstFollow?.artist_slug as string | undefined) ?? DEFAULT_COMMUNITY_SLUG;
 
       await admin
         .from("fan_badges")

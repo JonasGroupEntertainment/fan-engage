@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { safeAppPath } from "@/lib/safe-app-path";
+import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
+import { resolveOnboardArtist, withArtistParam } from "@/lib/onboarding/artist-param";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { first72hFromFanState } from "@/lib/first-72h";
 import { onboardingClientGate } from "@/lib/session-presence";
@@ -32,6 +34,9 @@ type Field = {
 
 const GENERIC_FINISH_ERROR =
   "Could not save your profile. Refresh this page and try again.";
+
+/** Server-validated `?artist=<slug>` (active row in public.artists). */
+export type LockedArtist = { slug: string; name: string };
 
 const MUSIC_OUTLET_OPTIONS = [
   "Spotify",
@@ -119,12 +124,19 @@ export default function OnboardingWizard({
   initialPhone = "",
   initialSmsConsent = false,
   sessionConfirmed = false,
+  lockedArtist = null,
 }: {
   initialEmail?: string;
   initialPhone?: string;
   /** True when this fan already opted in (for example on the public signup form). */
   initialSmsConsent?: boolean;
   sessionConfirmed?: boolean;
+  /**
+   * Artist the fan is joining, from a validated `?artist=<slug>`. When set it
+   * wins over `?ref=` for the community join; `?ref=` still carries the
+   * referrer's code. Null keeps the previous ref / RaeLynn behaviour.
+   */
+  lockedArtist?: LockedArtist | null;
 }) {
   const router = useRouter();
   // Server page already confirmed a session and passed the email. Starting
@@ -173,15 +185,21 @@ export default function OnboardingWizard({
     const rawNext = searchParams.get("next");
     const next = safeAppPath(rawNext) ?? "/onboarding";
     const ref = searchParams.get("ref");
+    const artistSlug = lockedArtist?.slug ?? null;
     const signupParams = new URLSearchParams({ next });
     if (ref) signupParams.set("ref", ref);
-    else signupParams.set("ref", "raelynn");
+    else signupParams.set("ref", artistSlug ?? LAUNCH_COMMUNITY_ID);
+    if (artistSlug) signupParams.set("artist", artistSlug);
     setSignupHref(`/signup?${signupParams.toString()}`);
+    const onboardingReturn =
+      next === "/onboarding" && ref
+        ? `/onboarding?ref=${encodeURIComponent(ref)}`
+        : next;
     setLoginHref(
       `/login?next=${encodeURIComponent(
-        next === "/onboarding" && ref
-          ? `/onboarding?ref=${encodeURIComponent(ref)}`
-          : next,
+        next === "/onboarding"
+          ? withArtistParam(onboardingReturn, artistSlug)
+          : onboardingReturn,
       )}`,
     );
 
@@ -198,7 +216,7 @@ export default function OnboardingWizard({
         }),
       );
     });
-  }, [initialEmail, serverConfirmed]);
+  }, [initialEmail, serverConfirmed, lockedArtist]);
 
   const handleInput = (name: string, value: string) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
@@ -281,6 +299,13 @@ export default function OnboardingWizard({
    */
   const buildOnboardBody = () => {
     const { refFromUrl, refCode } = readRefCodes();
+    // ?artist= (validated server-side) picks the community; ?ref= stays the
+    // referrer's code (and, on older Join-CTA links, the artist slug).
+    const { slug: communitySlug } = resolveOnboardArtist({
+      lockedArtist: lockedArtist?.slug,
+      refFromUrl,
+      defaultSlug: LAUNCH_COMMUNITY_ID,
+    });
     const textsConsented = hasSendablePhone(formState.phone) && smsConsent;
     return JSON.stringify({
       firstName: formState.firstName,
@@ -290,7 +315,7 @@ export default function OnboardingWizard({
       musicOutlet: resolveMusicOutlet(),
       interest: formState.interest,
       referralCode: refCode,
-      communitySlug: refFromUrl || "raelynn",
+      communitySlug,
       smsOptedIn: textsConsented,
       smsConsent: textsConsented,
       emailOptedIn: Boolean(formState.email),
@@ -498,6 +523,20 @@ export default function OnboardingWizard({
           </div>
 
           <div className="mt-8 space-y-6">
+            {lockedArtist && (
+              <div
+                data-testid="onboarding-locked-artist"
+                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+              >
+                <Star className="shrink-0 text-amber-300" size={16} />
+                <p className="text-white/80">
+                  You&apos;re joining{" "}
+                  <span className="font-semibold text-white">{lockedArtist.name}</span>
+                  &apos;s Fan Experience. Finish these steps to follow {lockedArtist.name} and
+                  claim your first points.
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-sm uppercase tracking-wide text-white/60">Step {stepIndex + 1}</p>
               <h1 className="mt-2 text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>

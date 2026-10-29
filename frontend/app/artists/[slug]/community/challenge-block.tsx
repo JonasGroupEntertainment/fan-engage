@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
 import type { ChallengeEntry } from "@/lib/data/types";
 import { submitEntryAction } from "./actions";
+import { pushPointsToast } from "@/components/points-toast";
 
 function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
@@ -44,7 +45,7 @@ export default function ChallengeBlock({
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
     try {
-      await submitEntryAction(formData);
+      pushPointsToast(await submitEntryAction(formData));
       formRef.current?.reset();
       setUploaderKey((k) => k + 1);
       setOpen(false);

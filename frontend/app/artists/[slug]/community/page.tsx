@@ -11,6 +11,7 @@ import {
   getCommentsByPost,
   getPollData,
   getPostsByArtist,
+  getTeamAuthoredPostIds,
   getTopTagsForArtist,
 } from "@/lib/data/community";
 import { canAccess, canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
@@ -27,6 +28,7 @@ import NewPostForm from "./new-post-form";
 import PostCard from "./post-card";
 import TagFilterChips from "./tag-filter-chips";
 import PickedForYou from "@/components/personal/picked-for-you";
+import PointsToastHost from "@/components/points-toast";
 
 export async function generateStaticParams() {
   return listArtists().map((a) => ({ slug: a.slug }));
@@ -74,7 +76,7 @@ export default async function ArtistCommunityPage({
   // Parallel-fetch comments + poll data + challenge entries for every visible
   // post so the feed renders in one round-trip. Fine at MVP scale; when post
   // counts per page get big we'll switch to on-expand fetching.
-  const [commentsByPost, pollByPost, entriesByPost] = await Promise.all([
+  const [commentsByPost, pollByPost, entriesByPost, teamPostIds] = await Promise.all([
     Promise.all(posts.map((p) => getCommentsByPost(p.id))),
     Promise.all(
       posts.map((p) => (p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null))),
@@ -84,6 +86,8 @@ export default async function ArtistCommunityPage({
         p.kind === "challenge" ? getChallengeEntries(p.id) : Promise.resolve([]),
       ),
     ),
+    // One batched admin_users lookup for the artist/team byline.
+    getTeamAuthoredPostIds(slug, posts),
   ]);
 
   const isSignedIn = fan !== null;
@@ -103,6 +107,8 @@ export default async function ArtistCommunityPage({
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+      {/* "+10 pts · 1,569 to Gold" after reactions, replies, votes, entries, posts. */}
+      <PointsToastHost />
 
       {fan?.id && (
         <PickedForYou fanId={fan.id} artistSlug={slug} />
@@ -246,6 +252,7 @@ export default async function ArtistCommunityPage({
                 currentUserId={fan?.id ?? null}
                 canReply={canEngage}
                 canReact={canEngage}
+                teamByline={teamPostIds.has(post.id) ? artist.name : null}
                 poll={pollByPost[i]}
                 challengeEntries={entriesByPost[i]}
               />

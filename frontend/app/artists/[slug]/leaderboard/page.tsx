@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { gatherArtistLeaderboard } from "@/lib/leaderboard/gather";
 import { isPublicLeaderboardHonest } from "@/lib/leaderboard/honesty";
+import { scoreLegend } from "@/lib/leaderboard/score";
 import LeaderboardPodium from "@/components/leaderboard-podium";
 import LeaderboardList from "@/components/leaderboard-list";
 import ShareButton from "@/components/share-button";
@@ -83,8 +84,8 @@ export default async function LeaderboardPage({
           <p className="text-base font-medium text-white">Leaderboard warming up</p>
           <p className="mt-1 text-sm text-white/55">
             We hide a near-empty board instead of showing one quiet score as
-            social proof. React, comment, or RSVP and it will open when the
-            room has real activity.
+            social proof. Check in, RSVP, share, post, comment, or react and
+            it will open when the room has real activity.
           </p>
         </div>
       ) : (
@@ -147,10 +148,10 @@ export default async function LeaderboardPage({
           How points are scored
         </p>
         <p className="mt-2 leading-relaxed">
-          1 pt per reaction · 3 pts per comment · 5 pts per RSVP · 10 pts per
-          redemption. Counts cap monthly — the chart resets at midnight UTC on
-          the 1st of each month. Only activity inside this artist&apos;s
-          community counts toward this leaderboard.
+          {scoreLegend()}. Redeeming rewards never moves your rank. Counts
+          cap monthly — the chart resets at midnight UTC on the 1st of each
+          month. Only activity inside this artist&apos;s community counts
+          toward this leaderboard.
         </p>
       </footer>
     </div>

@@ -68,6 +68,7 @@ export default async function ArtistPortalLayout({
     { href: "/artist-portal/events", label: "Events", surface: "events" },
     { href: "/artist-portal/community", label: "Community", surface: "community" },
     { href: "/artist-portal/redemptions", label: "Redemptions", surface: "redemptions" },
+    { href: "/artist-portal/checkin-qr", label: "Check-in QR", surface: "checkinQr" },
     { href: "/artist-portal/leaderboard", label: "Leaderboard", surface: "leaderboard" },
     { href: "/artist-portal/payouts", label: "Revenue", surface: "revenue" },
     { href: "/artist-portal/team", label: "Team", surface: "team" },

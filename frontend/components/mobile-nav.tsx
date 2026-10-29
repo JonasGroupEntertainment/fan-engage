@@ -12,13 +12,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { DEFAULT_COMMUNITY_SLUG, communitySignupHref } from "@/lib/community-default";
 
 export function MobileNav({
   navItems,
   isSignedIn = false,
+  joinHref = communitySignupHref(DEFAULT_COMMUNITY_SLUG),
 }: {
   navItems: { href: string; label: string }[];
   isSignedIn?: boolean;
+  /** Guest "Join" target — the layout passes the hostname community's signup door. */
+  joinHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -107,7 +111,7 @@ export function MobileNav({
                   Sign in
                 </Link>
                 <Link
-                  href="/signup?ref=raelynn"
+                  href={joinHref}
                   onClick={() => setOpen(false)}
                   className="flex-1 rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-center text-sm font-semibold text-white shadow-glass"
                 >

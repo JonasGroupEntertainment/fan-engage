@@ -82,7 +82,9 @@ describe("founder wall prices come from the community row", () => {
 describe("event_rsvps / fan_artist_following column names", () => {
   it("leaderboard gather filters event_rsvps on rsvp_at", () => {
     const src = readRepo("./leaderboard/gather.ts");
-    const rsvpBlock = src.slice(src.indexOf('from("event_rsvps")'), src.indexOf("redemptionsPromise"));
+    // Sprint 2 dropped redemptionsPromise (redemptions no longer score);
+    // the RSVP block now ends where the posts query starts.
+    const rsvpBlock = src.slice(src.indexOf('from("event_rsvps")'), src.indexOf("postsThisMonthPromise"));
     assert.match(rsvpBlock, /\.gte\("rsvp_at", monthStartIso\)/);
     assert.match(rsvpBlock, /\.lt\("rsvp_at", nextMonthIso\)/);
     assert.doesNotMatch(rsvpBlock, /\.(gte|lt)\("created_at"/);

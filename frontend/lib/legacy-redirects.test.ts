@@ -92,7 +92,7 @@ describe("signup and events aliases", () => {
 
   it("runs in middleware before auth and before the missing-Supabase early return", () => {
     const middleware = readFileSync(
-      fileURLToPath(new URL("../middleware.ts", import.meta.url)),
+      fileURLToPath(new URL("../proxy.ts", import.meta.url)),
       "utf8",
     );
     const legacyAt = middleware.indexOf("legacyGuestRedirect(");

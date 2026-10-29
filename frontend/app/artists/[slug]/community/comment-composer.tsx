@@ -27,6 +27,7 @@
 import { useState, useRef, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { addCommentAction } from "./actions";
+import { withPointsToast } from "@/components/points-toast";
 
 interface Props {
   postId: string;
@@ -149,7 +150,7 @@ export default function CommentComposer({ postId, artistSlug }: Props) {
       )}
 
       <form
-        action={addCommentAction}
+        action={withPointsToast(addCommentAction)}
         onSubmit={handleSubmit}
         className="flex items-start gap-2"
       >

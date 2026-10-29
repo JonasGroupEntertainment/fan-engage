@@ -31,11 +31,11 @@ const KIND_COLOR: Record<CardKind, string> = {
 };
 
 /**
- * <LatestStrip slug="raelynn" />  (FE)
- * <LatestStrip slug="nellies" />   (BEP)
+ * <LatestStrip slug={artist.slug} /> — pass the route / resolved community.
  *
  * Repo-agnostic: tries FE table names first (artist_events, etc.),
- * then BEP names (brand_events, etc.). Whichever returns rows wins.
+ * then the sister product's names (brand_events, etc.). Whichever returns
+ * rows wins, so the same file ports to Brand Engage Pro unchanged.
  */
 export async function LatestStrip({ slug }: { slug: string }) {
   const { cards, snapshotTime } = await collect(slug);

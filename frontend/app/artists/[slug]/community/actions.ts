@@ -12,12 +12,24 @@ import { notifyNewPost } from "@/lib/notifications/triggers/new-post";
 import { notifyCommentOnMyPost } from "@/lib/notifications/triggers/comment-on-my-post";
 
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
+import { withPointsProgress } from "@/lib/points/lifetime";
+import type { PointsProgress } from "@/lib/points/progress";
 import {
   premiumPath,
   requirePremiumFeature,
   type PremiumV1Feature,
 } from "@/lib/entitlements";
 type Visibility = "public" | "premium" | "founder-only";
+
+/**
+ * Return shape for the fan-facing actions that can earn points. Additive:
+ * these actions used to resolve to `undefined`, and still do on validation
+ * early-returns. On success they resolve to `{ pointsAwarded, lifetimePoints,
+ * nextTier }` so the client can show "+10 pts · 1,569 to Gold"
+ * (components/points-toast.tsx). Points themselves are still awarded by the
+ * SQL triggers — see lib/points/lifetime.ts.
+ */
+export type PointsActionResult = PointsProgress | undefined;
 
 async function requireUser() {
   const supabase = await createClient();
@@ -58,7 +70,7 @@ function normalizeUrl(urlRaw: string): string | null {
   return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
-export async function createPostAction(formData: FormData) {
+export async function createPostAction(formData: FormData): Promise<PointsActionResult> {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
 
@@ -88,18 +100,23 @@ export async function createPostAction(formData: FormData) {
 
   // tags is NOT NULL default '{}' in the DB — an explicit null here fails the
   // constraint and silently killed every fan post, so always send an array.
-  const { data: created, error: insertErr } = await supabase
-    .from("community_posts").insert({
-      artist_slug: artistSlug,
-      author_id: userId,
-      kind: "post",
-      body,
-      image_url: imageUrl,
-      video_url: videoUrl,
-      video_poster_url: videoPosterUrl,
-      caption_used: captionUsed, tags: aiSuggestedTags.slice(0, 6), image_alt: imageAlt})
-    .select("id")
-    .single();
+  const {
+    result: { data: created, error: insertErr },
+    progress,
+  } = await withPointsProgress(userId, () =>
+    supabase
+      .from("community_posts").insert({
+        artist_slug: artistSlug,
+        author_id: userId,
+        kind: "post",
+        body,
+        image_url: imageUrl,
+        video_url: videoUrl,
+        video_poster_url: videoPosterUrl,
+        caption_used: captionUsed, tags: aiSuggestedTags.slice(0, 6), image_alt: imageAlt})
+      .select("id")
+      .single(),
+  );
   if (insertErr) {
     console.error("[community] post insert failed", insertErr);
     throw new Error("Your post couldn't be saved. Please try again.");
@@ -131,9 +148,10 @@ export async function createPostAction(formData: FormData) {
 
   revalidatePath(`/artists/${artistSlug}/community`);
   revalidatePath(`/artists/${artistSlug}`);
+  return progress;
 }
 
-export async function toggleReactionAction(formData: FormData) {
+export async function toggleReactionAction(formData: FormData): Promise<PointsActionResult> {
   const postId = String(formData.get("post_id") ?? "");
   const emoji = String(formData.get("emoji") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
@@ -158,18 +176,23 @@ export async function toggleReactionAction(formData: FormData) {
       .eq("post_id", postId)
       .eq("fan_id", userId)
       .eq("emoji", emoji);
-  } else {
-    await supabase.from("community_reactions").insert({
+    revalidatePath(`/artists/${artistSlug}/community`);
+    return undefined; // un-reacting never earns points — no toast
+  }
+
+  const { progress } = await withPointsProgress(userId, () =>
+    supabase.from("community_reactions").insert({
       post_id: postId,
       fan_id: userId,
       emoji,
-    });
-  }
+    }),
+  );
 
   revalidatePath(`/artists/${artistSlug}/community`);
+  return progress;
 }
 
-export async function addCommentAction(formData: FormData) {
+export async function addCommentAction(formData: FormData): Promise<PointsActionResult> {
   const postId = String(formData.get("post_id") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
   const body = String(formData.get("body") ?? "").trim();
@@ -183,16 +206,21 @@ export async function addCommentAction(formData: FormData) {
   // posting. False otherwise. Default to false on absent / unparseable.
   const draftUsed = String(formData.get("draft_used") ?? "0") === "1";
 
-  const { data: created } = await supabase
-    .from("community_comments")
-    .insert({
-      post_id: postId,
-      author_id: userId,
-      body,
-      draft_used: draftUsed,
-    })
-    .select("id")
-    .single();
+  const {
+    result: { data: created },
+    progress,
+  } = await withPointsProgress(userId, () =>
+    supabase
+      .from("community_comments")
+      .insert({
+        post_id: postId,
+        author_id: userId,
+        body,
+        draft_used: draftUsed,
+      })
+      .select("id")
+      .single(),
+  );
 
   if (created) indexRowAsync("community_comments", created.id);
   if (created) moderateRowAsync("community_comments", created.id);
@@ -206,6 +234,7 @@ export async function addCommentAction(formData: FormData) {
   }
 
   revalidatePath(`/artists/${artistSlug}/community`);
+  return progress;
 }
 
 export async function deletePostAction(formData: FormData) {
@@ -282,7 +311,7 @@ export async function createPollAction(formData: FormData) {
   revalidatePath(`/artists/${artistSlug}/community`);
 }
 
-export async function votePollAction(formData: FormData) {
+export async function votePollAction(formData: FormData): Promise<PointsActionResult> {
   const postId = String(formData.get("post_id") ?? "");
   const optionId = String(formData.get("option_id") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
@@ -297,13 +326,16 @@ export async function votePollAction(formData: FormData) {
     .eq("post_id", postId)
     .eq("fan_id", userId);
 
-  await supabase.from("community_poll_votes").insert({
-    post_id: postId,
-    fan_id: userId,
-    option_id: optionId,
-  });
+  const { progress } = await withPointsProgress(userId, () =>
+    supabase.from("community_poll_votes").insert({
+      post_id: postId,
+      fan_id: userId,
+      option_id: optionId,
+    }),
+  );
 
   revalidatePath(`/artists/${artistSlug}/community`);
+  return progress;
 }
 
 // ─── Phase 2a: challenges ─────────────────────────────────────────────────
@@ -339,7 +371,7 @@ export async function createChallengeAction(formData: FormData) {
   revalidatePath(`/artists/${artistSlug}/community`);
 }
 
-export async function submitEntryAction(formData: FormData) {
+export async function submitEntryAction(formData: FormData): Promise<PointsActionResult> {
   const postId = String(formData.get("post_id") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
   const body = String(formData.get("body") ?? "").trim();
@@ -349,14 +381,17 @@ export async function submitEntryAction(formData: FormData) {
   const { supabase, userId } = await requireUser();
   const imageUrl = normalizeUrl(imageUrlRaw);
 
-  await supabase.from("community_challenge_entries").insert({
-    post_id: postId,
-    fan_id: userId,
-    body: body || null,
-    image_url: imageUrl,
-  });
+  const { progress } = await withPointsProgress(userId, () =>
+    supabase.from("community_challenge_entries").insert({
+      post_id: postId,
+      fan_id: userId,
+      body: body || null,
+      image_url: imageUrl,
+    }),
+  );
 
   revalidatePath(`/artists/${artistSlug}/community`);
+  return progress;
 }
 
 // ─── Phase 2a: announcements ──────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
@@ -109,9 +110,12 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
 /**
  * Fetch a single artist with their active events. Falls back to the
  * hardcoded ARTISTS map when Supabase is unreachable or the row is missing
- * — so dev previews without DB creds still render.
+ * — so dev previews without DB creds still render. Wrapped in React.cache
+ * so one request (hub layout + page + widgets) runs the query once.
  */
-export async function getArtistFromDb(slug: string): Promise<Artist | null> {
+export const getArtistFromDb = cache(async function getArtistFromDb(
+  slug: string,
+): Promise<Artist | null> {
   const normalized = slug.toLowerCase();
   // Unpublished hubs 404. Do not fall through to the placeholder bios.
   if (isUnpublishedArtistSlug(normalized)) return null;
@@ -144,7 +148,7 @@ export async function getArtistFromDb(slug: string): Promise<Artist | null> {
   } catch {
     return FALLBACK_ARTISTS[normalized] ?? null;
   }
-}
+});
 
 /** List every active artist with their events. */
 export async function listArtistsFromDb(): Promise<Artist[]> {

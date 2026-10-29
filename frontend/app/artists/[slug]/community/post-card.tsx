@@ -17,6 +17,7 @@ import {
 import PollBlock from "./poll-block";
 import ChallengeBlock from "./challenge-block";
 import { relativeTime } from "@/lib/format/relative-time";
+import { withPointsToast } from "@/components/points-toast";
 
 const REACTION_SET = ["❤️", "🔥", "👏", "💯", "😂"] as const;
 
@@ -45,6 +46,40 @@ function KindBadge({ kind }: { kind: CommunityPost["kind"] }) {
   return null;
 }
 
+/**
+ * Artist / team byline. Announcements read as the artist ("RaeLynn");
+ * team-grant posts of any other kind read as "RaeLynn's team". Both carry
+ * the accent-gradient chip so fans can tell official posts from fan posts
+ * at a glance. Fan posts keep the author's first name.
+ */
+function AuthorByline({
+  post,
+  teamByline,
+}: {
+  post: CommunityPost;
+  teamByline: string | null;
+}) {
+  if (!teamByline) {
+    return (
+      <p className="text-sm font-semibold">
+        {post.author_first_name ?? "Anonymous fan"}
+      </p>
+    );
+  }
+  const name = post.kind === "announcement" ? teamByline : `${teamByline}'s team`;
+  return (
+    <p className="flex items-center gap-2 text-sm font-semibold">
+      <span>{name}</span>
+      <span
+        title={`Official post from ${teamByline}'s team`}
+        className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-aurora to-ember px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-glass"
+      >
+        <span aria-hidden>✓</span> Artist
+      </span>
+    </p>
+  );
+}
+
 export default function PostCard({
   post,
   initialComments,
@@ -53,6 +88,7 @@ export default function PostCard({
   currentUserId,
   canReply = false,
   canReact = false,
+  teamByline = null,
   poll,
   challengeEntries,
 }: {
@@ -63,6 +99,8 @@ export default function PostCard({
   currentUserId: string | null;
   canReply?: boolean;
   canReact?: boolean;
+  /** Artist display name when the post is team-authored (see getTeamAuthoredPostIds); null for fan posts. */
+  teamByline?: string | null;
   poll?: PollData | null;
   challengeEntries?: ChallengeEntry[];
 }) {
@@ -103,9 +141,7 @@ export default function PostCard({
       <header className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold">
-              {post.author_first_name ?? "Anonymous fan"}
-            </p>
+            <AuthorByline post={post} teamByline={teamByline} />
             <KindBadge kind={post.kind} />
           </div>
           <p className="text-xs text-white/50">{relativeTime(post.created_at)}</p>
@@ -220,7 +256,7 @@ export default function PostCard({
             );
           }
           return (
-            <form key={emoji} action={toggleReactionAction}>
+            <form key={emoji} action={withPointsToast(toggleReactionAction)}>
               <input type="hidden" name="post_id" value={post.id} />
               <input type="hidden" name="artist_slug" value={post.artist_slug} />
               <input type="hidden" name="emoji" value={emoji} />

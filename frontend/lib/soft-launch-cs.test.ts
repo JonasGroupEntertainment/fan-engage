@@ -29,7 +29,9 @@ describe("soft-launch CS: guest copy and honesty", () => {
     }
     assert.match(guestSurfaces.homepage, /Create your fan profile/);
     assert.match(guestSurfaces.foundingBlock, /Claim your Founding badge/);
-    assert.match(guestSurfaces.foundingBlock, /href="\/signup\?ref=raelynn"/);
+    // Signup door is the hostname community's (DEFAULT_COMMUNITY_SLUG on the
+    // apex), never a hard-coded artist.
+    assert.match(guestSurfaces.foundingBlock, /href=\{communitySignupHref\(stats\.communityId\)\}/);
     assert.match(guestSurfaces.community, /Create your fan profile/);
     assert.match(guestSurfaces.artistPage, /Create your fan profile/);
     assert.match(guestSurfaces.foundingBlock, /Founding Fans/);

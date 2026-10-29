@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
+import { isTeamAuthored } from "@/lib/notifications/triggers/new-post";
 import type {
   ChallengeEntry,
   CommunityComment,
@@ -7,6 +9,42 @@ import type {
   PollData,
   PollOption,
 } from "./types";
+
+/**
+ * Which of these posts were written by the artist / their team?
+ *
+ * Same rule as the new-post notification (`isTeamAuthored` in
+ * lib/notifications/triggers/new-post.ts): announcements are always the
+ * artist's voice, and a plain post is the team's when its author holds an
+ * `admin_users` grant for this community (or `*`). One query for the whole
+ * page — never per post. Admin client because `admin_users` is not readable
+ * through the fan's RLS key.
+ */
+export async function getTeamAuthoredPostIds(
+  artistSlug: string,
+  posts: ReadonlyArray<Pick<CommunityPost, "id" | "author_id" | "kind">>,
+): Promise<Set<string>> {
+  const team = new Set<string>();
+  if (posts.length === 0) return team;
+  const authorIds = [...new Set(posts.map((p) => p.author_id))];
+  let granted = new Set<string>();
+  try {
+    const { data } = await createAdminClient()
+      .from("admin_users")
+      .select("user_id")
+      .in("user_id", authorIds)
+      .in("community_id", [artistSlug, "*"]);
+    granted = new Set((data ?? []).map((r) => r.user_id as string));
+  } catch {
+    // Grant lookup failed — announcements still get the artist byline.
+  }
+  for (const p of posts) {
+    if (isTeamAuthored({ kind: p.kind, hasTeamGrant: granted.has(p.author_id) })) {
+      team.add(p.id);
+    }
+  }
+  return team;
+}
 
 /**
  * Fetches the community feed for one artist, newest first with pinned

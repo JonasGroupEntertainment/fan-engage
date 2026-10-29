@@ -4,20 +4,21 @@
  * row, and most points come from cross-cutting events (signup bonus,
  * streak bonuses) that wouldn't make sense to attribute to one artist.
  *
- * Activity score weights (V1):
- *   reactions placed:       1 pt
- *   comments posted:        3 pts
- *   RSVPs added:            5 pts
- *   reward redemptions:    10 pts
+ * Activity score weights live in `./score.ts` (SCORE_WEIGHTS) — that is
+ * the single source of truth; the page legend is rendered from it.
  *
- * Rationale: comments take more effort than reactions, RSVPs imply
- * intent to show up, redemptions burn points (ultimate signal of
- * engagement). Tunable in the gather module without schema impact.
+ *   check-ins:   5 pts
+ *   RSVPs:       5 pts
+ *   shares:      3 pts
+ *   posts:       3 pts
+ *   comments:    2 pts
+ *   reactions:   1 pt
+ *   redemptions: 0 — spending points no longer moves the chart.
  */
 
 export interface LeaderboardEntry {
   fan_id: string;
-  rank: number;            // 1-based; ties resolved by earliest activity timestamp
+  rank: number;            // 1-based; ties resolved by fan id for stability
   display_name: string;
   avatar_url: string | null;
   /** Public profile slug for linking to /fans/[slug]; null if the fan has opted out. */
@@ -27,8 +28,10 @@ export interface LeaderboardEntry {
   /** Activity breakdown — useful for the "what counts" tooltip on the page. */
   reactions: number;
   comments: number;
+  posts: number;
+  shares: number;
   rsvps: number;
-  redemptions: number;
+  checkins: number;
 }
 
 export interface ArtistMonthlyLeaderboard {

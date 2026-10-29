@@ -6,7 +6,9 @@ import { listRsvpsForEvent } from "@/lib/data/events";
 import ArtistEditForm from "./edit-form";
 import CreateEventForm from "./create-event-form";
 import EditableEventRow from "./editable-event-row";
-import CheckinQrCard from "@/components/checkin-qr-card";
+import CheckinQr from "@/app/artist-portal/checkin-qr/checkin-qr";
+import { mintCheckinToken } from "@/lib/checkin-token";
+import { APP_URL } from "@/lib/app-url";
 import {
   deleteEventAction,
   sendReminderNowAction,
@@ -242,10 +244,24 @@ export default async function AdminArtistEditPage({
       </section>
 
       {/* Check-in QR — print or display at the venue / merch table */}
-      <CheckinQrCard
-        artistSlug={artist.slug as string}
-        artistName={artist.name as string}
-      />
+      {/* Same live component as /artist-portal/checkin-qr: rotates when
+          CHECKIN_TOKEN_SECRET is set, static (printable) when it is not.
+          Super-admins may mint for any artist (api/admin/checkin-token). */}
+      {(() => {
+        const mint = mintCheckinToken(artist.slug as string);
+        return (
+          <section className="glass-card p-5">
+            <CheckinQr
+              artistSlug={artist.slug as string}
+              artistName={artist.name as string}
+              initialUrl={`${APP_URL}${mint.path}`}
+              initialExpiresAt={mint.expiresAt}
+              rotationSeconds={mint.rotationSeconds}
+              rotation={mint.rotation}
+            />
+          </section>
+        );
+      })()}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
+import { pushPointsToast } from "@/components/points-toast";
 import VideoUploader from "@/components/video-uploader";
 import CaptionSuggester from "./caption-suggester";
 import AltTextSuggester from "@/components/community/alt-text-suggester";
@@ -84,7 +85,9 @@ export default function NewPostForm({
     // retries fail the status will be { kind: "error" } and we leave the
     // form populated so the user can fix and resubmit.
     const ok = await invoke(async () => {
-      await action(formData);
+      // Fan posts resolve to { pointsAwarded, … } (admin kinds resolve to
+      // undefined); feed the "+5 pts · N to Gold" toast either way.
+      pushPointsToast((await action(formData)) ?? undefined);
       return { ok: true };
     });
     if (ok) {

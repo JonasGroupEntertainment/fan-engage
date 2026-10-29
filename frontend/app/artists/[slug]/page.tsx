@@ -29,6 +29,7 @@ import { viewerFoundingFanNumber, viewerManagesEventRsvps } from "@/lib/rsvp-acc
 import { evaluateRsvpWindow, rsvpWindowView } from "@/lib/rsvp-window";
 import { focalPointStyle } from "@/lib/images/focal-point";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
+import { withArtistParam } from "@/lib/onboarding/artist-param";
 
 
 // Per-artist hero focal-point now comes from artists.hero_focal_x /
@@ -105,9 +106,9 @@ export default async function ArtistPage({
   // - signed in, profile done → drops / rewards (marketplace not open at soft launch)
   const marketplaceLive = isMarketplaceLive();
   const primaryCta = !isSignedIn
-    ? { label: "Create your fan profile", href: `/signup?ref=${artist.slug}` }
+    ? { label: "Create your fan profile", href: withArtistParam(`/signup?ref=${artist.slug}`, artist.slug) }
     : needsProfile
-      ? { label: "Complete your profile", href: `/onboarding?ref=${artist.slug}` }
+      ? { label: "Complete your profile", href: withArtistParam(`/onboarding?ref=${artist.slug}`, artist.slug) }
       : marketplaceLive
         ? { label: "Shop drops", href: "/marketplace" }
         : { label: "My rewards", href: "/rewards" };
@@ -251,7 +252,7 @@ export default async function ArtistPage({
             </p>
           )}
           {!artist.heroImage && (
-            <p className="mt-6 text-xs text-white/50">
+            <p className="mt-6 text-xs text-white/70">
               Hero imagery pending Box asset drop.
             </p>
           )}
@@ -309,7 +310,7 @@ export default async function ArtistPage({
               {goal.linkHref && goal.linkLabel && (
                 <Link
                   href={goal.linkHref}
-                  className="text-xs text-white/50 hover:text-white/70 transition"
+                  className="text-xs text-white/70 hover:text-white/90 transition"
                 >
                   {goal.linkLabel}
                 </Link>

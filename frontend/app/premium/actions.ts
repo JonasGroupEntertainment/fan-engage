@@ -145,7 +145,7 @@ export async function createCheckoutSessionAction(formData: FormData) {
     // 4) Make sure the fan has a membership row — the webhook handler will
     //    update it when the subscription is created. If they don't have one
     //    yet (e.g. they signed up pre-migration-0011 and never got their
-    //    raelynn membership), insert a free placeholder now.
+    //    launch-community membership), insert a free placeholder now.
     step = "ensure-membership";
     await admin
       .from("fan_community_memberships")

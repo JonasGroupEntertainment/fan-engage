@@ -3,15 +3,20 @@
  *
  * /create-account and /join → /signup, keeping the full query string
  * (referral ?ref= in particular).
- * /events → the RaeLynn community page. Community routes live at
- * /artists/[slug]/community; the launch community slug is raelynn
- * (DEFAULT_COMMUNITY_ID). /artists/raelynn is the artist hub, not the
- * community feed.
+ * /events → the default community page. Community routes live at
+ * /artists/[slug]/community; the launch community slug comes from
+ * DEFAULT_COMMUNITY_SLUG (lib/community-default.ts). /artists/<slug> is
+ * the artist hub, not the community feed.
  *
  * Exact paths only — /artist-portal/events and /api/events/* stay put.
  */
 
-export const RAELYNN_COMMUNITY_PATH = "/artists/raelynn/community";
+import { DEFAULT_COMMUNITY_SLUG, communityPath } from "./community-default.ts";
+
+/** Kept under its historical name for existing imports; resolves to the
+ *  default community's feed. */
+export const RAELYNN_COMMUNITY_PATH = communityPath(DEFAULT_COMMUNITY_SLUG, "community");
+export const DEFAULT_COMMUNITY_PATH = RAELYNN_COMMUNITY_PATH;
 
 const SIGNUP_ALIAS_PATHS = new Set(["/create-account", "/join"]);
 

@@ -39,9 +39,12 @@ describe("sticky-flow: marketplace guest digital path", () => {
     assert.match(layout, /merchAccess/);
     assert.match(market, /reason === "signed-out"/);
     assert.match(market, /redirect\(access\.navHref\)/);
-    assert.match(soon, /\/artists\/raelynn\/rewards/);
+    // Digital unlocks live under the viewer's resolved community (membership
+    // → host → DEFAULT_COMMUNITY_SLUG), never a hard-coded artist slug.
+    assert.match(soon, /communityPath\(artistSlug, "rewards"\)/);
     assert.match(rewards, /Redeem digital unlocks/);
-    assert.match(rewards, /href:\s*"\/artists\/raelynn\/rewards"/);
+    assert.match(rewards, /href:\s*communityPath\(communityId, "rewards"\)/);
+    assert.match(rewards, /getViewerCommunityId\(\)/);
     assert.doesNotMatch(soon, /jgos\.io/);
     assert.doesNotMatch(market, /jgos\.io/);
   });
