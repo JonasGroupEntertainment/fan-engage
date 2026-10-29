@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DEFAULT_COMMUNITY_SLUG } from "../community-default.ts";
 
 /**
  * Award points to a fan — the single authoritative function for all
@@ -17,8 +18,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Multi-tenancy: callers should pass communityId explicitly. When omitted,
  * we resolve the fan's community from their memberships — if they belong
  * to exactly one community that's unambiguous; otherwise we fall back to
- * "raelynn" (the original single-tenant default) so legacy behavior is
- * preserved. The resolved community is stamped on the ledger row so every
+ * DEFAULT_COMMUNITY_SLUG (the original single-tenant default) so legacy
+ * behavior is preserved. The resolved community is stamped on the ledger row so every
  * point event is attributable to a community.
  */
 export async function awardPoints(
@@ -48,7 +49,7 @@ export async function awardPoints(
     communityId =
       memberships && memberships.length === 1
         ? (memberships[0].community_id as string)
-        : "raelynn";
+        : DEFAULT_COMMUNITY_SLUG;
   }
 
   // Single SQL writer: ledger insert + Founding Fan 1.5× + denorm sync.

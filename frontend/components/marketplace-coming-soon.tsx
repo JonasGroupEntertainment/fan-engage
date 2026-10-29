@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DEFAULT_COMMUNITY_SLUG, communityPath, communitySignupHref } from "@/lib/community-default";
 
 /**
  * Soft-launch Coming soon wall for /marketplace and merch entry points.
@@ -6,15 +7,18 @@ import Link from "next/link";
  * Guests get a clear digital-rewards path; physical merch stays Coming soon.
  */
 
-const DIGITAL_REDEEM_HREF = "/artists/raelynn/rewards";
-
 export default function MarketplaceComingSoon({
-  artistName = "RaeLynn",
+  artistSlug = DEFAULT_COMMUNITY_SLUG,
+  artistName,
   signedIn = false,
 }: {
-  artistName?: string;
+  /** Community whose digital rewards the CTA opens; defaults to the launch community. */
+  artistSlug?: string;
+  /** Display name for the "Back to …" link; falls back to a neutral label. */
+  artistName?: string | null;
   signedIn?: boolean;
 }) {
+  const digitalRedeemHref = communityPath(artistSlug, "rewards");
   return (
     <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-aurora/15 via-slate-900/80 to-ember/15 p-8 shadow-glass sm:p-10">
       <p className="text-xs uppercase tracking-[0.3em] text-aurora">Marketplace</p>
@@ -46,8 +50,8 @@ export default function MarketplaceComingSoon({
         <Link
           href={
             signedIn
-              ? DIGITAL_REDEEM_HREF
-              : `/signup?ref=raelynn&next=${encodeURIComponent(DIGITAL_REDEEM_HREF)}`
+              ? digitalRedeemHref
+              : communitySignupHref(artistSlug, digitalRedeemHref)
           }
           className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-2.5 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
         >
@@ -60,10 +64,10 @@ export default function MarketplaceComingSoon({
           View rewards &amp; tiers
         </Link>
         <Link
-          href="/artists/raelynn"
+          href={communityPath(artistSlug)}
           className="inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-2.5 text-sm font-medium text-white/80 hover:bg-white/5"
         >
-          Back to {artistName}
+          {artistName ? `Back to ${artistName}` : "Back to the artist hub"}
         </Link>
       </div>
     </section>

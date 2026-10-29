@@ -18,11 +18,15 @@ import {
 } from "@/lib/first-72h";
 import { PREMIUM_CTA, getViewerPremiumAnywhere } from "@/lib/entitlements";
 import PremiumCta from "@/components/premium-cta";
+import { buildInviteLink, withArtistParam } from "@/lib/onboarding/artist-param";
+import { getViewerCommunityId } from "@/lib/viewer-community";
 
 async function buildInviteUrl(code: string | null | undefined): Promise<string> {
   const origin = await getAppOrigin();
   if (!code) return `${origin}/invite/your-code`;
-  return `${origin}/invite/${code}`;
+  // Generic invite — no single community context on this page. The
+  // per-artist cards below carry ?artist=<slug>.
+  return buildInviteLink({ origin, code });
 }
 
 async function getAppOrigin(): Promise<string> {
@@ -47,14 +51,16 @@ function formatRelativeTime(iso: string): string {
 }
 
 export default async function ReferralsPage() {
-  const [fan, myReferrals, leaderboard, artists, recentActivity, isPremiumFan] = await Promise.all([
-    getCurrentFan(),
-    getMyReferrals(),
-    getReferralLeaderboard(5),
-    listArtistsFromDb(),
-    getRecentReferralActivity(5),
-    getViewerPremiumAnywhere(),
-  ]);
+  const [fan, myReferrals, leaderboard, artists, recentActivity, isPremiumFan, viewerCommunityId] =
+    await Promise.all([
+      getCurrentFan(),
+      getMyReferrals(),
+      getReferralLeaderboard(5),
+      listArtistsFromDb(),
+      getRecentReferralActivity(5),
+      getViewerPremiumAnywhere(),
+      getViewerCommunityId(),
+    ]);
 
   const isSignedIn = fan !== null;
   const origin = await getAppOrigin();
@@ -88,6 +94,7 @@ export default async function ReferralsPage() {
               ]}
               primaryCta="Sign up free →"
               nextPath="/referrals"
+              communityId={viewerCommunityId}
               firstRewardLine="🎁 Join free, then invite friends into your favorite artist experience."
             />
           )}
@@ -161,8 +168,8 @@ export default async function ReferralsPage() {
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {featuredArtists.map((artist) => {
                 const artistInviteUrl = isSignedIn && fan?.referral_code
-                  ? `${origin}/invite/${fan.referral_code}?artist=${encodeURIComponent(artist.slug)}`
-                  : `${origin}/signup?ref=${encodeURIComponent(artist.slug)}`;
+                  ? buildInviteLink({ origin, code: fan.referral_code, artistSlug: artist.slug })
+                  : withArtistParam(`${origin}/signup?ref=${encodeURIComponent(artist.slug)}`, artist.slug);
                 const shareText = `I found ${artist.name}'s Fan Experience. Join through ${inviterName} and get your first 100 points toward drops, events, and rewards.`;
                 return (
                   <article

@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin } from "@/lib/admin-guard";
+import { getAdminContext } from "@/lib/admin";
 import { importFanRows } from "@/lib/fans/import-fans";
 import { MAX_IMPORT_ROWS_PER_REQUEST } from "@/lib/fans/import-patch";
 
@@ -12,6 +13,39 @@ export interface ImportRow {
   instagram?: string;
   tiktok?: string;
   city?: string;
+}
+
+export interface ImportCommunityOption {
+  slug: string;
+  label: string;
+}
+
+/**
+ * Communities the signed-in admin may import into, read from the
+ * `communities` table (never a hard-coded artist list). Super-admins see
+ * every row; community admins only their grants. Inactive pools stay
+ * listed — importing is how a pool gets seeded before launch.
+ */
+export async function listImportCommunitiesAction(): Promise<ImportCommunityOption[]> {
+  const ctx = await getAdminContext();
+  if (!ctx) throw new Error("Unauthorized");
+  let query = createAdminClient()
+    .from("communities")
+    .select("slug, display_name, active, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("slug", { ascending: true });
+  if (!ctx.isSuperAdmin) {
+    if (ctx.communities.length === 0) return [];
+    query = query.in("slug", ctx.communities);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error("Could not load communities");
+  return ((data ?? []) as Array<{ slug: string; display_name: string | null; active: boolean }>).map(
+    (c) => ({
+      slug: c.slug,
+      label: `${c.display_name ?? c.slug}${c.active ? "" : " (inactive)"}`,
+    }),
+  );
 }
 
 export interface ImportResult {

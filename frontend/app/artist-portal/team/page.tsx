@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fanDisplayName, type FanNameParts } from "@/lib/format/fan-name";
 import { getPortalContext, roleAtLeast } from "@/lib/artist-portal/access";
 import { addTeamMemberAction, removeTeamMemberAction } from "./actions";
 
@@ -33,11 +34,12 @@ export default async function TeamPage() {
   // Resolve emails/names from fans (fans.id == auth user id).
   const ids = members.map((m) => m.user_id);
   const { data: fans } = ids.length
-    ? await admin.from("fans").select("id, email, display_name").in("id", ids)
+    ? // fans has first_name/last_name, not display_name (lib/format/fan-name).
+      await admin.from("fans").select("id, email, first_name, last_name").in("id", ids)
     : { data: [] };
   const fanById = new Map(
-    ((fans ?? []) as Array<{ id: string; email: string | null; display_name: string | null }>).map(
-      (f) => [f.id, f],
+    ((fans ?? []) as Array<{ id: string; email: string | null } & FanNameParts>).map(
+      (f) => [f.id, { ...f, display_name: fanDisplayName(f, "") || null }],
     ),
   );
 

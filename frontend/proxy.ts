@@ -53,14 +53,16 @@ function enforceAdminBasicAuth(request: NextRequest): NextResponse | null {
 }
 
 /**
- * Refreshes the Supabase session on every request and redirects unauthenticated
- * users away from protected routes to /login.
+ * Proxy (the Next 16 name for middleware — see node_modules/next/dist/docs
+ * .../file-conventions/proxy.md). Refreshes the Supabase session on every
+ * request and redirects unauthenticated users away from protected routes
+ * to /login.
  *
  * If Supabase env vars aren't set yet (e.g. on a PR preview before keys are
- * wired) the middleware becomes a no-op instead of crashing the whole app —
+ * wired) the proxy becomes a no-op instead of crashing the whole app —
  * so previews of non-protected routes still work end-to-end.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Layer -1: pin production to www. next.config host rules did not fire
   // on live Vercel (pearl + apex still 200 on 2026-08-26). Same-path 308.
   const hostRedirect = productionHostRedirect(
@@ -170,10 +172,13 @@ export async function middleware(request: NextRequest) {
       cookies: request.cookies.getAll(),
     })
   ) {
+    const artist = request.nextUrl.searchParams.get("artist");
     const signup = guestSignupHref({
-      ref: request.nextUrl.searchParams.get("ref"),
+      ref: artist || request.nextUrl.searchParams.get("ref"),
       next: request.nextUrl.searchParams.get("next"),
-      fallbackNext: pathname,
+      // Keep ?artist= (and any other query) on the round trip so the
+      // onboarding artist lock survives the signup bounce.
+      fallbackNext: pathname + request.nextUrl.search,
     });
     return NextResponse.redirect(new URL(signup, request.url));
   }
@@ -183,9 +188,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on everything except static assets / image optimization / favicon.
+    // Run on everything except static assets / image optimization / favicon
+    // and the PWA + SEO + cron files (manifest, service worker, icons,
+    // robots, sitemap, OG images, api/cron) — none of those need a Supabase
+    // auth round-trip, and crons authenticate with CRON_SECRET at the route.
     // Note: api/fan-engage is explicitly excluded here — rate limiting is
     // handled at the route level (route.ts files) instead.
-    "/((?!_next/static|_next/image|favicon.ico|api/fan-engage).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|api/fan-engage|api/cron/|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml|icons/|images/|videos/|icon-[^/]*\\.png|badge-[^/]*\\.png|apple-icon|opengraph-image|icon$|icon\\.png).*)",
   ],
 };

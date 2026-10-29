@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fanDisplayName, type FanNameParts } from "@/lib/format/fan-name";
 import {
   assertPortalRole,
   requirePortalPage,
@@ -56,7 +57,8 @@ export default async function ArtistPortalCommunityPage() {
   const { data: posts } = await admin
     .from("community_posts")
     .select(
-      "id, title, body, created_at, author_id, fans(display_name)"
+      // fans has first_name/last_name, not display_name (lib/format/fan-name).
+      "id, title, body, created_at, author_id, fans(first_name, last_name)"
     )
     .eq("artist_slug", ctx.communityId)
     .order("created_at", { ascending: false })
@@ -120,7 +122,7 @@ export default async function ArtistPortalCommunityPage() {
           </p>
         ) : (
           recentPosts.map((p) => {
-            const author = (p.fans as unknown) as { display_name: string | null } | null;
+            const author = (p.fans as unknown) as FanNameParts | null;
             return (
               <div
                 key={p.id}
@@ -136,7 +138,7 @@ export default async function ArtistPortalCommunityPage() {
                 </p>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-xs text-white/50">
-                    {author?.display_name ?? "Artist"} ·{" "}
+                    {fanDisplayName(author, "Artist")} ·{" "}
                     {new Date(p.created_at as string).toLocaleString()}
                   </p>
                   {canPost && (

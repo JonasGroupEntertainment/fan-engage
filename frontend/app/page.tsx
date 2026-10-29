@@ -21,6 +21,7 @@ import { first72hFromFanState } from "@/lib/first-72h";
 import FirstSessionChecklist from "@/components/first-session-checklist";
 import { sanitizeNextPath } from "@/lib/app-url";
 import { REFERRAL_JOIN_POINTS } from "@/lib/launch-catalog";
+import { buildInviteLink } from "@/lib/onboarding/artist-param";
 // ─── Signed-in dashboard content ──────────────────────────────────────────
 // Signed-out visitors render <SignedOutLanding/> earlier and never see any
 // of this.
@@ -190,8 +191,12 @@ export default async function Home({
     (headerList.get("x-forwarded-host") ?? headerList.get("host"));
   const proto = headerList.get("x-forwarded-proto") ?? "https";
   const origin = host?.startsWith("http") ? host : `${proto}://${host}`;
+  // When the fan's community context is unambiguous (exactly one followed
+  // artist), carry it so the invitee lands in that artist at onboarding.
+  const followed = fanHome?.followedArtists ?? [];
+  const inviteArtistSlug = followed.length === 1 ? followed[0].slug : null;
   const inviteUrl = fan?.referral_code
-    ? `${origin}/invite/${fan.referral_code}`
+    ? buildInviteLink({ origin, code: fan.referral_code, artistSlug: inviteArtistSlug })
     : null;
 
   return (

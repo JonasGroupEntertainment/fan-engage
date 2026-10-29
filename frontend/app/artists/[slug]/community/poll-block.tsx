@@ -2,6 +2,7 @@
 
 import type { PollData } from "@/lib/data/types";
 import { votePollAction } from "./actions";
+import { withPointsToast } from "@/components/points-toast";
 
 export default function PollBlock({
   postId,
@@ -32,7 +33,7 @@ export default function PollBlock({
           return (
             <form
               key={o.id}
-              action={votePollAction}
+              action={withPointsToast(votePollAction)}
               className="relative"
             >
               <input type="hidden" name="post_id" value={postId} />

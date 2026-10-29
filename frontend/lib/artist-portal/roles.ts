@@ -43,6 +43,8 @@ export const PORTAL_MIN_ROLE = {
   events: "editor",
   /** Redemptions management UI and its actions. */
   redemptions: "editor",
+  /** Live check-in QR page and the token-minting API behind it. */
+  checkinQr: "editor",
   /** Leaderboard — read-only analytics. */
   leaderboard: "viewer",
   /** Revenue / payout history — financial, admin and above. */

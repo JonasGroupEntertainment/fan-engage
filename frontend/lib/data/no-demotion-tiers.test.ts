@@ -124,7 +124,7 @@ describe("0085 no-demotion tiers — backfill", () => {
 });
 
 describe("getCurrentFanKpis tier progress reads lifetime points", () => {
-  const fn = fanTs.slice(fanTs.indexOf("export async function getCurrentFanKpis"));
+  const fn = fanTs.slice(fanTs.indexOf("async function getCurrentFanKpis"));
 
   it("FanKpis gains lifetime_points without renaming existing fields", () => {
     const kpis = typesTs.slice(typesTs.indexOf("export interface FanKpis"));

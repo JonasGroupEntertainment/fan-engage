@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
@@ -27,7 +28,7 @@ export interface FanMembership {
  * specific community_id if provided). Returns null for signed-out users,
  * fans without a membership in the community, or any DB error.
  */
-export async function getCurrentMembership(
+export const getCurrentMembership = cache(async function getCurrentMembership(
   communityId?: string,
 ): Promise<FanMembership | null> {
   try {
@@ -56,7 +57,7 @@ export async function getCurrentMembership(
     console.warn("getCurrentMembership: failed", err);
     return null;
   }
-}
+});
 
 /**
  * The signed-in fan's primary community: their earliest active membership.
@@ -173,8 +174,11 @@ export async function getPointBreakdown(): Promise<PointBreakdownRow[]> {
 /**
  * Fetches the current user's fan profile. Returns null for signed-out or
  * unconfigured-Supabase — callers should fall back to static preview content.
+ *
+ * Wrapped in React.cache so the layout, page and widgets on one request
+ * share a single query instead of each re-fetching.
  */
-export async function getCurrentFan(): Promise<FanProfile | null> {
+export const getCurrentFan = cache(async function getCurrentFan(): Promise<FanProfile | null> {
   try {
     const supabase = await createClient();
     const {
@@ -198,14 +202,14 @@ export async function getCurrentFan(): Promise<FanProfile | null> {
     console.warn("getCurrentFan: failed", err);
     return null;
   }
-}
+});
 
 /**
  * Rolls up the fan's headline KPIs for the current community: total
  * points (from the community membership, not the legacy fans.total_points),
  * community-scoped referrals and badges, distance to next tier.
  */
-export async function getCurrentFanKpis(): Promise<FanKpis | null> {
+export const getCurrentFanKpis = cache(async function getCurrentFanKpis(): Promise<FanKpis | null> {
   try {
     const supabase = await createClient();
     const {
@@ -278,4 +282,4 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     console.warn("getCurrentFanKpis: failed", err);
     return null;
   }
-}
+});

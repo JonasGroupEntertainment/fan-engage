@@ -19,7 +19,10 @@ export async function toggleFollowAction(formData: FormData) {
       .from("fan_artist_following")
       .upsert(
         { fan_id: user.id, artist_slug: artistSlug },
-        { onConflict: "fan_id,artist_slug" },
+        // fan_artist_following has no UPDATE policy (0006), so a plain
+        // upsert (ON CONFLICT DO UPDATE) fails RLS when the row already
+        // exists — common now that 0088 backfills follows from memberships.
+        { onConflict: "fan_id,artist_slug", ignoreDuplicates: true },
       );
   } else {
     await supabase

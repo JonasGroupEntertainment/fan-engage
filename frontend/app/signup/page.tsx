@@ -59,7 +59,7 @@ async function getReferrerArtist(slug: string | undefined): Promise<ReferrerArti
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ ref?: string }>;
+  searchParams?: Promise<{ ref?: string; artist?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -67,7 +67,11 @@ export default async function SignupPage({
   const sp = (await searchParams) ?? {};
   const [referrerName, referrerArtist, terms, privacy, rewardsTerms] = await Promise.all([
     getReferrerName(),
-    getReferrerArtist(sp.ref),
+    // The contextual hero prefers the explicit artist pick, then the legacy
+    // ?ref=<artist-slug> attribution. Both are validated against artists.
+    sp.artist
+      ? getReferrerArtist(sp.artist).then((a) => a ?? getReferrerArtist(sp.ref))
+      : getReferrerArtist(sp.ref),
     getPolicy("terms"),
     getPolicy("privacy"),
     getPolicy("rewards_terms"),

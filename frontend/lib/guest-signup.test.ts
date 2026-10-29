@@ -56,7 +56,7 @@ describe("isOnboardingPath", () => {
 
 describe("middleware guest onboarding redirect", () => {
   it("sends unauthenticated /onboarding to /signup via guestSignupHref", () => {
-    const middleware = readRepo("../middleware.ts");
+    const middleware = readRepo("../proxy.ts");
     assert.match(middleware, /isOnboardingPath/);
     assert.match(middleware, /guestSignupHref/);
     assert.match(middleware, /searchParams\.get\("ref"\)/);

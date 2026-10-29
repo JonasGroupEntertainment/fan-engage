@@ -1,5 +1,13 @@
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DEFAULT_COMMUNITY_SLUG } from "./community-default";
+
+export {
+  DEFAULT_COMMUNITY_SLUG,
+  communityPath,
+  communitySignupHref,
+  resolveDefaultCommunitySlug,
+} from "./community-default";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────
@@ -11,8 +19,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * scope their queries accordingly.
  *
  * For the legacy domain (fan-engage-pearl.vercel.app) and local dev we
- * fall back to RaeLynn, keeping single-tenant parity until wildcard DNS
- * is pointed at the platform.
+ * fall back to DEFAULT_COMMUNITY_SLUG (the launch community, env-overridable
+ * — see lib/community-default.ts), keeping single-tenant parity until
+ * wildcard DNS is pointed at the platform.
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -33,9 +42,9 @@ export interface Community {
 
 /** Fallback community for hostnames that don't match a known subdomain.
  *  Applies to fan-engage-pearl.vercel.app, localhost, and any apex request.
- *  Keeps today's deployment working as a single-tenant RaeLynn site until
- *  subdomains are configured. */
-export const DEFAULT_COMMUNITY_ID = "raelynn";
+ *  Alias of DEFAULT_COMMUNITY_SLUG (single source of truth in
+ *  lib/community-default.ts) kept for existing imports. */
+export const DEFAULT_COMMUNITY_ID: string = DEFAULT_COMMUNITY_SLUG;
 
 /** Subdomain → community_slug map. MUST stay in sync with the
  *  communities.subdomain column in the DB. When adding a new community,
@@ -48,7 +57,8 @@ export const COMMUNITY_BY_SUBDOMAIN: Record<string, string> = {
   danmarshall: "dan-marshall",
   hunterhawkins: "hunter-hawkins",
   streetteam: "street-team",
-  nellies: "nellies",
+  // Brand (non-music) communities belong to the sister product, Brand
+  // Engage Pro, and are never mapped here.
 };
 
 /**
@@ -59,9 +69,9 @@ export const COMMUNITY_BY_SUBDOMAIN: Record<string, string> = {
  * Examples:
  *   'raelynn.fanengage.app'          → 'raelynn'
  *   'streetteam.fanengage.app'       → 'street-team'
- *   'fan-engage-pearl.vercel.app'    → 'raelynn'  (legacy default)
- *   'fanengage.app'                  → 'raelynn'  (apex, for now)
- *   'localhost:3000'                 → 'raelynn'  (dev)
+ *   'fan-engage-pearl.vercel.app'    → DEFAULT_COMMUNITY_SLUG  (legacy default)
+ *   'fanengage.app'                  → DEFAULT_COMMUNITY_SLUG  (apex, for now)
+ *   'localhost:3000'                 → DEFAULT_COMMUNITY_SLUG  (dev)
  */
 export function resolveCommunityFromHost(host: string | null | undefined): string {
   if (!host) return DEFAULT_COMMUNITY_ID;

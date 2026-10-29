@@ -98,6 +98,9 @@ export function SignupForm({
   const searchParams = useSearchParams();
   const community = searchParams.get("community");
   const ref = searchParams.get("ref");
+  // Explicit artist pick (?artist=<slug>) — independent of ?ref=, which may
+  // be an artist slug (Join CTA) or a fan invite code on older links.
+  const artistParam = searchParams.get("artist");
   const inviteCode = searchParams.get("invite");
   // Where to send the user after a successful signup. Preserve any
   // ?ref=<artist-slug> attribution from the artist-page Join CTA so the
@@ -106,7 +109,7 @@ export function SignupForm({
   // preview banners when a session expires mid-flow). Only relative paths —
   // anything else would be an open redirect.
   const rawNext = searchParams.get("next");
-  const onboardingHref = signupOnboardingHref(rawNext, ref);
+  const onboardingHref = signupOnboardingHref(rawNext, ref, artistParam);
   const fromOnboardingBounce =
     rawNext === "/onboarding" || (rawNext?.startsWith("/onboarding") ?? false);
   const loginHref =

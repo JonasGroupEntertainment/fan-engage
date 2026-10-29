@@ -21,7 +21,7 @@ export function isTeamAuthored(opts: { kind: string | null; hasTeamGrant: boolea
   return opts.hasTeamGrant;
 }
 
-/** "RaeLynn posted" for the artist/team; fan posts speak for the community. */
+/** "<Artist> posted" for the artist/team; fan posts speak for the community. */
 export function newPostTitle(artistName: string, fromTeam: boolean): string {
   return fromTeam ? `${artistName} posted` : `New in ${artistName}'s community`;
 }
@@ -73,7 +73,13 @@ export async function notifyNewPost(opts: {
     const { data: follows } = await admin
       .from("fan_artist_following")
       .select("fan_id")
-      .eq("artist_slug", opts.artistSlug);
+      .eq("artist_slug", opts.artistSlug)
+      // Deterministic under the MAX_CONCURRENT cap below: newest follows
+      // first, so organic follows win over the 0088 backfill (which copies
+      // each membership's joined_at). Without an order the capped 200 were
+      // whatever Postgres returned first.
+      .order("followed_at", { ascending: false })
+      .limit(1000);
 
     const fanIds = (follows ?? [])
       .map((r) => r.fan_id as string)

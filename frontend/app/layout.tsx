@@ -5,6 +5,7 @@ import "./globals.css";
 import CookieBanner from "@/components/cookie-banner";
 import Footer from "@/components/footer";
 import InstallPrompt from "@/components/install-prompt";
+import RegisterSW from "@/components/register-sw";
 import PremiumUpgradePrompt from "@/components/premium-upgrade-prompt";
 import PremiumBadge from "@/components/premium-badge";
 import AdminPill from "@/components/admin-pill";
@@ -14,7 +15,8 @@ import { MobileNav } from "@/components/mobile-nav";
 import { DesktopNav } from "@/components/desktop-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/lib/data/notifications";
-import { getCurrentCommunityId } from "@/lib/community";
+import { getCurrentCommunityId, communitySignupHref } from "@/lib/community";
+import { DEFAULT_COMMUNITY_SLUG } from "@/lib/community-default";
 import { getEntitlement, fanIsPremiumAnywhere, merchAccess } from "@/lib/entitlements";
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
@@ -113,6 +115,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUserSafe();
+  // Hostname community: the guest "Join" door and merch signup ref point at
+  // it, so a fan arriving on an artist's subdomain joins that artist.
+  const hostCommunityId = await getCurrentCommunityId().catch(() => DEFAULT_COMMUNITY_SLUG);
+  const joinHref = communitySignupHref(hostCommunityId);
   // Unread inbox count + premium entitlement are only meaningful for
   // signed-in fans. Both are wrapped so a transient DB hiccup never
   // breaks the header render.
@@ -149,6 +155,7 @@ export default async function RootLayout({
   const merch = merchAccess({
     signedIn: Boolean(user),
     isPremium,
+    communityId: hostCommunityId,
   });
   const navItems = [
     { href: "/", label: "Fan Home" },
@@ -181,7 +188,7 @@ export default async function RootLayout({
                   Fan Engage Pro
                 </span>
               </Link>
-              <MobileNav navItems={navItems} isSignedIn={Boolean(user)} />
+              <MobileNav navItems={navItems} isSignedIn={Boolean(user)} joinHref={joinHref} />
             </div>
             <DesktopNav navItems={navItems} />
             <div className="hidden flex-1 max-w-xs lg:block">
@@ -223,7 +230,7 @@ export default async function RootLayout({
                   Sign in
                 </Link>
                 <Link
-                  href="/signup?ref=raelynn"
+                  href={joinHref}
                   className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
                 >
                   Join
@@ -236,6 +243,7 @@ export default async function RootLayout({
         <Footer />
         <CookieBanner />
         <InstallPrompt />
+        <RegisterSW />
         <PremiumUpgradePrompt
           isPremium={isPremium}
           signedIn={Boolean(user)}

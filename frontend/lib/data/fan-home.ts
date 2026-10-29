@@ -5,6 +5,8 @@ import { getAdminContext } from "@/lib/admin";
 import { roleAtLeast } from "@/lib/admin-authz";
 import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
 import { isPastEvent } from "@/lib/data/artists";
+import { getCurrentCommunityId } from "@/lib/community";
+import { pickViewerCommunity } from "@/lib/viewer-community";
 import {
   evaluateRsvpWindow,
   grantManagesEventRsvps,
@@ -128,6 +130,12 @@ export interface FanHomeData {
    * reveal the body of founder-only posts in Recent Activity.
    */
   founderCommunities: string[];
+  /**
+   * The community the dashboard links into for rewards etc.: the hostname
+   * community when the fan follows it, else their first followed artist,
+   * else the hostname community (which falls back to DEFAULT_COMMUNITY_SLUG).
+   */
+  primaryCommunity: string;
 }
 
 /**
@@ -364,6 +372,10 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
 
   const followedArtists = (artistsRes.data ?? []) as FanHomeFollowedArtist[];
   const artistNameBySlug = new Map(followedArtists.map((a) => [a.slug, a.name]));
+  const primaryCommunity = pickViewerCommunity({
+    memberSlugs: followedArtists.map((a) => a.slug),
+    hostSlug: await getCurrentCommunityId(),
+  });
 
   // Build the upcoming-events list. Limit to top 3 after applying any
   // post-fetch filtering (none today, but headroom is cheap).
@@ -544,6 +556,7 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     totalBadgeCount,
     premiumCommunities,
     founderCommunities,
+    primaryCommunity,
   };
 }
 
