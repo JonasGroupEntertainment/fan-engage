@@ -58,7 +58,7 @@ export default async function ArtistPortalCommunityPage() {
     .from("community_posts")
     .select(
       // fans has first_name/last_name, not display_name (lib/format/fan-name).
-      "id, title, body, created_at, author_id, fans(first_name, last_name)"
+      "id, title, body, created_at, author_id, fans:fans!community_posts_author_id_fkey(first_name, last_name)"
     )
     .eq("artist_slug", ctx.communityId)
     .order("created_at", { ascending: false })

@@ -49,7 +49,7 @@ async function getPortalData(communityId: string) {
     // Recent 3 posts in this community (artist_slug = communityId)
     admin
       .from("community_posts")
-      .select("id, title, body, created_at, author_id, fans(first_name, last_name)")
+      .select("id, title, body, created_at, author_id, fans:fans!community_posts_author_id_fkey(first_name, last_name)")
       .eq("artist_slug", communityId)
       .order("created_at", { ascending: false })
       .limit(3),
