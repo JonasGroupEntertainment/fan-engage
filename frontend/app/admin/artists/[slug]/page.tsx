@@ -15,6 +15,8 @@ import {
 } from "../actions";
 import { formatRsvpOpensAt } from "@/lib/rsvp-window";
 import ModerationButton from "@/app/admin/community/moderation-button";
+import PresaveManager from "./presave-manager";
+import { listPresavesForAdmin } from "@/lib/presave/read";
 
 type ReminderRow = {
   event_id: string;
@@ -42,7 +44,10 @@ export default async function AdminArtistEditPage({
 
   if (!artist) notFound();
 
-  const events = await listEventsForAdmin(slug);
+  const [events, presaves] = await Promise.all([
+    listEventsForAdmin(slug),
+    listPresavesForAdmin(slug).catch(() => []),
+  ]);
 
   const rsvpListsByEvent = await Promise.all(
     events.map((e) => listRsvpsForEvent(e.id)),
@@ -149,6 +154,10 @@ export default async function AdminArtistEditPage({
                   sort_order: e.sort_order ?? 0,
                   active: e.active ?? true,
                   rsvp_opens_at: e.rsvp_opens_at ?? null,
+                  city: e.city ?? null,
+                  region: e.region ?? null,
+                  lat: e.lat ?? null,
+                  lng: e.lng ?? null,
                 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -242,6 +251,9 @@ export default async function AdminArtistEditPage({
 
         <CreateEventForm slug={slug} />
       </section>
+
+      {/* Pre-saves — fan_actions rows of kind 'pre_save' (Sprint 3 item C) */}
+      <PresaveManager slug={slug} presaves={presaves} />
 
       {/* Check-in QR — print or display at the venue / merch table */}
       {/* Same live component as /artist-portal/checkin-qr: rotates when

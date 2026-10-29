@@ -46,6 +46,7 @@ export const VERCEL_CRON_JOBS = [
   "moderation-explain",
   "fraud-scan",
   "leaderboard-notifications",
+  "streak-at-risk",
 ] as const;
 
 export type VercelCronJob = (typeof VERCEL_CRON_JOBS)[number];
@@ -69,6 +70,7 @@ const NOTIFIER_JOBS = new Set<VercelCronJob>([
   "drops-notifier",
   "anniversary-notifier",
   "leaderboard-notifications",
+  "streak-at-risk",
 ]);
 
 export type CronLogEventName = "start" | "finish" | "failure";

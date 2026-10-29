@@ -28,6 +28,8 @@ import {
   type DigestRecipient,
 } from "@/lib/digest";
 import {
+  DIGEST_FROM_NAME,
+  DIGEST_REPLY_TO,
   digestLogStatus,
   formatMailchimpFailure,
   subscriberHash,
@@ -41,8 +43,8 @@ const MAILCHIMP_LIST = () => process.env.MAILCHIMP_AUDIENCE_ID;
 /** Subject line for the campaign. Personalization happens via the
  *  template body via *|FNAME|* and *|DIGESTHTML|* merge tags. */
 const CAMPAIGN_SUBJECT = "Your weekly Fan Engage roundup";
-const CAMPAIGN_FROM_NAME = "Fan Engage";
-const CAMPAIGN_REPLY_TO = "no-reply@fanengage.app";
+const CAMPAIGN_FROM_NAME = DIGEST_FROM_NAME;
+const CAMPAIGN_REPLY_TO = DIGEST_REPLY_TO;
 
 /** Lower-bound on how many recipients we need for the campaign to be
  *  worth firing. If only 0-1 fan is eligible this week, we skip. */

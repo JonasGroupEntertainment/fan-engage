@@ -7,6 +7,9 @@ import {
   recordDigestSent,
 } from "@/lib/digest/send";
 import { unsentCampaignError } from "@/lib/digest/outcomes";
+import { runLapsedPass, type LapsedClient, type LapsedPassResult } from "@/lib/digest/lapsed-pass";
+import { cronAuthProblem } from "@/lib/cron-observability";
+import { getAdminContext } from "@/lib/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +36,17 @@ export const dynamic = "force-dynamic";
  *   * Anthropic: 200 fans × ~3 community summaries × ~$0.0001 ≈ $0.06
  *   * Mailchimp: 200 PUTs (free) + 1 campaign send (covered by plan)
  *   * Total: ~$0.06/week, ~$3/year
+ *
+ * After the digest, a "we miss you" pass (lib/digest/lapsed-pass.ts)
+ * nudges opted-in fans whose newest activity is 14–30 days old and who
+ * have not had a nudge in 30 days. Each send is a notification_log row
+ * (notification_type "lapsed_nudge") so later runs skip them. Its result
+ * is `summary.lapsed`; a lapsed failure never fails the digest.
+ *
+ * ?dryRun=1 — cron-authed, or a signed-in super-admin — skips the digest,
+ * runs only the lapsed selection, and returns bucket counts plus up to 10
+ * sample candidates. It sends nothing and records nothing (not even a
+ * cron_runs / digest_log row), so it bypasses runCron on purpose.
  */
 
 const BATCH_SIZE = 500;
@@ -45,12 +59,58 @@ interface DigestRunSummary {
   errors: Array<{ fan_id: string; error: string }>;
   campaignId: string | null;
   campaignError: string | null;
+  lapsed: LapsedPassResult | null;
+  lapsedError: string | null;
   weekStart: string;
   durationMs: number;
 }
 
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  if (url.searchParams.get("dryRun") === "1") {
+    return lapsedDryRun(request, url);
+  }
   return runCron(request, "weekly-digest", () => weeklyDigest(request));
+}
+
+/**
+ * Dry run of the lapsed pass. Cron auth as always; a signed-in super-admin
+ * may also run it (it sends and records nothing) so the selection can be
+ * checked from a browser without handling CRON_SECRET.
+ */
+async function lapsedDryRun(request: Request, url: URL) {
+  const authProblem = cronAuthProblem(request);
+  if (authProblem) {
+    const ctx = await getAdminContext();
+    if (!ctx?.isSuperAdmin) {
+      return NextResponse.json(
+        { ok: false, error: authProblem.error },
+        { status: authProblem.status },
+      );
+    }
+  }
+  try {
+    const lapsed = await runLapsedPass({
+      // LapsedClient is the narrow, test-stubbable slice of the Supabase
+      // client; the structural check against SupabaseClient recurses too
+      // deep for tsc, hence the cast.
+      admin: createAdminClient() as unknown as LapsedClient,
+      testEmail: url.searchParams.get("testEmail"),
+      dryRun: true,
+    });
+    return NextResponse.json({
+      ok: true,
+      dryRun: true,
+      digest: "skipped (dryRun)",
+      lapsed,
+      ranAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, dryRun: true, error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
 }
 
 async function weeklyDigest(request: Request) {
@@ -69,6 +129,8 @@ async function weeklyDigest(request: Request) {
     errors: [],
     campaignId: null,
     campaignError: null,
+    lapsed: null,
+    lapsedError: null,
     weekStart,
     durationMs: 0,
   };
@@ -185,6 +247,25 @@ async function weeklyDigest(request: Request) {
         totalCandidates: summary.totalCandidates,
         errors: summary.errors,
       });
+    }
+
+    // Second pass: fans the digest skipped because they went quiet. Its
+    // failures are reported in summary.lapsed / lapsedError, never as a
+    // digest failure (errorTextFromBody reads summary.errors and
+    // summary.campaignError only).
+    try {
+      summary.lapsed = await runLapsedPass({
+        admin: admin as unknown as LapsedClient,
+        testEmail,
+        dryRun: false,
+      });
+      if (summary.lapsed.error) {
+        summary.lapsedError = summary.lapsed.error;
+        console.error(`[cron weekly-digest] lapsed pass: ${summary.lapsed.error}`);
+      }
+    } catch (err) {
+      summary.lapsedError = err instanceof Error ? err.message : String(err);
+      console.error("[cron weekly-digest] lapsed pass failed:", summary.lapsedError);
     }
 
     summary.durationMs = Date.now() - started;

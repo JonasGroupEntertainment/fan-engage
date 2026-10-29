@@ -67,6 +67,10 @@
     {
       "path": "/api/cron/leaderboard-notifications",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/streak-at-risk",
+      "schedule": "0 * * * *"
     }
   ]
 }

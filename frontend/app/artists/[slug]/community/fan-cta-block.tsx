@@ -1,7 +1,9 @@
 "use client";
 
 import type { FanActionRow } from "@/lib/data/campaigns";
+import type { PresaveCardRow } from "@/lib/presave/read";
 import { completeFanActionAction } from "./cta-actions";
+import PresaveCard from "./presave-card";
 
 const KIND_ICON: Record<string, string> = {
   pre_save: "🎵",
@@ -17,12 +19,25 @@ export default function FanCtaBlock({
   artistSlug,
   actions,
   signedIn,
+  presaves = [],
+  signInHref,
+  accentFrom,
+  accentTo,
 }: {
   artistSlug: string;
   actions: FanActionRow[];
   signedIn: boolean;
+  /** Live pre-saves (lib/presave/read.ts) — rendered by PresaveCard with the
+   *  honest copy + points toast instead of the generic CTA row below. */
+  presaves?: PresaveCardRow[];
+  signInHref?: string;
+  accentFrom?: string | null;
+  accentTo?: string | null;
 }) {
-  if (actions.length === 0) return null;
+  // pre_save rows have their own card; keep them out of the generic list so
+  // a campaign never shows twice.
+  const generic = actions.filter((a) => a.kind !== "pre_save");
+  if (generic.length === 0 && presaves.length === 0) return null;
 
   return (
     <section className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/30 via-slate-900 to-midnight p-5">
@@ -37,8 +52,21 @@ export default function FanCtaBlock({
           </h2>
         </div>
       </div>
+      {presaves.length > 0 && (
+        <div className="mb-3">
+          <PresaveCard
+            artistSlug={artistSlug}
+            presaves={presaves}
+            signedIn={signedIn}
+            signInHref={signInHref ?? `/login?next=/artists/${artistSlug}/community`}
+            accentFrom={accentFrom}
+            accentTo={accentTo}
+            embedded
+          />
+        </div>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
-        {actions.map((a) => (
+        {generic.map((a) => (
           <div
             key={a.id}
             className={`rounded-2xl border p-4 ${

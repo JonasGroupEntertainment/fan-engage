@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { profileValuesFromFan } from "@/lib/profile-form";
+import { profileValuesFromFan, type FanProfileRow } from "@/lib/profile-form";
 import ProfileForm from "./profile-form";
 
 export const metadata = { title: "Edit profile" };
@@ -13,11 +13,24 @@ export default async function EditProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/me/profile");
 
-  const { data: fan } = await supabase
+  // home_region is migration 0090; until it is applied the select would
+  // fail and blank the whole form, so retry without it.
+  const BASE_COLUMNS =
+    "first_name, last_name, city, phone, interest, music_outlet, socials, avatar_url";
+  const withRegion = await supabase
     .from("fans")
-    .select("first_name, last_name, city, phone, interest, music_outlet, socials, avatar_url")
+    .select(`${BASE_COLUMNS}, home_region`)
     .eq("id", user.id)
     .maybeSingle();
+  let fan = withRegion.data as FanProfileRow | null;
+  if (withRegion.error && /home_region/i.test(withRegion.error.message ?? "")) {
+    const plain = await supabase
+      .from("fans")
+      .select(BASE_COLUMNS)
+      .eq("id", user.id)
+      .maybeSingle();
+    fan = plain.data as FanProfileRow | null;
+  }
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:py-14">

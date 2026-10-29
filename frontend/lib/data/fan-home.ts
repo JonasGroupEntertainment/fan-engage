@@ -3,8 +3,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import { getAdminContext } from "@/lib/admin";
 import { roleAtLeast } from "@/lib/admin-authz";
-import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
+import { selectWithOptionalEventGeo } from "@/lib/data/event-select";
 import { isPastEvent } from "@/lib/data/artists";
+import { eventDistance, fanHomeCoords } from "@/lib/geo/near";
+import { eventDayKey } from "@/lib/today/event-day";
+import { selectTodayItems, type TodayItem } from "@/lib/today/select";
+import { easternDateString } from "@/lib/dates/eastern";
+import { shouldListLaunchReward } from "@/lib/launch-catalog";
 import { getCurrentCommunityId } from "@/lib/community";
 import { pickViewerCommunity } from "@/lib/viewer-community";
 import {
@@ -48,7 +53,20 @@ export interface FanHomeUpcomingEvent {
    * that says when RSVP opens. Null when RSVP is open now.
    */
   rsvpStatusLabel: string | null;
+  /** Venue city / state from migration 0090; null until an admin fills them in. */
+  city: string | null;
+  region: string | null;
+  /**
+   * Whole miles from the fan's home (fans.home_lat/lng) to the venue
+   * (artist_events.lat/lng). Null when either side has no coordinates —
+   * the UI never shows a distance it cannot stand behind.
+   */
+  distanceMiles: number | null;
+  /** True when `distanceMiles` exists and is under NEAR_YOU_MILES (75). */
+  nearYou: boolean;
 }
+
+export type { TodayItem } from "@/lib/today/select";
 
 /**
  * @deprecated Back-compat shim — alias for `FanHomeUpcomingEvent`. New code
@@ -136,6 +154,13 @@ export interface FanHomeData {
    * else the hostname community (which falls back to DEFAULT_COMMUNITY_SLUG).
    */
   primaryCommunity: string;
+  /**
+   * Sprint 3: "Today" row — up to four chips answering "what can I do
+   * right now" (check in, tonight's show, new posts, streak, unclaimed
+   * reward). Empty when there is nothing to do; the dashboard then renders
+   * no row at all. Selection is pure (lib/today/select.ts).
+   */
+  today: TodayItem[];
 }
 
 /**
@@ -321,6 +346,42 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     .from("event_reminders")
     .select("event_id, kind");
 
+  // Today row, extra query 1 of 2: the fan's recent check-ins at followed
+  // artists. Drives "Check in today" (not yet today, and a venue reason:
+  // event today or checked in there before).
+  const checkinsPromise = followedSlugs.length
+    ? admin
+        .from("checkins")
+        .select("artist_slug, created_at")
+        .eq("fan_id", user.id)
+        .in("artist_slug", followedSlugs)
+        .order("created_at", { ascending: false })
+        .limit(100)
+    : Promise.resolve({ data: [] as Array<{ artist_slug: string; created_at: string }>, error: null });
+
+  // Today row, extra query 2 of 2: rewards the fan can afford, with the
+  // fan's own redemptions embedded (PostgREST filters the embed, not the
+  // parent, so unredeemed rewards come back with an empty array).
+  const fanPoints = Number(fan.total_points ?? 0);
+  const rewardsPromise = fanPoints > 0
+    ? admin
+        .from("rewards_catalog")
+        .select(
+          "id, title, point_cost, community_id, requires_tier, active, stock, drops_at, expires_at, clip_url, in_app_only, reward_redemptions(fan_id)",
+        )
+        .eq("active", true)
+        .gt("point_cost", 0)
+        .lte("point_cost", fanPoints)
+        .or(
+          followedSlugs.length
+            ? `community_id.in.(${followedSlugs.join(",")}),community_id.is.null`
+            : "community_id.is.null",
+        )
+        .eq("reward_redemptions.fan_id", user.id)
+        .order("point_cost", { ascending: false })
+        .limit(25)
+    : Promise.resolve({ data: [] as TodayRewardRow[], error: null });
+
   const [
     artistsRes,
     upcomingEventsRes,
@@ -341,6 +402,8 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     foundingNumbersRes,
     adminGrantsRes,
     adminCtx,
+    checkinsRes,
+    rewardsRes,
   ] = await Promise.all([
     artistsPromise,
     upcomingEventsPromise,
@@ -361,6 +424,8 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     foundingNumbersPromise,
     adminGrantsPromise,
     adminCtxPromise,
+    checkinsPromise,
+    rewardsPromise,
   ]);
 
   const premiumCommunities = ((premiumCommunitiesRes.data ?? []) as Array<{
@@ -402,10 +467,12 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   const superAdminManages =
     Boolean(adminCtx?.isSuperAdmin) && roleAtLeast(adminCtx?.role ?? null, "editor");
 
-  const upcomingEvents: FanHomeUpcomingEvent[] = upcomingEventsRes
-    .filter((e) =>
-      homeEventVisible(e.tier, e.artist_slug, { premiumCommunities, founderCommunities }),
-    )
+  const fanHome = fanHomeCoords(fan as FanProfile);
+  const visibleUpcoming = upcomingEventsRes.filter((e) =>
+    homeEventVisible(e.tier, e.artist_slug, { premiumCommunities, founderCommunities }),
+  );
+
+  const upcomingEvents: FanHomeUpcomingEvent[] = visibleUpcoming
     .slice(0, 3)
     .map((e) => {
       const reminderKinds = remindersByEvent.get(e.id) ?? new Set<string>();
@@ -437,6 +504,9 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
         has_scheduled_reminder:
           reminderKinds.has("reminder_24h") || reminderKinds.has("reminder_1h"),
         rsvpStatusLabel,
+        city: e.city,
+        region: e.region,
+        ...eventDistance(fanHome, { lat: e.lat, lng: e.lng }),
       };
     });
 
@@ -542,6 +612,20 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   const totalEarnedBadges = earnedSet.size;
   const totalBadgeCount = allBadges.length;
 
+  const today = buildTodayItems({
+    now: new Date(),
+    fan: fan as FanProfile & { last_active_date?: string | null; current_streak_days?: number | null },
+    followedArtists,
+    events: visibleUpcoming,
+    fanHome,
+    checkins: (checkinsRes.data ?? []) as Array<{ artist_slug: string; created_at: string }>,
+    recentActivity,
+    rewards: rewardsRes.error ? [] : ((rewardsRes.data ?? []) as unknown as TodayRewardRow[]),
+    premiumCommunities,
+    founderCommunities,
+    primaryCommunity,
+  });
+
   return {
     fan: fan as FanProfile,
     followedArtists,
@@ -557,7 +641,115 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     premiumCommunities,
     founderCommunities,
     primaryCommunity,
+    today,
   };
+}
+
+type TodayRewardRow = {
+  id: string;
+  title: string;
+  point_cost: number;
+  community_id: string | null;
+  requires_tier: "premium" | "founder-only" | null;
+  active: boolean;
+  stock: number | null;
+  drops_at: string | null;
+  expires_at: string | null;
+  clip_url: string | null;
+  in_app_only: boolean;
+  reward_redemptions: Array<{ fan_id: string }> | null;
+};
+
+/** Eastern YYYY-MM-DD for the day before `now`. */
+function easternYesterday(now: Date): string {
+  return easternDateString(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+}
+
+/** UTC YYYY-MM-DD — the calendar lib/streaks/touch.ts keeps last_active_date on. */
+function utcDateString(at: Date): string {
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * Shape the already-loaded Fan Home reads into the pure Today selector's
+ * input. No queries here — the two extra reads (checkins, rewards) ran in
+ * the main Promise.all.
+ */
+function buildTodayItems(args: {
+  now: Date;
+  fan: FanProfile & { last_active_date?: string | null; current_streak_days?: number | null };
+  followedArtists: FanHomeFollowedArtist[];
+  events: HomeUpcomingRow[];
+  fanHome: ReturnType<typeof fanHomeCoords>;
+  checkins: Array<{ artist_slug: string; created_at: string }>;
+  recentActivity: FanHomeActivityPost[];
+  rewards: TodayRewardRow[];
+  premiumCommunities: string[];
+  founderCommunities: string[];
+  primaryCommunity: string;
+}): TodayItem[] {
+  const { now, fan } = args;
+  const todayKey = easternDateString(now);
+  const nowMs = now.getTime();
+
+  // "New posts since last visit": last_active_date is the streak's UTC
+  // day marker (lib/streaks/touch.ts), which touchStreak has already
+  // bumped to today by the time Fan Home renders. So "since last visit"
+  // means posts created today or later than the previous active day —
+  // count posts newer than the start of the last active day (UTC). Recent
+  // Activity is capped at 5, so the count is capped too ("5+ new posts").
+  const lastActive = fan.last_active_date ?? null;
+  const sinceMs = lastActive ? Date.parse(`${lastActive}T00:00:00Z`) : Number.NaN;
+  const newCount = Number.isFinite(sinceMs)
+    ? args.recentActivity.filter((p) => Date.parse(p.created_at) > sinceMs).length
+    : 0;
+  const postsHref = `/artists/${args.primaryCommunity}/community`;
+
+  return selectTodayItems({
+    todayKey,
+    yesterdayKey: easternYesterday(now),
+    streakTodayKey: utcDateString(now),
+    streakYesterdayKey: utcDateString(new Date(nowMs - 24 * 60 * 60 * 1000)),
+    followedArtists: args.followedArtists.map((a) => ({ slug: a.slug, name: a.name })),
+    events: args.events.map((e) => ({
+      id: e.id,
+      artist_slug: e.artist_slug,
+      title: e.title,
+      dayKey: eventDayKey(e, now),
+      starts_at: e.starts_at,
+      url: e.url,
+      ...eventDistance(args.fanHome, { lat: e.lat, lng: e.lng }),
+    })),
+    checkins: args.checkins
+      .filter((c) => Number.isFinite(Date.parse(c.created_at)))
+      .map((c) => ({
+        artist_slug: c.artist_slug,
+        dayKey: easternDateString(new Date(c.created_at)),
+      })),
+    newPosts: { count: newCount, capped: newCount >= 5, href: postsHref },
+    streak: {
+      currentStreakDays: Number(fan.current_streak_days ?? 0),
+      lastActiveDate: lastActive,
+      href: "/activity",
+    },
+    rewards: args.rewards
+      .filter((r) => r.stock !== 0)
+      .filter((r) => !r.drops_at || Date.parse(r.drops_at) <= nowMs)
+      .filter((r) => !r.expires_at || Date.parse(r.expires_at) > nowMs)
+      .filter((r) => shouldListLaunchReward(r, { signedIn: true }))
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        point_cost: r.point_cost,
+        community_id: r.community_id,
+        requires_tier: r.requires_tier,
+        redeemed: (r.reward_redemptions?.length ?? 0) > 0,
+      })),
+    points: Number(fan.total_points ?? 0),
+    premiumCommunities: args.premiumCommunities,
+    founderCommunities: args.founderCommunities,
+    rewardsHref: "/rewards",
+  });
 }
 
 type HomeUpcomingRow = {
@@ -571,6 +763,11 @@ type HomeUpcomingRow = {
   url: string | null;
   tier: "public" | "premium" | "founder-only";
   rsvp_opens_at: string | null;
+  /** Migration 0090. Null until applied / filled in. */
+  city: string | null;
+  region: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 /**
@@ -603,7 +800,7 @@ async function loadHomeUpcomingEvents(
   if (followedSlugs.length === 0) return [];
   const columns =
     "id, artist_slug, title, starts_at, ends_at, event_date, location, url, tier, active";
-  const { data, error } = await selectWithOptionalRsvpOpens(
+  const { data, error } = await selectWithOptionalEventGeo(
     (cols) =>
       admin
         .from("artist_events")
@@ -619,7 +816,15 @@ async function loadHomeUpcomingEvents(
   );
   if (error || !data) return [];
   const now = Date.parse(nowIso);
-  return (data as unknown as Array<Omit<HomeUpcomingRow, "rsvp_opens_at" | "tier"> & { tier?: string | null; rsvp_opens_at?: string | null }>)
+  type RawRow = Omit<HomeUpcomingRow, "rsvp_opens_at" | "tier" | "city" | "region" | "lat" | "lng"> & {
+    tier?: string | null;
+    rsvp_opens_at?: string | null;
+    city?: string | null;
+    region?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  };
+  return (data as unknown as RawRow[])
     .filter((row) => !isPastEvent(row, now))
     .map((row) => ({
       id: row.id,
@@ -632,5 +837,9 @@ async function loadHomeUpcomingEvents(
       url: row.url,
       tier: (row.tier === "premium" || row.tier === "founder-only" ? row.tier : "public") as HomeUpcomingRow["tier"],
       rsvp_opens_at: row.rsvp_opens_at ?? null,
+      city: row.city ?? null,
+      region: row.region ?? null,
+      lat: typeof row.lat === "number" ? row.lat : null,
+      lng: typeof row.lng === "number" ? row.lng : null,
     }));
 }

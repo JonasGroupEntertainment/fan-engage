@@ -10,6 +10,8 @@ export type ProfileFormValues = {
   firstName: string;
   lastName: string;
   city: string;
+  /** Migration 0090: home state/province (fans.home_region). Pairs with `city`. */
+  homeRegion: string;
   phone: string;
   interest: string;
   musicOutlet: string;
@@ -48,6 +50,7 @@ const FIELD_NAMES = [
   "firstName",
   "lastName",
   "city",
+  "homeRegion",
   "phone",
   "interest",
   "musicOutlet",
@@ -71,6 +74,8 @@ export type FanProfileRow = {
   first_name: string | null;
   last_name: string | null;
   city: string | null;
+  /** Optional until 0090 is applied. */
+  home_region?: string | null;
   phone: string | null;
   interest: string | null;
   music_outlet: string | null;
@@ -85,6 +90,7 @@ export function profileValuesFromFan(fan: FanProfileRow | null): ProfileFormValu
     firstName: fan?.first_name ?? "",
     lastName: fan?.last_name ?? "",
     city: fan?.city ?? "",
+    homeRegion: fan?.home_region ?? "",
     phone: fan?.phone ?? "",
     interest: fan?.interest ?? "",
     musicOutlet: fan?.music_outlet ?? "",

@@ -134,3 +134,7 @@ function brief(error: string): string {
 function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
+
+/** Sender identity shared by the weekly digest campaign and the lapsed nudge. */
+export const DIGEST_FROM_NAME = "Fan Engage";
+export const DIGEST_REPLY_TO = "no-reply@fanengage.app";

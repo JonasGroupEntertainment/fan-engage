@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isFeatureEnabledForCommunity } from "@/lib/ai-gates/read";
 import {
   canUsePremiumFeature,
   entitlementFromMembershipRow,
@@ -152,4 +153,21 @@ export async function requirePremiumAnywhere(
     return { allowed: true, entitlement };
   }
   return { allowed: false, reason: "needs-premium" };
+}
+
+/**
+ * AI comment drafter gate for one community. Free when the community's gate
+ * is open — a row in ai_feature_gates (0091, edited at /admin/ai-gates)
+ * wins, else the AI_DRAFTER_FREE_COMMUNITIES env fallback — otherwise the
+ * unchanged Premium path (`ai_comment_drafter` in PREMIUM_V1_FEATURES).
+ */
+export async function requireAiCommentDrafter(
+  fanId: string,
+  communityId: string,
+): Promise<PremiumGateResult & { via: "gate" | "premium" }> {
+  if (await isFeatureEnabledForCommunity("ai_comment_drafter", communityId)) {
+    return { allowed: true, entitlement: null, via: "gate" };
+  }
+  const gate = await requirePremiumFeature(fanId, communityId, "ai_comment_drafter");
+  return { ...gate, via: "premium" };
 }

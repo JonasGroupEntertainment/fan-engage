@@ -45,10 +45,15 @@ export async function notifyNewPost(opts: {
     // Excerpt the post body
     const { data: post } = await admin
       .from("community_posts")
-      .select("body, title, kind")
+      .select("body, title, kind, visibility")
       .eq("id", opts.postId)
       .maybeSingle();
     if (!post) return;
+    // Gated posts (premium / founder-only) must not leak their body to every
+    // follower's lock screen. The push still goes out (it's a nudge to the
+    // feed, where the paywall / founder card decides what they see) but
+    // carries the title only, or a generic line.
+    const gated = (post.visibility as string | null) != null && post.visibility !== "public";
 
     // Who wrote it? `admin_users.community_id` is the artist slug (or `*`
     // for super-admins), so a grant row for this community means the
@@ -64,7 +69,7 @@ export async function notifyNewPost(opts: {
       hasTeamGrant: (grants ?? []).length > 0,
     });
 
-    const excerpt = String(post.body ?? post.title ?? "")
+    const excerpt = String(gated ? (post.title ?? "") : (post.body ?? post.title ?? ""))
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 80);

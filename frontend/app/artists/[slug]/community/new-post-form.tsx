@@ -56,9 +56,11 @@ export default function NewPostForm({
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    // Admins can flag a post public, premium, or founder-only; non-admins never get
-    // this option in the UI, and the server action also rejects it on fan-created posts.
-    if (isAdmin && kind !== "post") {
+    // Team authors (admin_users grant) can flag any kind — including a plain
+    // post — public, premium, or founder-only. Fans never see the control and
+    // the server actions ignore the field unless the author holds a grant
+    // (lib/founder-gate/core.ts resolveAuthorVisibility).
+    if (isAdmin) {
       formData.set("visibility", visibility);
     }
 
@@ -135,7 +137,7 @@ export default function NewPostForm({
                     : "🏆 Challenge"}
             </button>
           ))}
-          {kind !== "post" && (
+          {(
             <div className="ml-auto flex items-center gap-1 rounded-full border border-white/15 bg-black/30 p-0.5">
               {(["public", "premium", "founder-only"] as Visibility[]).map((v) => {
                 const isActive = visibility === v;

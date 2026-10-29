@@ -61,12 +61,29 @@ export default function ProfileForm({ initialValues }: { initialValues: ProfileF
         defaultValue={values.lastName}
         placeholder="Your last name"
       />
-      <TextField
-        label="City & state"
-        name="city"
-        defaultValue={values.city}
-        placeholder="Austin, TX"
-      />
+      <div className="grid gap-5 sm:grid-cols-[1fr_8rem]">
+        <TextField
+          label="Home city"
+          name="city"
+          defaultValue={values.city}
+          placeholder="Austin"
+        />
+        <label className="block text-sm text-white/80">
+          <span>State</span>
+          <input
+            type="text"
+            name="homeRegion"
+            defaultValue={values.homeRegion}
+            placeholder="TX"
+            maxLength={20}
+            autoCapitalize="characters"
+            className={`${INPUT_CLASS} ${INPUT_BORDER} uppercase`}
+          />
+        </label>
+        <span className="-mt-3 block text-xs text-white/50 sm:col-span-2">
+          Used to show how far shows are from you. Leave blank to hide distances.
+        </span>
+      </div>
 
       <label className="block text-sm text-white/80">
         <span>Phone number</span>

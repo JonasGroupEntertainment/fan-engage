@@ -3,6 +3,7 @@ import WeeklyRecapTile from "@/components/weekly-recap-tile";
 import type { WeeklyRecap } from "@/lib/personal-recap/types";
 import PushOptInBanner from "@/components/push-opt-in-banner";
 import StreakTile from "@/components/streak-tile";
+import TodayRow from "@/components/today-row";
 import type { FanHomeData, FanHomeUpcomingEvent } from "@/lib/data/fan-home";
 import { focalPointStyle } from "@/lib/images/focal-point";
 
@@ -48,6 +49,11 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
           </h1>
         </div>
       </header>
+
+      {/* "Today" — what can I do right now. Sits under the first-72-hours
+          checklist (rendered by app/page.tsx above this component) and
+          above everything else. Renders nothing when there is nothing to do. */}
+      <TodayRow items={data.today ?? []} />
 
       {/* Followed artists strip */}
       <PushOptInBanner />
@@ -246,6 +252,12 @@ function UpcomingEventsList({
                 <p className="mt-1 text-xs text-white/60">
                   {e.artist_name ? `${e.artist_name} · ` : ""}
                   {e.location ? `📍 ${e.location}` : "Location TBA"}
+                  {e.distanceMiles != null ? ` · ${e.distanceMiles} mi` : ""}
+                  {e.nearYou && (
+                    <span className="ml-2 inline-flex rounded-full bg-aurora/20 px-1.5 py-0.5 text-[10px] font-medium text-aurora">
+                      Near you
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="shrink-0 text-right">

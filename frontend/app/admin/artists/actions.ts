@@ -1,4 +1,7 @@
 "use server";
+
+import { resolveCityCoords } from "@/lib/geo/resolve";
+import { isMissingEventGeoColumn } from "@/lib/data/event-select";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
@@ -120,6 +123,39 @@ export async function updateArtistAction(formData: FormData) {
  * { error } on validation/DB failure. The client form (CreateEventForm)
  * uses useFormSave for retry-on-503 + visible status feedback.
  */
+/**
+ * 0090 venue location from the admin event forms. City + region are stored
+ * as typed (region upper-cased); lat/lng come from the form when given,
+ * else are resolved from the bundled US city table. Unresolvable cities
+ * store null coordinates and the row shows "(unresolved — add coordinates)".
+ */
+function eventGeoFromForm(formData: FormData): {
+  city: string | null;
+  region: string | null;
+  lat: number | null;
+  lng: number | null;
+} {
+  const city = String(formData.get("city") ?? "").trim();
+  const region = String(formData.get("region") ?? "").trim().toUpperCase();
+  const latRaw = String(formData.get("lat") ?? "").trim();
+  const lngRaw = String(formData.get("lng") ?? "").trim();
+  let lat = latRaw ? Number(latRaw) : null;
+  let lng = lngRaw ? Number(lngRaw) : null;
+  if (lat !== null && !Number.isFinite(lat)) lat = null;
+  if (lng !== null && !Number.isFinite(lng)) lng = null;
+  if ((lat === null || lng === null) && city) {
+    const resolved = resolveCityCoords(city, region || null);
+    if (resolved) {
+      lat = resolved.lat;
+      lng = resolved.lng;
+    } else {
+      lat = null;
+      lng = null;
+    }
+  }
+  return { city: city || null, region: region || null, lat, lng };
+}
+
 export async function createEventAction(formData: FormData) {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
@@ -151,10 +187,19 @@ export async function createEventAction(formData: FormData) {
     capacity: Number.isFinite(capacity) ? capacity : null,
     sort_order: sortOrder,
   };
+  const geo = eventGeoFromForm(formData);
   let { error } = await supa.from("artist_events").insert({
     ...row,
+    ...geo,
     rsvp_opens_at: opensAt.value,
   });
+  if (error && isMissingEventGeoColumn(error)) {
+    // Migration 0090 not applied yet: save without the venue location.
+    ({ error } = await supa.from("artist_events").insert({
+      ...row,
+      rsvp_opens_at: opensAt.value,
+    }));
+  }
   if (error && isMissingRsvpOpensColumn(error)) {
     if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
     ({ error } = await supa.from("artist_events").insert(row));
@@ -223,11 +268,20 @@ export async function updateEventAction(formData: FormData) {
     sort_order: sortOrder,
     active,
   };
+  const geo = eventGeoFromForm(formData);
   let { error } = await supa
     .from("artist_events")
-    .update({ ...row, rsvp_opens_at: opensAt.value })
+    .update({ ...row, ...geo, rsvp_opens_at: opensAt.value })
     .eq("id", eventId)
     .eq("artist_slug", artistSlug);
+  if (error && isMissingEventGeoColumn(error)) {
+    // Migration 0090 not applied yet: save without the venue location.
+    ({ error } = await supa
+      .from("artist_events")
+      .update({ ...row, rsvp_opens_at: opensAt.value })
+      .eq("id", eventId)
+      .eq("artist_slug", artistSlug));
+  }
   if (error && isMissingRsvpOpensColumn(error)) {
     if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
     ({ error } = await supa

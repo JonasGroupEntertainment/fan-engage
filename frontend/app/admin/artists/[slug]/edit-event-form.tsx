@@ -22,6 +22,11 @@ export interface EditableEvent {
   sort_order: number;
   active: boolean;
   rsvp_opens_at?: string | null;
+  /** Migration 0090 venue location. Absent/null until filled in. */
+  city?: string | null;
+  region?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 /**
@@ -104,6 +109,40 @@ export default function EditEventForm({
         placeholder="Location (Nashville, TN)"
         className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
       />
+      <input
+        name="city"
+        defaultValue={event.city ?? ""}
+        placeholder="Venue city (Austin)"
+        className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
+      />
+      <input
+        name="region"
+        defaultValue={event.region ?? ""}
+        placeholder="State (TX)"
+        maxLength={20}
+        className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm uppercase"
+      />
+      <input
+        name="lat"
+        defaultValue={event.lat ?? ""}
+        type="number"
+        step="any"
+        placeholder="Latitude (blank = resolve from city)"
+        className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
+      />
+      <input
+        name="lng"
+        defaultValue={event.lng ?? ""}
+        type="number"
+        step="any"
+        placeholder="Longitude (blank = resolve from city)"
+        className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
+      />
+      <p className="text-[11px] text-white/45 md:col-span-2">
+        City + state power &ldquo;Near you&rdquo; and the distance on fan event cards. Leave
+        latitude/longitude blank to resolve them from the city table on save; the row says
+        &ldquo;unresolved&rdquo; when the city is not in the table.
+      </p>
       <input
         name="detail"
         defaultValue={event.detail ?? ""}

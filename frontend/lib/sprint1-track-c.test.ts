@@ -215,3 +215,12 @@ describe("share badge pages rewrite legacy descriptions", () => {
     });
   }
 });
+
+describe("new-post push never leaks a gated body (Sprint 3)", () => {
+  const src = readFileSync(new URL("./notifications/triggers/new-post.ts", import.meta.url), "utf8");
+  it("selects visibility and excerpts only the title for non-public posts", () => {
+    assert.match(src, /select\("body, title, kind, visibility"\)/);
+    assert.match(src, /post\.visibility !== "public"/);
+    assert.match(src, /gated \? \(post\.title \?\? ""\) : \(post\.body/);
+  });
+});

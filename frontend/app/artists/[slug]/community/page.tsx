@@ -6,6 +6,8 @@ import { getArtistFromDb } from "@/lib/data/artists";
 import { getAdminUser } from "@/lib/admin";
 import { getCurrentFan } from "@/lib/data/fan";
 import { getActiveFanActionsForArtist } from "@/lib/data/campaigns";
+import { getLivePresavesForArtist } from "@/lib/presave/read";
+import { getLockedFounderPostStubs, mergeFounderStubs } from "./founder-gate";
 import {
   getChallengeEntries,
   getCommentsByPost,
@@ -27,6 +29,7 @@ import FanCtaBlock from "./fan-cta-block";
 import NewPostForm from "./new-post-form";
 import PostCard from "./post-card";
 import TagFilterChips from "./tag-filter-chips";
+import FounderLockedCard from "./founder-locked-card";
 import PickedForYou from "@/components/personal/picked-for-you";
 import PointsToastHost from "@/components/points-toast";
 
@@ -63,14 +66,27 @@ export default async function ArtistCommunityPage({
   const artist = await getArtistFromDb(slug);
   if (!artist) notFound();
 
-  const [fan, posts, adminUser, fanActions, entitlement, topTags] = await Promise.all([
-    getCurrentFan(),
-    getPostsByArtist(slug, 30, { tagFilter }),
-    getAdminUser(),
-    getActiveFanActionsForArtist(slug),
-    getViewerEntitlement(slug),
-    getTopTagsForArtist(slug, 10),
-  ]);
+  const [fan, visiblePosts, adminUser, fanActions, presaves, entitlement, topTags] =
+    await Promise.all([
+      getCurrentFan(),
+      getPostsByArtist(slug, 30, { tagFilter }),
+      getAdminUser(),
+      getActiveFanActionsForArtist(slug),
+      getLivePresavesForArtist(slug),
+      getViewerEntitlement(slug),
+      getTopTagsForArtist(slug, 10),
+    ]);
+
+  // Founder-only rows are hidden at the DB for non-founders (0091), so the
+  // feed would silently lose them. Fetch id/title stubs (never the body) with
+  // the service role and merge them back in as locked cards. Founders and
+  // admins already received the real rows above; nothing to add for them.
+  const viewerIsFounder = Boolean(entitlement?.isFounder);
+  const founderStubs =
+    adminUser !== null || viewerIsFounder
+      ? []
+      : await getLockedFounderPostStubs(slug, { excludeIds: visiblePosts.map((p) => p.id), tagFilter });
+  const posts = mergeFounderStubs(visiblePosts, founderStubs);
   const visibleTags = filterCommunityTagsForMarketplace(topTags, marketplaceLive);
 
   // Parallel-fetch comments + poll data + challenge entries for every visible
@@ -145,7 +161,15 @@ export default async function ArtistCommunityPage({
         </div>
       </section>
 
-      <FanCtaBlock artistSlug={slug} actions={fanActions} signedIn={isSignedIn} />
+      <FanCtaBlock
+        artistSlug={slug}
+        actions={fanActions}
+        presaves={presaves}
+        signedIn={isSignedIn}
+        signInHref={`/login?next=/artists/${slug}/community`}
+        accentFrom={artist.accentFrom}
+        accentTo={artist.accentTo}
+      />
 
       {isSignedIn && canWrite ? (
         <NewPostForm artistSlug={slug} isAdmin={isAdmin} />
@@ -219,6 +243,18 @@ export default async function ArtistCommunityPage({
                       Create your fan profile
                     </Link>
                   </section>
+                );
+              }
+              if (post.visibility === "founder-only") {
+                return (
+                  <FounderLockedCard
+                    key={post.id}
+                    title={post.title}
+                    artistName={artist.name}
+                    foundersHref={`/artists/${slug}/founders`}
+                    accentFrom={artist.accentFrom}
+                    accentTo={artist.accentTo}
+                  />
                 );
               }
               return (
