@@ -19,6 +19,7 @@ import {
   type RsvpAdminGrant,
 } from "@/lib/rsvp-window";
 import type { Badge, FanProfile } from "./types";
+import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 
 export interface FanHomeFollowedArtist {
   slug: string;
@@ -249,24 +250,36 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     .eq("fan_id", user.id);
 
   // Recent community posts from followed artists
-  const activityPromise = followedSlugs.length
-    ? admin
-        .from("community_posts")
-        .select("id, artist_slug, kind, title, body, author_id, pinned, created_at, visibility")
-        .in("artist_slug", followedSlugs)
-        .order("created_at", { ascending: false })
-        .limit(5)
-    : Promise.resolve({ data: [] as Array<{
-        id: string;
-        artist_slug: string;
-        kind: string;
-        title: string | null;
-        body: string;
-        author_id: string;
-        pinned: boolean;
-        created_at: string;
-        visibility: "public" | "premium" | "founder-only";
-      }> });
+  type ActivityRow = {
+    id: string;
+    artist_slug: string;
+    kind: string;
+    title: string | null;
+    body: string;
+    author_id: string;
+    pinned: boolean;
+    created_at: string;
+    visibility: "public" | "premium" | "founder-only";
+  };
+  const activityQuery = (withScheduledFilter: boolean) => {
+    let q = admin
+      .from("community_posts")
+      .select("id, artist_slug, kind, title, body, author_id, pinned, created_at, visibility")
+      .in("artist_slug", followedSlugs);
+    // Service-role read on a fan's behalf: hide scheduled posts (0094).
+    if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
+    return q.order("created_at", { ascending: false }).limit(5);
+  };
+  const activityPromise: Promise<{ data: ActivityRow[] | null }> = followedSlugs.length
+    ? (async () => {
+        const first = await activityQuery(true);
+        // Until 0094 is applied the column does not exist — fall back to the
+        // unfiltered read rather than an empty Recent Activity.
+        const res =
+          first.error && isMissingScheduledColumnError(first.error) ? await activityQuery(false) : first;
+        return { data: (res.data ?? null) as ActivityRow[] | null };
+      })()
+    : Promise.resolve({ data: [] as ActivityRow[] });
 
   // Phase 5d: viewer's premium memberships across followed communities.
   // Used to decide which premium posts to body-reveal in Recent Activity.

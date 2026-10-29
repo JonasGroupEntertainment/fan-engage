@@ -8,6 +8,7 @@ import {
   updatePortalEventAction,
   deletePortalEventAction,
 } from "./actions";
+import BulkAddPanel from "./bulk-add-panel";
 
 interface Event {
   id: string;
@@ -23,7 +24,7 @@ interface Event {
 }
 
 const inputCls =
-  "rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-purple-500";
+  "min-h-11 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-purple-500";
 
 function EventForm({
   artistSlug,
@@ -120,7 +121,7 @@ function EventForm({
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="min-h-11 rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {submitting ? "Saving…" : event ? "Save changes" : "+ Add event"}
         </button>
@@ -190,10 +191,10 @@ function EventRow({
               {event.capacity ? ` / ${event.capacity} capacity` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
             <button
               onClick={() => setEditing(true)}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:border-white/20 hover:text-white transition-colors"
+              className="min-h-11 rounded-lg border border-white/10 px-4 py-1.5 text-xs text-white/60 hover:border-white/20 hover:text-white transition-colors"
             >
               Edit
             </button>
@@ -202,7 +203,7 @@ function EventRow({
                 <span className="text-xs text-rose-300">Delete?</span>
                 <button
                   onClick={handleDelete}
-                  className="rounded-lg bg-rose-500/20 border border-rose-500/30 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/30"
+                  className="min-h-11 rounded-lg bg-rose-500/20 border border-rose-500/30 px-4 py-1.5 text-xs text-rose-300 hover:bg-rose-500/30"
                 >
                   Confirm
                 </button>
@@ -216,7 +217,7 @@ function EventRow({
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:border-rose-500/30 hover:text-rose-300 transition-colors"
+                className="min-h-11 rounded-lg border border-white/10 px-4 py-1.5 text-xs text-white/50 hover:border-rose-500/30 hover:text-rose-300 transition-colors"
               >
                 Delete
               </button>
@@ -238,10 +239,11 @@ export default function EventsClient({
   artistSlug: string;
 }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1
             className="text-2xl font-semibold text-white"
@@ -253,13 +255,29 @@ export default function EventsClient({
             {events.length} event{events.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate((v) => !v)}
-          className="rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white"
-        >
-          {showCreate ? "Cancel" : "+ New event"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setShowBulk((v) => !v);
+              setShowCreate(false);
+            }}
+            className="min-h-11 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:border-white/30 hover:text-white"
+          >
+            {showBulk ? "Cancel" : "Paste a tour list"}
+          </button>
+          <button
+            onClick={() => {
+              setShowCreate((v) => !v);
+              setShowBulk(false);
+            }}
+            className="min-h-11 rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white"
+          >
+            {showCreate ? "Cancel" : "+ New event"}
+          </button>
+        </div>
       </div>
+
+      {showBulk && <BulkAddPanel onDone={() => setShowBulk(false)} />}
 
       {showCreate && (
         <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
@@ -271,9 +289,9 @@ export default function EventsClient({
         </div>
       )}
 
-      {events.length === 0 && !showCreate && (
+      {events.length === 0 && !showCreate && !showBulk && (
         <div className="rounded-2xl border border-white/10 bg-black/20 py-16 text-center text-white/50">
-          No events yet. Add your first one above.
+          No events yet. Add your first one above, or paste a whole tour list.
         </div>
       )}
 

@@ -59,8 +59,8 @@ export default async function TeamPage() {
       </div>
 
       {/* Members list */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/50">
               <th className="px-4 py-3">Member</th>
@@ -103,7 +103,7 @@ export default async function TeamPage() {
                         <input type="hidden" name="user_id" value={m.user_id} />
                         <button
                           type="submit"
-                          className="text-xs text-red-300/70 hover:text-red-300"
+                          className="inline-flex min-h-11 items-center px-2 text-xs text-red-300/70 hover:text-red-300"
                         >
                           Remove
                         </button>
@@ -122,24 +122,24 @@ export default async function TeamPage() {
         <h2 className="text-sm font-semibold text-white">Add a team member</h2>
         <form
           action={addTeamMemberAction}
-          className="mt-3 flex flex-wrap items-end gap-3"
+          className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
         >
-          <label className="flex-1 min-w-[220px]">
+          <label className="w-full sm:w-auto sm:flex-1 sm:min-w-[220px]">
             <span className="mb-1 block text-xs text-white/50">Email</span>
             <input
               type="email"
               name="email"
               required
               placeholder="teammate@example.com"
-              className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/40 focus:outline-none"
+              className="min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/40 focus:outline-none"
             />
           </label>
-          <label>
+          <label className="w-full sm:w-auto">
             <span className="mb-1 block text-xs text-white/50">Role</span>
             <select
               name="role"
               defaultValue="editor"
-              className="rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white focus:border-white/40 focus:outline-none"
+              className="min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white focus:border-white/40 focus:outline-none sm:w-auto"
             >
               <option value="admin">Admin</option>
               <option value="editor">Editor</option>
@@ -148,7 +148,7 @@ export default async function TeamPage() {
           </label>
           <button
             type="submit"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+            className="min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 sm:w-auto"
           >
             Add member
           </button>

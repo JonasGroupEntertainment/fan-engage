@@ -1,6 +1,6 @@
 "use server";
 
-import { resolveCityCoords } from "@/lib/geo/resolve";
+import { buildEventRow, resolveEventGeo } from "@/lib/events/build-event-row";
 import { isMissingEventGeoColumn } from "@/lib/data/event-select";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -124,36 +124,16 @@ export async function updateArtistAction(formData: FormData) {
  * uses useFormSave for retry-on-503 + visible status feedback.
  */
 /**
- * 0090 venue location from the admin event forms. City + region are stored
- * as typed (region upper-cased); lat/lng come from the form when given,
- * else are resolved from the bundled US city table. Unresolvable cities
- * store null coordinates and the row shows "(unresolved — add coordinates)".
+ * 0090 venue location from the admin event forms — see resolveEventGeo in
+ * lib/events/build-event-row.ts (shared with the portal bulk importer).
  */
-function eventGeoFromForm(formData: FormData): {
-  city: string | null;
-  region: string | null;
-  lat: number | null;
-  lng: number | null;
-} {
-  const city = String(formData.get("city") ?? "").trim();
-  const region = String(formData.get("region") ?? "").trim().toUpperCase();
-  const latRaw = String(formData.get("lat") ?? "").trim();
-  const lngRaw = String(formData.get("lng") ?? "").trim();
-  let lat = latRaw ? Number(latRaw) : null;
-  let lng = lngRaw ? Number(lngRaw) : null;
-  if (lat !== null && !Number.isFinite(lat)) lat = null;
-  if (lng !== null && !Number.isFinite(lng)) lng = null;
-  if ((lat === null || lng === null) && city) {
-    const resolved = resolveCityCoords(city, region || null);
-    if (resolved) {
-      lat = resolved.lat;
-      lng = resolved.lng;
-    } else {
-      lat = null;
-      lng = null;
-    }
-  }
-  return { city: city || null, region: region || null, lat, lng };
+function eventGeoFromForm(formData: FormData) {
+  return resolveEventGeo({
+    city: String(formData.get("city") ?? ""),
+    region: String(formData.get("region") ?? ""),
+    lat: String(formData.get("lat") ?? ""),
+    lng: String(formData.get("lng") ?? ""),
+  });
 }
 
 export async function createEventAction(formData: FormData) {
@@ -178,14 +158,7 @@ export async function createEventAction(formData: FormData) {
   const supa = createAdminClient();
   const row = {
     artist_slug: artistSlug,
-    title,
-    detail: detail || null,
-    event_date: eventDate || null,
-    starts_at: startsAt || null,
-    location: location || null,
-    url: url || null,
-    capacity: Number.isFinite(capacity) ? capacity : null,
-    sort_order: sortOrder,
+    ...buildEventRow({ title, detail, eventDate, startsAt, location, url, capacity, sortOrder }),
   };
   const geo = eventGeoFromForm(formData);
   let { error } = await supa.from("artist_events").insert({
@@ -258,14 +231,7 @@ export async function updateEventAction(formData: FormData) {
 
   const supa = createAdminClient();
   const row = {
-    title,
-    detail: detail || null,
-    event_date: eventDate || null,
-    starts_at: startsAt || null,
-    location: location || null,
-    url: url || null,
-    capacity: Number.isFinite(capacity) ? capacity : null,
-    sort_order: sortOrder,
+    ...buildEventRow({ title, detail, eventDate, startsAt, location, url, capacity, sortOrder }),
     active,
   };
   const geo = eventGeoFromForm(formData);

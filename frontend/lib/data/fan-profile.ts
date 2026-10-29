@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPremium } from "@/lib/entitlements-core";
+import { scheduledPostsVisibleFilter, withScheduledFilterFallback } from "@/lib/data/scheduled-posts";
 
 /**
  * Public fan profile data layer.
@@ -100,13 +101,19 @@ export async function getFanProfileBySlug(
       .from("fan_artist_following")
       .select("artists!inner ( slug, name )")
       .eq("fan_id", fan.id),
-    admin
-      .from("community_posts")
-      .select("id, title, body, created_at, artist_slug, artists ( name )")
-      .eq("author_id", fan.id)
-      .eq("kind", "post")
-      .order("created_at", { ascending: false })
-      .limit(5),
+    // Public profile, service-role read: a team member's scheduled post has
+    // created_at = scheduled_for and would sort first, leaking its body
+    // before it is due (0094). Retried without the filter until the column
+    // exists.
+    withScheduledFilterFallback((withFilter) => {
+      let q = admin
+        .from("community_posts")
+        .select("id, title, body, created_at, artist_slug, artists ( name )")
+        .eq("author_id", fan.id)
+        .eq("kind", "post");
+      if (withFilter) q = q.or(scheduledPostsVisibleFilter());
+      return q.order("created_at", { ascending: false }).limit(5);
+    }),
     admin
       .from("fan_community_memberships")
       .select("subscription_tier")

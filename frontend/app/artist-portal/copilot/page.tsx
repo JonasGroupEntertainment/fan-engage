@@ -28,7 +28,7 @@ export default async function CopilotPage() {
             to do next.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-white/50">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-white/50">
           <span>
             Updated{" "}
             {generated.toLocaleString("en-US", {
@@ -43,7 +43,7 @@ export default async function CopilotPage() {
             <form action={refreshBriefAction}>
               <button
                 type="submit"
-                className="rounded-lg border border-white/15 px-3 py-1.5 font-medium text-white/80 hover:border-white/30 hover:text-white"
+                className="min-h-11 rounded-lg border border-white/15 px-4 py-1.5 font-medium text-white/80 hover:border-white/30 hover:text-white"
               >
                 Refresh
               </button>
@@ -56,7 +56,7 @@ export default async function CopilotPage() {
         <p className="text-lg font-semibold text-white">{brief.headline}</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Members" value={pulse.memberCount} />
         <Stat label="New (7d)" value={pulse.newMembers7d} />
         <Stat label="Active (7d)" value={pulse.activeFans7d} />
@@ -125,8 +125,8 @@ export default async function CopilotPage() {
             been active recently. 🎉
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/10">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-white/10">
+            <table className="w-full min-w-[320px] text-sm">
               <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/50">
                 <tr>
                   <th className="px-4 py-2">Fan</th>

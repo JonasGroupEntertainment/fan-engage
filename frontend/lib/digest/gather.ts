@@ -20,6 +20,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 import type {
   DigestCommunityBlock,
   DigestEvent,
@@ -100,17 +101,26 @@ export async function gatherDigestPayload(
   //    (anything not auto_hide is fine — pending rows might still be in
   //    classification but their content is real).
   const oneWeekAgoIso = new Date(Date.now() - WEEK_MS).toISOString();
-  const postRows = rowsOrThrow(
-    "community_posts",
-    await admin
+  // Scheduled-but-unpublished posts (0094 scheduled_for in the future) must not
+  // reach the digest. The column may not exist before 0094 is applied, so a
+  // missing-column error retries without the filter.
+  const postsQuery = (withScheduledFilter: boolean) => {
+    let q = admin
       .from("community_posts")
       .select("id, artist_slug, title, body, created_at, moderation_status")
       .in("artist_slug", targetSlugs)
       .gte("created_at", oneWeekAgoIso)
-      .in("moderation_status", ["pending", "safe", "flag_review"])
+      .in("moderation_status", ["pending", "safe", "flag_review"]);
+    if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
+    return q
       .order("created_at", { ascending: false })
-      .limit(targetSlugs.length * POSTS_CANDIDATES_PER_COMMUNITY),
-  );
+      .limit(targetSlugs.length * POSTS_CANDIDATES_PER_COMMUNITY);
+  };
+  let postsRes = await postsQuery(true);
+  if (postsRes.error && isMissingScheduledColumnError(postsRes.error)) {
+    postsRes = await postsQuery(false);
+  }
+  const postRows = rowsOrThrow("community_posts", postsRes);
 
   // 4. Pull reaction + comment counts for those posts in two batched queries.
   const candidatePostIds = (postRows ?? []).map((p) => p.id as string);

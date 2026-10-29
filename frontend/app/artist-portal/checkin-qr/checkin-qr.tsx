@@ -90,8 +90,8 @@ export default function CheckinQr({
       : null;
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-black/30 p-6 space-y-4">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-black/30 p-4 sm:p-6 space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-sm font-semibold text-white">Venue check-in QR</p>
         {countdown && (
           <p className="text-xs tabular-nums text-white/70" aria-live="polite">
@@ -130,7 +130,7 @@ export default function CheckinQr({
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10 transition"
+            className="min-h-11 rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10 transition"
           >
             🖨 Print QR card
           </button>

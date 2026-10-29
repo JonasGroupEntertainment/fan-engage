@@ -89,19 +89,19 @@ export default function RedemptionRow({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Fulfillment note (optional)"
-            className="flex-1 min-w-0 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none sm:w-auto sm:flex-1"
           />
           <button
             onClick={handleFulfill}
             disabled={loading}
-            className="rounded-full bg-green-600/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500 disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-full bg-green-600/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500 disabled:opacity-50 sm:flex-none"
           >
             {loading ? "…" : "Mark fulfilled"}
           </button>
           <button
             onClick={handleCancel}
             disabled={loading}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:text-rose-300 hover:border-rose-500/30 disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:text-rose-300 hover:border-rose-500/30 disabled:opacity-50 sm:flex-none"
           >
             Cancel & refund
           </button>

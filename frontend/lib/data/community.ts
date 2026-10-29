@@ -9,6 +9,7 @@ import type {
   PollData,
   PollOption,
 } from "./types";
+import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 
 /**
  * Which of these posts were written by the artist / their team?
@@ -62,23 +63,36 @@ export async function getPostsByArtist(
       data: { user },
     } = await supabase.auth.getUser();
 
-    let postsQuery = supabase
-      .from("community_posts")
-      .select(
-        "id, artist_slug, author_id, kind, title, body, image_url, video_url, video_poster_url, pinned, visibility, created_at, tags, thread_summary, thread_summary_count",
-      )
-      .eq("artist_slug", artistSlug)
-      .order("pinned", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(limit + 20);
+    const buildPostsQuery = (withScheduledFilter: boolean) => {
+      let q = supabase
+        .from("community_posts")
+        .select(
+          "id, artist_slug, author_id, kind, title, body, image_url, video_url, video_poster_url, pinned, visibility, created_at, tags, thread_summary, thread_summary_count",
+        )
+        .eq("artist_slug", artistSlug);
+      // 0094: RLS already hides future-scheduled rows from fans, but the
+      // author_read / admin_read policies would surface the team's own
+      // scheduled posts in the public feed with no "scheduled" marker. The
+      // portal is the place to see those, so the feed filters them too.
+      if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
+      q = q
+        .order("pinned", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit + 20);
+      // Phase 5 #5: optional ?tag=foo filter from the community-feed URL.
+      // Uses pgvector-style array contains via Supabase's .contains().
+      if (options.tagFilter && options.tagFilter.length > 0) {
+        q = q.contains("tags", [options.tagFilter]);
+      }
+      return q;
+    };
 
-    // Phase 5 #5: optional ?tag=foo filter from the community-feed URL.
-    // Uses pgvector-style array contains via Supabase's .contains().
-    if (options.tagFilter && options.tagFilter.length > 0) {
-      postsQuery = postsQuery.contains("tags", [options.tagFilter]);
+    let { data: posts, error: postsErr } = await buildPostsQuery(true);
+    // Until 0094 is applied the column does not exist — degrade to the
+    // unfiltered feed rather than an empty one.
+    if (postsErr && isMissingScheduledColumnError(postsErr)) {
+      ({ data: posts, error: postsErr } = await buildPostsQuery(false));
     }
-
-    const { data: posts, error: postsErr } = await postsQuery;
 
     if (postsErr) throw postsErr;
     if (!posts || posts.length === 0) return [];

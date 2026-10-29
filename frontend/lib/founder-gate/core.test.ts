@@ -87,9 +87,14 @@ describe("stubToLockedPost + mergeFounderStubs", () => {
 
 describe("the feed path uses these helpers", () => {
   it("createPostAction resolves visibility through the team-author rule", () => {
+    // Sprint 4: the row builder moved to lib/community/post-input.ts (shared
+    // with the artist-portal composer); it is the one place that calls
+    // resolveAuthorVisibility, fed by the same communityAdminUser grant.
     const actions = readRepo("../../app/artists/[slug]/community/actions.ts");
-    assert.match(actions, /resolveAuthorVisibility\(formData\.get\("visibility"\)/);
     assert.match(actions, /communityAdminUser\(artistSlug, "editor"\)/);
+    assert.match(actions, /buildCommunityPostRow\(input, \{[\s\S]*?hasTeamGrant: teamAuthor !== null/);
+    const builder = readRepo("../community/post-input.ts");
+    assert.match(builder, /resolveAuthorVisibility\(input\.visibility, \{ hasTeamGrant: ctx\.hasTeamGrant \}\)/);
   });
 
   it("the stub reader never selects the body", () => {

@@ -50,6 +50,7 @@ describe("PORTAL_MIN_ROLE matrix", () => {
   it("admin can open everything except team", () => {
     assert.equal(canAccessPortalSurface("admin", "team"), false);
     assert.equal(canAccessPortalSurface("admin", "revenue"), true);
+    assert.equal(canAccessPortalSurface("admin", "moderation"), true);
     assert.equal(canAccessPortalSurface("admin", "events"), true);
     assert.equal(canAccessPortalSurface("admin", "redemptions"), true);
     assert.equal(canAccessPortalSurface("admin", "communityPost"), true);
@@ -61,6 +62,7 @@ describe("PORTAL_MIN_ROLE matrix", () => {
     assert.equal(canAccessPortalSurface("editor", "redemptions"), true);
     assert.equal(canAccessPortalSurface("editor", "copilotRefresh"), true);
     assert.equal(canAccessPortalSurface("editor", "revenue"), false);
+    assert.equal(canAccessPortalSurface("editor", "moderation"), false);
     assert.equal(canAccessPortalSurface("editor", "team"), false);
   });
 
@@ -73,6 +75,7 @@ describe("PORTAL_MIN_ROLE matrix", () => {
     assert.equal(canAccessPortalSurface("viewer", "events"), false);
     assert.equal(canAccessPortalSurface("viewer", "redemptions"), false);
     assert.equal(canAccessPortalSurface("viewer", "revenue"), false);
+    assert.equal(canAccessPortalSurface("viewer", "moderation"), false);
     assert.equal(canAccessPortalSurface("viewer", "team"), false);
   });
 });
@@ -100,13 +103,15 @@ describe("artist portal source gating", () => {
     const expectations: Array<[string, RegExp]> = [
       ["../../app/artist-portal/page.tsx", /getPortalContext\(\)/],
       ["../../app/artist-portal/community/page.tsx", /requirePortalPage\("community"/],
-      ["../../app/artist-portal/community/page.tsx", /assertPortalRole\("communityPost"\)/],
+      ["../../app/artist-portal/community/actions.ts", /assertPortalRole\("communityPost"\)/],
       ["../../app/artist-portal/events/page.tsx", /requirePortalPage\("events"/],
       ["../../app/artist-portal/events/actions.ts", /assertPortalRole\("events"\)/],
       ["../../app/artist-portal/leaderboard/page.tsx", /requirePortalPage\("leaderboard"/],
       ["../../app/artist-portal/payouts/page.tsx", /requirePortalPage\("revenue"/],
       ["../../app/artist-portal/redemptions/page.tsx", /requirePortalPage\("redemptions"/],
       ["../../app/artist-portal/redemptions/actions.ts", /assertPortalRole\("redemptions"\)/],
+      ["../../app/artist-portal/moderation/page.tsx", /requirePortalPage\("moderation"/],
+      ["../../app/artist-portal/moderation/actions.ts", /assertPortalRole\("moderation"\)/],
     ];
     for (const [file, re] of expectations) {
       assert.match(readRepo(file), re, file);

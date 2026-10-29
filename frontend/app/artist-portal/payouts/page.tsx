@@ -148,7 +148,7 @@ export default async function ArtistPortalPayoutsPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[420px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
                   <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wide text-white/50">

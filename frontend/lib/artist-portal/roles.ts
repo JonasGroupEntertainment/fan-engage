@@ -49,8 +49,18 @@ export const PORTAL_MIN_ROLE = {
   leaderboard: "viewer",
   /** Revenue / payout history — financial, admin and above. */
   revenue: "admin",
+  /** Own-community moderation queue (approve / hide / re-queue) — admin and above. */
+  moderation: "admin",
   /** Team management — owner only. */
   team: "owner",
+  /** Launch checklist — read-only readiness view. */
+  launch: "viewer",
+  /** Monday team brief, rendered on demand — read-only. */
+  brief: "viewer",
+  /** Superfans to thank — read-only list. */
+  superfans: "viewer",
+  /** "Mark thanked" writes a superfan_thanks row. */
+  superfansThank: "editor",
 } as const satisfies Record<string, PortalRole>;
 
 export type PortalSurface = keyof typeof PORTAL_MIN_ROLE;
