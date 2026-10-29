@@ -26,7 +26,6 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
     recentActivity,
     badgesInProgress,
     premiumCommunities,
-    founderCommunities,
   } = data;
 
   // Resolved in getFanHomeData: host community if followed, else first
@@ -89,8 +88,6 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
         <RecentActivityFeed
           posts={recentActivity}
           hasFollows={followedArtists.length > 0}
-          premiumCommunities={premiumCommunities}
-          founderCommunities={founderCommunities}
         />
 
         {/* Badges in progress */}
@@ -322,13 +319,9 @@ function ActiveCtasBlock({ ctas }: { ctas: FanHomeData["ctas"] }) {
 function RecentActivityFeed({
   posts,
   hasFollows,
-  premiumCommunities,
-  founderCommunities,
 }: {
   posts: FanHomeData["recentActivity"];
   hasFollows: boolean;
-  premiumCommunities: string[];
-  founderCommunities: string[];
 }) {
   if (posts.length === 0) {
     return (
@@ -349,14 +342,8 @@ function RecentActivityFeed({
       <ul className="mt-4 space-y-3">
         {posts.slice(0, 5).map((post) => {
           const badge = postKindBadge(post.kind);
-          // Gate body for premium / founder-only posts unless the viewer has
-          // the right membership. Title + kind chip still surface either way.
-          const bodyAccessible =
-            post.visibility === "public" ||
-            (post.visibility === "premium" &&
-              premiumCommunities.includes(post.artist_slug)) ||
-            (post.visibility === "founder-only" &&
-              founderCommunities.includes(post.artist_slug));
+          // Server already cleared body when this is false (tier, staff, author).
+          const bodyAccessible = post.canReadBody === true;
           // Pick the most useful display string:
           //   1. Title if present (announcements, polls with a title, challenges)
           //   2. Body excerpt if accessible (regular posts, body-bearing types)

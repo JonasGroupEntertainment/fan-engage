@@ -7,7 +7,7 @@ import { getAdminUser } from "@/lib/admin";
 import { getCurrentFan } from "@/lib/data/fan";
 import { getActiveFanActionsForArtist } from "@/lib/data/campaigns";
 import { getLivePresavesForArtist } from "@/lib/presave/read";
-import { getLockedFounderPostStubs, mergeFounderStubs } from "./founder-gate";
+import { getLockedPostStubs, mergeFounderStubs } from "./founder-gate";
 import {
   getChallengeEntries,
   getCommentsByPost,
@@ -17,6 +17,7 @@ import {
   getTopTagsForArtist,
 } from "@/lib/data/community";
 import { canAccess, canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
+import { canReadPost } from "@/lib/founder-gate/core";
 import { guestSignupHref } from "@/lib/guest-signup";
 import {
   filterCommunityTagsForMarketplace,
@@ -66,10 +67,11 @@ export default async function ArtistCommunityPage({
   const artist = await getArtistFromDb(slug);
   if (!artist) notFound();
 
-  const [fan, visiblePosts, adminUser, fanActions, presaves, entitlement, topTags] =
+  const [fan, visiblePosts, lockedStubs, adminUser, fanActions, presaves, entitlement, topTags] =
     await Promise.all([
       getCurrentFan(),
       getPostsByArtist(slug, 30, { tagFilter }),
+      getLockedPostStubs(slug, { excludeIds: [], tagFilter }),
       getAdminUser(),
       getActiveFanActionsForArtist(slug),
       getLivePresavesForArtist(slug),
@@ -77,29 +79,42 @@ export default async function ArtistCommunityPage({
       getTopTagsForArtist(slug, 10),
     ]);
 
-  // Founder-only rows are hidden at the DB for non-founders (0091), so the
-  // feed would silently lose them. Fetch id/title stubs (never the body) with
-  // the service role and merge them back in as locked cards. Founders and
-  // admins already received the real rows above; nothing to add for them.
-  const viewerIsFounder = Boolean(entitlement?.isFounder);
-  const founderStubs =
-    adminUser !== null || viewerIsFounder
-      ? []
-      : await getLockedFounderPostStubs(slug, { excludeIds: visiblePosts.map((p) => p.id), tagFilter });
-  const posts = mergeFounderStubs(visiblePosts, founderStubs);
+  // 0096 hides premium and founder-only rows from fans who do not qualify,
+  // so the feed would silently lose them. Stubs are id/title only (the RPC
+  // cannot return a body) and merge back in as locked cards. Fans who can
+  // already read the row have it in visiblePosts; the stub list excludes
+  // those ids.
+  const viewer = {
+    isAdmin: adminUser !== null,
+    isFounder: Boolean(entitlement?.isFounder),
+    isPremium: Boolean(entitlement?.isPremium),
+    fanId: fan?.id ?? null,
+  };
+  const seen = new Set(visiblePosts.map((p) => p.id));
+  const posts = mergeFounderStubs(
+    visiblePosts,
+    lockedStubs.filter((stub) => !seen.has(stub.id)),
+  );
+  const readable = (post: (typeof posts)[number]) => {
+    if (viewer.isAdmin) return true;
+    if (viewer.fanId && post.author_id && post.author_id === viewer.fanId) return true;
+    return canReadPost(post, viewer) && canAccess(post.visibility, entitlement).allowed;
+  };
   const visibleTags = filterCommunityTagsForMarketplace(topTags, marketplaceLive);
 
   // Parallel-fetch comments + poll data + challenge entries for every visible
   // post so the feed renders in one round-trip. Fine at MVP scale; when post
   // counts per page get big we'll switch to on-expand fetching.
   const [commentsByPost, pollByPost, entriesByPost, teamPostIds] = await Promise.all([
-    Promise.all(posts.map((p) => getCommentsByPost(p.id))),
+    Promise.all(posts.map((p) => (readable(p) ? getCommentsByPost(p.id) : Promise.resolve([])))),
     Promise.all(
-      posts.map((p) => (p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null))),
+      posts.map((p) =>
+        readable(p) && p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null),
+      ),
     ),
     Promise.all(
       posts.map((p) =>
-        p.kind === "challenge" ? getChallengeEntries(p.id) : Promise.resolve([]),
+        readable(p) && p.kind === "challenge" ? getChallengeEntries(p.id) : Promise.resolve([]),
       ),
     ),
     // One batched admin_users lookup for the artist/team byline.
@@ -217,8 +232,10 @@ export default async function ArtistCommunityPage({
       ) : (
         <div className="space-y-4">
           {posts.map((post, i) => {
-            // Admins always see everything — otherwise gate premium posts.
-            const access = isAdmin
+            // Admins, staff, and the author always see the post. Everyone
+            // else is gated on tier. getPostsByArtist already cleared the
+            // body, media, and thread summary when this is false.
+            const access = readable(post)
               ? { allowed: true, reason: "premium-member" as const }
               : canAccess(post.visibility, entitlement);
             if (!access.allowed) {

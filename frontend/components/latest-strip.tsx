@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminUser } from "@/lib/admin";
 import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
+import { canReadPost, gatedPostTeaser, type PostVisibility } from "@/lib/founder-gate/core";
+import { getViewerEntitlement } from "@/lib/entitlements";
 import { relativeTime } from "@/lib/format/relative-time";
 
 type CardKind = "post" | "event" | "drop" | "prediction";
@@ -107,6 +110,19 @@ async function collect(
 ): Promise<{ cards: LatestCard[]; snapshotTime: number }> {
   const snapshotTime = Date.now();
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [entitlement, adminUser] = await Promise.all([
+    getViewerEntitlement(slug),
+    getAdminUser(),
+  ]);
+  const viewer = {
+    isAdmin: adminUser !== null,
+    isFounder: Boolean(entitlement?.isFounder),
+    isPremium: Boolean(entitlement?.isPremium),
+    fanId: user?.id ?? null,
+  };
   const cards: LatestCard[] = [];
 
   // ─── Resolve community/scope id from the slug ──────────────────────
@@ -130,7 +146,7 @@ async function collect(
   for (const col of ["artist_id", "brand_slug", "community_id"]) {
     const { data, error } = await supabase
       .from("community_posts")
-      .select("id, title, body, created_at, kind, is_prediction, pinned")
+      .select("id, title, body, created_at, kind, is_prediction, pinned, visibility, author_id")
       .eq(col, col === "brand_slug" ? slug : scopeId)
       .order("created_at", { ascending: false })
       .limit(5);
@@ -144,13 +160,19 @@ async function collect(
         kind: string | null;
         is_prediction: boolean | null;
         pinned: boolean | null;
+        visibility: string | null;
+        author_id: string | null;
       }>) {
         if (isPlaceholderDraftPost(p)) continue;
+        const visibility: PostVisibility =
+          p.visibility === "premium" || p.visibility === "founder-only" ? p.visibility : "public";
+        const allowed = canReadPost({ visibility, author_id: p.author_id }, viewer);
         const kind: CardKind = p.is_prediction ? "prediction" : "post";
+        const teaser = gatedPostTeaser(visibility);
         cards.push({
           kind,
-          title: p.title ?? truncate(p.body ?? "", 80) ?? "Community post",
-          body: p.title ? truncate(p.body, 120) : null,
+          title: p.title ?? (allowed ? truncate(p.body ?? "", 80) : teaser) ?? "Community post",
+          body: allowed && p.title ? truncate(p.body, 120) : null,
           href: hrefForCommunity(slug),
           ts: p.created_at,
           when: relativeTime(p.created_at),
