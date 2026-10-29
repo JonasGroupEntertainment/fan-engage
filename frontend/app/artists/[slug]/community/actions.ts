@@ -13,7 +13,7 @@ import { notifyCommentOnMyPost } from "@/lib/notifications/triggers/comment-on-m
 
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
 import { withPointsProgress } from "@/lib/points/lifetime";
-import { resolveAuthorVisibility } from "@/lib/founder-gate/core";
+import { POST_BODY_MAX, buildCommunityPostRow, readPostInput } from "@/lib/community/post-input";
 import type { PointsProgress } from "@/lib/points/progress";
 import {
   premiumPath,
@@ -73,56 +73,40 @@ function normalizeUrl(urlRaw: string): string | null {
 
 export async function createPostAction(formData: FormData): Promise<PointsActionResult> {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
-  const body = String(formData.get("body") ?? "").trim();
-
-  // AI alt-text — capture fan-edited image_alt
-  const imageAltRaw = String(formData.get("image_alt") ?? "").trim();
-  const imageAlt = imageAltRaw.length > 0 ? imageAltRaw.slice(0, 500) : null;
-
-  // AI #5 — capture fan-selected tags from TagSuggester
-  const aiSuggestedTagsRaw = String(formData.get("ai_suggested_tags") ?? "");
-  const aiSuggestedTags = aiSuggestedTagsRaw
-    .split(",")
-    .map((t) => t.trim().toLowerCase())
-    .filter((t) => t.length > 0 && t.length <= 24);
-  const imageUrlRaw = String(formData.get("image_url") ?? "").trim();
-  const videoUrlRaw = String(formData.get("video_url") ?? "").trim();
-  const videoPosterUrlRaw = String(formData.get("video_poster_url") ?? "").trim();
-  // Phase 12: caption_used="1" when fan picked from a Claude vision suggestion.
-  const captionUsed = String(formData.get("caption_used") ?? "0") === "1";
-  if (!artistSlug || !body) return;
-  if (body.length > 2000) return;
+  // Row shape (image_alt, ai_suggested_tags, caption_used, media urls,
+  // visibility, scheduled_for) is read and built by the shared pure helper
+  // so the fan composer and the artist-portal composer write identical rows.
+  // This action is the plain-post path: the fan composer routes the other
+  // kinds to their own actions below.
+  const input = { ...readPostInput(formData), kind: "post" as const };
+  if (!artistSlug || !input.body) return;
+  if (input.body.length > POST_BODY_MAX) return;
 
   const { supabase, userId } = await requireUser();
   await requirePremiumCommunityWrite(userId, artistSlug, "community_post");
   // Visibility: only a team author (admin_users grant for this community or
   // '*' — the same rule the byline and new-post notification use) may make a
-  // post premium / founder-only. Everyone else is forced to 'public'.
+  // post premium / founder-only. Everyone else is forced to 'public'. The
+  // same grant gates scheduling (fans always publish now).
   const teamAuthor = await communityAdminUser(artistSlug, "editor");
-  const visibility = resolveAuthorVisibility(formData.get("visibility") as string | null, {
+  const built = buildCommunityPostRow(input, {
+    artistSlug,
+    authorId: userId,
     hasTeamGrant: teamAuthor !== null,
   });
-  const imageUrl = normalizeUrl(imageUrlRaw);
-  const videoUrl = normalizeUrl(videoUrlRaw);
-  const videoPosterUrl = normalizeUrl(videoPosterUrlRaw);
+  if (!built.ok) return;
+  const body = built.row.body;
 
   // tags is NOT NULL default '{}' in the DB — an explicit null here fails the
-  // constraint and silently killed every fan post, so always send an array.
+  // constraint and silently killed every fan post, so the helper always
+  // sends an array.
   const {
     result: { data: created, error: insertErr },
     progress,
   } = await withPointsProgress(userId, () =>
     supabase
-      .from("community_posts").insert({
-        artist_slug: artistSlug,
-        author_id: userId,
-        kind: "post",
-        body,
-        visibility,
-        image_url: imageUrl,
-        video_url: videoUrl,
-        video_poster_url: videoPosterUrl,
-        caption_used: captionUsed, tags: aiSuggestedTags.slice(0, 6), image_alt: imageAlt})
+      .from("community_posts")
+      .insert(built.row)
       .select("id")
       .single(),
   );
@@ -151,7 +135,9 @@ export async function createPostAction(formData: FormData): Promise<PointsAction
   if (created) indexRowAsync("community_posts", created.id);
   if (created) moderateRowAsync("community_posts", created.id);
   if (created) tagRowAsync(created.id);
-  if (created) {
+  // A post scheduled for the future is announced by
+  // /api/cron/publish-scheduled-posts when it comes due — never here.
+  if (created && built.notifyAtCreate) {
     notifyNewPost({ postId: created.id, artistSlug, authorId: userId }).catch(() => {});
   }
 

@@ -71,6 +71,14 @@
     {
       "path": "/api/cron/streak-at-risk",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/publish-scheduled-posts",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/weekly-team-brief",
+      "schedule": "0 13 * * 1"
     }
   ]
 }

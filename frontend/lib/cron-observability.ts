@@ -47,6 +47,8 @@ export const VERCEL_CRON_JOBS = [
   "fraud-scan",
   "leaderboard-notifications",
   "streak-at-risk",
+  "publish-scheduled-posts",
+  "weekly-team-brief",
 ] as const;
 
 export type VercelCronJob = (typeof VERCEL_CRON_JOBS)[number];
@@ -71,6 +73,7 @@ const NOTIFIER_JOBS = new Set<VercelCronJob>([
   "anniversary-notifier",
   "leaderboard-notifications",
   "streak-at-risk",
+  "publish-scheduled-posts",
 ]);
 
 export type CronLogEventName = "start" | "finish" | "failure";
@@ -143,6 +146,13 @@ export function optionalEnvWarning(
 ): string | null {
   if (NOTIFIER_JOBS.has(job as VercelCronJob)) {
     const missing = missingEnvVars(PUSH_ENV, env);
+    return missing.length > 0 ? missingEnvMessage(missing) : null;
+  }
+  if (job === "weekly-team-brief") {
+    // Mandrill only — the Mailchimp path would enrol team members in the
+    // fan audience. Warn (the run reports provider: null and skips every
+    // artist) rather than 503 so the per-artist numbers still log.
+    const missing = missingEnvVars(["MANDRILL_API_KEY"], env);
     return missing.length > 0 ? missingEnvMessage(missing) : null;
   }
   if (job === "fraud-scan") {

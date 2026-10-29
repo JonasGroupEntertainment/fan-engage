@@ -34,7 +34,7 @@ export default async function ArtistPortalRedemptionsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
             Redemptions

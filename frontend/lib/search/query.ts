@@ -27,6 +27,7 @@ import type {
   SearchResults,
   SearchSourceTable,
 } from "./types";
+import { scheduledPostsVisibleFilter, withScheduledFilterFallback } from "@/lib/data/scheduled-posts";
 
 /** How many candidate hits to pull from pgvector before grouping/trimming. */
 const RAW_LIMIT = 30;
@@ -285,10 +286,15 @@ async function fetchAllSourceRows(
   if (idsByTable.community_posts.length > 0) {
     tasks.push(
       (async () => {
-        const { data } = await admin
-          .from("community_posts")
-          .select("id, artist_slug, title, body, created_at, moderation_status")
-          .in("id", idsByTable.community_posts);
+        // Service-role read on a fan's behalf: hide scheduled posts (0094);
+        // retried without the filter until the column exists.
+        const { data } = await withScheduledFilterFallback((withFilter) => {
+          const q = admin
+            .from("community_posts")
+            .select("id, artist_slug, title, body, created_at, moderation_status")
+            .in("id", idsByTable.community_posts);
+          return withFilter ? q.or(scheduledPostsVisibleFilter()) : q;
+        });
         for (const row of (data ?? []) as Array<{
           id: string;
           artist_slug: string;

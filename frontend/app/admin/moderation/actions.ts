@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { authorizeAdmin } from "@/lib/admin-guard";
 import { communityOfRow } from "@/lib/community-owner";
-import { applyAdminOverride, type ModerateSourceTable } from "@/lib/moderation";
+import { applyAdminOverride } from "@/lib/moderation";
+import {
+  OVERRIDE_ACTION_STATUS,
+  decideOverride,
+  parseOverrideForm,
+  type ModerationOverrideStatus,
+} from "@/lib/moderation/apply";
 
 /**
  * Admin override actions for the moderation queue.
@@ -15,28 +21,35 @@ import { applyAdminOverride, type ModerateSourceTable } from "@/lib/moderation";
  *
  * All three buttons (Approve / Hide / Restore) route through the same
  * underlying mechanism — the only difference is the new_status value.
+ *
+ * Form parsing and the scope decision live in lib/moderation/apply so the
+ * artist-portal queue (app/artist-portal/moderation/actions.ts) cannot
+ * drift from this file. Authorization stays here: admins are checked by
+ * lib/admin-guard, portal teams by lib/artist-portal/access.
  */
 
 async function override(
   formData: FormData,
-  newStatus: "safe" | "flag_review" | "auto_hide",
+  newStatus: ModerationOverrideStatus,
 ): Promise<void> {
-  const table = String(formData.get("table") ?? "") as ModerateSourceTable;
-  const rowId = String(formData.get("row_id") ?? "");
-  const notes = String(formData.get("notes") ?? "").trim() || undefined;
-
-  if (
-    !rowId ||
-    (table !== "community_posts" && table !== "community_comments")
-  ) {
-    return;
-  }
+  const parsed = parseOverrideForm(formData);
+  if (!parsed) return;
+  const { table, rowId, notes } = parsed;
 
   // Check the caller against the community that owns the row, not the form.
   const communityId = await communityOfRow(table, rowId);
   if (!communityId) return;
   const guard = await authorizeAdmin({ communityId, minRole: "editor" });
   if (!guard.ok) return;
+
+  // authorizeAdmin already pinned the caller to this community (or they are
+  // a super-admin), so the scope here is the row's own community.
+  const decision = decideOverride({
+    rowCommunityId: communityId,
+    scopeCommunityId: communityId,
+    newStatus,
+  });
+  if (!decision.ok) return;
 
   const result = await applyAdminOverride({
     table,
@@ -54,15 +67,15 @@ async function override(
 }
 
 export async function approveAction(formData: FormData): Promise<void> {
-  return override(formData, "safe");
+  return override(formData, OVERRIDE_ACTION_STATUS.approve);
 }
 
 export async function hideAction(formData: FormData): Promise<void> {
-  return override(formData, "auto_hide");
+  return override(formData, OVERRIDE_ACTION_STATUS.hide);
 }
 
 export async function restoreToReviewAction(
   formData: FormData,
 ): Promise<void> {
-  return override(formData, "flag_review");
+  return override(formData, OVERRIDE_ACTION_STATUS.requeue);
 }
