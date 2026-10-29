@@ -19,7 +19,9 @@ import {
   verifyCheckinToken,
 } from "./checkin-token.ts";
 
-const SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // secret-ok
+// Deliberately not hex-shaped: a 64-hex fixture trips gitleaks' generic rule
+// in CI. The lib treats the secret as an opaque HMAC key, so any string works.
+const SECRET = "unit-test-checkin-secret-not-real";
 const ON = { CHECKIN_TOKEN_SECRET: SECRET };
 const OFF = { CHECKIN_TOKEN_SECRET: SECRET, CHECKIN_TOKEN_ROTATION: "off" };
 const UNSET = {};
