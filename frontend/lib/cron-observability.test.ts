@@ -207,7 +207,11 @@ describe("scheduled routes log through runCron", () => {
 
   it("covers every cron in frontend/vercel.json", () => {
     const jobs = vercel.crons.map((cron) => cron.path.replace("/api/cron/", ""));
-    assert.deepEqual(jobs, [...VERCEL_CRON_JOBS]);
+    // weekly-digest is paused in vercel.json until a test send and typed GO.
+    assert.deepEqual(
+      jobs,
+      VERCEL_CRON_JOBS.filter((job) => job !== "weekly-digest"),
+    );
   });
 
   it("each route calls runCron with its job name", () => {
