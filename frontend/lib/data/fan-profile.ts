@@ -105,12 +105,15 @@ export async function getFanProfileBySlug(
     // created_at = scheduled_for and would sort first, leaking its body
     // before it is due (0094). Retried without the filter until the column
     // exists.
+    // Public page. Gated posts stay off it even for the author — anyone
+    // with the URL can open this profile. visibility is not null (0015).
     withScheduledFilterFallback((withFilter) => {
       let q = admin
         .from("community_posts")
-        .select("id, title, body, created_at, artist_slug, artists ( name )")
+        .select("id, title, body, created_at, artist_slug, visibility, artists ( name )")
         .eq("author_id", fan.id)
-        .eq("kind", "post");
+        .eq("kind", "post")
+        .eq("visibility", "public");
       if (withFilter) q = q.or(scheduledPostsVisibleFilter());
       return q.order("created_at", { ascending: false }).limit(5);
     }),
@@ -143,6 +146,7 @@ export async function getFanProfileBySlug(
     body: string | null;
     created_at: string;
     artist_slug: string | null;
+    visibility: string | null;
     artists: { name: string } | null;
   };
 
@@ -180,14 +184,16 @@ export async function getFanProfileBySlug(
       slug: f.artists.slug,
       name: f.artists.name,
     })),
-    recentPosts: posts.map((p) => ({
-      id: p.id,
-      title: p.title,
-      body: p.body,
-      createdAt: p.created_at,
-      artistSlug: p.artist_slug,
-      artistName: p.artists?.name ?? null,
-    })),
+    recentPosts: posts
+      .filter((p) => p.visibility == null || p.visibility === "public")
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        body: p.body,
+        createdAt: p.created_at,
+        artistSlug: p.artist_slug,
+        artistName: p.artists?.name ?? null,
+      })),
   };
 }
 

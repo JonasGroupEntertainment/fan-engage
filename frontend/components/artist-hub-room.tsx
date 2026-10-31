@@ -6,8 +6,13 @@ import {
   getTeamAuthoredPostIds,
 } from "@/lib/data/community";
 import { getCurrentFan } from "@/lib/data/fan";
+import { getAdminUser } from "@/lib/admin";
+import { canReadPost } from "@/lib/founder-gate/core";
 import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
 import PostCard from "@/app/artists/[slug]/community/post-card";
+import FounderLockedCard from "@/app/artists/[slug]/community/founder-locked-card";
+import { getLockedPostStubs, mergeFounderStubs } from "@/app/artists/[slug]/community/founder-gate";
+import PremiumPaywall from "@/components/premium-paywall";
 
 /**
  * Artist hub room: posts + polls for signed-in fans.
@@ -20,9 +25,10 @@ export default async function ArtistHubRoom({
   artistSlug: string;
   artistName: string;
 }) {
-  const [fan, entitlement] = await Promise.all([
+  const [fan, entitlement, adminUser] = await Promise.all([
     getCurrentFan(),
     getViewerEntitlement(artistSlug),
+    getAdminUser(),
   ]);
   const isSignedIn = fan !== null;
 
@@ -45,12 +51,28 @@ export default async function ArtistHubRoom({
     );
   }
 
-  const posts = await getPostsByArtist(artistSlug, 8);
-  const visible = posts.slice(0, 4);
+  const viewer = {
+    isAdmin: adminUser !== null,
+    isFounder: Boolean(entitlement?.isFounder),
+    isPremium: Boolean(entitlement?.isPremium),
+    fanId: fan.id,
+  };
+  const [loaded, stubs] = await Promise.all([
+    getPostsByArtist(artistSlug, 8),
+    getLockedPostStubs(artistSlug, { excludeIds: [], limit: 8 }),
+  ]);
+  const seen = new Set(loaded.map((p) => p.id));
+  const visible = mergeFounderStubs(
+    loaded,
+    stubs.filter((stub) => !seen.has(stub.id)),
+  ).slice(0, 4);
+  const canRead = (post: (typeof visible)[number]) => canReadPost(post, viewer);
   const [commentsByPost, pollByPost, teamPostIds] = await Promise.all([
-    Promise.all(visible.map((p) => getCommentsByPost(p.id))),
+    Promise.all(visible.map((p) => (canRead(p) ? getCommentsByPost(p.id) : Promise.resolve([])))),
     Promise.all(
-      visible.map((p) => (p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null))),
+      visible.map((p) =>
+        canRead(p) && p.kind === "poll" ? getPollData(p.id) : Promise.resolve(null),
+      ),
     ),
     getTeamAuthoredPostIds(artistSlug, visible),
   ]);
@@ -82,20 +104,42 @@ export default async function ArtistHubRoom({
         </div>
       ) : (
         <div className="space-y-4">
-          {visible.map((post, i) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              initialComments={commentsByPost[i]}
-              isAuthor={post.author_id === fan.id}
-              isAdmin={false}
-              currentUserId={fan.id}
-              canReply={canWrite}
-              canReact={canWrite}
-              teamByline={teamPostIds.has(post.id) ? artistName : null}
-              poll={pollByPost[i]}
-            />
-          ))}
+          {visible.map((post, i) =>
+            canRead(post) ? (
+              <PostCard
+                key={post.id}
+                post={post}
+                initialComments={commentsByPost[i]}
+                isAuthor={post.author_id === fan.id}
+                isAdmin={viewer.isAdmin}
+                currentUserId={fan.id}
+                canReply={canWrite}
+                canReact={canWrite}
+                teamByline={teamPostIds.has(post.id) ? artistName : null}
+                poll={pollByPost[i]}
+              />
+            ) : post.visibility === "founder-only" ? (
+              <FounderLockedCard
+                key={post.id}
+                title={post.title}
+                artistName={artistName}
+                foundersHref={`/artists/${artistSlug}/founders`}
+              />
+            ) : (
+              <PremiumPaywall
+                key={post.id}
+                feature="This post"
+                description={
+                  post.title
+                    ? `"${post.title}" — Premium fans see every backstage post and work-in-progress.`
+                    : "Premium fans see every backstage post and work-in-progress."
+                }
+                communityId={artistSlug}
+                reason="needs-premium"
+                compact
+              />
+            ),
+          )}
           {!hasPoll && (
             <p className="text-xs text-white/50">
               Polls show up here when the room has one.

@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminUser } from "@/lib/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import { isTeamAuthored } from "@/lib/notifications/triggers/new-post";
+import { redactGatedPost, type PostViewer } from "@/lib/founder-gate/core";
+import { getViewerEntitlement } from "@/lib/entitlements";
 import type {
   ChallengeEntry,
   CommunityComment,
@@ -163,7 +166,9 @@ export async function getPostsByArtist(
           video_poster_url: p.video_poster_url as string | null,
           pinned: p.pinned as boolean,
           visibility:
-            ((p.visibility as "public" | "premium" | null) ?? "public"),
+            p.visibility === "premium" || p.visibility === "founder-only"
+              ? p.visibility
+              : "public",
           created_at: p.created_at as string,
           reaction_counts: reactionsByPost.get(p.id as string) ?? {},
           my_reactions: myReactionsByPost.get(p.id as string) ?? [],
@@ -177,7 +182,30 @@ export async function getPostsByArtist(
         }) as CommunityPost,
     );
     // Public + signed-in fan feeds share this loader — drafts stay in DB.
-    return rejectPlaceholderDraftPosts(mapped).slice(0, limit);
+    // Fail closed: if the tier lookup throws, gated bodies are stripped.
+    let viewer: PostViewer = {
+      isAdmin: false,
+      isFounder: false,
+      isPremium: false,
+      fanId: user?.id ?? null,
+    };
+    try {
+      const [entitlement, adminUser] = await Promise.all([
+        getViewerEntitlement(artistSlug),
+        getAdminUser(),
+      ]);
+      viewer = {
+        isAdmin: adminUser !== null,
+        isFounder: Boolean(entitlement?.isFounder),
+        isPremium: Boolean(entitlement?.isPremium),
+        fanId: user?.id ?? null,
+      };
+    } catch {
+      // viewer stays free — gated fields are cleared below.
+    }
+    return rejectPlaceholderDraftPosts(mapped)
+      .slice(0, limit)
+      .map((post) => redactGatedPost(post, viewer));
   } catch {
     return [];
   }

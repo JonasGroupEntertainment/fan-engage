@@ -20,6 +20,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canReadPostInCommunity, gatedPostTeaser } from "@/lib/founder-gate/core";
 import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 import type {
   DigestCommunityBlock,
@@ -104,10 +105,36 @@ export async function gatherDigestPayload(
   // Scheduled-but-unpublished posts (0094 scheduled_for in the future) must not
   // reach the digest. The column may not exist before 0094 is applied, so a
   // missing-column error retries without the filter.
+  // Titles and visibility first. The body is loaded in a second query
+  // and only for posts this recipient can read, so a free fan's digest
+  // never contains a premium or founder-only body.
+  const [premiumRes, founderRes, staffRes] = await Promise.all([
+    admin
+      .from("fan_community_memberships")
+      .select("community_id")
+      .eq("fan_id", recipient.fan_id)
+      .in("subscription_tier", ["premium", "comped", "past_due"]),
+    admin
+      .from("fan_community_memberships")
+      .select("community_id")
+      .eq("fan_id", recipient.fan_id)
+      .eq("is_founder", true),
+    admin
+      .from("admin_users")
+      .select("community_id")
+      .eq("user_id", recipient.fan_id),
+  ]);
+  const postAccess = {
+    fanId: recipient.fan_id,
+    premiumCommunities: (premiumRes.data ?? []).map((r) => r.community_id as string),
+    founderCommunities: (founderRes.data ?? []).map((r) => r.community_id as string),
+    staffCommunities: (staffRes.data ?? []).map((r) => r.community_id as string),
+  };
+
   const postsQuery = (withScheduledFilter: boolean) => {
     let q = admin
       .from("community_posts")
-      .select("id, artist_slug, title, body, created_at, moderation_status")
+      .select("id, artist_slug, author_id, title, created_at, moderation_status, visibility")
       .in("artist_slug", targetSlugs)
       .gte("created_at", oneWeekAgoIso)
       .in("moderation_status", ["pending", "safe", "flag_review"]);
@@ -121,6 +148,31 @@ export async function gatherDigestPayload(
     postsRes = await postsQuery(false);
   }
   const postRows = rowsOrThrow("community_posts", postsRes);
+  const readablePostIds = (postRows ?? [])
+    .filter((p) =>
+      canReadPostInCommunity(
+        {
+          visibility:
+            p.visibility === "premium" || p.visibility === "founder-only"
+              ? p.visibility
+              : "public",
+          author_id: (p.author_id as string | null) ?? null,
+          artist_slug: p.artist_slug as string,
+        },
+        postAccess,
+      ),
+    )
+    .map((p) => p.id as string);
+  const bodyById = new Map<string, string>();
+  if (readablePostIds.length > 0) {
+    const bodyRes = rowsOrThrow(
+      "community_posts",
+      await admin.from("community_posts").select("id, body").in("id", readablePostIds),
+    );
+    for (const row of bodyRes ?? []) {
+      bodyById.set(row.id as string, (row.body as string | null) ?? "");
+    }
+  }
 
   // 4. Pull reaction + comment counts for those posts in two batched queries.
   const candidatePostIds = (postRows ?? []).map((p) => p.id as string);
@@ -159,11 +211,15 @@ export async function gatherDigestPayload(
     const slug = p.artist_slug as string;
     const id = p.id as string;
     const arr = postsByCommunity.get(slug) ?? [];
+    const visibility = (p.visibility as string | null) ?? "public";
+    const readable = readablePostIds.includes(id);
     arr.push({
       id,
       artist_slug: slug,
       title: (p.title as string | null) ?? null,
-      body: p.body as string,
+      body: readable
+        ? (bodyById.get(id) ?? "")
+        : gatedPostTeaser(visibility === "founder-only" ? "founder-only" : "premium"),
       reaction_count: reactionsByPost.get(id) ?? 0,
       comment_count: commentsByPost.get(id) ?? 0,
       created_at: p.created_at as string,

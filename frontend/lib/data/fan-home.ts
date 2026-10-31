@@ -20,6 +20,7 @@ import {
 } from "@/lib/rsvp-window";
 import type { Badge, FanProfile } from "./types";
 import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
+import { canReadPostInCommunity } from "@/lib/founder-gate/core";
 
 export interface FanHomeFollowedArtist {
   slug: string;
@@ -102,8 +103,11 @@ export interface FanHomeActivityPost {
   pinned: boolean;
   /** Phase 5e: post visibility tier. 'premium' posts are body-gated unless
    * the viewer has a premium/comped/past_due membership. 'founder-only' posts
-   * are body-gated unless the viewer is a founder in that community. */
+   * are body-gated unless the viewer is a founder in that community.
+   * A Founding Fan who is not Premium does not inherit premium posts. */
   visibility: "public" | "premium" | "founder-only";
+  /** False when body was cleared because this fan cannot read the post. */
+  canReadBody: boolean;
 }
 
 export interface FanHomeBadgeProgress {
@@ -255,16 +259,17 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     artist_slug: string;
     kind: string;
     title: string | null;
-    body: string;
     author_id: string;
     pinned: boolean;
     created_at: string;
     visibility: "public" | "premium" | "founder-only";
   };
+  // Titles only. Bodies are loaded afterwards with the fan's own session
+  // so the service role cannot hand a gated body to Fan Home.
   const activityQuery = (withScheduledFilter: boolean) => {
     let q = admin
       .from("community_posts")
-      .select("id, artist_slug, kind, title, body, author_id, pinned, created_at, visibility")
+      .select("id, artist_slug, kind, title, author_id, pinned, created_at, visibility")
       .in("artist_slug", followedSlugs);
     // Service-role read on a fan's behalf: hide scheduled posts (0094).
     if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
@@ -561,29 +566,54 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     );
   }
 
-  const recentActivity: FanHomeActivityPost[] = rejectPlaceholderDraftPosts(
-    (activityRes.data ?? []) as Array<{
+  const activityRows = (activityRes.data ?? []) as Array<{
     id: string;
     artist_slug: string;
     kind: string;
     title: string | null;
-    body: string;
     author_id: string;
     pinned: boolean;
     created_at: string;
     visibility: "public" | "premium" | "founder-only" | null;
-  }>,
-  ).map((p) => ({
-    id: p.id,
-    artist_slug: p.artist_slug,
-    artist_name: artistNameBySlug.get(p.artist_slug) ?? null,
-    kind: p.kind,
-    title: p.title,
-    body: p.body,
-    author_first_name: authorNameById.get(p.author_id) ?? null,
-    created_at: p.created_at,
-    pinned: p.pinned,
-    visibility: (p.visibility ?? "public") as "public" | "premium" | "founder-only",
+  }>;
+  const staffReadCommunities = [
+    ...((adminCtx?.isSuperAdmin ? ["*"] : []) as string[]),
+    ...rsvpGrants.map((g) => g.communityId),
+  ];
+  const bodyById = new Map<string, string>();
+  if (activityRows.length > 0) {
+    const { data: bodyRows } = await supabase
+      .from("community_posts")
+      .select("id, body, visibility")
+      .in("id", activityRows.map((p) => p.id));
+    for (const row of bodyRows ?? []) {
+      bodyById.set(row.id as string, (row.body as string | null) ?? "");
+    }
+  }
+  const recentActivity: FanHomeActivityPost[] = rejectPlaceholderDraftPosts(activityRows.map((p) => {
+    const visibility = (p.visibility ?? "public") as "public" | "premium" | "founder-only";
+    const allowed = canReadPostInCommunity(
+      { visibility, author_id: p.author_id, artist_slug: p.artist_slug },
+      {
+        fanId: user.id,
+        premiumCommunities,
+        founderCommunities,
+        staffCommunities: staffReadCommunities,
+      },
+    );
+    return {
+      id: p.id,
+      artist_slug: p.artist_slug,
+      artist_name: artistNameBySlug.get(p.artist_slug) ?? null,
+      kind: p.kind,
+      title: p.title,
+      body: allowed ? (bodyById.get(p.id) ?? "") : "",
+      author_first_name: authorNameById.get(p.author_id) ?? null,
+      created_at: p.created_at,
+      pinned: p.pinned,
+      visibility,
+      canReadBody: allowed,
+    };
   }));
 
   // Badges in progress
