@@ -8,12 +8,15 @@
 --
 -- This migration:
 --   * adds can_read_post_visibility(visibility, artist_slug) — the same
---     matrix as app canReadPostBody / canAccess:
+--     matrix as app canReadPostBody:
 --       public        everyone, including anon
 --       premium       is_premium (premium, comped, past_due)
---       founder-only  is_founder
---     A Founding Fan who is not Premium does not inherit premium posts.
---     Premium does not inherit founder-only posts.
+--                     OR an awarded founding_fan_number (>= 1)
+--       founder-only  that same founding_fan_number
+--     Founding Fan is fan_community_memberships.founding_fan_number,
+--     the column points, the free badge, and the 48-hour RSVP already
+--     use. It is not the is_founder flag and not founder_number (the
+--     older paid founder slot). Premium does not inherit founder-only.
 --   * rebuilds community_posts_public_read with that check, keeping
 --     0094's scheduled_for gate and 0025's moderation filter.
 --     community_posts_author_read and community_posts_admin_read stay,
@@ -35,7 +38,8 @@
 --
 -- No new table. Idempotent. Apply one statement at a time in the SQL
 -- editor (a multi-statement paste drops everything after the first).
--- Requires 0094 (scheduled_for) and 0015/0019 (is_premium, is_founder).
+-- Requires 0094 (scheduled_for), 0015 (is_premium), and 0051
+-- (founding_fan_number).
 -- NOT applied to production by this change.
 
 -- Statement 1
@@ -50,17 +54,32 @@ set search_path = public
 as $$
   select case
     when p_visibility is null or p_visibility = 'public' then true
-    when auth.uid() is null then false
-    when p_visibility = 'premium'
-      then public.is_premium(auth.uid(), p_artist_slug)
-    when p_visibility = 'founder-only'
-      then public.is_founder(auth.uid(), p_artist_slug)
+    when (select auth.uid()) is null then false
+    when p_visibility = 'premium' then
+      public.is_premium((select auth.uid()), p_artist_slug)
+      or exists (
+        select 1
+        from public.fan_community_memberships m
+        where m.fan_id = (select auth.uid())
+          and m.community_id = p_artist_slug
+          and m.founding_fan_number is not null
+          and m.founding_fan_number >= 1
+      )
+    when p_visibility = 'founder-only' then
+      exists (
+        select 1
+        from public.fan_community_memberships m
+        where m.fan_id = (select auth.uid())
+          and m.community_id = p_artist_slug
+          and m.founding_fan_number is not null
+          and m.founding_fan_number >= 1
+      )
     else false
   end;
 $$;
 
 comment on function public.can_read_post_visibility(text, text) is
-  'True when the current session may read a community post of this visibility in this community. Public is open. Premium uses is_premium (not is_founder). Founder-only uses is_founder. Does not cover the author or admin_users exceptions; those are separate policies.';
+  'True when the current session may read a community post of this visibility in this community. Public is open. Premium is is_premium (premium, comped, past_due) or an awarded founding_fan_number (>= 1). Founder-only is that same founding_fan_number. Not the is_founder flag and not founder_number. Does not cover the author or admin_users exceptions; those are separate policies.';
 
 -- Statement 2
 revoke all on function public.can_read_post_visibility(text, text) from public, anon, authenticated;
@@ -209,7 +228,8 @@ grant execute on function public.locked_community_post_stubs(text, text, integer
 -- select policyname from pg_policies
 --  where tablename = 'community_posts' and policyname = 'community_posts_public_read';
 -- select pg_get_functiondef('public.can_read_post_visibility(text,text)'::regprocedure);
--- -- premium branch calls is_premium, not is_founder.
+-- -- premium branch calls is_premium OR founding_fan_number >= 1.
+-- -- founder-only branch is founding_fan_number >= 1, not is_founder.
 -- select proname from pg_proc
 --  where proname in (
 --    'can_read_post_visibility',

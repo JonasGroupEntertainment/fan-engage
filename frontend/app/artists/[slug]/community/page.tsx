@@ -16,8 +16,8 @@ import {
   getTeamAuthoredPostIds,
   getTopTagsForArtist,
 } from "@/lib/data/community";
-import { canAccess, canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
-import { canReadPost } from "@/lib/founder-gate/core";
+import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
+import { canReadPost, postViewerFromEntitlement } from "@/lib/founder-gate/core";
 import { guestSignupHref } from "@/lib/guest-signup";
 import {
   filterCommunityTagsForMarketplace,
@@ -84,22 +84,16 @@ export default async function ArtistCommunityPage({
   // cannot return a body) and merge back in as locked cards. Fans who can
   // already read the row have it in visiblePosts; the stub list excludes
   // those ids.
-  const viewer = {
+  const viewer = postViewerFromEntitlement(entitlement, {
     isAdmin: adminUser !== null,
-    isFounder: Boolean(entitlement?.isFounder),
-    isPremium: Boolean(entitlement?.isPremium),
     fanId: fan?.id ?? null,
-  };
+  });
   const seen = new Set(visiblePosts.map((p) => p.id));
   const posts = mergeFounderStubs(
     visiblePosts,
     lockedStubs.filter((stub) => !seen.has(stub.id)),
   );
-  const readable = (post: (typeof posts)[number]) => {
-    if (viewer.isAdmin) return true;
-    if (viewer.fanId && post.author_id && post.author_id === viewer.fanId) return true;
-    return canReadPost(post, viewer) && canAccess(post.visibility, entitlement).allowed;
-  };
+  const readable = (post: (typeof posts)[number]) => canReadPost(post, viewer);
   const visibleTags = filterCommunityTagsForMarketplace(topTags, marketplaceLive);
 
   // Parallel-fetch comments + poll data + challenge entries for every visible
@@ -232,13 +226,11 @@ export default async function ArtistCommunityPage({
       ) : (
         <div className="space-y-4">
           {posts.map((post, i) => {
-            // Admins, staff, and the author always see the post. Everyone
-            // else is gated on tier. getPostsByArtist already cleared the
-            // body, media, and thread summary when this is false.
-            const access = readable(post)
-              ? { allowed: true, reason: "premium-member" as const }
-              : canAccess(post.visibility, entitlement);
-            if (!access.allowed) {
+            // Admins, staff, the author, Premium members, and Founding Fans
+            // (founding_fan_number >= 1) see the post. getPostsByArtist
+            // already cleared the body, media, and thread summary when
+            // this is false.
+            if (!readable(post)) {
               if (!isSignedIn) {
                 return (
                   <section
@@ -286,11 +278,7 @@ export default async function ArtistCommunityPage({
                   communityId={slug}
                   accentFrom={artist.accentFrom}
                   accentTo={artist.accentTo}
-                  reason={
-                    access.reason === "needs-founder"
-                      ? "needs-founder"
-                      : "needs-premium"
-                  }
+                  reason="needs-premium"
                   compact
                 />
               );

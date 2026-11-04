@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminUser } from "@/lib/admin";
 import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
-import { canReadPost, gatedPostTeaser, type PostVisibility } from "@/lib/founder-gate/core";
+import { canReadPost, gatedPostTeaser, postViewerFromEntitlement, type PostVisibility } from "@/lib/founder-gate/core";
 import { getViewerEntitlement } from "@/lib/entitlements";
 import { relativeTime } from "@/lib/format/relative-time";
 
@@ -117,12 +117,10 @@ async function collect(
     getViewerEntitlement(slug),
     getAdminUser(),
   ]);
-  const viewer = {
+  const viewer = postViewerFromEntitlement(entitlement, {
     isAdmin: adminUser !== null,
-    isFounder: Boolean(entitlement?.isFounder),
-    isPremium: Boolean(entitlement?.isPremium),
     fanId: user?.id ?? null,
-  };
+  });
   const cards: LatestCard[] = [];
 
   // ─── Resolve community/scope id from the slug ──────────────────────

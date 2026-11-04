@@ -8,6 +8,7 @@ import {
   canReadPostInCommunity,
   gatedPostTeaser,
   mergeFounderStubs,
+  postViewerFromEntitlement,
   redactGatedPost,
   resolveAuthorVisibility,
   stubToLockedPost,
@@ -57,17 +58,68 @@ describe("canReadPostBody", () => {
     assert.equal(canReadPostBody("premium", premium), true);
     assert.equal(canReadPostBody("founder-only", premium), false);
   });
-  it("a founder who is not premium reads founder-only but not premium", () => {
-    // Founding Fan is not a paid tier. canAccess / is_premium do not
-    // treat is_founder as a superset of Premium.
+  it("a founding fan who is not premium reads founder-only and premium", () => {
+    // isFounder on this helper means founding_fan_number >= 1 already passed.
     const founder = { isAdmin: false, isFounder: true, isPremium: false };
     assert.equal(canReadPostBody("founder-only", founder), true);
-    assert.equal(canReadPostBody("premium", founder), false);
+    assert.equal(canReadPostBody("premium", founder), true);
   });
   it("a founder who is also premium reads both", () => {
     const both = { isAdmin: false, isFounder: true, isPremium: true };
     assert.equal(canReadPostBody("premium", both), true);
     assert.equal(canReadPostBody("founder-only", both), true);
+  });
+});
+
+describe("postViewerFromEntitlement", () => {
+  it("an awarded founding number reads premium and founder-only", () => {
+    const founder = postViewerFromEntitlement(
+      { isPremium: false, foundingFanNumber: 12 },
+      { isAdmin: false },
+    );
+    assert.equal(founder.isFounder, true);
+    assert.equal(founder.isPremium, false);
+    assert.equal(canReadPostBody("premium", founder), true);
+    assert.equal(canReadPostBody("founder-only", founder), true);
+  });
+
+  it("numbers above the public cap of 100 still count", () => {
+    const founder = postViewerFromEntitlement(
+      { isPremium: false, foundingFanNumber: 101 },
+      { isAdmin: false },
+    );
+    assert.equal(canReadPostBody("premium", founder), true);
+    assert.equal(canReadPostBody("founder-only", founder), true);
+  });
+
+  it("null, zero, and negative numbers are not a Founding Fan", () => {
+    for (const foundingFanNumber of [null, undefined, 0, -3]) {
+      const viewer = postViewerFromEntitlement(
+        { isPremium: false, foundingFanNumber },
+        { isAdmin: false },
+      );
+      assert.equal(viewer.isFounder, false, String(foundingFanNumber));
+      assert.equal(canReadPostBody("premium", viewer), false);
+      assert.equal(canReadPostBody("founder-only", viewer), false);
+    }
+  });
+
+  it("premium without a founding number does not read founder-only", () => {
+    const premium = postViewerFromEntitlement(
+      { isPremium: true, foundingFanNumber: null },
+      { isAdmin: false },
+    );
+    assert.equal(canReadPostBody("premium", premium), true);
+    assert.equal(canReadPostBody("founder-only", premium), false);
+  });
+
+  it("does not read a founding number off the is_founder flag", () => {
+    const flagged = postViewerFromEntitlement(
+      { isPremium: false, foundingFanNumber: null },
+      { isAdmin: false, fanId: "fan" },
+    );
+    assert.equal(flagged.isFounder, false);
+    assert.equal(canReadPost({ visibility: "premium", author_id: "other" }, flagged), false);
   });
 });
 

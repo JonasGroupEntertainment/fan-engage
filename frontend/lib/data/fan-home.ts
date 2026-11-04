@@ -21,6 +21,7 @@ import {
 import type { Badge, FanProfile } from "./types";
 import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 import { canReadPostInCommunity } from "@/lib/founder-gate/core";
+import { isFoundingFanNumber } from "@/lib/points/economy";
 
 export interface FanHomeFollowedArtist {
   slug: string;
@@ -479,6 +480,11 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   }>) {
     foundingNumberByCommunity.set(row.community_id, row.founding_fan_number);
   }
+  // Post bodies use the awarded number. founderCommunities (is_founder)
+  // stays on events and the Today reward chip.
+  const foundingFanCommunities = [...foundingNumberByCommunity.entries()]
+    .filter((entry) => isFoundingFanNumber(entry[1]))
+    .map(([communityId]) => communityId);
   const rsvpGrants: RsvpAdminGrant[] = (
     (adminGrantsRes.data ?? []) as Array<{ community_id: string; role: string | null }>
   ).map((row) => ({ communityId: row.community_id, role: row.role }));
@@ -597,7 +603,7 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
       {
         fanId: user.id,
         premiumCommunities,
-        founderCommunities,
+        founderCommunities: foundingFanCommunities,
         staffCommunities: staffReadCommunities,
       },
     );

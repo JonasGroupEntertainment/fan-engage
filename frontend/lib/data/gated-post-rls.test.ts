@@ -10,13 +10,22 @@ function readRepo(relFromLib: string): string {
 const sql = readRepo("../../../supabase/migrations/0096_lock_gated_posts.sql");
 
 describe("0096_lock_gated_posts", () => {
-  it("gates premium with is_premium and founder-only with is_founder", () => {
+  it("gates premium with is_premium or founding_fan_number, and founder-only with the number", () => {
     assert.match(sql, /create or replace function public\.can_read_post_visibility/);
     assert.match(sql, /p_visibility = 'public'/);
-    assert.match(sql, /p_visibility = 'premium'[\s\S]*public\.is_premium\(auth\.uid\(\), p_artist_slug\)/);
-    assert.match(sql, /p_visibility = 'founder-only'[\s\S]*public\.is_founder\(auth\.uid\(\), p_artist_slug\)/);
+    assert.match(sql, /p_visibility = 'premium'[\s\S]*public\.is_premium\(\(select auth\.uid\(\)\), p_artist_slug\)/);
+    assert.match(sql, /founding_fan_number is not null/);
+    assert.match(sql, /founding_fan_number >= 1/);
     const premiumBranch = sql.slice(sql.indexOf("p_visibility = 'premium'"), sql.indexOf("p_visibility = 'founder-only'"));
+    const founderBranch = sql.slice(sql.indexOf("p_visibility = 'founder-only'"), sql.indexOf("else false"));
+    assert.match(premiumBranch, /founding_fan_number >= 1/);
+    assert.match(founderBranch, /founding_fan_number >= 1/);
     assert.doesNotMatch(premiumBranch, /is_founder/);
+    assert.doesNotMatch(founderBranch, /is_founder/);
+    assert.doesNotMatch(premiumBranch, /founder_number/);
+    assert.doesNotMatch(founderBranch, /founder_number/);
+    assert.doesNotMatch(premiumBranch, /subscription_tier/);
+    assert.doesNotMatch(founderBranch, /subscription_tier/);
   });
 
   it("rebuilds the public read policy and keeps the scheduled gate", () => {
@@ -73,6 +82,31 @@ describe("fan-facing reads do not ship a gated body", () => {
     assert.match(src, /select\("id, body, visibility"\)/);
     assert.match(src, /canReadPostInCommunity/);
     assert.match(src, /canReadBody: allowed/);
+  });
+
+  it("post viewers use the founding number, not the is_founder flag", () => {
+    const readers = [
+      "../../app/artists/[slug]/community/page.tsx",
+      "../../components/artist-hub-room.tsx",
+      "../../components/latest-strip.tsx",
+      "./community.ts",
+      "../drafts/draft-comment.ts",
+    ];
+    for (const rel of readers) {
+      const src = readRepo(rel);
+      assert.match(src, /postViewerFromEntitlement/, rel);
+      assert.doesNotMatch(src, /isFounder: Boolean\(entitlement/, rel);
+    }
+    const home = readRepo("./fan-home.ts");
+    assert.match(home, /isFoundingFanNumber/);
+    assert.match(home, /founderCommunities: foundingFanCommunities/);
+    const digest = readRepo("../digest/gather.ts");
+    assert.match(digest, /founding_fan_number/);
+    assert.match(digest, /isFoundingFanNumber/);
+    assert.match(digest, /\.gte\("founding_fan_number", 1\)/);
+    assert.doesNotMatch(digest, /is_founder/);
+    const entitlement = readRepo("../entitlements.ts");
+    assert.match(entitlement, /founding_fan_number/);
   });
 
   it("public profile, search, digest, and the drafter stay on the public or tier check", () => {

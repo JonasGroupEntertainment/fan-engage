@@ -36,6 +36,7 @@ function entitlement(
     isPremium: false,
     isFounder: false,
     founderNumber: null,
+    foundingFanNumber: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     monthlyCreditCents: 0,
@@ -72,6 +73,23 @@ describe("shared isPremium helper", () => {
         subscription_tier: "past_due",
       })),
       true,
+    );
+    assert.equal(
+      entitlementFromMembershipRow({
+        fan_id: "a",
+        community_id: "raelynn",
+        founding_fan_number: 4,
+      }).foundingFanNumber,
+      4,
+    );
+    assert.equal(
+      entitlementFromMembershipRow({
+        fan_id: "a",
+        community_id: "raelynn",
+        is_founder: true,
+        founder_number: 4,
+      }).foundingFanNumber,
+      null,
     );
   });
 });

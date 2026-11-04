@@ -21,6 +21,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canReadPostInCommunity, gatedPostTeaser } from "@/lib/founder-gate/core";
+import { isFoundingFanNumber } from "@/lib/points/economy";
 import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 import type {
   DigestCommunityBlock,
@@ -116,9 +117,9 @@ export async function gatherDigestPayload(
       .in("subscription_tier", ["premium", "comped", "past_due"]),
     admin
       .from("fan_community_memberships")
-      .select("community_id")
+      .select("community_id, founding_fan_number")
       .eq("fan_id", recipient.fan_id)
-      .eq("is_founder", true),
+      .gte("founding_fan_number", 1),
     admin
       .from("admin_users")
       .select("community_id")
@@ -127,7 +128,9 @@ export async function gatherDigestPayload(
   const postAccess = {
     fanId: recipient.fan_id,
     premiumCommunities: (premiumRes.data ?? []).map((r) => r.community_id as string),
-    founderCommunities: (founderRes.data ?? []).map((r) => r.community_id as string),
+    founderCommunities: (founderRes.data ?? [])
+      .filter((r) => isFoundingFanNumber(r.founding_fan_number as number | null))
+      .map((r) => r.community_id as string),
     staffCommunities: (staffRes.data ?? []).map((r) => r.community_id as string),
   };
 

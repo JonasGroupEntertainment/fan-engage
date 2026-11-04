@@ -13,7 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin";
 import { getEntitlement } from "@/lib/entitlements";
-import { canReadPost, type PostVisibility, type PostViewer } from "@/lib/founder-gate/core";
+import { canReadPost, postViewerFromEntitlement, type PostVisibility, type PostViewer } from "@/lib/founder-gate/core";
 import { generateCommentDrafts, DraftError } from "./client";
 
 export interface DraftCommentRequest {
@@ -54,14 +54,12 @@ async function loadReadablePost(
     getEntitlement(userId, artistSlug).catch(() => null),
     getAdminContext().catch(() => null),
   ]);
-  const viewer: PostViewer = {
+  const viewer: PostViewer = postViewerFromEntitlement(entitlement, {
     isAdmin: Boolean(
       adminCtx && (adminCtx.isSuperAdmin || adminCtx.communities.includes(artistSlug)),
     ),
-    isFounder: Boolean(entitlement?.isFounder),
-    isPremium: Boolean(entitlement?.isPremium),
     fanId: userId,
-  };
+  });
   const visibility = (data.visibility as PostVisibility | null) ?? "public";
   if (
     !canReadPost(

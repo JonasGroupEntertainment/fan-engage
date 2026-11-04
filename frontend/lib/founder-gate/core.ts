@@ -8,7 +8,13 @@
  * locked_community_post_stubs (never the body). These helpers decide
  * (a) whether a viewer may read a body, (b) where stubs sit in the feed,
  * and (c) whether a viewer may author a given visibility.
+ *
+ * A Founding Fan is an awarded founding_fan_number (>= 1) on
+ * fan_community_memberships — the same rule as points and early RSVP.
+ * That number also unlocks Premium posts. It is not the is_founder flag
+ * and not founder_number.
  */
+import { isFoundingFanNumber } from "../points/economy.ts";
 
 export type PostVisibility = "public" | "premium" | "founder-only";
 
@@ -86,11 +92,14 @@ export function resolveAuthorVisibility(
 /**
  * Can this viewer read the body of a post with this visibility?
  *
- * Tier model (same matrix as canAccess in lib/entitlements-core.ts):
- * public is open; premium needs premium / comped / past_due; founder-only
- * needs is_founder. A Founding Fan who is not Premium does not inherit
- * premium posts, and Premium does not inherit founder-only posts.
- * Admins and staff pass isAdmin (admin_users, including '*').
+ * public is open. premium needs Premium (premium / comped / past_due)
+ * or an awarded Founding Fan number. founder-only needs that number.
+ * Premium does not inherit founder-only posts. Admins and staff pass
+ * isAdmin (admin_users, including '*').
+ *
+ * `isFounder` here means the number check already passed
+ * (founding_fan_number >= 1). Callers must set it with
+ * postViewerFromEntitlement, not from the is_founder column.
  */
 export function canReadPostBody(
   visibility: PostVisibility,
@@ -100,16 +109,33 @@ export function canReadPostBody(
   if (!viewer) return false;
   if (viewer.isAdmin) return true;
   if (visibility === "founder-only") return viewer.isFounder;
-  if (visibility === "premium") return viewer.isPremium;
+  if (visibility === "premium") return viewer.isPremium || viewer.isFounder;
   return false;
 }
 
 export interface PostViewer {
   isAdmin: boolean;
+  /** Awarded founding_fan_number >= 1. Not the is_founder column. */
   isFounder: boolean;
   isPremium: boolean;
   /** The post's author can read their own gated post. */
   fanId?: string | null;
+}
+
+/** Membership fields the post viewer needs. The number is the Founding Fan check. */
+export function postViewerFromEntitlement(
+  entitlement: {
+    isPremium?: boolean;
+    foundingFanNumber?: number | null;
+  } | null | undefined,
+  extras: { isAdmin: boolean; fanId?: string | null },
+): PostViewer {
+  return {
+    isAdmin: extras.isAdmin,
+    isFounder: isFoundingFanNumber(entitlement?.foundingFanNumber),
+    isPremium: Boolean(entitlement?.isPremium),
+    fanId: extras.fanId ?? null,
+  };
 }
 
 /** Tier check plus the author exception. Public posts are open to everyone. */

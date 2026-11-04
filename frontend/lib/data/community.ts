@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
 import { isTeamAuthored } from "@/lib/notifications/triggers/new-post";
-import { redactGatedPost, type PostViewer } from "@/lib/founder-gate/core";
+import { postViewerFromEntitlement, redactGatedPost, type PostViewer } from "@/lib/founder-gate/core";
 import { getViewerEntitlement } from "@/lib/entitlements";
 import type {
   ChallengeEntry,
@@ -183,23 +183,19 @@ export async function getPostsByArtist(
     );
     // Public + signed-in fan feeds share this loader — drafts stay in DB.
     // Fail closed: if the tier lookup throws, gated bodies are stripped.
-    let viewer: PostViewer = {
+    let viewer: PostViewer = postViewerFromEntitlement(null, {
       isAdmin: false,
-      isFounder: false,
-      isPremium: false,
       fanId: user?.id ?? null,
-    };
+    });
     try {
       const [entitlement, adminUser] = await Promise.all([
         getViewerEntitlement(artistSlug),
         getAdminUser(),
       ]);
-      viewer = {
+      viewer = postViewerFromEntitlement(entitlement, {
         isAdmin: adminUser !== null,
-        isFounder: Boolean(entitlement?.isFounder),
-        isPremium: Boolean(entitlement?.isPremium),
         fanId: user?.id ?? null,
-      };
+      });
     } catch {
       // viewer stays free — gated fields are cleared below.
     }

@@ -7,7 +7,7 @@ import {
 } from "@/lib/data/community";
 import { getCurrentFan } from "@/lib/data/fan";
 import { getAdminUser } from "@/lib/admin";
-import { canReadPost } from "@/lib/founder-gate/core";
+import { canReadPost, postViewerFromEntitlement } from "@/lib/founder-gate/core";
 import { canUsePremiumFeature, getViewerEntitlement } from "@/lib/entitlements";
 import PostCard from "@/app/artists/[slug]/community/post-card";
 import FounderLockedCard from "@/app/artists/[slug]/community/founder-locked-card";
@@ -51,12 +51,10 @@ export default async function ArtistHubRoom({
     );
   }
 
-  const viewer = {
+  const viewer = postViewerFromEntitlement(entitlement, {
     isAdmin: adminUser !== null,
-    isFounder: Boolean(entitlement?.isFounder),
-    isPremium: Boolean(entitlement?.isPremium),
     fanId: fan.id,
-  };
+  });
   const [loaded, stubs] = await Promise.all([
     getPostsByArtist(artistSlug, 8),
     getLockedPostStubs(artistSlug, { excludeIds: [], limit: 8 }),
