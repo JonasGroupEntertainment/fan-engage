@@ -32,6 +32,11 @@ export interface MembershipEntitlement {
   isPremium: boolean;
   isFounder: boolean;
   founderNumber: number | null;
+  /**
+   * Awarded Founding Fan number on fan_community_memberships.
+   * >= 1 is a Founding Fan (see isFoundingFanNumber). Not founder_number.
+   */
+  foundingFanNumber: number | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   monthlyCreditCents: number;
@@ -249,6 +254,7 @@ export function entitlementFromMembershipRow(row: {
   subscription_tier?: string | null;
   is_founder?: boolean | null;
   founder_number?: number | null;
+  founding_fan_number?: number | null;
   current_period_end?: string | null;
   cancel_at_period_end?: boolean | null;
   monthly_credit_cents?: number | null;
@@ -262,6 +268,8 @@ export function entitlementFromMembershipRow(row: {
     isPremium: isPremium(tier),
     isFounder: Boolean(row.is_founder),
     founderNumber: row.founder_number ?? null,
+    foundingFanNumber:
+      typeof row.founding_fan_number === "number" ? row.founding_fan_number : null,
     currentPeriodEnd: row.current_period_end ?? null,
     cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
     monthlyCreditCents: row.monthly_credit_cents ?? 0,
@@ -285,6 +293,10 @@ export function entitlementFromMembershipRow(row: {
  * - 'founder-only': allowed only if viewer has is_founder=true; else
  *                   'needs-founder' if authenticated but not a founder, or
  *                   'signed-out' if not authenticated
+ *
+ * Community posts do not use this helper. Post reads go through
+ * canReadPostBody, where an awarded founding_fan_number (>= 1) reads
+ * premium posts and is the founder-only check. Event tiers stay here.
  */
 export function canAccess(
   contentTier: "public" | "premium" | "founder-only",
