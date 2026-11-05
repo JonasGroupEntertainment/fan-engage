@@ -1,9 +1,14 @@
 /**
  * Official public contact for Fan Engage Pro.
- * Locked by product owner Raymond Boyd + Fan Engage ops: one address
- * on the footer, legal pages, and support/help surfaces.
+ * One address on the footer, legal pages, and support/help surfaces:
+ * support@fanengagepro.com. Help already used this inbox.
+ *
+ * raymond@jonasgroup.com is a staff inbox (super-admin grant in
+ * 0044_super_admin_grants.sql). It is not a public support address.
+ * The DMCA agent (bhamilton@joneskeller.com) and the rewards-ops
+ * address carla@jonasgroup.com are not rewritten here.
  */
-export const OFFICIAL_CONTACT_EMAIL = "raymond@jonasgroup.com";
+export const OFFICIAL_CONTACT_EMAIL = "support@fanengagepro.com";
 
 export const OFFICIAL_CONTACT_MAILTO = `mailto:${OFFICIAL_CONTACT_EMAIL}`;
 
@@ -19,9 +24,9 @@ export const RETIRED_PUBLIC_CONTACT_EMAILS = [
   "contact@fanengagepro.com",
   "contact@fep.com",
   "support@fanengage.app",
-  "support@fanengagepro.com",
   "privacy@fanengage.app",
   "legal@fanengage.app",
+  "raymond@jonasgroup.com",
 ] as const;
 
 function escapeRegExp(value: string): string {
@@ -31,10 +36,14 @@ function escapeRegExp(value: string): string {
 export function alignOfficialContactEmails(content: string): string {
   let next = content;
   for (const retired of RETIRED_PUBLIC_CONTACT_EMAILS) {
+    const escaped = escapeRegExp(retired);
+    // Replace a whole markdown link first so the mailto and the label
+    // are not each wrapped again.
     next = next.replace(
-      new RegExp(escapeRegExp(retired), "gi"),
+      new RegExp(`\\[${escaped}\\]\\(mailto:${escaped}\\)`, "gi"),
       OFFICIAL_CONTACT_MD_LINK,
     );
+    next = next.replace(new RegExp(escaped, "gi"), OFFICIAL_CONTACT_MD_LINK);
   }
   return next;
 }
