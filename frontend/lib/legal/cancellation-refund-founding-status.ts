@@ -11,9 +11,19 @@
 export const CANCELLATION_REFUND_EFFECTIVE_DATE = "2026-10-12T12:00:00.000Z";
 export const CANCELLATION_REFUND_UPDATED_AT = "2026-10-12T12:00:00.000Z";
 
+/** Shared with /terms and /rewards-terms so those pages cannot drift. */
+export const FOUNDING_FAN_FREE_BADGE =
+  "Founding Fan status is a free badge offered to the first 100 fans who join an artist's community. It is not a paid plan and does not change the price of Premium.";
+
+export const FOUNDING_FAN_KEEP_RULE =
+  "Founding Fans keep their badge and 1.5× points as long as their account stays active.";
+
+export const FOUNDING_FAN_PREMIUM_SEPARATE =
+  "Premium is a separate optional subscription billed at the rate shown at checkout.";
+
 export const FOUNDING_FAN_STATUS_SECTION = `## 3. Founding Fan status
 
-Founding Fan status is a free badge offered to the first 100 fans who join an artist's community. It is not a paid plan and does not change the price of Premium. Founding Fans keep their badge and 1.5× points as long as their account stays active. Premium is a separate optional subscription billed at the rate shown at checkout.`;
+${FOUNDING_FAN_FREE_BADGE} ${FOUNDING_FAN_KEEP_RULE} ${FOUNDING_FAN_PREMIUM_SEPARATE}`;
 
 const FOUNDING_FAN_PRICING_SECTION = `## 3. Founding Fan pricing
 
