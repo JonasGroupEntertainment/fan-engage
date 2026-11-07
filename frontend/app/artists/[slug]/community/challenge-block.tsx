@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
+import { challengeEntryImageAlt } from "@/lib/community/challenge-entry-alt";
 import type { ChallengeEntry } from "@/lib/data/types";
 import { submitEntryAction } from "./actions";
 import { pushPointsToast } from "@/components/points-toast";
@@ -137,7 +138,7 @@ export default function ChallengeBlock({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={e.image_url}
-                  alt=""
+                  alt={challengeEntryImageAlt(e.body)}
                   className="mt-2 max-h-72 w-full rounded-xl object-cover"
                 />
               )}
