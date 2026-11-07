@@ -34,6 +34,9 @@ describe("help, pricing perk, and header copy", () => {
     assert.match(help, /href="\/terms"/);
     assert.match(help, /How points work/);
     assert.match(help, /numbered badge and 1\.5× points,\s+plus 48-hour early RSVP/);
+    assert.match(help, /as long as your account stays active/);
+    assert.match(help, /Cancelling Premium does not\s+remove them/);
+    assert.match(help, /OFFICIAL_CONTACT_EMAIL/);
     assert.match(help, /support@fanengagepro\.com/);
     assert.match(help, /TODO: support@fanengagepro\.com inbox is being set up/);
     assert.equal(help.includes("raymond@jonasgroup.com"), false);
