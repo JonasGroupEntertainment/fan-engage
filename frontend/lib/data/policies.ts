@@ -19,6 +19,7 @@ import {
   applyTermsFoundingFanStatus,
   applyTermsMinimumAge,
 } from "@/lib/legal/align-policy-copy";
+import { applyTermsPremiumBilling } from "@/lib/legal/premium-billing-wording";
 
 export type PolicySlug =
   | "terms"
@@ -69,6 +70,7 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
   if (policy.slug === "terms") {
     contentMd = applyTermsFoundingFanStatus(contentMd);
     contentMd = applyTermsMinimumAge(contentMd);
+    contentMd = applyTermsPremiumBilling(contentMd);
   }
   if (policy.slug === "rewards_terms") {
     contentMd = applyRewardsFoundingFanStatus(contentMd);
