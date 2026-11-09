@@ -19,6 +19,7 @@ import {
   applyTermsFoundingFanStatus,
   applyTermsMinimumAge,
 } from "@/lib/legal/align-policy-copy";
+import { applyItem4PolicyCopy } from "@/lib/legal/premium-billing-wording";
 
 export type PolicySlug =
   | "terms"
@@ -81,6 +82,13 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
     contentMd = applyCancellationFoundingStatus(contentMd);
     effectiveDate = CANCELLATION_REFUND_EFFECTIVE_DATE;
     updatedAt = CANCELLATION_REFUND_UPDATED_AT;
+  }
+  if (
+    policy.slug === "terms" ||
+    policy.slug === "rewards_terms" ||
+    policy.slug === "cancellation_refund"
+  ) {
+    contentMd = applyItem4PolicyCopy(policy.slug, contentMd);
   }
   return {
     ...policy,
