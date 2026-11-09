@@ -45,6 +45,8 @@ export const PORTAL_MIN_ROLE = {
   redemptions: "editor",
   /** Live check-in QR page and the token-minting API behind it. */
   checkinQr: "editor",
+  /** Static promo-link QR. Not the rotating check-in code. */
+  promoQr: "editor",
   /** Leaderboard — read-only analytics. */
   leaderboard: "viewer",
   /** Revenue / payout history — financial, admin and above. */
