@@ -8,7 +8,8 @@
 -- at read time. This file is the matching database update for after review.
 -- Privacy (slug = 'privacy') is not updated.
 
--- 1. Entity name only. Governing law and venue are not changed here.
+-- 1. Entity name only. Governing law stays North Carolina.
+--    Arbitration is put back to North Carolina below, not changed to Colorado.
 update public.policy_pages
 set content_md = replace(
   content_md,
@@ -17,6 +18,16 @@ set content_md = replace(
 )
 where slug in ('terms', 'rewards_terms', 'cancellation_refund')
   and content_md like '%a North Carolina limited liability company%';
+
+-- 1b. Arbitration place back to North Carolina. Does not touch governing law.
+update public.policy_pages
+set content_md = replace(
+  content_md,
+  'The place of the arbitration and each in person hearing shall be Colorado.',
+  'The place of the arbitration and each in person hearing shall be North Carolina.'
+)
+where slug in ('terms', 'rewards_terms', 'cancellation_refund')
+  and content_md like '%The place of the arbitration and each in person hearing shall be Colorado.%';
 
 -- 2. Monthly-only billing cycles on terms.
 update public.policy_pages

@@ -27,9 +27,9 @@ Also removed when stored:
 
 `a North Carolina limited liability company` becomes `a Colorado limited liability company` on terms, rewards terms, and cancellation.
 
-Governing law stays `laws of the State of North Carolina`. The entity is a Colorado LLC. Kevin and counsel still need to decide whether that split is what they want.
+Governing law stays `laws of the State of North Carolina`. The arbitration place stays North Carolina: `The place of the arbitration and each in person hearing shall be North Carolina.` The entity is a Colorado LLC. Kevin and counsel still need to decide whether that split is what they want.
 
-The terms loader still rewrites the arbitration place from North Carolina to Colorado. That venue sentence is separate from governing law.
+If a stored row already says the arbitration place is Colorado, the rewrite and the review SQL put that one sentence back to North Carolina. They do not change governing law.
 
 ## Rewards placeholders
 

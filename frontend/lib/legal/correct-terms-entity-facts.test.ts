@@ -20,7 +20,7 @@ const LIVE_TERMS_EXCERPTS = [
 const UNRELATED_POLICY = `Residents of certain states, including California, Colorado, Connecticut, Utah, and Virginia (the "States") may have additional rights. Fan Engage Pro LLC, a North Carolina limited liability company.`;
 
 describe("applyTermsColoradoEntityFacts", () => {
-  it("maps the entity and venue phrases to Colorado and leaves governing law in North Carolina", () => {
+  it("maps the entity phrase to Colorado and leaves governing law and arbitration in North Carolina", () => {
     const corrected = applyTermsColoradoEntityFacts("terms", LIVE_TERMS_EXCERPTS);
     assert.equal(corrected.includes("a North Carolina limited liability company"), false);
     assert.match(
@@ -31,12 +31,16 @@ describe("applyTermsColoradoEntityFacts", () => {
     assert.doesNotMatch(corrected, /laws of the State of Colorado/);
     assert.match(
       corrected,
+      /The place of the arbitration and each in person hearing shall be North Carolina\./,
+    );
+    assert.doesNotMatch(
+      corrected,
       /The place of the arbitration and each in person hearing shall be Colorado\./,
     );
     assert.equal(
       TERMS_ENTITY_FACT_REPLACEMENTS.length,
-      2,
-      "entity and venue only; governing law stays North Carolina",
+      1,
+      "entity only; governing law and arbitration stay North Carolina",
     );
   });
 

@@ -111,6 +111,12 @@ function stripStoreCreditSentences(content: string): string {
   return next;
 }
 
+const ARBITRATION_IN_COLORADO =
+  "The place of the arbitration and each in person hearing shall be Colorado.";
+
+const ARBITRATION_IN_NORTH_CAROLINA =
+  "The place of the arbitration and each in person hearing shall be North Carolina.";
+
 const ITEM4_SLUGS = new Set(["terms", "rewards_terms", "cancellation_refund"]);
 
 /**
@@ -123,6 +129,7 @@ export function applyItem4PolicyCopy(slug: string, content: string): string {
     "a North Carolina limited liability company",
     "a Colorado limited liability company",
   );
+  next = next.replaceAll(ARBITRATION_IN_COLORADO, ARBITRATION_IN_NORTH_CAROLINA);
   if (slug === "terms") next = applyTermsPremiumBilling(next);
   if (next.includes("eligible seven-day free trial, then monthly or yearly billing")) {
     next = replaceFlexible(next, NEW_SUBSCRIPTION_REFUND_WINDOW, "");

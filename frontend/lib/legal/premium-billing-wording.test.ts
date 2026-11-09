@@ -74,6 +74,7 @@ describe("terms premium billing wording", () => {
 const REWARDS = [
   "Fan Engage Pro LLC, a North Carolina limited liability company",
   "laws of the State of North Carolina",
+  "The place of the arbitration and each in person hearing shall be Colorado.",
   "The Fan Engage Pro Rules for Use and User Content [link] also apply to the Fan Engage Pro Reward Program.",
   "The [link] for upgrade to Premium access and the cancellation/refund policy are located at [/cancellation-refund] on the platform.",
   "The Fan Engage Pro Terms of Use [here, provide link] and the Fan Engage Pro Rules for Use and User Content [link] also apply.",
@@ -88,6 +89,8 @@ describe("item 4 policy copy", () => {
     const next = applyItem4PolicyCopy("rewards_terms", REWARDS);
     assert.equal(next.includes("North Carolina limited liability company"), false);
     assert.match(next, /laws of the State of North Carolina/);
+    assert.match(next, /arbitration and each in person hearing shall be North Carolina/);
+    assert.doesNotMatch(next, /arbitration and each in person hearing shall be Colorado/);
     assert.equal(next.includes(TERMS_ELIGIBLE_TRIAL), true);
     assert.equal(next.includes("$5"), false);
     assert.equal(next.includes("store credit"), false);
