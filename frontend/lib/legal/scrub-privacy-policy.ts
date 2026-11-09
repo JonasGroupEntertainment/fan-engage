@@ -1,3 +1,4 @@
+import { applyPrivacyAgeRequirement } from "./align-policy-copy.ts";
 import {
   OFFICIAL_CONTACT_MD_LINK,
   alignOfficialContactEmails,
@@ -12,6 +13,8 @@ import {
  * helper rewrites only those phrases so /privacy stays accurate even before
  * the matching SQL migration is applied. Other policies pass through
  * unchanged. Commercial and fan-product language is left in place.
+ * The children-under-13 section is rewritten to the 18+ age requirement
+ * in align-policy-copy.ts so /privacy matches /terms.
  */
 export const PRIVACY_COUNSEL_EFFECTIVE_DATE = "2026-09-24";
 
@@ -116,6 +119,7 @@ export function applyPrivacyCounselScrub(content: string): string {
   next = alignOfficialContactEmails(next);
   next = fillEmptyPrivacyContact(next);
   next = applyPrivacySmsDisclosure(next);
+  next = applyPrivacyAgeRequirement(next);
   return next;
 }
 

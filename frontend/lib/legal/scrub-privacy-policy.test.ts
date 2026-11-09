@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   OFFICIAL_CONTACT_EMAIL,
   OFFICIAL_CONTACT_MAILTO,
+  OFFICIAL_CONTACT_MD_LINK,
   alignOfficialContactEmails,
   applyTermsSupportContact,
 } from "./official-contact.ts";
@@ -34,7 +35,7 @@ const LIVE_PRIVACY_EXCERPTS = [
 ].join("\r\n\r\n");
 
 const DIRTY =
-  /donat|volunteer|harm reduction|nonprofit|further our mission|contact@fanengagepro\.com|contact@fep\.com|support@fanengage|privacy@fanengage|legal@fanengage|June 19, 2026/i;
+  /donat|volunteer|harm reduction|nonprofit|further our mission|contact@fanengagepro\.com|contact@fep\.com|support@fanengage\.app|privacy@fanengage|legal@fanengage|raymond@jonasgroup\.com|June 19, 2026/i;
 
 describe("applyPrivacyCounselScrub", () => {
   it("removes nonprofit mission language and locks contact emails on the live privacy excerpts", () => {
@@ -129,11 +130,26 @@ describe("privacyCounselEffectiveDate", () => {
 
 describe("official contact alignment", () => {
   it("rewrites retired public inboxes and the Terms support sentence", () => {
-    const cookie = "Email: support@fanengagepro.com\n\nWe use authentication cookies.";
+    assert.equal(OFFICIAL_CONTACT_EMAIL, "support@fanengagepro.com");
+
+    const cookie = "Email: raymond@jonasgroup.com\n\nWe use authentication cookies.";
     const aligned = alignOfficialContactEmails(cookie);
     assert.match(aligned, new RegExp(OFFICIAL_CONTACT_MAILTO));
     assert.match(aligned, /We use authentication cookies\./);
-    assert.equal(aligned.includes("support@fanengagepro.com"), false);
+    assert.equal(aligned.includes("raymond@jonasgroup.com"), false);
+    assert.equal(
+      alignOfficialContactEmails("Email: support@fanengagepro.com\n\nWe use authentication cookies."),
+      "Email: support@fanengagepro.com\n\nWe use authentication cookies.",
+    );
+    assert.equal(
+      alignOfficialContactEmails("[raymond@jonasgroup.com](mailto:raymond@jonasgroup.com)"),
+      OFFICIAL_CONTACT_MD_LINK,
+    );
+    assert.equal(alignOfficialContactEmails(OFFICIAL_CONTACT_MD_LINK), OFFICIAL_CONTACT_MD_LINK);
+    assert.equal(
+      alignOfficialContactEmails("bhamilton@joneskeller.com and carla@jonasgroup.com"),
+      "bhamilton@joneskeller.com and carla@jonasgroup.com",
+    );
 
     const terms =
       "cancel your subscription renewal either through your online account management page or by contacting FEP customer support team; however, you will be charged";
@@ -167,7 +183,7 @@ describe("official contact alignment", () => {
     for (const src of [footer, holding, login, unsubscribe, helpSms]) {
       assert.match(src, /OFFICIAL_CONTACT_EMAIL|OFFICIAL_CONTACT_MAILTO/);
       assert.equal(src.includes("support@fanengage.app"), false);
-      assert.equal(src.includes("support@fanengagepro.com"), false);
+      assert.equal(src.includes("raymond@jonasgroup.com"), false);
     }
   });
 });

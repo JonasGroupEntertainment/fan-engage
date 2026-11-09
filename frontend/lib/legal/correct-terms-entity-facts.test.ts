@@ -20,22 +20,27 @@ const LIVE_TERMS_EXCERPTS = [
 const UNRELATED_POLICY = `Residents of certain states, including California, Colorado, Connecticut, Utah, and Virginia (the "States") may have additional rights. Fan Engage Pro LLC, a North Carolina limited liability company.`;
 
 describe("applyTermsColoradoEntityFacts", () => {
-  it("maps the three published NC entity/law/venue phrases to Colorado on terms only", () => {
+  it("maps the entity phrase to Colorado and leaves governing law and arbitration in North Carolina", () => {
     const corrected = applyTermsColoradoEntityFacts("terms", LIVE_TERMS_EXCERPTS);
-    assert.equal(corrected.includes("North Carolina"), false);
+    assert.equal(corrected.includes("a North Carolina limited liability company"), false);
     assert.match(
       corrected,
       /Fan Engage Pro LLC, a Colorado limited liability company/,
     );
-    assert.match(corrected, /laws of the State of Colorado/);
+    assert.match(corrected, /laws of the State of North Carolina/);
+    assert.doesNotMatch(corrected, /laws of the State of Colorado/);
     assert.match(
+      corrected,
+      /The place of the arbitration and each in person hearing shall be North Carolina\./,
+    );
+    assert.doesNotMatch(
       corrected,
       /The place of the arbitration and each in person hearing shall be Colorado\./,
     );
     assert.equal(
       TERMS_ENTITY_FACT_REPLACEMENTS.length,
-      3,
-      "keep the replacement list limited to the three published facts",
+      1,
+      "entity only; governing law and arbitration stay North Carolina",
     );
   });
 
@@ -56,7 +61,8 @@ describe("applyTermsColoradoEntityFacts", () => {
       "\n\nNotices: 300 Poplar St, Belmont, NC 28012.";
     const corrected = applyTermsColoradoEntityFacts("terms", withNotice);
     assert.match(corrected, /300 Poplar St, Belmont, NC 28012/);
-    assert.equal(corrected.includes("North Carolina"), false);
+    assert.match(corrected, /laws of the State of North Carolina/);
+    assert.equal(corrected.includes("a North Carolina limited liability company"), false);
   });
 
   it("is applied when policy_pages terms are loaded for /terms and signup", () => {
