@@ -31,9 +31,10 @@ export default function HelpPage() {
         <article className="space-y-2">
           <h2 className="text-lg font-semibold text-white">What is Fan Engage Pro?</h2>
           <p className="text-sm leading-relaxed">
-            Fan Engage Pro is a fan experience for artists. Follow the artists
-            you care about, earn points for showing up, RSVP to events, and
-            unlock in-app rewards.
+            Fan Engage Pro is a fan experience for artists, operated by Fan
+            Engage Pro LLC, a Colorado limited liability company. Follow the
+            artists you care about, earn points for showing up, RSVP to events,
+            and unlock in-app rewards.
           </p>
         </article>
 
@@ -51,14 +52,15 @@ export default function HelpPage() {
         <article className="space-y-2">
           <h2 className="text-lg font-semibold text-white">Premium billing</h2>
           <p className="text-sm leading-relaxed">
-            Premium is a separate optional subscription. It is billed monthly
-            or yearly at the price shown on the{" "}
+            Premium includes an eligible seven-day free trial, then monthly or
+            yearly billing. The price is shown on the{" "}
             <Link href="/premium" className="text-white underline underline-offset-4 hover:text-white/80">
               Premium
             </Link>{" "}
-            page and at checkout. Eligible new accounts can start a 7-day free
-            trial. There is one free trial per account. You are not charged
-            until the trial ends, and you can cancel before then.
+            page and at checkout. There is one free trial per account. You are
+            not charged until the trial ends, and you can cancel before then.
+            Premium includes a $5 monthly store credit on both monthly and
+            yearly plans, redeemable when the FEP store opens.
           </p>
         </article>
 
