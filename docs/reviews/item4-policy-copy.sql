@@ -59,12 +59,22 @@ where slug in ('terms', 'rewards_terms', 'cancellation_refund')
   and content_md like '%Refunds are available within 30 days of a new subscription purchase%'
   and content_md like '%eligible seven-day free trial, then monthly or yearly billing%';
 
--- 5. $5 credit. Not "spendable now". Not once per billing cycle.
+-- 5. Remove store-credit sentences from these policy rows. Do not edit
+-- monthly_credit_cents or any other credit code.
+update public.policy_pages
+set content_md = replace(
+  content_md,
+  'Premium includes a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens.',
+  ''
+)
+where slug in ('terms', 'rewards_terms', 'cancellation_refund')
+  and content_md like '%Premium includes a $5 monthly store credit on both monthly and yearly plans%';
+
 update public.policy_pages
 set content_md = replace(
   content_md,
   'a $5.00 monthly credit applied to the User''s account each billing cycle, redeemable toward marketplace items within that Artist''s community.',
-  'a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens'
+  ''
 )
 where slug in ('terms', 'rewards_terms', 'cancellation_refund')
   and content_md like '%$5.00 monthly credit applied to the User''s account each billing cycle, redeemable toward marketplace items%';
@@ -73,8 +83,39 @@ update public.policy_pages
 set content_md = replace(
   content_md,
   'a $5.00 monthly credit applied to the User''s account each billing cycle',
-  'a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens'
+  ''
 )
 where slug in ('terms', 'rewards_terms', 'cancellation_refund')
-  and content_md like '%$5.00 monthly credit applied to the User''s account each billing cycle%'
-  and content_md not like '%redeemable when the FEP store opens%';
+  and content_md like '%$5.00 monthly credit applied to the User''s account each billing cycle%';
+
+update public.policy_pages
+set content_md = replace(
+  content_md,
+  'a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens',
+  ''
+)
+where slug in ('terms', 'rewards_terms', 'cancellation_refund')
+  and content_md like '%a $5 monthly store credit on both monthly and yearly plans%';
+
+-- 6. Rewards terms: drop Rules for Use. Keep the Terms of Use clause.
+update public.policy_pages
+set content_md = replace(
+  replace(
+    content_md,
+    ' and the Fan Engage Pro Rules for Use and User Content [link]',
+    ''
+  ),
+  'The Fan Engage Pro Rules for Use and User Content [link] also apply to the Fan Engage Pro Reward Program.',
+  ''
+)
+where slug = 'rewards_terms'
+  and content_md like '%Rules for Use%';
+
+update public.policy_pages
+set content_md = replace(
+  content_md,
+  '(no public page is published)',
+  ''
+)
+where slug = 'rewards_terms'
+  and content_md like '%(no public page is published)%';

@@ -31,11 +31,9 @@ describe("help, pricing perk, and header copy", () => {
     assert.match(help, /Premium billing/);
     assert.match(help, /Colorado limited liability company/);
     assert.match(help, /eligible seven-day free trial, then monthly or\s+yearly billing/);
-    assert.match(
-      help,
-      /\$5 monthly store credit on both monthly and\s+yearly plans, redeemable when the FEP store opens/,
-    );
+    assert.doesNotMatch(help, /\$5 monthly store credit/);
     assert.doesNotMatch(help, /redeemable toward marketplace/);
+    assert.doesNotMatch(help, /Rules for Use/);
     assert.doesNotMatch(help, /within 30 days of a new subscription/);
     assert.match(help, /How to cancel/);
     assert.match(help, /href="\/cancellation-refund"/);

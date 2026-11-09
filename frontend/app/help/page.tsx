@@ -59,8 +59,6 @@ export default function HelpPage() {
             </Link>{" "}
             page and at checkout. There is one free trial per account. You are
             not charged until the trial ends, and you can cancel before then.
-            Premium includes a $5 monthly store credit on both monthly and
-            yearly plans, redeemable when the FEP store opens.
           </p>
         </article>
 

@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import {
-  PREMIUM_STORE_CREDIT,
   TERMS_ELIGIBLE_TRIAL,
   TERMS_MONTHLY_OR_YEARLY_BILLING,
   applyItem4PolicyCopy,
@@ -85,27 +84,27 @@ const REWARDS = [
 ].join("\n\n");
 
 describe("item 4 policy copy", () => {
-  it("states the trial, the unspendable store credit, and the Colorado entity", () => {
+  it("states the trial and the Colorado entity, and drops credit and Rules for Use", () => {
     const next = applyItem4PolicyCopy("rewards_terms", REWARDS);
     assert.equal(next.includes("North Carolina limited liability company"), false);
     assert.match(next, /laws of the State of North Carolina/);
     assert.equal(next.includes(TERMS_ELIGIBLE_TRIAL), true);
-    assert.equal(next.includes(PREMIUM_STORE_CREDIT) || next.includes("redeemable when the FEP store opens"), true);
+    assert.equal(next.includes("$5"), false);
+    assert.equal(next.includes("store credit"), false);
     assert.equal(next.includes("each billing cycle"), false);
-    assert.equal(next.includes("redeemable toward marketplace"), false);
+    assert.equal(next.includes("Rules for Use"), false);
+    assert.equal(next.includes("no public page is published"), false);
     assert.equal(next.includes("within 30 days of a new subscription"), false);
     assert.equal(next.includes("[link]"), false);
     assert.equal(next.includes("[here, provide link]"), false);
     assert.equal(next.includes("example.com"), false);
     assert.equal(next.includes("{{"), false);
     assert.equal(next.includes("](#)"), false);
-    assert.match(next, /\[Terms of Use\]\(\/terms\)/);
+    assert.match(next, /\[Terms of Use\]\(\/terms\) also apply/);
     assert.match(next, /\[Premium\]\(\/premium\)/);
     assert.match(next, /\[cancellation and refund policy\]\(\/cancellation-refund\)/);
     assert.doesNotMatch(next, /\(\/premium\)\(\/premium\)/);
     assert.match(next, /\[Privacy Policy\]\(\/privacy\)/);
-    assert.match(next, /no public page is published/);
-    assert.doesNotMatch(next, /\/rules/);
     assert.equal(applyItem4PolicyCopy("rewards_terms", next), next);
   });
 
@@ -125,9 +124,11 @@ describe("item 4 policy copy", () => {
     }
     assert.equal(existsSync(`${app}rules/page.tsx`), false);
     const linked = applyRewardsPlaceholderLinks(
-      "The Fan Engage Pro Rules for Use and User Content [link]",
+      "The Fan Engage Pro Rules for Use and User Content [link] also apply to the Fan Engage Pro Reward Program.",
     );
-    assert.equal(linked.includes("](/"), false);
+    assert.equal(linked.includes("Rules for Use"), false);
+    assert.equal(linked.includes("no public page is published"), false);
+    assert.equal(linked.trim(), "");
   });
 
   it("adds the same premium facts to cancellation without a stored trial sentence", () => {
@@ -136,7 +137,8 @@ describe("item 4 policy copy", () => {
       "Fan Engage does not offer refunds for partial billing periods.",
     );
     assert.equal(next.includes(TERMS_ELIGIBLE_TRIAL), true);
-    assert.equal(next.includes(PREMIUM_STORE_CREDIT), true);
+    assert.equal(next.includes("$5"), false);
+    assert.equal(next.includes("store credit"), false);
     assert.match(next, /does not offer refunds for partial billing periods/);
     assert.match(next, /Colorado limited liability company/);
   });

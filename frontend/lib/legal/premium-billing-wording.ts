@@ -23,35 +23,18 @@ export const TERMS_SIGNUP_DAY_BILLING =
 export const TERMS_ELIGIBLE_TRIAL =
   "Premium includes an eligible seven-day free trial, then monthly or yearly billing.";
 
-/**
- * The $5 credit is stored as monthly_credit_cents = 500 and nothing can
- * spend it. Marketplace merch is behind NEXT_PUBLIC_MARKETPLACE_LIVE.
- * Do not call the credit spendable until a store can take it.
- * [CONFIRM WITH RAYMOND]
- */
-export const PREMIUM_STORE_CREDIT =
-  "Premium includes a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens.";
-
 export const COLORADO_ENTITY_SENTENCE =
   "Fan Engage Pro is operated by Fan Engage Pro LLC, a Colorado limited liability company.";
 
 const NEW_SUBSCRIPTION_REFUND_WINDOW =
   "Refunds are available within 30 days of a new subscription purchase if you have not substantially used the service.";
 
-const STORE_CREDIT_EACH_CYCLE =
-  "a $5.00 monthly credit applied to the User's account each billing cycle, redeemable toward marketplace items within that Artist's community.";
-
-const STORE_CREDIT_EACH_CYCLE_SHORT =
-  "a $5.00 monthly credit applied to the User's account each billing cycle";
-
-const STORE_CREDIT_CLAUSE =
-  "a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens";
-
-const RULES_FOR_USE_PLACEHOLDER =
-  "The Fan Engage Pro Rules for Use and User Content [link]";
-
-const RULES_FOR_USE_UNPUBLISHED =
-  "The Fan Engage Pro Rules for Use and User Content (no public page is published)";
+const STORE_CREDIT_SENTENCES = [
+  "Premium includes a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens.",
+  "a $5.00 monthly credit applied to the User's account each billing cycle, redeemable toward marketplace items within that Artist's community.",
+  "a $5.00 monthly credit applied to the User's account each billing cycle",
+  "a $5 monthly store credit on both monthly and yearly plans, redeemable when the FEP store opens",
+];
 
 const TERMS_PLACEHOLDER = "The Fan Engage Pro Terms of Use [here, provide link]";
 
@@ -86,9 +69,25 @@ export function applyTermsPremiumBilling(content: string): string {
   return next;
 }
 
-/** Real public routes. Rules for Use has no page under frontend/app. */
+function tidyPlaceholderProse(content: string): string {
+  return content
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +([.,])/g, "$1")
+    .replace(/\bSee and\b/g, "See")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+/** Real public routes. Rules for Use is deleted, not pointed at a new page. */
 export function applyRewardsPlaceholderLinks(content: string): string {
-  let next = content.replaceAll(RULES_FOR_USE_PLACEHOLDER, RULES_FOR_USE_UNPUBLISHED);
+  let next = content.replace(
+    /\s+and the Fan Engage Pro Rules for Use and User Content(?: \[link\])?/g,
+    "",
+  );
+  next = next.replace(
+    /The Fan Engage Pro Rules for Use and User Content(?: \[link\])?[^.]*\./g,
+    "",
+  );
+  next = next.replace(/\(no public page is published\)/g, "");
   next = next.replaceAll(TERMS_PLACEHOLDER, TERMS_LINK);
   next = replaceFlexible(next, PREMIUM_AND_CANCELLATION_PLACEHOLDER, PREMIUM_AND_CANCELLATION_LINKS);
   next = next.replaceAll(PRIVACY_PLACEHOLDER, PRIVACY_LINK);
@@ -96,14 +95,19 @@ export function applyRewardsPlaceholderLinks(content: string): string {
   next = next.replaceAll("[/terms]", "[Terms of Use](/terms)");
   next = next.replaceAll("[/privacy]", "[Privacy Policy](/privacy)");
   next = next.replaceAll("[/premium]", "[Premium](/premium)");
-  next = next.replaceAll("[here, provide link]", "(no public page is published)");
-  next = next.replaceAll("[link]", "(no public page is published)");
-  next = next.replace(/\{\{[^}]+\}\}/g, "(no public page is published)");
-  next = next.replace(
-    /\[([^\]]+)\]\(https?:\/\/example\.com[^)]*\)/gi,
-    "$1 (no public page is published)",
-  );
-  next = next.replace(/\[([^\]]+)\]\(#\)/g, "$1 (no public page is published)");
+  next = next.replaceAll("[here, provide link]", "");
+  next = next.replaceAll("[link]", "");
+  next = next.replace(/\{\{[^}]+\}\}/g, "");
+  next = next.replace(/\[([^\]]+)\]\(https?:\/\/example\.com[^)]*\)/gi, "$1");
+  next = next.replace(/\[([^\]]+)\]\(#\)/g, "$1");
+  return tidyPlaceholderProse(next);
+}
+
+function stripStoreCreditSentences(content: string): string {
+  let next = content;
+  for (const sentence of STORE_CREDIT_SENTENCES) {
+    next = replaceFlexible(next, sentence, "");
+  }
   return next;
 }
 
@@ -125,14 +129,10 @@ export function applyItem4PolicyCopy(slug: string, content: string): string {
   } else {
     next = replaceFlexible(next, NEW_SUBSCRIPTION_REFUND_WINDOW, TERMS_ELIGIBLE_TRIAL);
   }
-  next = replaceFlexible(next, STORE_CREDIT_EACH_CYCLE, STORE_CREDIT_CLAUSE);
-  next = replaceFlexible(next, STORE_CREDIT_EACH_CYCLE_SHORT, STORE_CREDIT_CLAUSE);
+  next = stripStoreCreditSentences(next);
   if (slug === "rewards_terms") next = applyRewardsPlaceholderLinks(next);
   if (!next.includes("eligible seven-day free trial, then monthly or yearly billing")) {
     next += `\n\n## Premium billing\n\n${TERMS_ELIGIBLE_TRIAL}`;
-  }
-  if (!next.includes("$5 monthly store credit on both monthly and yearly plans")) {
-    next += `\n\n${PREMIUM_STORE_CREDIT}`;
   }
   if (!next.includes("a Colorado limited liability company")) {
     next += `\n\n${COLORADO_ENTITY_SENTENCE}`;
