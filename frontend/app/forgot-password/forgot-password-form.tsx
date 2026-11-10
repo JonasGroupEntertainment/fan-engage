@@ -3,9 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { authEmailRedirectTo } from "@/lib/app-url";
-import { buildPasswordRecoveryOptions } from "@/lib/password-recovery-options";
+import { requestPasswordResetAction } from "./actions";
 import {
   TurnstileWidget,
   isTurnstileConfigured,
@@ -106,23 +104,17 @@ export default function ForgotPasswordForm() {
     setMessage("");
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), buildPasswordRecoveryOptions({
-        redirectTo: authEmailRedirectTo("/reset-password"),
-        turnstileConfigured,
-        turnstileToken,
-      }));
-      if (error) throw error;
-      setStatus("sent");
-      setMessage(
-        "Check your email for a link to reset your password. Use the newest link — requesting another one invalidates the previous one.",
-      );
-      startResendCooldown();
+      // The server builds and sends the link itself, so the token is only
+      // used when the new password is submitted. Mail scanners can't burn it.
+      const res = await requestPasswordResetAction(email.trim(), turnstileToken);
+      setStatus(res.ok ? "sent" : "error");
+      setMessage(res.message);
+      if (res.ok) startResendCooldown();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Unable to send reset link.");
     } finally {
-      // Supabase consumes the single-use token; every retry needs a fresh one.
+      // The server verifies the single-use Turnstile token; every retry needs a fresh one.
       resetChallenge();
     }
   }
