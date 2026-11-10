@@ -45,7 +45,10 @@ import { SmsConsentCopy } from "@/components/sms-consent-copy";
 import {
   AGE_BLOCKED_MESSAGE,
   AGE_BLOCK_STORAGE_KEY,
+  PARENT_CONSENT_LABEL,
+  PARENT_CONSENT_MESSAGE,
   ageBand,
+  needsParentConsent,
   parseBirthDate,
   toIsoDate,
 } from "@/lib/age-gate";
@@ -133,6 +136,7 @@ export function SignupForm({
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [parentConsentChecked, setParentConsentChecked] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -146,6 +150,7 @@ export function SignupForm({
   const birthDate = parseBirthDate(birthYear, birthMonth, birthDay);
   // Texts are 18+. Until a full adult date is entered, the box stays off.
   const smsAllowed = birthDate != null && ageBand(birthDate) === "adult";
+  const parentConsentRequired = needsParentConsent(birthDate);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -211,7 +216,9 @@ export function SignupForm({
     loadState: turnstileLoadState,
   });
   const canSubmitSignup =
-    signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
+    signupAllowsSubmit(turnstileGate) &&
+    (!hasConsentDocs || consentChecked) &&
+    (!parentConsentRequired || parentConsentChecked);
 
   async function ensureCaptcha(): Promise<boolean> {
     const gate = nextSignupTurnstileGate({
@@ -274,11 +281,22 @@ export function SignupForm({
       return;
     }
 
+    if (needsParentConsent(birthDate) && !parentConsentChecked) {
+      setStatus("error");
+      setMessage(PARENT_CONSENT_MESSAGE);
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     const ok = await ensureCaptcha();
     if (!ok) return;
-    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined, sms, toIsoDate(birthDate));
+    await createAccount(
+      hasConsentDocs ? CONSENT_VERSION : undefined,
+      sms,
+      toIsoDate(birthDate),
+      needsParentConsent(birthDate),
+    );
   }
 
   function blockForAge() {
@@ -291,6 +309,7 @@ export function SignupForm({
     setPassword("");
     setPhone("");
     setSmsConsent(false);
+    setParentConsentChecked(false);
     setBirthMonth("");
     setBirthDay("");
     setBirthYear("");
@@ -303,6 +322,7 @@ export function SignupForm({
     consentVersion: string | undefined,
     sms: PublicSmsOptIn,
     birthDateIso: string,
+    parentConsent: boolean,
   ) {
     setStatus("loading");
     setMessage("");
@@ -324,6 +344,7 @@ export function SignupForm({
           phone: sms.phone,
           smsOptedIn: sms.smsOptedIn,
           birthDate: birthDateIso,
+          parentConsent,
         }),
       });
       resetChallenge();
@@ -754,6 +775,25 @@ export function SignupForm({
                 </p>
               )}
             </div>
+          )}
+
+          {parentConsentRequired && (
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                name="parent-consent"
+                checked={parentConsentChecked}
+                onChange={(e) => {
+                  setParentConsentChecked(e.target.checked);
+                  if (status === "error") {
+                    setStatus("idle");
+                    setMessage("");
+                  }
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+              />
+              <span>{PARENT_CONSENT_LABEL}</span>
+            </label>
           )}
 
           {hasConsentDocs ? (
