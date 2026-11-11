@@ -150,7 +150,6 @@ function FollowedArtistsStrip({
               {a.hero_image ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={a.hero_image}
                     alt=""
