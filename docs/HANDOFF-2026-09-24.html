@@ -360,13 +360,13 @@ git push -u origin fix/short-description
 gh pr create --base main --head fix/short-description --title "..." --body "..."
 gh pr checks N --watch --fail-fast
 gh pr update-branch N          # only if the PR is behind main, then watch checks again
-gh pr merge N --merge --delete-branch
+gh pr merge N --squash --delete-branch   # squash was used for every merge on 2026-11-11
 git checkout main && git pull</code></pre>
 <p>The recipe for checking the Production deploy by SHA is in the 2026-09-17 handoff and still works. In this shell, a foreground <code>sleep</code> is blocked; use <code>--watch</code> or an until-loop instead.</p>
 <h3>Database changes</h3>
 <ol>
 <li>Apply the SQL to the correct project through the Supabase MCP first, and confirm with a select.</li>
-<li>Record it as the next numbered file (0074 next) in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
+<li>Record it as the next numbered file (0099 next as of 2026-11-11) in root <code>supabase/migrations/</code> with the header line "Already applied to production via MCP on YYYY-MM-DD; kept here for the repo record."</li>
 <li>Any new SECURITY DEFINER function starts closed. Revoke EXECUTE from PUBLIC, anon, and authenticated, grant service_role, and only grant a browser role back with a written reason, the way 0062 does.</li>
 </ol>
 </section>
