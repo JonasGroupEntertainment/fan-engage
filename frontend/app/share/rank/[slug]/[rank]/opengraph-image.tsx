@@ -15,15 +15,16 @@ function ordinal(n: number): string {
 export default async function RankOpengraphImage({
   params,
 }: {
-  params: { slug: string; rank: string };
+  params: Promise<{ slug: string; rank: string }>;
 }) {
-  const artist = await getArtistFromDb(params.slug).catch(() => null);
+  const routeParams = await params;
+  const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
 
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
-  const rankNum = parseInt(params.rank, 10);
-  const rankDisplay = Number.isFinite(rankNum) && rankNum > 0 ? ordinal(rankNum) : params.rank;
+  const rankNum = parseInt(routeParams.rank, 10);
+  const rankDisplay = Number.isFinite(rankNum) && rankNum > 0 ? ordinal(rankNum) : routeParams.rank;
 
   return new ImageResponse(
     (
@@ -44,7 +45,7 @@ export default async function RankOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -55,7 +56,7 @@ export default async function RankOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -132,7 +133,7 @@ export default async function RankOpengraphImage({
               marginTop: 4,
             }}
           >
-            {artistName} fan community
+            {`${artistName} fan community`}
           </div>
         </div>
 
