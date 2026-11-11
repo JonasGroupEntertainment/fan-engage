@@ -17,6 +17,7 @@ const adminNav: Array<{
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/launch", label: "Launch Wizard" },
   { href: "/admin/artists", label: "Artists" },
+  { href: "/admin/events", label: "Events", minRole: "admin" },
   { href: "/admin/campaigns", label: "Campaigns" },
   { href: "/admin/broadcast", label: "Broadcast" },
   { href: "/admin/analytics", label: "Analytics" },

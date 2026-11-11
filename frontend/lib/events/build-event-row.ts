@@ -70,6 +70,24 @@ export function buildEventRow(input: EventRowInput): EventRow {
   };
 }
 
+/**
+ * The two columns that say whose event this is.
+ *
+ * `artist_events.community_id` is NOT NULL with a database default of
+ * 'raelynn' (a leftover from when RaeLynn was the only community). An insert
+ * that sets only `artist_slug` therefore files another artist's event under
+ * RaeLynn, and the artist portal, which reads by `community_id`, shows it to
+ * the wrong team. Every writer spreads this so the two always match.
+ */
+export function eventOwnerColumns(artistSlug: string): {
+  artist_slug: string;
+  community_id: string;
+} {
+  const slug = (artistSlug ?? "").trim();
+  if (!slug) throw new Error("artist slug is required to save an event");
+  return { artist_slug: slug, community_id: slug };
+}
+
 export interface EventGeoInput {
   city?: string | null;
   region?: string | null;

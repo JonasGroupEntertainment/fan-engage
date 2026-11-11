@@ -1,6 +1,6 @@
 "use server";
 
-import { buildEventRow, resolveEventGeo } from "@/lib/events/build-event-row";
+import { buildEventRow, eventOwnerColumns, resolveEventGeo } from "@/lib/events/build-event-row";
 import { isMissingEventGeoColumn } from "@/lib/data/event-select";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -157,7 +157,7 @@ export async function createEventAction(formData: FormData) {
 
   const supa = createAdminClient();
   const row = {
-    artist_slug: artistSlug,
+    ...eventOwnerColumns(artistSlug),
     ...buildEventRow({ title, detail, eventDate, startsAt, location, url, capacity, sortOrder }),
   };
   const geo = eventGeoFromForm(formData);
