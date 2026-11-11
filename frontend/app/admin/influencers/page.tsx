@@ -110,7 +110,6 @@ function CreateInfluencerForm() {
           { slug: "raelynn", name: "RaeLynn" },
           { slug: "bailee", name: "Bailee" },
           { slug: "blake", name: "Blake" },
-          { slug: "konnor", name: "Konnor" },
           { slug: "dan", name: "Dan" },
         ]);
       } finally {

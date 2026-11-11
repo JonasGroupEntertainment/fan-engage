@@ -107,30 +107,6 @@ const SEED_CONTENT: Record<string, SeedPost[]> = {
       visibility: "public",
     },
   ],
-  konnor: [
-    {
-      kind: "announcement",
-      title: "Konnor community — you're founding this",
-      body: "Being here now means you're a founding fan. This space is yours — for music talk, early access, and being close to what Konnor is building. Start the conversation: what's the track you keep going back to?",
-      pinned: true,
-      visibility: "public",
-    },
-    {
-      kind: "poll",
-      title: null,
-      body: "Where do you mostly stream Konnor's music?",
-      pinned: false,
-      visibility: "public",
-      poll_options: ["Spotify", "Apple Music", "YouTube", "I buy it"],
-    },
-    {
-      kind: "challenge",
-      title: "Lyric that hit different",
-      body: "Drop a Konnor lyric that meant something to you and the context around it — what you were going through, where you were. Best response gets featured.",
-      pinned: false,
-      visibility: "public",
-    },
-  ],
   "danger-twins": [
     {
       kind: "announcement",

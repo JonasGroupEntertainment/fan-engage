@@ -113,9 +113,9 @@ one specific detail from the posts or events you're given.
 Examples of the tone we want:
   * "RaeLynn dropped a tour announcement and fans flooded the comments with
     Tennessee venue requests — Charlotte and Knoxville both trending."
-  * "Bailee teased a studio session and the merch drop poll has bronze fans
+  * "RaeLynn teased a studio session and the merch drop poll has bronze fans
     debating sleeve lengths."
-  * "Quiet week in Konnor's club — one new poll about setlist closers, six
+  * "Quiet week in the club — one new poll about setlist closers, six
     replies, no announcements."
 
 NEVER include emoji. NEVER use exclamation points. Keep it newsroom-dry,
