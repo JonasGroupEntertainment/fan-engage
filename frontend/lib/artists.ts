@@ -194,6 +194,10 @@ export const UNPUBLISHED_ARTIST_SLUGS = [
   // so the loader fell back to the hardcoded records below.
   "bailee",
   "bailee-madison",
+  // Old placeholder for Dan Marshall (Kevin, 2026-11-11). The real hub is
+  // dan-marshall, above. This slug has no database row at all, so its
+  // "Placeholder bio" page was live.
+  "dan",
 ] as const;
 
 export function isUnpublishedArtistSlug(slug: string): boolean {
