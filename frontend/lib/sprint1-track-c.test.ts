@@ -208,9 +208,10 @@ describe("share badge pages rewrite legacy descriptions", () => {
       assert.match(src, /publicFoundingFanDescription\(raw\)/);
       assert.match(src, /tierBadgeDescription\(slug, TIER_MIN_POINTS\[tierSlug\]\)/);
       // Either the row is rewritten at load time (page) or at use (OG image).
+      // Both read the awaited route param as badgeSlug (Next 16 params is a Promise).
       assert.match(
         src,
-        /description: publicBadgeDescription\(badgeSlug, |publicBadgeDescription\(params\.badge, /,
+        /publicBadgeDescription\(badgeSlug, /,
       );
     });
   }

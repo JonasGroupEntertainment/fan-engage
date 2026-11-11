@@ -9,6 +9,11 @@ import {
   deletePortalEventAction,
 } from "./actions";
 import BulkAddPanel from "./bulk-add-panel";
+import { withLocalDateTimesAsIso } from "@/lib/dates/datetime-local";
+import { useLocalDateTimeDefault } from "@/lib/dates/use-local-datetime-default";
+
+/** datetime-local fields the team types in their own zone. */
+const LOCAL_TIME_FIELDS = ["starts_at"] as const;
 
 interface Event {
   id: string;
@@ -41,14 +46,13 @@ function EventForm({
     onSuccess: () => { router.refresh(); onDone(); },
   });
 
-  const startsAtLocal = event?.starts_at
-    ? new Date(event.starts_at).toISOString().slice(0, 16)
-    : "";
+  // Shown in the team member's own zone; handleSubmit sends an ISO instant.
+  const startsAtRef = useLocalDateTimeDefault(event?.starts_at);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErr(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = withLocalDateTimesAsIso(new FormData(e.currentTarget), LOCAL_TIME_FIELDS);
     const action = event ? updatePortalEventAction : createPortalEventAction;
     const result = await submit(action, fd);
     if (result?.error) setErr(result.error);
@@ -70,7 +74,7 @@ function EventForm({
       <input
         name="starts_at"
         type="datetime-local"
-        defaultValue={startsAtLocal}
+        ref={startsAtRef}
         className={inputCls}
       />
       <input

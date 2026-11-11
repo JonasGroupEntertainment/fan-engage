@@ -9,16 +9,17 @@ export const alt = "Exclusive drop on Fan Engage";
 export default async function DropOpengraphImage({
   params,
 }: {
-  params: { slug: string; drop: string };
+  params: Promise<{ slug: string; drop: string }>;
 }) {
-  const artist = await getArtistFromDb(params.slug).catch(() => null);
+  const routeParams = await params;
+  const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
 
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
 
   // drop param is a human-readable slug; decode for display
-  const dropLabel = decodeURIComponent(params.drop)
+  const dropLabel = decodeURIComponent(routeParams.drop)
     .replace(/-/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -41,7 +42,7 @@ export default async function DropOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -52,7 +53,7 @@ export default async function DropOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -120,7 +121,7 @@ export default async function DropOpengraphImage({
             {dropLabel}
           </div>
           <div style={{ fontSize: 30, fontWeight: 500, color: "rgba(255,255,255,0.7)" }}>
-            from {artistName}
+            {`from ${artistName}`}
           </div>
         </div>
 
