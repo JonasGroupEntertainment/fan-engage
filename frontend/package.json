@@ -38,6 +38,9 @@
   },
   "overrides": {
     "sharp": "^0.35.0",
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
