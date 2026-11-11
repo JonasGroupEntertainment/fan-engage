@@ -198,6 +198,9 @@ export const UNPUBLISHED_ARTIST_SLUGS = [
   // dan-marshall, above. This slug has no database row at all, so its
   // "Placeholder bio" page was live.
   "dan",
+  // Placeholder only (Kevin, 2026-11-11). Its artists row is inactive, so
+  // the "Placeholder bio" page was live through the same fallback.
+  "blake",
 ] as const;
 
 export function isUnpublishedArtistSlug(slug: string): boolean {

@@ -18,7 +18,7 @@ describe("unpublished artist hubs", () => {
   it("404s Danger Twins, Dan Marshall, and Hunter Hawkins instead of serving placeholders", () => {
     assert.deepEqual(
       [...UNPUBLISHED_ARTIST_SLUGS],
-      ["danger-twins", "dan-marshall", "hunter-hawkins", "bailee", "bailee-madison", "dan"],
+      ["danger-twins", "dan-marshall", "hunter-hawkins", "bailee", "bailee-madison", "dan", "blake"],
     );
     for (const slug of UNPUBLISHED_ARTIST_SLUGS) {
       assert.equal(isUnpublishedArtistSlug(slug), true);
@@ -108,5 +108,25 @@ describe("the dan placeholder is hidden", () => {
   it("does not hide artists whose slug only starts with dan", () => {
     assert.equal(isUnpublishedArtistSlug("dana"), false);
     assert.equal(isUnpublishedArtistSlug("danger"), false);
+  });
+});
+
+// Kevin, 2026-11-11: hide the blake placeholder too.
+describe("the blake placeholder is hidden", () => {
+  it("serves no public hub for blake", () => {
+    for (const slug of ["blake", "Blake"]) {
+      assert.equal(isUnpublishedArtistSlug(slug), true);
+      assert.equal(getArtist(slug), null);
+    }
+    assert.equal(listArtists().some((a) => a.slug === "blake"), false);
+  });
+
+  it("leaves RaeLynn as the only hardcoded hub that is public", () => {
+    assert.deepEqual(
+      listArtistRecords()
+        .map((a) => a.slug)
+        .filter((slug) => getArtist(slug) !== null),
+      ["raelynn"],
+    );
   });
 });
