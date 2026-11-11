@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { applyTermsColoradoEntityFacts } from "./correct-terms-entity-facts.ts";
 import {
   TERMS_ELIGIBLE_TRIAL,
   TERMS_MONTHLY_OR_YEARLY_BILLING,
@@ -132,6 +133,73 @@ describe("item 4 policy copy", () => {
     assert.equal(linked.includes("Rules for Use"), false);
     assert.equal(linked.includes("no public page is published"), false);
     assert.equal(linked.trim(), "");
+  });
+
+  it("sets governing law to North Carolina and leaves the Colorado entity and North Carolina arbitration", () => {
+    const stored = [
+      `Fan Engage Pro LLC, a Colorado limited liability company ("we," "us" or "FEP").`,
+      `This Agreement will be governed by and construed in accordance with the laws of the State of Colorado, without giving effect to any principles of conflicts of laws.`,
+      `The place of the arbitration and each in person hearing shall be North Carolina.`,
+    ].join("\n\n");
+    for (const slug of ["terms", "rewards_terms", "cancellation_refund"]) {
+      const next = applyItem4PolicyCopy(slug, applyTermsColoradoEntityFacts(slug, stored));
+      assert.match(next, /Fan Engage Pro LLC, a Colorado limited liability company/);
+      assert.equal(next.includes("a North Carolina limited liability company"), false);
+      assert.match(
+        next,
+        /governed by and construed in accordance with the laws of the State of North Carolina/,
+      );
+      assert.equal(next.includes("laws of the State of Colorado"), false);
+      assert.match(
+        next,
+        /The place of the arbitration and each in person hearing shall be North Carolina\./,
+      );
+      assert.doesNotMatch(next, /shall be Colorado/);
+      assert.equal(applyItem4PolicyCopy(slug, next), next);
+    }
+  });
+
+  it("does not rewrite governing law or venue on privacy", () => {
+    const privacy = [
+      `Residents of certain states, including California, Colorado, Connecticut, Utah, and Virginia (the "States") may have additional rights.`,
+      `This Agreement will be governed by and construed in accordance with the laws of the State of Colorado, without giving effect to any principles of conflicts of laws.`,
+      `The place of the arbitration and each in person hearing shall be Colorado.`,
+    ].join("\n\n");
+    assert.equal(applyItem4PolicyCopy("privacy", privacy), privacy);
+  });
+
+  it("publish SQL matches the live governing-law and arbitration sentences", () => {
+    const sql = readRepo("../../../docs/reviews/item4-policy-copy.sql");
+    const governingFrom = sql.indexOf("'laws of the State of Colorado'");
+    const governingTo = sql.indexOf("'laws of the State of North Carolina'");
+    assert.ok(governingFrom !== -1 && governingTo > governingFrom);
+    const venueFrom = sql.indexOf(
+      "'The place of the arbitration and each in person hearing shall be Colorado.'",
+    );
+    const venueTo = sql.indexOf(
+      "'The place of the arbitration and each in person hearing shall be North Carolina.'",
+    );
+    assert.ok(venueFrom !== -1 && venueTo > venueFrom);
+    const entityFrom = sql.indexOf("'a North Carolina limited liability company'");
+    const entityTo = sql.indexOf("'a Colorado limited liability company'");
+    assert.ok(entityFrom !== -1 && entityTo > entityFrom);
+    assert.equal(
+      sql.includes("'a Colorado limited liability company',\n  'a North Carolina limited liability company'"),
+      false,
+    );
+    assert.match(sql, /slug in \('terms', 'rewards_terms', 'cancellation_refund'\)/);
+    assert.match(sql, /Privacy \(slug = 'privacy'\) is not updated/);
+    const applied = readRepo("../../../supabase/migrations/0058_terms_colorado_entity.sql");
+    assert.match(
+      applied,
+      /'laws of the State of North Carolina',\s+'laws of the State of Colorado'/,
+      "0058 is the merged migration and still writes Colorado governing law; do not edit it",
+    );
+    assert.match(
+      applied,
+      /shall be North Carolina\.',\s+'The place of the arbitration and each in person hearing shall be Colorado\.'/,
+      "0058 is the merged migration and still writes a Colorado arbitration place; do not edit it",
+    );
   });
 
   it("adds the same premium facts to cancellation without a stored trial sentence", () => {

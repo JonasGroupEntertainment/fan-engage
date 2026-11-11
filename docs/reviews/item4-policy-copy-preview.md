@@ -25,11 +25,11 @@ Also removed when stored:
 
 ## Entity and governing law
 
-`a North Carolina limited liability company` becomes `a Colorado limited liability company` on terms, rewards terms, and cancellation.
+`a North Carolina limited liability company` becomes `a Colorado limited liability company` on terms, rewards terms, and cancellation. That entity phrase stays. `Fan Engage Pro LLC, a Colorado limited liability company` is not rewritten.
 
-Governing law stays `laws of the State of North Carolina`. The arbitration place stays North Carolina: `The place of the arbitration and each in person hearing shall be North Carolina.` The entity is a Colorado LLC. Kevin and counsel still need to decide whether that split is what they want.
+Counsel set governing law to North Carolina. `laws of the State of Colorado` becomes `laws of the State of North Carolina` on terms, rewards terms, and cancellation. The arbitration place stays North Carolina: `The place of the arbitration and each in person hearing shall be North Carolina.`
 
-If a stored row already says the arbitration place is Colorado, the rewrite and the review SQL put that one sentence back to North Carolina. They do not change governing law.
+If a stored row already says the arbitration place is Colorado, the rewrite and the review SQL put that one sentence back to North Carolina. If a stored row says `laws of the State of Colorado`, they put that phrase back to North Carolina. `0058_terms_colorado_entity.sql` is the merged migration that wrote those Colorado sentences onto the terms row. It is not edited. The public pages show North Carolina for both sentences before anyone runs `docs/reviews/item4-policy-copy.sql`.
 
 ## Rewards placeholders
 
