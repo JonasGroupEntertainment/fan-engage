@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import { createEventAction } from "../actions";
+import { withLocalDateTimesAsIso } from "@/lib/dates/datetime-local";
+
+/** datetime-local fields the admin types in their own zone. */
+const LOCAL_TIME_FIELDS = ["starts_at", "rsvp_opens_at"] as const;
 
 /**
  * "Add event" form rendered at the bottom of /admin/artists/[slug].
@@ -21,7 +25,7 @@ export default function CreateEventForm({ slug }: { slug: string }) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusinessError(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = withLocalDateTimesAsIso(new FormData(e.currentTarget), LOCAL_TIME_FIELDS);
     const result = await submit(createEventAction, fd);
     if (result?.success) {
       // Reset the form so admin can quickly add another event.
@@ -106,7 +110,7 @@ export default function CreateEventForm({ slug }: { slug: string }) {
         className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
       />
       <label className="text-xs text-white/70 md:col-span-2">
-        RSVP opens for everyone (UTC)
+        RSVP opens for everyone (your local time)
         <input
           name="rsvp_opens_at"
           type="datetime-local"
@@ -114,7 +118,7 @@ export default function CreateEventForm({ slug }: { slug: string }) {
         />
         <span className="mt-1 block text-[11px] text-white/45">
           Founding Fans can RSVP 48 hours earlier. Leave blank to keep RSVP open now.
-          Same clock as the start time field. Fans see the time in Eastern.
+          Type both times as they read on your own clock. Fans see the time in Eastern.
         </span>
       </label>
       <input

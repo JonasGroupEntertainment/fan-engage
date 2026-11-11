@@ -16,12 +16,13 @@ const TIER_COLORS: Record<string, { from: string; to: string; label: string }> =
 export default async function FanProfileOpengraphImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const profile = await getFanProfileBySlug(params.slug).catch(() => null);
+  const routeParams = await params;
+  const profile = await getFanProfileBySlug(routeParams.slug).catch(() => null);
 
   const displayName = profile?.firstName ?? "Fan";
-  const slug = profile?.profileSlug ?? params.slug;
+  const slug = profile?.profileSlug ?? routeParams.slug;
   const tier = TIER_COLORS[(profile?.tier ?? "bronze").toLowerCase()] ?? TIER_COLORS.bronze;
   const points = profile?.totalPoints ?? 0;
   const founderCount = profile?.founderBadges.length ?? 0;
@@ -49,7 +50,7 @@ export default async function FanProfileOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 18% 12%, ${tier.from}aa, transparent 55%), ` +
@@ -84,7 +85,7 @@ export default async function FanProfileOpengraphImage({
               color: "rgba(255,255,255,0.7)",
             }}
           >
-            {tier.label} tier · @{slug}
+            {`${tier.label} tier · @${slug}`}
           </div>
           <div
             style={{
@@ -92,7 +93,7 @@ export default async function FanProfileOpengraphImage({
               letterSpacing: "-0.04em", maxWidth: 1040,
             }}
           >
-            {displayName}&apos;s fan experience profile
+            {`${displayName}’s fan experience profile`}
           </div>
           {founderCount > 0 ? (
             <div
@@ -101,8 +102,7 @@ export default async function FanProfileOpengraphImage({
                 color: "rgba(255,255,255,0.88)", marginTop: 6,
               }}
             >
-              🌟 Founder · {founderForLine}
-              {founderCount > 3 ? ` · +${founderCount - 3} more` : ""}
+              {`🌟 Founder · ${founderForLine}${founderCount > 3 ? ` · +${founderCount - 3} more` : ""}`}
             </div>
           ) : (
             <div
