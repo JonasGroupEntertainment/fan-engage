@@ -36,8 +36,28 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # The build sometimes fails while Turbopack maps the Google fonts in
+      # app/layout.tsx ("next/font/google queries have exactly one entry").
+      # The same commit passes on a second run, so retry that one error up
+      # to three times. Any other build failure still fails at once.
       - name: Build
-        run: npm run build
+        shell: bash
+        run: |
+          FONT_FLAKE="next/font/google queries have exactly one entry"
+          MAX_ATTEMPTS=3
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if npm run build 2>&1 | tee build.log; then
+              exit 0
+            fi
+            if ! grep -qF "$FONT_FLAKE" build.log; then
+              echo "::error::Build failed (not the known font flake)."
+              exit 1
+            fi
+            echo "::warning::Build attempt $attempt of $MAX_ATTEMPTS hit the Google font flake."
+            sleep 10
+          done
+          echo "::error::Build still failing on the Google font flake after $MAX_ATTEMPTS attempts."
+          exit 1
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
