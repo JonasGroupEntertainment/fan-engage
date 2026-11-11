@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { authRateLimitSalt } from "@/lib/auth-rate-limit-policy";
 import { getClientIp } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/shared-rate-limit";
+import { isUnderPasswordResetLimit } from "@/lib/password-reset-rate-limit";
 import { turnstileUpstreamFailOpen } from "@/lib/turnstile-verify-policy";
 import { authEmailRedirectTo, resolveAppUrl } from "@/lib/app-url";
 import { mandrillConfigured, sendMandrillBatch } from "@/lib/email/transactional";
@@ -18,8 +19,6 @@ export type ResetRequestResult = { ok: boolean; message: string };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-const RESET_LIMIT = 5;
-const RESET_WINDOW_SECONDS = 15 * 60;
 const APP_NAME = "Fan Engage Pro";
 
 async function turnstilePassed(token: string | null, ip: string): Promise<boolean> {
@@ -44,21 +43,27 @@ async function turnstilePassed(token: string | null, ip: string): Promise<boolea
   }
 }
 
-/** True when this request may go ahead. Only a spent budget blocks it. */
+/**
+ * True when this request may go ahead. The IP and the email each have their
+ * own budget (lib/password-reset-rate-limit.ts). Only a spent budget blocks
+ * the request; a limiter outage lets it through.
+ */
 async function underRateLimit(ip: string, email: string): Promise<boolean> {
+  let salt: string;
   try {
-    const decision = await checkSharedRateLimit({
-      scope: "password-reset",
-      identifier: `${ip}:${email}`,
-      limit: RESET_LIMIT,
-      windowSeconds: RESET_WINDOW_SECONDS,
-      salt: authRateLimitSalt(process.env),
-    });
-    return decision.allowed || decision.reason !== "exhausted";
+    salt = authRateLimitSalt(process.env);
   } catch (error) {
     console.error("[forgot-password] rate limit unavailable", error);
     return true;
   }
+  return isUnderPasswordResetLimit(ip, email, async (budget) => {
+    try {
+      return await checkSharedRateLimit({ ...budget, salt });
+    } catch (error) {
+      console.error("[forgot-password] rate limit unavailable", error);
+      throw error;
+    }
+  });
 }
 
 /**
