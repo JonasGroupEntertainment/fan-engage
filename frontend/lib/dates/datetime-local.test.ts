@@ -7,8 +7,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isoToLocalInput,
+  isValidTimeZone,
   localInputToIso,
   withLocalDateTimesAsIso,
+  zonedLocalToIso,
 } from "./datetime-local.ts";
 
 describe("localInputToIso", () => {
@@ -94,5 +96,47 @@ describe("withLocalDateTimesAsIso", () => {
     const out = withLocalDateTimesAsIso(fd, ["starts_at"]);
 
     assert.equal(out.has("starts_at"), false);
+  });
+});
+
+describe("zonedLocalToIso", () => {
+  it("reads a zoneless time in the named zone, not the server's", () => {
+    // Arrange: the process is pinned to Central; the caller is in Los Angeles.
+    const typed = "2027-03-14T19:30";
+
+    // Act
+    const iso = zonedLocalToIso(typed, "America/Los_Angeles");
+
+    // Assert: 7:30 PM PDT is 02:30 UTC the next day.
+    assert.equal(iso, "2027-03-15T02:30:00.000Z");
+  });
+
+  it("follows daylight saving in the named zone", () => {
+    assert.equal(zonedLocalToIso("2027-01-10T19:30", "America/New_York"), "2027-01-11T00:30:00.000Z");
+    assert.equal(zonedLocalToIso("2027-07-10T19:30", "America/New_York"), "2027-07-10T23:30:00.000Z");
+  });
+
+  it("handles a zone that does not observe daylight saving", () => {
+    assert.equal(zonedLocalToIso("2027-07-10T19:30", "America/Phoenix"), "2027-07-11T02:30:00.000Z");
+  });
+
+  it("returns null for a value that is not a zoneless date and time", () => {
+    assert.equal(zonedLocalToIso("", "America/Chicago"), null);
+    assert.equal(zonedLocalToIso("2027-03-14", "America/Chicago"), null);
+    assert.equal(zonedLocalToIso("2027-03-14T19:30:00Z", "America/Chicago"), null);
+    assert.equal(zonedLocalToIso("2027-13-40T19:30", "America/Chicago"), null);
+  });
+
+  it("returns null for an unknown zone", () => {
+    assert.equal(zonedLocalToIso("2027-03-14T19:30", "Mars/Olympus"), null);
+  });
+});
+
+describe("isValidTimeZone", () => {
+  it("accepts IANA zones and rejects anything else", () => {
+    assert.equal(isValidTimeZone("America/Chicago"), true);
+    assert.equal(isValidTimeZone("Mars/Olympus"), false);
+    assert.equal(isValidTimeZone(""), false);
+    assert.equal(isValidTimeZone(null), false);
   });
 });

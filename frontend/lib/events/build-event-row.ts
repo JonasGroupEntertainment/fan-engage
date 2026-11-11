@@ -1,3 +1,4 @@
+import { zonedLocalToIso } from "../dates/datetime-local.ts";
 import { resolveCityCoords } from "../geo/resolve.ts";
 
 /**
@@ -143,13 +144,23 @@ export function formatEventDisplayDate(isoDate: string, time?: string | null): s
 }
 
 /**
- * `starts_at` value in the same shape the forms submit (`datetime-local`,
- * "YYYY-MM-DDTHH:MM"). Null when no time is known — the forms leave
- * starts_at empty too, and event_date carries the day for display and
- * for lib/today/event-day.ts.
+ * `starts_at` for a parsed tour-list line. Null when no time is known:
+ * the forms leave starts_at empty too, and event_date carries the day for
+ * display and for lib/today/event-day.ts.
+ *
+ * With a `timeZone` (the IANA zone of the person importing), the time is
+ * read as wall-clock time in that zone and returned as an ISO instant.
+ * Without one, or with a zone the runtime does not know, the zoneless
+ * "YYYY-MM-DDTHH:MM" is returned, which Postgres reads as UTC.
  */
-export function buildStartsAt(isoDate: string, time?: string | null): string | null {
+export function buildStartsAt(
+  isoDate: string,
+  time?: string | null,
+  timeZone?: string | null,
+): string | null {
   if (!time || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
-  return `${isoDate}T${time}`;
+  const zoneless = `${isoDate}T${time}`;
+  if (!timeZone) return zoneless;
+  return zonedLocalToIso(zoneless, timeZone) ?? zoneless;
 }
