@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import { updateEventAction } from "../actions";
+import { withLocalDateTimesAsIso } from "@/lib/dates/datetime-local";
+import { useLocalDateTimeDefault } from "@/lib/dates/use-local-datetime-default";
+
+/** datetime-local fields the admin types in their own zone. */
+const LOCAL_TIME_FIELDS = ["starts_at", "rsvp_opens_at"] as const;
 
 /**
  * Subset of the artist_events row that the edit form needs to pre-fill.
@@ -59,22 +64,18 @@ export default function EditEventForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusinessError(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = withLocalDateTimesAsIso(new FormData(e.currentTarget), LOCAL_TIME_FIELDS);
     const result = await submit(updateEventAction, fd);
     if (result?.error) {
       setBusinessError(result.error);
     }
   }
 
-  // <input type="datetime-local"> needs `YYYY-MM-DDTHH:mm` (no seconds, no
-  // timezone suffix). The DB stores starts_at as a full ISO timestamptz,
-  // so we slice it down. If starts_at is null, leave the field empty.
-  const startsAtLocal = event.starts_at
-    ? new Date(event.starts_at).toISOString().slice(0, 16)
-    : "";
-  const rsvpOpensLocal = event.rsvp_opens_at
-    ? new Date(event.rsvp_opens_at).toISOString().slice(0, 16)
-    : "";
+  // The stored instants are shown in the admin's own zone, filled in the
+  // browser (see useLocalDateTimeDefault). handleSubmit turns them back
+  // into ISO instants before the action runs.
+  const startsAtRef = useLocalDateTimeDefault(event.starts_at);
+  const rsvpOpensRef = useLocalDateTimeDefault(event.rsvp_opens_at);
 
   return (
     <form
@@ -94,7 +95,7 @@ export default function EditEventForm({
       <input
         name="starts_at"
         type="datetime-local"
-        defaultValue={startsAtLocal}
+        ref={startsAtRef}
         className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
       />
       <input
@@ -163,16 +164,16 @@ export default function EditEventForm({
         className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
       />
       <label className="text-xs text-white/70 md:col-span-2">
-        RSVP opens for everyone (UTC)
+        RSVP opens for everyone (your local time)
         <input
           name="rsvp_opens_at"
           type="datetime-local"
-          defaultValue={rsvpOpensLocal}
+          ref={rsvpOpensRef}
           className="mt-1 w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
         />
         <span className="mt-1 block text-[11px] text-white/45">
           Founding Fans can RSVP 48 hours earlier. Leave blank to keep RSVP open now.
-          Same clock as the start time field. Fans see the time in Eastern.
+          Type both times as they read on your own clock. Fans see the time in Eastern.
         </span>
       </label>
       <input

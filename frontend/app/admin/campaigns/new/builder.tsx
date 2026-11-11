@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import { createAndPublishCampaign } from "../actions";
+import { withLocalDateTimesAsIso } from "@/lib/dates/datetime-local";
 
 type Artist = { slug: string; name: string };
 type CTAKind = "pre_save" | "stream" | "share" | "radio_request" | "playlist_add" | "social_follow" | "custom";
@@ -136,7 +137,9 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
       formData.set("email_body", "");
     }
     if (!includeSms) formData.set("sms_body", "");
-    const result = await submit(createAndPublishCampaign, formData);
+    // The event start is typed in the admin's own zone; send an ISO instant.
+    const payload = withLocalDateTimesAsIso(formData, ["event_starts_at"]);
+    const result = await submit(createAndPublishCampaign, payload);
     if (result?.success) {
       router.push("/admin/campaigns");
     } else if (result && !result.success) {

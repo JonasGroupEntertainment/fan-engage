@@ -12,18 +12,13 @@ const TIER_LABELS: Record<string, string> = {
   free: "Fan",
 };
 
-const TIER_ICONS: Record<string, string> = {
-  premium: "★",
-  comped: "★",
-  free: "♦",
-};
-
 export default async function TierOpengraphImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const artist = await getArtistFromDb(params.slug).catch(() => null);
+  const routeParams = await params;
+  const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
 
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
@@ -48,7 +43,7 @@ export default async function TierOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -59,7 +54,7 @@ export default async function TierOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -100,17 +95,20 @@ export default async function TierOpengraphImage({
             textAlign: "center",
           }}
         >
-          <div
-            style={{
-              fontSize: 120,
-              lineHeight: 1,
-              background: `linear-gradient(135deg, ${accentFrom}, ${accentTo})`,
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            {TIER_ICONS["premium"]}
-          </div>
+          {/* Drawn star: the built-in share-image font has no ★ glyph, so
+              the text character rendered as an empty box. */}
+          <svg width="120" height="120" viewBox="0 0 24 24">
+            <defs>
+              <linearGradient id="star" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor={accentFrom} />
+                <stop offset="1" stopColor={accentTo} />
+              </linearGradient>
+            </defs>
+            <path
+              fill="url(#star)"
+              d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.2l-6.1 3.4 1.4-6.8L2.2 9.1l6.9-.8z"
+            />
+          </svg>
           <div
             style={{
               fontSize: 26,

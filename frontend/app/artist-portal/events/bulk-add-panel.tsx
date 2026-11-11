@@ -51,7 +51,9 @@ export default function BulkAddPanel({ onDone }: { onDone: () => void }) {
     setErr(null);
     startTransition(async () => {
       try {
-        const r = await bulkCreateEventsAction(text);
+        // Show times in the list are read in this browser's time zone.
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const r = await bulkCreateEventsAction(text, timeZone);
         if ("error" in r) {
           setErr(r.error);
           return;
@@ -77,6 +79,7 @@ export default function BulkAddPanel({ onDone }: { onDone: () => void }) {
           <p className="mt-1 text-xs text-white/40">
             One show per line: date, venue, city/state, optional time and ticket
             link, in any order. Dashes, pipes, commas or tabs between them.
+            Times are saved in your own time zone.
           </p>
         </div>
         <button
