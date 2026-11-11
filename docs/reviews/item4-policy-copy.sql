@@ -8,7 +8,8 @@
 -- at read time. This file is the matching database update for after review.
 -- Privacy (slug = 'privacy') is not updated.
 
--- 1. Entity name only. Governing law stays North Carolina.
+-- 1. Entity name only. The Colorado LLC phrase stays.
+--    Governing law is set to North Carolina in 1c.
 --    Arbitration is put back to North Carolina below, not changed to Colorado.
 update public.policy_pages
 set content_md = replace(
@@ -19,7 +20,8 @@ set content_md = replace(
 where slug in ('terms', 'rewards_terms', 'cancellation_refund')
   and content_md like '%a North Carolina limited liability company%';
 
--- 1b. Arbitration place back to North Carolina. Does not touch governing law.
+-- 1b. Arbitration place back to North Carolina. This statement does not
+--     touch governing law. Statement 1c does.
 update public.policy_pages
 set content_md = replace(
   content_md,
@@ -28,6 +30,22 @@ set content_md = replace(
 )
 where slug in ('terms', 'rewards_terms', 'cancellation_refund')
   and content_md like '%The place of the arbitration and each in person hearing shall be Colorado.%';
+
+-- 1c. Governing law to North Carolina, per counsel.
+--     Does not change "a Colorado limited liability company".
+--     0058_terms_colorado_entity.sql is the merged migration that writes
+--     Colorado governing law and a Colorado arbitration place. It is not
+--     edited. If it was run, the terms row still stores Colorado until this
+--     statement is run by hand. The app rewrite shows North Carolina before
+--     that.
+update public.policy_pages
+set content_md = replace(
+  content_md,
+  'laws of the State of Colorado',
+  'laws of the State of North Carolina'
+)
+where slug in ('terms', 'rewards_terms', 'cancellation_refund')
+  and content_md like '%laws of the State of Colorado%';
 
 -- 2. Monthly-only billing cycles on terms.
 update public.policy_pages
