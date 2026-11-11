@@ -117,19 +117,6 @@ export const ARTISTS: Record<string, Artist> = {
     merch: [{ title: "Tour Poster Set", tier: "Bronze+", points: "1,200 pts" }],
     social: [],
   },
-  konnor: {
-    slug: "konnor",
-    name: "Konnor",
-    tagline: "New-school songwriting.",
-    bio: "Placeholder bio — awaiting assets from Box drop.",
-    heroImage: null,
-    accentFrom: "#f59e0b",
-    accentTo: "#fb923c",
-    genres: ["Pop", "Indie"],
-    upcoming: [{ title: "TBD", detail: "Dates to come", date: "—" }],
-    merch: [{ title: "Signed Lyric Print", tier: "Silver+", points: "2,800 pts" }],
-    social: [],
-  },
   dan: {
     slug: "dan",
     name: "Dan",
@@ -202,6 +189,18 @@ export const UNPUBLISHED_ARTIST_SLUGS = [
   "danger-twins",
   "dan-marshall",
   "hunter-hawkins",
+  // On hold (Kevin, 2026-11-11): nothing for Bailee is public. Both slugs
+  // had placeholder hubs live because neither has an active database row,
+  // so the loader fell back to the hardcoded records below.
+  "bailee",
+  "bailee-madison",
+  // Old placeholder for Dan Marshall (Kevin, 2026-11-11). The real hub is
+  // dan-marshall, above. This slug has no database row at all, so its
+  // "Placeholder bio" page was live.
+  "dan",
+  // Placeholder only (Kevin, 2026-11-11). Its artists row is inactive, so
+  // the "Placeholder bio" page was live through the same fallback.
+  "blake",
 ] as const;
 
 export function isUnpublishedArtistSlug(slug: string): boolean {
