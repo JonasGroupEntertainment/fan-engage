@@ -11,6 +11,8 @@ import {
 } from "@/lib/events/build-event-row";
 import { parseTourList, type ParsedEvent, type ParseError } from "@/lib/events/parse-tour-list";
 import { eventDayKey } from "@/lib/today/event-day";
+import { isValidTimeZone } from "@/lib/dates/datetime-local";
+import { EASTERN_TIME_ZONE } from "@/lib/dates/eastern";
 
 /**
  * Editors and above may manage events (PORTAL_MIN_ROLE.events). Throws
@@ -153,15 +155,21 @@ export interface BulkCreateResult {
  * event_date) already exist for the artist are skipped, as are lines that
  * did not parse. Rows are built with the same helpers as the single-event
  * forms (lib/events/build-event-row.ts): title = venue, location =
- * "City, ST", event_date = "Mar 14, 2026 · 7:30 PM", starts_at =
- * "YYYY-MM-DDTHH:MM" only when a time was given, plus the 0090
+ * "City, ST", event_date = "Mar 14, 2026 · 7:30 PM", starts_at = that
+ * time as an instant only when a time was given, plus the 0090
  * city/region/lat/lng columns. sort_order runs sequentially after the
  * artist's current maximum.
+ *
+ * `timeZone` is the importer's IANA zone, sent by the browser. Times in the
+ * list are read in that zone. A missing or unknown zone falls back to
+ * Eastern, the zone fans see times in.
  */
 export async function bulkCreateEventsAction(
   text: string,
+  timeZone?: string,
 ): Promise<BulkCreateResult | { error: string }> {
   const { supabase, communityId } = await requireEditor();
+  const zone = isValidTimeZone(timeZone) ? (timeZone as string) : EASTERN_TIME_ZONE;
   const clean = String(text ?? "");
   if (clean.split("\n").length > MAX_TOUR_LINES) {
     return { error: `Paste at most ${MAX_TOUR_LINES} lines at a time.` };
@@ -190,7 +198,7 @@ export async function bulkCreateEventsAction(
       title: r.venue,
       detail: r.detail,
       eventDate: formatEventDisplayDate(r.date, r.time),
-      startsAt: buildStartsAt(r.date, r.time),
+      startsAt: buildStartsAt(r.date, r.time, zone),
       location: r.location,
       url: r.url,
       sortOrder: nextSort++,
@@ -219,9 +227,12 @@ export async function bulkCreateEventsAction(
 
 /**
  * Which parsed lines collide with an existing (title, day) for the artist.
- * The day comes from eventDayKey (starts_at, else the parsed event_date
- * text), so "Mar 14, 2026" and "Mar 14, 2026 · 7:30 PM" are the same show
- * and re-pasting a list is a no-op. Titles compare case-insensitively.
+ * A row matches on either day it could be known by: the Eastern day of
+ * starts_at, or the day in the event_date text. Both are kept because a
+ * late show out west starts after midnight Eastern, so its starts_at day
+ * is one ahead of the date on the tour list. "Mar 14, 2026" and
+ * "Mar 14, 2026 · 7:30 PM" are the same show and re-pasting a list is a
+ * no-op. Titles compare case-insensitively.
  */
 async function findExistingLines(
   supabase: ReturnType<typeof createAdminClient>,
@@ -235,10 +246,20 @@ async function findExistingLines(
     .from("artist_events")
     .select("title, event_date, starts_at")
     .eq("community_id", communityId);
+  const events = (data ?? []) as Array<{
+    title: string;
+    event_date: string | null;
+    starts_at: string | null;
+  }>;
   const have = new Set(
-    ((data ?? []) as Array<{ title: string; event_date: string | null; starts_at: string | null }>).map(
-      (e) => `${e.title.toLowerCase()}|${eventDayKey(e) ?? e.event_date ?? ""}`,
-    ),
+    events.flatMap((e) => {
+      const title = e.title.toLowerCase();
+      const byStart = eventDayKey(e);
+      const byText = eventDayKey({ ...e, starts_at: null });
+      return [byStart, byText, e.event_date ?? ""]
+        .filter((day): day is string => day !== null)
+        .map((day) => `${title}|${day}`);
+    }),
   );
   return rows.filter((r) => have.has(`${r.venue.toLowerCase()}|${r.date}`)).map((r) => r.line);
 }

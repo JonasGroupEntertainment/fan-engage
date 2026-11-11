@@ -3,6 +3,7 @@ import { getAdminContext } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createPromoCode, togglePromoCode } from "@/app/account/promo/actions";
 import CreateStripeCouponForm from "./create-stripe-coupon-form";
+import LocalDateTimeField from "@/components/local-datetime-field";
 
 export const dynamic = "force-dynamic";
 
@@ -87,10 +88,9 @@ export default async function PromoCodesPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-white/50">Expires at (blank = never)</label>
-              <input
+              <label className="text-xs text-white/50">Expires at, your local time (blank = never)</label>
+              <LocalDateTimeField
                 name="expires_at"
-                type="datetime-local"
                 className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-sm text-white focus:border-aurora/50 focus:outline-none"
               />
             </div>
