@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminCommunityId } from "@/lib/admin";
 import { authorizeAdmin } from "@/lib/admin-guard";
-import { buildEventRow } from "@/lib/events/build-event-row";
+import { buildEventRow, eventOwnerColumns } from "@/lib/events/build-event-row";
 import { duplicateEventWindowStart, parseCapacity } from "@/lib/events/duplicate-guard";
 
 /** Same role the artist editor needs to create events. */
@@ -60,7 +60,7 @@ export async function addEventAction(formData: FormData) {
   }
 
   const row = {
-    artist_slug: artistSlug,
+    ...eventOwnerColumns(artistSlug),
     ...buildEventRow({
       title,
       detail: field(formData, "detail"),

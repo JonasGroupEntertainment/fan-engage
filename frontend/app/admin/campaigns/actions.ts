@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/admin-guard";
 import { broadcastEmail, broadcastSms } from "@/lib/broadcast";
 import { createNotification } from "@/lib/data/notifications";
+import { eventOwnerColumns } from "@/lib/events/build-event-row";
 
 /**
  * Campaign builder — single "Publish" action fans out into community posts,
@@ -194,7 +195,7 @@ export async function createAndPublishCampaign(formData: FormData) {
     const { data: ev } = await supa
       .from("artist_events")
       .insert({
-        artist_slug: artistSlug,
+        ...eventOwnerColumns(artistSlug),
         title: eventTitle,
         detail: detail || null,
         event_date: dateText || null,

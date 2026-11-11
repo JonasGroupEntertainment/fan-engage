@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminCommunityId } from "@/lib/admin";
 import { authorizeAdmin } from "@/lib/admin-guard";
 import PendingSubmitButton from "@/components/pending-submit-button";
+import LocalDateTimeField from "@/components/local-datetime-field";
+import { EASTERN_TIME_ZONE } from "@/lib/dates/eastern";
 import { addEventAction, removeEventAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +25,21 @@ type EventRow = {
 const INPUT_CLASS =
   "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-white/30 focus:outline-none";
 
+/**
+ * This page renders on the server, which has no idea of the admin's time
+ * zone, so a bare toLocaleString() printed UTC. Show Eastern, the zone fans
+ * see times in, and say so.
+ */
 function whenLabel(event: EventRow): string {
-  if (event.starts_at) return new Date(event.starts_at).toLocaleString();
-  return event.event_date ?? "Date to be announced";
+  if (!event.starts_at) return event.event_date ?? "Date to be announced";
+  const start = new Date(event.starts_at);
+  if (Number.isNaN(start.getTime())) return event.event_date ?? "Date to be announced";
+  const text = start.toLocaleString("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  return `${text} ET`;
 }
 
 export default async function EventsAdminPage() {
@@ -63,8 +77,8 @@ export default async function EventsAdminPage() {
             <input type="text" name="title" required placeholder="Fan meet and greet" className={INPUT_CLASS} />
           </label>
           <label>
-            <span className="mb-1 block text-xs text-white/60">Starts (optional)</span>
-            <input type="datetime-local" name="starts_at" className={INPUT_CLASS} />
+            <span className="mb-1 block text-xs text-white/60">Starts, your local time (optional)</span>
+            <LocalDateTimeField name="starts_at" className={INPUT_CLASS} />
           </label>
           <label>
             <span className="mb-1 block text-xs text-white/60">Date text (optional)</span>
