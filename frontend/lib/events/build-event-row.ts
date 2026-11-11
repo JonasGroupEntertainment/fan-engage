@@ -9,8 +9,10 @@ import { resolveCityCoords } from "../geo/resolve.ts";
  * Column conventions (0006 + 0011 + 0090):
  *   event_date  — free-form display string an admin typed ("Mar 14, 2026",
  *                 "Mar 14 · 7 PM"). Parsed by lib/today/event-day.ts.
- *   starts_at   — timestamptz. The forms submit a `datetime-local` value
- *                 ("2026-03-14T19:30", no zone) and the DB stores it as-is.
+ *   starts_at   — timestamptz. The forms convert the `datetime-local`
+ *                 value to an ISO instant in the browser
+ *                 (lib/dates/datetime-local.ts), so the admin's own zone
+ *                 is kept. A zoneless value is still read as UTC.
  *   location    — free-form venue / city text shown to fans.
  *   city/region/lat/lng — 0090 venue coordinates for "near me".
  */

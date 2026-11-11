@@ -10,16 +10,17 @@ export const alt = "RSVP confirmed on Fan Engage";
 export default async function RsvpOpengraphImage({
   params,
 }: {
-  params: { slug: string; event: string };
+  params: Promise<{ slug: string; event: string }>;
 }) {
+  const routeParams = await params;
   const [artist, eventRow] = await Promise.all([
-    getArtistFromDb(params.slug).catch(() => null),
+    getArtistFromDb(routeParams.slug).catch(() => null),
     (async () => {
       const admin = createAdminClient();
       const { data } = await admin
         .from("artist_events")
         .select("title, detail, event_date, location")
-        .eq("id", params.event)
+        .eq("id", routeParams.event)
         .maybeSingle();
       return data;
     })(),
@@ -29,13 +30,10 @@ export default async function RsvpOpengraphImage({
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
   const eventTitle = eventRow?.title ?? "Upcoming Event";
-  const eventDate = eventRow?.event_date
-    ? new Date(eventRow.event_date).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
+  // event_date is the free-form display string an admin typed
+  // ("Fri, May 1, 2026 · 7 PM"), so print it as written. Parsing it with
+  // new Date() gave "Invalid Date" for anything but a bare date.
+  const eventDate = (eventRow?.event_date as string | null)?.trim() || null;
   const location = eventRow?.location ?? null;
 
   return new ImageResponse(
@@ -57,7 +55,7 @@ export default async function RsvpOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -68,7 +66,7 @@ export default async function RsvpOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -158,7 +156,7 @@ export default async function RsvpOpengraphImage({
           }}
         >
           <div style={{ maxWidth: 720 }}>
-            RSVP confirmed via Fan Engage — the {artistName} community app.
+            {`RSVP confirmed via Fan Engage — the ${artistName} community app.`}
           </div>
           <div
             style={{
