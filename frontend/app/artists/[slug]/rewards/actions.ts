@@ -16,6 +16,9 @@ export async function redeemRewardAction(formData: FormData) {
 
   const rewardId = formData.get("rewardId") as string;
   const deliveryDetails = (formData.get("deliveryDetails") as string) || undefined;
+  // The artist page the fan is on. The database only uses it for a reward
+  // with no community, and checks the fan belongs to it.
+  const communitySlug = String(formData.get("communitySlug") ?? "").trim() || null;
 
   if (!rewardId) {
     return { error: "Invalid reward" };
@@ -24,6 +27,7 @@ export async function redeemRewardAction(formData: FormData) {
   const result = await redeemReward({
     rewardId,
     deliveryDetails,
+    pageCommunityId: communitySlug,
   });
 
   if (!result.ok) {
