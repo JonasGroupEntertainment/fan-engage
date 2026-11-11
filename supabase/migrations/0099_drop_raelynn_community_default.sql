@@ -38,7 +38,7 @@
 -- NOT touched: notifications. Three writers leave community_id out
 -- (lib/data/notifications.ts, lib/event-matching/send.ts and the SQL
 -- function upsert_notification) and a notification has no parent row to
--- derive from. Its default stays until those are changed.
+-- derive from. Migration 0100 changes those writers and drops that default.
 --
 -- No new table, so no Data API grants. No existing row is changed.
 -- Idempotent: every statement can be run twice.

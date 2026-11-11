@@ -286,6 +286,7 @@ export async function createAndPublishCampaign(formData: FormData) {
           url: `/artists/${artistSlug}/community`,
           icon: "📣",
           dedupKey: `campaign:${campaignId}`,
+          communityId: artistSlug,
         }),
       ),
     );

@@ -44,7 +44,7 @@ export async function sendEventMatchNotifications(
   // Load event metadata for the SMS / notification body.
   const { data: event, error: eventErr } = await admin
     .from("artist_events")
-    .select("id, artist_slug, title, location, starts_at, url")
+    .select("id, artist_slug, community_id, title, location, starts_at, url")
     .eq("id", eventId)
     .maybeSingle();
   if (eventErr || !event) {
@@ -52,6 +52,10 @@ export async function sendEventMatchNotifications(
       `event ${eventId} not found: ${eventErr?.message ?? "no row"}`,
     );
   }
+  // The notification is filed under the event's own community. Without this
+  // the row used to fall back to a database default of 'raelynn'.
+  const eventCommunityId =
+    (event.community_id as string | null) ?? (event.artist_slug as string);
 
   const { data: artist } = await admin
     .from("artists")
@@ -117,6 +121,7 @@ export async function sendEventMatchNotifications(
     const dedupKey = `event-match:${eventId}:${c.fan_id}`;
     const { error: notifErr } = await admin.from("notifications").insert({
       fan_id: c.fan_id,
+      community_id: eventCommunityId,
       kind: "event_match",
       title: inAppTitle,
       body: inAppBody,

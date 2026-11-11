@@ -83,6 +83,7 @@ export async function pickWinnerAction(formData: FormData) {
     url: artistSlug ? `/artists/${artistSlug}/community` : "/rewards",
     icon: "🏆",
     dedupKey: `challenge_winner:${postId}:${fanId}`,
+    communityId: artistSlug || null,
   });
 
   revalidatePath("/admin/challenges");
