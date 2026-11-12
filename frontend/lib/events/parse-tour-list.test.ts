@@ -245,6 +245,17 @@ describe("build-event-row helpers", () => {
     assert.equal(buildStartsAt("bad", "19:30"), null);
   });
 
+  it("builds starts_at as an instant in the importer's zone when one is given", () => {
+    // 7:30 PM Central on Mar 14, 2026 is CDT (UTC-5).
+    assert.equal(buildStartsAt("2026-03-14", "19:30", "America/Chicago"), "2026-03-15T00:30:00.000Z");
+    assert.equal(buildStartsAt("2026-03-14", "19:30", "America/Los_Angeles"), "2026-03-15T02:30:00.000Z");
+    assert.equal(buildStartsAt("2026-03-14", null, "America/Chicago"), null);
+  });
+
+  it("falls back to the zoneless value when the zone is unknown", () => {
+    assert.equal(buildStartsAt("2026-03-14", "19:30", "Mars/Olympus"), "2026-03-14T19:30");
+  });
+
   it("buildEventRow nulls blanks and defaults sort_order", () => {
     assert.deepEqual(buildEventRow({ title: " Ryman ", eventDate: "", url: " " }), {
       title: "Ryman",

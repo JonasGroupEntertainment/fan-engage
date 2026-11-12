@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { draftComment } from "@/lib/drafts";
 import { apiRateLimiter } from "@/lib/rate-limit";
 import { PREMIUM_CTA, requireAiCommentDrafter } from "@/lib/entitlements";
@@ -61,13 +60,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing postId." }, { status: 400 });
   }
 
-  const admin = createAdminClient();
-  const { data: post } = await admin
+  // The fan's session, not the service role. 0096 hides a gated row
+  // here; before that migration the drafter still refuses the body.
+  const { data: post } = await supabase
     .from("community_posts")
     .select("artist_slug")
     .eq("id", postId)
     .maybeSingle();
   const communityId = (post?.artist_slug as string | null) ?? "";
+  if (!communityId) {
+    return NextResponse.json({ error: "That post is locked." }, { status: 403 });
+  }
   if (communityId) {
     const gate = await requireAiCommentDrafter(user.id, communityId);
     if (!gate.allowed) {
@@ -88,7 +91,8 @@ export async function POST(request: Request) {
   const result = await draftComment({ postId, userId: user.id });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+    const locked = result.error === "That post is locked.";
+    return NextResponse.json({ error: result.error }, { status: locked ? 403 : 500 });
   }
 
   return NextResponse.json(

@@ -1,12 +1,14 @@
 /**
  * Auth doors that are not yet proven in production.
  *
- * Password signup + password sign-in stay. Magic-link / email-OTP and
- * forgot-password email recovery historically failed on 2026-08-26
- * (same-browser verify → "PKCE code verifier not found in storage").
- * Hide those CTAs in production until an explicit enable flag is set
- * after recovery is proven on preview. `/auth/callback` now falls back
- * to a browser PKCE exchange and accepts token_hash links.
+ * Password signup + password sign-in stay. Magic-link / email-OTP
+ * failed on 2026-08-26 (same-browser verify → "PKCE code verifier not
+ * found in storage") and stays hidden in production until enabled.
+ *
+ * Forgot password is on by default. The server sends our own link
+ * (/reset-password?token_hash=...) and the token is only verified when the
+ * new password is submitted, so mail scanners can't burn it. Turn it off
+ * with NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=false.
  */
 
 export type AuthDoorsEnv = {
@@ -45,8 +47,8 @@ export function isForgotPasswordEnabled(
   const explicit = env.NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED?.trim().toLowerCase();
   if (explicit === "true" || explicit === "1") return true;
   if (explicit === "false" || explicit === "0") return false;
-  // Production HOLD until NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=true after
-  // recovery is proven. Preview/dev keep the form so the PKCE/token_hash
-  // callback can be verified before flipping production.
-  return vercelEnvOf(env) !== "production";
+  // On by default. The reset email now links to /reset-password with a
+  // token_hash that is only verified on submit, so the 2026-08-26 PKCE
+  // failure and mail-scanner token burn no longer apply.
+  return true;
 }
