@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_URL } from "@/lib/app-url";
 import {
@@ -41,9 +41,10 @@ type FanRow = {
 };
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "reengagement-email", () => reengagementEmail(request));
+}
 
+async function reengagementEmail(request: Request) {
   if (!isReengagementEmailEnabled()) {
     return NextResponse.json({ ok: true, enabled: false, sent: 0 });
   }
