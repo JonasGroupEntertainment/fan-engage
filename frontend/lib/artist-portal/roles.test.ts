@@ -61,6 +61,8 @@ describe("PORTAL_MIN_ROLE matrix", () => {
     assert.equal(canAccessPortalSurface("editor", "events"), true);
     assert.equal(canAccessPortalSurface("editor", "redemptions"), true);
     assert.equal(canAccessPortalSurface("editor", "copilotRefresh"), true);
+    assert.equal(canAccessPortalSurface("editor", "checkinQr"), true);
+    assert.equal(canAccessPortalSurface("editor", "promoQr"), true);
     assert.equal(canAccessPortalSurface("editor", "revenue"), false);
     assert.equal(canAccessPortalSurface("editor", "moderation"), false);
     assert.equal(canAccessPortalSurface("editor", "team"), false);
@@ -74,6 +76,8 @@ describe("PORTAL_MIN_ROLE matrix", () => {
     assert.equal(canAccessPortalSurface("viewer", "communityPost"), false);
     assert.equal(canAccessPortalSurface("viewer", "events"), false);
     assert.equal(canAccessPortalSurface("viewer", "redemptions"), false);
+    assert.equal(canAccessPortalSurface("viewer", "checkinQr"), false);
+    assert.equal(canAccessPortalSurface("viewer", "promoQr"), false);
     assert.equal(canAccessPortalSurface("viewer", "revenue"), false);
     assert.equal(canAccessPortalSurface("viewer", "moderation"), false);
     assert.equal(canAccessPortalSurface("viewer", "team"), false);
@@ -112,6 +116,8 @@ describe("artist portal source gating", () => {
       ["../../app/artist-portal/redemptions/actions.ts", /assertPortalRole\("redemptions"\)/],
       ["../../app/artist-portal/moderation/page.tsx", /requirePortalPage\("moderation"/],
       ["../../app/artist-portal/moderation/actions.ts", /assertPortalRole\("moderation"\)/],
+      ["../../app/artist-portal/checkin-qr/page.tsx", /requirePortalPage\("checkinQr"/],
+      ["../../app/artist-portal/promo-qr/page.tsx", /requirePortalPage\("promoQr"/],
     ];
     for (const [file, re] of expectations) {
       assert.match(readRepo(file), re, file);

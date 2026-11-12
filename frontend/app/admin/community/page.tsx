@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { challengeEntryImageAlt } from "@/lib/community/challenge-entry-alt";
+import { captureAppException } from "@/lib/sentry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   adminDeleteCommentAction,
@@ -56,11 +58,19 @@ async function loadFeed() {
       .limit(50),
     admin
       .from("community_challenge_entries")
-      .select("id,post_id,body,image_url, image_alt,created_at,fan_id")
+      .select("id, post_id, body, image_url, created_at, fan_id")
       .order("created_at", { ascending: false })
       .limit(50),
     admin.from("fans").select("id,first_name"),
   ]);
+
+  if (entriesRes.error) {
+    console.error("admin community: challenge entries query failed", entriesRes.error);
+    await captureAppException(entriesRes.error, {
+      route: "/admin/community",
+      step: "challenge-entries",
+    });
+  }
 
   const nameById = new Map<string, string | null>(
     (fansRes.data ?? []).map((f) => [f.id as string, (f.first_name as string | null) ?? null]),
@@ -248,7 +258,7 @@ export default async function AdminCommunityPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={e.image_url}
-                  alt=""
+                  alt={challengeEntryImageAlt(e.body)}
                   className="h-16 w-16 shrink-0 rounded-xl object-cover"
                 />
               )}

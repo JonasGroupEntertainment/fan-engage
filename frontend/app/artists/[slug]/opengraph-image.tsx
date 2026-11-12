@@ -16,9 +16,10 @@ export const alt = "Artist on Fan Engage";
 export default async function ArtistOpengraphImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const artist = await getArtistFromDb(params.slug).catch(() => null);
+  const routeParams = await params;
+  const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
 
   // Fall back to a clean branded card if the slug doesn't resolve. We
   // never want a 500 on the OG endpoint — broken share previews are
@@ -52,7 +53,7 @@ export default async function ArtistOpengraphImage({
           <div
             style={{
               position: "absolute",
-              inset: 0,
+              top: 0, left: 0, right: 0, bottom: 0,
               display: "flex",
               backgroundImage: `url(${heroImage})`,
               backgroundSize: "cover",
@@ -67,7 +68,7 @@ export default async function ArtistOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 15% 10%, ${accentFrom}cc, transparent 55%), ` +
@@ -175,7 +176,7 @@ export default async function ArtistOpengraphImage({
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span
               style={{
-                display: "inline-block",
+                display: "flex",
                 width: 10,
                 height: 10,
                 borderRadius: 999,

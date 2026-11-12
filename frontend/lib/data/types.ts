@@ -181,7 +181,6 @@ export interface ChallengeEntry {
   fan_first_name: string | null;
   body: string | null;
   image_url: string | null;
-  image_alt: string | null;
   moderation_status: string | null;
   moderation_user_message: string | null;
   created_at: string;

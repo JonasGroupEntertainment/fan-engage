@@ -2,15 +2,22 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAdminContext } from "@/lib/admin";
+import { roleAtLeast, type AdminRole } from "@/lib/admin-authz";
 import { guestAdminPolicyRedirect } from "@/lib/admin-policy-redirect";
 import { getCommunity } from "@/lib/community";
 import { countPendingRedemptions } from "@/lib/data/rewards";
 
-const adminNav = [
+const adminNav: Array<{
+  href: string;
+  label: string;
+  superAdminOnly?: boolean;
+  minRole?: AdminRole;
+}> = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/applications", label: "Applications" },
   { href: "/admin/launch", label: "Launch Wizard" },
   { href: "/admin/artists", label: "Artists" },
+  { href: "/admin/events", label: "Events", minRole: "admin" },
   { href: "/admin/campaigns", label: "Campaigns" },
   { href: "/admin/broadcast", label: "Broadcast" },
   { href: "/admin/analytics", label: "Analytics" },
@@ -23,6 +30,7 @@ const adminNav = [
   { href: "/admin/fans", label: "Fans" },
   { href: "/admin/super-fans", label: "Super Fans" },
   { href: "/admin/promo-codes", label: "Promo Codes" },
+  { href: "/admin/promo-qr", label: "Promo QR", minRole: "editor" },
   { href: "/admin/policies", label: "Policies" },
   { href: "/admin/moderation", label: "Moderation" },
   { href: "/admin/briefs", label: "Briefs" },
@@ -107,7 +115,13 @@ export default async function AdminLayout({
 
         <nav className="mb-8 flex flex-wrap gap-2">
           {adminNav
-            .filter((item) => !("superAdminOnly" in item && item.superAdminOnly) || ctx.isSuperAdmin)
+            .filter((item) => {
+              if (item.superAdminOnly && !ctx.isSuperAdmin) return false;
+              if (item.minRole && !ctx.isSuperAdmin && !roleAtLeast(ctx.role, item.minRole)) {
+                return false;
+              }
+              return true;
+            })
             .map((item) => (
             <Link
               key={item.href}

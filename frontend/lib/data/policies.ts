@@ -14,6 +14,12 @@ import {
   CANCELLATION_REFUND_EFFECTIVE_DATE,
   CANCELLATION_REFUND_UPDATED_AT,
 } from "@/lib/legal/cancellation-refund-founding-status";
+import {
+  applyRewardsFoundingFanStatus,
+  applyTermsFoundingFanStatus,
+  applyTermsMinimumAge,
+} from "@/lib/legal/align-policy-copy";
+import { applyItem4PolicyCopy } from "@/lib/legal/premium-billing-wording";
 
 export type PolicySlug =
   | "terms"
@@ -61,6 +67,13 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
   contentMd = applyTermsSupportContact(policy.slug, contentMd);
   let effectiveDate = policy.effective_date;
   let updatedAt = policy.updated_at;
+  if (policy.slug === "terms") {
+    contentMd = applyTermsFoundingFanStatus(contentMd);
+    contentMd = applyTermsMinimumAge(contentMd);
+  }
+  if (policy.slug === "rewards_terms") {
+    contentMd = applyRewardsFoundingFanStatus(contentMd);
+  }
   if (policy.slug === "privacy") {
     contentMd = applyPrivacyCounselScrub(contentMd);
     effectiveDate = privacyCounselEffectiveDate(effectiveDate);
@@ -69,6 +82,13 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
     contentMd = applyCancellationFoundingStatus(contentMd);
     effectiveDate = CANCELLATION_REFUND_EFFECTIVE_DATE;
     updatedAt = CANCELLATION_REFUND_UPDATED_AT;
+  }
+  if (
+    policy.slug === "terms" ||
+    policy.slug === "rewards_terms" ||
+    policy.slug === "cancellation_refund"
+  ) {
+    contentMd = applyItem4PolicyCopy(policy.slug, contentMd);
   }
   return {
     ...policy,

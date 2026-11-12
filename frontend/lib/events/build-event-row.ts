@@ -1,3 +1,4 @@
+import { zonedLocalToIso } from "../dates/datetime-local.ts";
 import { resolveCityCoords } from "../geo/resolve.ts";
 
 /**
@@ -9,8 +10,10 @@ import { resolveCityCoords } from "../geo/resolve.ts";
  * Column conventions (0006 + 0011 + 0090):
  *   event_date  — free-form display string an admin typed ("Mar 14, 2026",
  *                 "Mar 14 · 7 PM"). Parsed by lib/today/event-day.ts.
- *   starts_at   — timestamptz. The forms submit a `datetime-local` value
- *                 ("2026-03-14T19:30", no zone) and the DB stores it as-is.
+ *   starts_at   — timestamptz. The forms convert the `datetime-local`
+ *                 value to an ISO instant in the browser
+ *                 (lib/dates/datetime-local.ts), so the admin's own zone
+ *                 is kept. A zoneless value is still read as UTC.
  *   location    — free-form venue / city text shown to fans.
  *   city/region/lat/lng — 0090 venue coordinates for "near me".
  */
@@ -65,6 +68,24 @@ export function buildEventRow(input: EventRowInput): EventRow {
     capacity,
     sort_order: sortOrder,
   };
+}
+
+/**
+ * The two columns that say whose event this is.
+ *
+ * `artist_events.community_id` is NOT NULL with a database default of
+ * 'raelynn' (a leftover from when RaeLynn was the only community). An insert
+ * that sets only `artist_slug` therefore files another artist's event under
+ * RaeLynn, and the artist portal, which reads by `community_id`, shows it to
+ * the wrong team. Every writer spreads this so the two always match.
+ */
+export function eventOwnerColumns(artistSlug: string): {
+  artist_slug: string;
+  community_id: string;
+} {
+  const slug = (artistSlug ?? "").trim();
+  if (!slug) throw new Error("artist slug is required to save an event");
+  return { artist_slug: slug, community_id: slug };
 }
 
 export interface EventGeoInput {
@@ -141,13 +162,23 @@ export function formatEventDisplayDate(isoDate: string, time?: string | null): s
 }
 
 /**
- * `starts_at` value in the same shape the forms submit (`datetime-local`,
- * "YYYY-MM-DDTHH:MM"). Null when no time is known — the forms leave
- * starts_at empty too, and event_date carries the day for display and
- * for lib/today/event-day.ts.
+ * `starts_at` for a parsed tour-list line. Null when no time is known:
+ * the forms leave starts_at empty too, and event_date carries the day for
+ * display and for lib/today/event-day.ts.
+ *
+ * With a `timeZone` (the IANA zone of the person importing), the time is
+ * read as wall-clock time in that zone and returned as an ISO instant.
+ * Without one, or with a zone the runtime does not know, the zoneless
+ * "YYYY-MM-DDTHH:MM" is returned, which Postgres reads as UTC.
  */
-export function buildStartsAt(isoDate: string, time?: string | null): string | null {
+export function buildStartsAt(
+  isoDate: string,
+  time?: string | null,
+  timeZone?: string | null,
+): string | null {
   if (!time || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
-  return `${isoDate}T${time}`;
+  const zoneless = `${isoDate}T${time}`;
+  if (!timeZone) return zoneless;
+  return zonedLocalToIso(zoneless, timeZone) ?? zoneless;
 }

@@ -15,10 +15,11 @@ export const alt = "Founder badge on Fan Engage";
 export default async function FounderOpengraphImage({
   params,
 }: {
-  params: { slug: string; number: string };
+  params: Promise<{ slug: string; number: string }>;
 }) {
-  const artist = await getArtistFromDb(params.slug).catch(() => null);
-  const number = parseInt(params.number, 10);
+  const routeParams = await params;
+  const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
+  const number = parseInt(routeParams.number, 10);
 
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
@@ -45,7 +46,7 @@ export default async function FounderOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -58,7 +59,7 @@ export default async function FounderOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -136,7 +137,7 @@ export default async function FounderOpengraphImage({
               color: "transparent",
             }}
           >
-            #{founderNumber}
+            {`#${founderNumber}`}
           </div>
           <div
             style={{
@@ -149,7 +150,7 @@ export default async function FounderOpengraphImage({
               marginTop: 4,
             }}
           >
-            for {artistName}
+            {`for ${artistName}`}
           </div>
         </div>
 

@@ -13,6 +13,8 @@ import type {
   PollOption,
 } from "./types";
 import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
+import { captureAppException } from "@/lib/sentry";
+import { isNextControlFlowError } from "@/lib/sentry-report";
 
 /**
  * Which of these posts were written by the artist / their team?
@@ -267,7 +269,12 @@ export async function getPollData(postId: string): Promise<PollData | null> {
   }
 }
 
-/** Challenge entries for a single challenge post, newest first. */
+/**
+ * Challenge entries for a single challenge post, newest first.
+ * The table's columns are id, post_id, fan_id, body, image_url, created_at
+ * (0003). There is no image_alt column — selecting it is PostgREST 42703,
+ * and an empty catch used to turn that into "0 entries" for everyone.
+ */
 export async function getChallengeEntries(
   postId: string,
 ): Promise<ChallengeEntry[]> {
@@ -275,7 +282,7 @@ export async function getChallengeEntries(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("community_challenge_entries")
-      .select("id, post_id, fan_id, body, image_url, image_alt, created_at")
+      .select("id, post_id, fan_id, body, image_url, created_at")
       .eq("post_id", postId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -301,7 +308,13 @@ export async function getChallengeEntries(
           created_at: e.created_at as string,
         }) as ChallengeEntry,
     );
-  } catch {
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    console.error("getChallengeEntries failed:", error);
+    await captureAppException(error, {
+      route: "/artists/community",
+      step: "challenge-entries",
+    });
     return [];
   }
 }

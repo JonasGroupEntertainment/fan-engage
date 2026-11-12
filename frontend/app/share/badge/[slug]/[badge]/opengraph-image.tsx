@@ -28,16 +28,17 @@ function publicBadgeDescription(slug: string, raw: string | null): string | null
 export default async function BadgeOpengraphImage({
   params,
 }: {
-  params: { slug: string; badge: string };
+  params: Promise<{ slug: string; badge: string }>;
 }) {
+  const { slug: artistSlug, badge: badgeSlug } = await params;
   const [artist, badgeRow] = await Promise.all([
-    getArtistFromDb(params.slug).catch(() => null),
+    getArtistFromDb(artistSlug).catch(() => null),
     (async () => {
       const admin = createAdminClient();
       const { data } = await admin
         .from("badges")
         .select("name, description, icon")
-        .eq("slug", params.badge)
+        .eq("slug", badgeSlug)
         .maybeSingle();
       return data;
     })(),
@@ -50,7 +51,7 @@ export default async function BadgeOpengraphImage({
   const badgeIcon = badgeRow?.icon ?? "🏆";
   const badgeDesc =
     (badgeRow
-      ? publicBadgeDescription(params.badge, (badgeRow.description as string | null) ?? null)
+      ? publicBadgeDescription(badgeSlug, (badgeRow.description as string | null) ?? null)
       : null) ?? "Earned on Fan Engage";
 
   return new ImageResponse(
@@ -72,7 +73,7 @@ export default async function BadgeOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -83,7 +84,7 @@ export default async function BadgeOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -156,7 +157,7 @@ export default async function BadgeOpengraphImage({
               color: "rgba(255,255,255,0.7)",
             }}
           >
-            for {artistName}
+            {`for ${artistName}`}
           </div>
         </div>
 
