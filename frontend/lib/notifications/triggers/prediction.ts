@@ -26,7 +26,7 @@ export async function notifyPredictionResolved(opts: {
       await Promise.all([
         admin
           .from("community_posts")
-          .select("title, body")
+          .select("title, visibility")
           .eq("id", opts.postId)
           .maybeSingle(),
         admin
@@ -64,6 +64,10 @@ export async function notifyPredictionResolved(opts: {
     }
 
     const promptTitle = (post.title as string | null) ?? "Prediction";
+    const gated = (post.visibility as string | null) != null && post.visibility !== "public";
+    const reveal = gated
+      ? `${artistName} resolved a prediction. Open the community to see it.`
+      : `The answer was: ${correctLabel}`;
     const url = `/artists/${opts.artistSlug}/community#post-${opts.postId}`;
 
     const MAX_CONCURRENT = 200;
@@ -91,7 +95,7 @@ export async function notifyPredictionResolved(opts: {
           type: "drops",
           payload: {
             title: `${artistName} resolved a prediction`,
-            body: `The answer was: ${correctLabel}`,
+            body: reveal,
             url,
             tag: `prediction:${opts.postId}`,
           },
