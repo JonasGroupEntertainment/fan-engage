@@ -75,6 +75,10 @@
     {
       "path": "/api/cron/weekly-team-brief",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/reengagement-email",
+      "schedule": "0 15 * * *"
     }
   ]
 }
