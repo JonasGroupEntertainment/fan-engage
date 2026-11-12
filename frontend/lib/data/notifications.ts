@@ -66,6 +66,11 @@ export async function getUnreadCount(): Promise<number> {
  *
  * Dedup is enforced by the unique index on (fan_id, dedup_key); we catch
  * duplicate-key errors and no-op.
+ *
+ * `communityId` is required so every caller has to decide. Pass the artist
+ * community the notice is about, or null when it is not about one community
+ * (a platform notice). Leaving it out used to file the row under 'raelynn'
+ * through a database default (dropped by migration 0100).
  */
 export async function createNotification(params: {
   fanId: string;
@@ -75,6 +80,7 @@ export async function createNotification(params: {
   url?: string | null;
   icon?: string | null;
   dedupKey?: string | null;
+  communityId: string | null;
 }): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.from("notifications").insert({
@@ -85,6 +91,7 @@ export async function createNotification(params: {
     url: params.url ?? null,
     icon: params.icon ?? null,
     dedup_key: params.dedupKey ?? null,
+    community_id: params.communityId,
   });
   // 23505 = unique_violation — dedup key already exists, silently skip
   if (error && error.code !== "23505") {

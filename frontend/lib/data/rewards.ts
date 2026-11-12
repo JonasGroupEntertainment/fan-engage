@@ -161,9 +161,16 @@ export async function countPendingRedemptions(communityId: string): Promise<numb
 export async function redeemReward({
   rewardId,
   deliveryDetails,
+  pageCommunityId,
 }: {
   rewardId: string;
   deliveryDetails?: string;
+  /**
+   * Community of the artist page the fan is redeeming on. Only used for a
+   * reward that has no community of its own (migration 0101); a reward with
+   * a community always spends against that community.
+   */
+  pageCommunityId?: string | null;
 }): Promise<{ ok: boolean; redemptionId?: string; error?: string }> {
   try {
     const supabase = await createClient();
@@ -197,6 +204,10 @@ export async function redeemReward({
       p_fan_id: user.id,
       p_reward_id: rewardId,
       p_delivery_details: deliveryDetails ?? null,
+      // Sent only when the reward has no community. The live function takes
+      // three arguments until 0101 is applied, so every other redemption
+      // must keep the three-argument call.
+      ...(communityId === null && pageCommunityId ? { p_community_id: pageCommunityId } : {}),
     });
 
     if (error) {

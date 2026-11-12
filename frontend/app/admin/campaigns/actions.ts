@@ -135,6 +135,7 @@ export async function createAndPublishCampaign(formData: FormData) {
     const { data: offer } = await supa
       .from("offers")
       .insert({
+        community_id: artistSlug,
         slug: offerSlug,
         title: offerTitle,
         description: String(formData.get("offer_description") ?? ""),
@@ -286,6 +287,7 @@ export async function createAndPublishCampaign(formData: FormData) {
           url: `/artists/${artistSlug}/community`,
           icon: "📣",
           dedupKey: `campaign:${campaignId}`,
+          communityId: artistSlug,
         }),
       ),
     );
