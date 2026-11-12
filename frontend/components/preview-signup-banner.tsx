@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DEFAULT_COMMUNITY_SLUG, communitySignupHref } from "@/lib/community-default";
 
 /**
  * Marketing-grade banner shown above protected-experience pages
@@ -17,6 +18,7 @@ export default function PreviewSignupBanner({
   primaryCta = "Sign up free →",
   nextPath,
   firstRewardLine,
+  communityId = DEFAULT_COMMUNITY_SLUG,
 }: {
   eyebrow: string;
   headline: string;
@@ -31,10 +33,10 @@ export default function PreviewSignupBanner({
    * incentive language stays consistent across the funnel.
    */
   firstRewardLine?: string;
+  /** Community the signup `ref` points at — pass the hostname/viewer community. */
+  communityId?: string;
 }) {
-  const signupParams = new URLSearchParams({ ref: "raelynn" });
-  if (nextPath) signupParams.set("next", nextPath);
-  const signupHref = `/signup?${signupParams.toString()}`;
+  const signupHref = communitySignupHref(communityId, nextPath);
   const loginHref = nextPath
     ? `/login?next=${encodeURIComponent(nextPath)}`
     : "/login";

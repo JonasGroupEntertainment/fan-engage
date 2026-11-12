@@ -106,10 +106,16 @@ export default function LeaderboardList({
                 </p>
                 {showBreakdown && (
                   <p className="mt-0.5 text-xs text-white/55">
-                    {entry.reactions > 0 && `${entry.reactions} reactions`}
-                    {entry.comments > 0 && ` · ${entry.comments} comments`}
-                    {entry.rsvps > 0 && ` · ${entry.rsvps} RSVPs`}
-                    {entry.redemptions > 0 && ` · ${entry.redemptions} redemptions`}
+                    {[
+                      entry.checkins > 0 && `${entry.checkins} check-ins`,
+                      entry.rsvps > 0 && `${entry.rsvps} RSVPs`,
+                      entry.shares > 0 && `${entry.shares} shares`,
+                      entry.posts > 0 && `${entry.posts} posts`,
+                      entry.comments > 0 && `${entry.comments} comments`,
+                      entry.reactions > 0 && `${entry.reactions} reactions`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 )}
               </div>

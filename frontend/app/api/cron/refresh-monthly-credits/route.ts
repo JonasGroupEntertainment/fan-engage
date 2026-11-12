@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cronShouldRefreshCredit } from "@/lib/premium-trial";
@@ -34,9 +34,10 @@ export const dynamic = "force-dynamic";
  * anything else so random callers can't drain credit grants.
  */
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "refresh-monthly-credits", () => refreshMonthlyCredits());
+}
 
+async function refreshMonthlyCredits() {
   const started = Date.now();
   const admin = createAdminClient();
 

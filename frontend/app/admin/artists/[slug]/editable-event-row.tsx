@@ -23,10 +23,26 @@ export default function EditableEventRow({
   children: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
+  const hasCoords = typeof event.lat === "number" && typeof event.lng === "number";
+  const hasCity = Boolean(event.city?.trim());
 
   return (
     <div className="rounded-2xl bg-black/40 p-3">
       {children}
+
+      {/* 0090 venue location status — distance on fan cards needs lat/lng. */}
+      {(hasCity || hasCoords) && (
+        <p className="mt-1 text-[11px] text-white/50">
+          📍 {hasCity ? `${event.city}${event.region ? `, ${event.region}` : ""}` : "Coordinates set"}
+          {hasCoords ? (
+            <span className="ml-1 text-white/35">
+              ({event.lat?.toFixed(3)}, {event.lng?.toFixed(3)})
+            </span>
+          ) : (
+            <span className="ml-1 text-amber-300/80">(unresolved — add coordinates)</span>
+          )}
+        </p>
+      )}
 
       {/* Edit affordance — sits at the bottom of the read-only row, parallel
           to the existing "View RSVPs" details summary. Hidden while the form

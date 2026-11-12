@@ -12,6 +12,8 @@ import type { Badge, BadgeCategory, TierSlug } from "@/lib/data/types";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
 import { FOUNDING_FAN_RULE } from "@/lib/founding-fan-rule";
 import { tierBadgeEarned, tierJourneyState } from "@/lib/tier-thresholds";
+import { communityPath } from "@/lib/community-default";
+import { getViewerCommunityId } from "@/lib/viewer-community";
 
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   welcome:   "Getting started",
@@ -27,18 +29,21 @@ type EarnMore = {
   reward: string;
   href: string;
 };
-const earnMore: EarnMore[] = [
-  { title: "Share referral link", detail: "Every verified signup", reward: "+150 pts", href: "/referrals" },
-  {
-    title: "Redeem digital unlocks",
-    detail: "Wallpapers and in-app drops",
-    reward: "—",
-    href: "/artists/raelynn/rewards",
-  },
-  isMarketplaceLive()
-    ? { title: "Browse marketplace", detail: "Redeem points for drops", reward: "—", href: "/marketplace" }
-    : { title: "Merch — coming soon", detail: "Physical merch stays closed — digital path is above", reward: "—", href: "/marketplace" },
-];
+/** Digital unlocks live under the viewer's community (membership → host → default). */
+function buildEarnMore(communityId: string): EarnMore[] {
+  return [
+    { title: "Share referral link", detail: "Every verified signup", reward: "+150 pts", href: "/referrals" },
+    {
+      title: "Redeem digital unlocks",
+      detail: "Wallpapers and in-app drops",
+      reward: "—",
+      href: communityPath(communityId, "rewards"),
+    },
+    isMarketplaceLive()
+      ? { title: "Browse marketplace", detail: "Redeem points for drops", reward: "—", href: "/marketplace" }
+      : { title: "Merch — coming soon", detail: "Physical merch stays closed — digital path is above", reward: "—", href: "/marketplace" },
+  ];
+}
 
 function formatPts(n: number | null | undefined) {
   if (n == null) return "—";
@@ -48,13 +53,15 @@ function formatPts(n: number | null | undefined) {
 export const metadata = { title: "Rewards" };
 
 export default async function RewardsPage() {
-  const [fan, kpis, tiers, dbBadges, breakdown] = await Promise.all([
+  const [fan, kpis, tiers, dbBadges, breakdown, communityId] = await Promise.all([
     getCurrentFan(),
     getCurrentFanKpis(),
     getTiers(),
     getBadgesWithEarnedStatus(),
     getPointBreakdown(),
+    getViewerCommunityId(),
   ]);
+  const earnMore = buildEarnMore(communityId);
 
   // Signed-in users see their real badges (empty until earned).
   // Guests get no fake Bronze/Gold progress chrome or preview numbers.
@@ -116,6 +123,7 @@ export default async function RewardsPage() {
               ]}
               primaryCta="Sign up free →"
               nextPath="/rewards"
+              communityId={communityId}
               firstRewardLine="🎁 Earn your first 100 fan points the moment you sign up."
             />
           )}

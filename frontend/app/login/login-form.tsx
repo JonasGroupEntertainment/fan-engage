@@ -8,6 +8,7 @@ import {
   OFFICIAL_CONTACT_MAILTO,
 } from "@/lib/legal/official-contact";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ensureImportedFanMembership } from "@/app/auth/ensure-membership";
 import { createClient } from "@/lib/supabase/client";
 import { authEmailRedirectTo, sanitizeNextPath } from "@/lib/app-url";
 import {
@@ -211,6 +212,11 @@ export function LoginForm({
       });
       const { error } = await supabase.auth.signInWithPassword(credentials);
       if (error) throw error;
+      try {
+        await ensureImportedFanMembership();
+      } catch {
+        // Login still finishes when the membership repair cannot run.
+      }
       router.push(next);
       router.refresh();
     } catch (err) {

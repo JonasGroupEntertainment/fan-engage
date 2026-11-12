@@ -51,7 +51,7 @@ describe("onboard always joins RaeLynn then claims founding", () => {
 
   it("resolves a community even without a payload slug", () => {
     assert.match(onboard, /resolveOnboardCommunityId/);
-    assert.match(onboard, /LAUNCH_COMMUNITY_ID|raelynn/);
+    assert.match(onboard, /LAUNCH_COMMUNITY_ID/);
     assert.doesNotMatch(
       onboard,
       /if\s*\(\s*\/\^\[a-z0-9-\]\+\$\/\.test\(candidateSlug\)\)/,
@@ -66,8 +66,10 @@ describe("onboard always joins RaeLynn then claims founding", () => {
   });
 
   it("wizard defaults communitySlug to raelynn when ref is missing", () => {
-    assert.match(wizard, /communitySlug:/);
-    assert.match(wizard, /raelynn/);
+    assert.match(wizard, /communitySlug[:,]/);
+    // The default is now the LAUNCH_COMMUNITY_ID constant ("raelynn"),
+    // passed as defaultSlug to resolveOnboardArtist.
+    assert.match(wizard, /defaultSlug: LAUNCH_COMMUNITY_ID/);
   });
 
   it("Finish onboarding claims the free slot with no payment or trial", () => {

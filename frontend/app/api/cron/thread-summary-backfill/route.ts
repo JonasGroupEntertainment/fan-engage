@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { backfillThreadSummaries } from "@/lib/thread-summary/backfill";
 
@@ -15,9 +15,10 @@ export const dynamic = "force-dynamic";
  * Capped at 10 posts per tick to bound cost.
  */
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "thread-summary-backfill", () => threadSummaryBackfill());
+}
 
+async function threadSummaryBackfill() {
   const started = Date.now();
   const result = await backfillThreadSummaries();
 

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentCommunityId } from "@/lib/community";
@@ -15,6 +16,8 @@ export interface FanMembership {
   community_id: string;
   joined_at: string;
   total_points: number;
+  /** Lifetime earned points in this community (0085). Optional until applied. */
+  lifetime_points?: number | null;
   current_tier: TierSlug;
   referral_code: string | null;
   status: "active" | "suspended" | "pending";
@@ -25,7 +28,7 @@ export interface FanMembership {
  * specific community_id if provided). Returns null for signed-out users,
  * fans without a membership in the community, or any DB error.
  */
-export async function getCurrentMembership(
+export const getCurrentMembership = cache(async function getCurrentMembership(
   communityId?: string,
 ): Promise<FanMembership | null> {
   try {
@@ -54,7 +57,7 @@ export async function getCurrentMembership(
     console.warn("getCurrentMembership: failed", err);
     return null;
   }
-}
+});
 
 /**
  * The signed-in fan's primary community: their earliest active membership.
@@ -171,8 +174,11 @@ export async function getPointBreakdown(): Promise<PointBreakdownRow[]> {
 /**
  * Fetches the current user's fan profile. Returns null for signed-out or
  * unconfigured-Supabase — callers should fall back to static preview content.
+ *
+ * Wrapped in React.cache so the layout, page and widgets on one request
+ * share a single query instead of each re-fetching.
  */
-export async function getCurrentFan(): Promise<FanProfile | null> {
+export const getCurrentFan = cache(async function getCurrentFan(): Promise<FanProfile | null> {
   try {
     const supabase = await createClient();
     const {
@@ -196,14 +202,14 @@ export async function getCurrentFan(): Promise<FanProfile | null> {
     console.warn("getCurrentFan: failed", err);
     return null;
   }
-}
+});
 
 /**
  * Rolls up the fan's headline KPIs for the current community: total
  * points (from the community membership, not the legacy fans.total_points),
  * community-scoped referrals and badges, distance to next tier.
  */
-export async function getCurrentFanKpis(): Promise<FanKpis | null> {
+export const getCurrentFanKpis = cache(async function getCurrentFanKpis(): Promise<FanKpis | null> {
   try {
     const supabase = await createClient();
     const {
@@ -214,7 +220,7 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     const communityId = await getCurrentCommunityId();
 
     const admin = createAdminClient();
-    const [membership, referralsRes, badgesRes, tiers, ledgerRes] = await Promise.all([
+    const [membership, referralsRes, badgesRes, tiers, ledgerRes, lifetimeRes] = await Promise.all([
       getCurrentMembership(communityId),
       supabase
         .from("referrals")
@@ -228,6 +234,13 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
         .eq("community_id", communityId),
       getTiers(),
       admin.rpc("fan_ledger_balance", { p_fan_id: user.id }),
+      // fans.lifetime_points (0085). Until that migration is applied the
+      // column does not exist and this select errors; we fall back below.
+      admin
+        .from("fans")
+        .select("lifetime_points")
+        .eq("id", user.id)
+        .maybeSingle(),
     ]);
 
     const total_points =
@@ -237,17 +250,29 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     const referral_count = referralsRes.count ?? 0;
     const badge_count = badgesRes.count ?? 0;
 
+    // Tier progress follows lifetime earned points, never the spendable
+    // balance, so redeeming a reward cannot move the "to next tier" figure
+    // backwards (0085 no-demotion tiers). Floor at the wallet so a DB that
+    // has not run 0085 yet behaves exactly as before.
+    const lifetimeRaw = (lifetimeRes.data as { lifetime_points?: number | null } | null)
+      ?.lifetime_points;
+    const lifetime_points = Math.max(
+      typeof lifetimeRaw === "number" ? lifetimeRaw : 0,
+      total_points,
+    );
+
     const next_tier =
       tiers
-        .filter((t) => t.min_points > total_points)
+        .filter((t) => t.min_points > lifetime_points)
         .sort((a, b) => a.min_points - b.min_points)[0] ?? null;
 
     const points_to_next_tier = next_tier
-      ? Math.max(0, next_tier.min_points - total_points)
+      ? Math.max(0, next_tier.min_points - lifetime_points)
       : null;
 
     return {
       total_points,
+      lifetime_points,
       referral_count,
       badge_count,
       next_tier: (next_tier ?? null) as Tier | null,
@@ -257,4 +282,4 @@ export async function getCurrentFanKpis(): Promise<FanKpis | null> {
     console.warn("getCurrentFanKpis: failed", err);
     return null;
   }
-}
+});

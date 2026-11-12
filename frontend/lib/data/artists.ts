@@ -1,6 +1,7 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { selectWithOptionalRsvpOpens } from "@/lib/data/event-select";
+import { selectWithOptionalEventGeo } from "@/lib/data/event-select";
 import {
   ARTISTS as FALLBACK_ARTISTS,
   isUnpublishedArtistSlug,
@@ -28,6 +29,11 @@ export interface ArtistEvent {
   tier: "public" | "premium";
   /** Migration 0079. Absent until that column is applied; null means open now. */
   rsvp_opens_at?: string | null;
+  /** Migration 0090 venue coordinates. Absent until applied; null until an admin fills them in. */
+  city?: string | null;
+  region?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 const ARTIST_EVENT_COLUMNS =
@@ -51,11 +57,20 @@ type ArtistRow = {
 };
 
 /**
- * An event is past once its end (or start, when no end is set) is behind us.
- * Events with only a free-form `event_date` string can't be judged, so they
- * stay visible until an admin deactivates them or sets timestamps.
+ * An event is past once `ends_at ?? starts_at` is behind us, so an event
+ * that has started but not ended is still live and still listed. Shared by
+ * the artist hub and Fan Home so both surfaces agree.
+ *
+ * An event with neither timestamp stays listed on purpose: many rows only
+ * carry a free-form `event_date` string ("Summer 2026", "TBA") that cannot
+ * be compared to a clock, and hiding them would make a real announced show
+ * vanish. They leave the list when an admin deactivates them or fills in
+ * `starts_at` / `ends_at`.
  */
-function isPastEvent(e: ArtistEvent, now: number): boolean {
+export function isPastEvent(
+  e: { starts_at: string | null; ends_at: string | null },
+  now: number,
+): boolean {
   const ts = e.ends_at ?? e.starts_at;
   if (!ts) return false;
   const t = Date.parse(ts);
@@ -91,6 +106,10 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
         url: e.url ?? null,
         tier: (e.tier ?? "public") as "public" | "premium",
         rsvpOpensAt: e.rsvp_opens_at ?? null,
+        city: e.city ?? null,
+        region: e.region ?? null,
+        lat: typeof e.lat === "number" ? e.lat : null,
+        lng: typeof e.lng === "number" ? e.lng : null,
       })),
     merch: fallback?.merch ?? [],
     merchUrl: row.merch_url ?? fallback?.merchUrl ?? null,
@@ -100,9 +119,12 @@ function rowToArtist(row: ArtistRow, events: ArtistEvent[]): Artist {
 /**
  * Fetch a single artist with their active events. Falls back to the
  * hardcoded ARTISTS map when Supabase is unreachable or the row is missing
- * — so dev previews without DB creds still render.
+ * — so dev previews without DB creds still render. Wrapped in React.cache
+ * so one request (hub layout + page + widgets) runs the query once.
  */
-export async function getArtistFromDb(slug: string): Promise<Artist | null> {
+export const getArtistFromDb = cache(async function getArtistFromDb(
+  slug: string,
+): Promise<Artist | null> {
   const normalized = slug.toLowerCase();
   // Unpublished hubs 404. Do not fall through to the placeholder bios.
   if (isUnpublishedArtistSlug(normalized)) return null;
@@ -116,7 +138,7 @@ export async function getArtistFromDb(slug: string): Promise<Artist | null> {
         .eq("slug", normalized)
         .eq("active", true)
         .maybeSingle(),
-      selectWithOptionalRsvpOpens(
+      selectWithOptionalEventGeo(
         (columns) =>
           supabase
             .from("artist_events")
@@ -135,7 +157,7 @@ export async function getArtistFromDb(slug: string): Promise<Artist | null> {
   } catch {
     return FALLBACK_ARTISTS[normalized] ?? null;
   }
-}
+});
 
 /** List every active artist with their events. */
 export async function listArtistsFromDb(): Promise<Artist[]> {
@@ -151,7 +173,7 @@ export async function listArtistsFromDb(): Promise<Artist[]> {
     }
 
     const slugs = artists.map((a) => a.slug as string);
-    const { data: events } = await selectWithOptionalRsvpOpens(
+    const { data: events } = await selectWithOptionalEventGeo(
       (columns) =>
         supabase
           .from("artist_events")
@@ -215,7 +237,7 @@ export async function listEventsForAdmin(slug: string): Promise<ArtistEvent[]> {
   const admin = createAdminClient();
   const columns =
     "id, artist_slug, title, detail, event_date, url, location, image_url, capacity, starts_at, ends_at, sort_order, active";
-  const { data } = await selectWithOptionalRsvpOpens(
+  const { data } = await selectWithOptionalEventGeo(
     (cols) =>
       admin.from("artist_events").select(cols).eq("artist_slug", slug).order("sort_order"),
     columns,

@@ -6,13 +6,17 @@ import { listRsvpsForEvent } from "@/lib/data/events";
 import ArtistEditForm from "./edit-form";
 import CreateEventForm from "./create-event-form";
 import EditableEventRow from "./editable-event-row";
-import CheckinQrCard from "@/components/checkin-qr-card";
+import CheckinQr from "@/app/artist-portal/checkin-qr/checkin-qr";
+import { mintCheckinToken } from "@/lib/checkin-token";
+import { APP_URL } from "@/lib/app-url";
 import {
   deleteEventAction,
   sendReminderNowAction,
 } from "../actions";
 import { formatRsvpOpensAt } from "@/lib/rsvp-window";
 import ModerationButton from "@/app/admin/community/moderation-button";
+import PresaveManager from "./presave-manager";
+import { listPresavesForAdmin } from "@/lib/presave/read";
 
 type ReminderRow = {
   event_id: string;
@@ -40,7 +44,10 @@ export default async function AdminArtistEditPage({
 
   if (!artist) notFound();
 
-  const events = await listEventsForAdmin(slug);
+  const [events, presaves] = await Promise.all([
+    listEventsForAdmin(slug),
+    listPresavesForAdmin(slug).catch(() => []),
+  ]);
 
   const rsvpListsByEvent = await Promise.all(
     events.map((e) => listRsvpsForEvent(e.id)),
@@ -147,6 +154,10 @@ export default async function AdminArtistEditPage({
                   sort_order: e.sort_order ?? 0,
                   active: e.active ?? true,
                   rsvp_opens_at: e.rsvp_opens_at ?? null,
+                  city: e.city ?? null,
+                  region: e.region ?? null,
+                  lat: e.lat ?? null,
+                  lng: e.lng ?? null,
                 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -241,11 +252,28 @@ export default async function AdminArtistEditPage({
         <CreateEventForm slug={slug} />
       </section>
 
+      {/* Pre-saves — fan_actions rows of kind 'pre_save' (Sprint 3 item C) */}
+      <PresaveManager slug={slug} presaves={presaves} />
+
       {/* Check-in QR — print or display at the venue / merch table */}
-      <CheckinQrCard
-        artistSlug={artist.slug as string}
-        artistName={artist.name as string}
-      />
+      {/* Same live component as /artist-portal/checkin-qr: rotates when
+          CHECKIN_TOKEN_SECRET is set, static (printable) when it is not.
+          Super-admins may mint for any artist (api/admin/checkin-token). */}
+      {(() => {
+        const mint = mintCheckinToken(artist.slug as string);
+        return (
+          <section className="glass-card p-5">
+            <CheckinQr
+              artistSlug={artist.slug as string}
+              artistName={artist.name as string}
+              initialUrl={`${APP_URL}${mint.path}`}
+              initialExpiresAt={mint.expiresAt}
+              rotationSeconds={mint.rotationSeconds}
+              rotation={mint.rotation}
+            />
+          </section>
+        );
+      })()}
     </div>
   );
 }

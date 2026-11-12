@@ -37,6 +37,8 @@ export interface FanProfile {
   referral_code: string | null;
   referred_by: string | null;
   total_points: number;
+  /** Lifetime earned points (0085). Optional until the migration is applied. */
+  lifetime_points?: number | null;
   current_tier: TierSlug;
   sms_opted_in: boolean;
   email_opted_in: boolean;
@@ -46,12 +48,23 @@ export interface FanProfile {
   email_opted_in_at?: string | null;
   avatar_url: string | null;
   monthly_credit_cents?: number | null;
+  /** Migration 0090: home state/province + resolved coordinates. Absent until applied. */
+  home_region?: string | null;
+  home_lat?: number | null;
+  home_lng?: number | null;
 }
 
 export type BadgeCategory = "welcome" | "referral" | "community" | "tier";
 
 export interface FanKpis {
+  /** Spendable balance (ledger net). The wallet figure. */
   total_points: number;
+  /**
+   * Points earned over the fan's lifetime (fans.lifetime_points, 0085).
+   * Never decreases on redemption. Tier progress is computed from this, so
+   * spending points cannot push a fan back from the next tier.
+   */
+  lifetime_points: number;
   referral_count: number;
   badge_count: number;
   next_tier: Tier | null;
@@ -111,7 +124,7 @@ export interface LeaderboardRow {
 
 export type CommunityPostKind = "post" | "announcement" | "poll" | "challenge";
 
-export type CommunityPostVisibility = "public" | "premium";
+export type CommunityPostVisibility = "public" | "premium" | "founder-only";
 
 export interface CommunityPost {
   id: string;
@@ -168,7 +181,6 @@ export interface ChallengeEntry {
   fan_first_name: string | null;
   body: string | null;
   image_url: string | null;
-  image_alt: string | null;
   moderation_status: string | null;
   moderation_user_message: string | null;
   created_at: string;

@@ -1,12 +1,14 @@
 /**
  * /admin/briefs
  *
- * Recent daily admin briefs (Phase 15). Server component — admin
- * layout already enforces the auth gate. Lists the last 14 briefs,
- * with the most recent expanded by default.
+ * Recent daily admin briefs (Phase 15). Briefs summarise the whole
+ * platform, so this page is super-admin only (on top of the admin
+ * layout's auth gate). Lists the last 14 briefs, with the most recent
+ * expanded by default.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { superAdminOnly } from "@/lib/admin-guard";
 import type { AdminBriefMetrics } from "@/lib/admin-brief";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,8 @@ interface BriefRow {
 }
 
 export default async function AdminBriefsPage() {
+  await superAdminOnly("/admin/briefs");
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("admin_briefs")

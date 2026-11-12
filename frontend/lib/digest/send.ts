@@ -20,7 +20,6 @@
  * Phase 4 setup.
  */
 
-import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   gatherDigestPayload,
@@ -28,6 +27,14 @@ import {
   summarizeAllCommunities,
   type DigestRecipient,
 } from "@/lib/digest";
+import {
+  DIGEST_FROM_NAME,
+  DIGEST_REPLY_TO,
+  digestLogStatus,
+  formatMailchimpFailure,
+  subscriberHash,
+  type DigestAttemptStatus,
+} from "@/lib/digest/outcomes";
 
 const MAILCHIMP_API_KEY = () => process.env.MAILCHIMP_API_KEY;
 const MAILCHIMP_SERVER = () => process.env.MAILCHIMP_SERVER_PREFIX;
@@ -36,20 +43,16 @@ const MAILCHIMP_LIST = () => process.env.MAILCHIMP_AUDIENCE_ID;
 /** Subject line for the campaign. Personalization happens via the
  *  template body via *|FNAME|* and *|DIGESTHTML|* merge tags. */
 const CAMPAIGN_SUBJECT = "Your weekly Fan Engage roundup";
-const CAMPAIGN_FROM_NAME = "Fan Engage";
-const CAMPAIGN_REPLY_TO = "no-reply@fanengage.app";
+const CAMPAIGN_FROM_NAME = DIGEST_FROM_NAME;
+const CAMPAIGN_REPLY_TO = DIGEST_REPLY_TO;
 
 /** Lower-bound on how many recipients we need for the campaign to be
  *  worth firing. If only 0-1 fan is eligible this week, we skip. */
 const MIN_RECIPIENTS = 1;
 
 interface SendOneResult {
-  status:
-    | "rendered"
-    | "merge_fields_updated"
-    | "skipped_no_payload"
-    | "skipped_subscriber_missing"
-    | "error";
+  status: DigestAttemptStatus;
+  /** Skip reason or failure detail. Stored on digest_log.error_message. */
   error?: string;
   /** Set when we successfully ran the renderer + summarizer. */
   htmlBody?: string;
@@ -68,8 +71,11 @@ export async function prepareDigestForFan(
 ): Promise<SendOneResult> {
   try {
     // 1. Gather + summarize + render.
-    const payload = await gatherDigestPayload(recipient);
-    if (!payload) return { status: "skipped_no_payload" };
+    const gathered = await gatherDigestPayload(recipient);
+    if (!gathered.ok) {
+      return { status: "skipped_no_payload", error: gathered.reason };
+    }
+    const payload = gathered.payload;
 
     await summarizeAllCommunities(payload);
     const { html, text } = renderDigestPayload(payload);
@@ -85,10 +91,14 @@ export async function prepareDigestForFan(
     const server = MAILCHIMP_SERVER();
     const listId = MAILCHIMP_LIST();
     if (!apiKey || !server || !listId) {
-      // No Mailchimp configured. We still rendered — return that so the
-      // cron persists html_body to digest_log for inspection.
+      const missing = [
+        !apiKey ? "MAILCHIMP_API_KEY" : null,
+        !server ? "MAILCHIMP_SERVER_PREFIX" : null,
+        !listId ? "MAILCHIMP_AUDIENCE_ID" : null,
+      ].filter((name): name is string => Boolean(name));
       return {
-        status: "rendered",
+        status: "error",
+        error: `Missing env: ${missing.join(", ")}`,
         htmlBody: html,
         textBody: text,
         payloadCommunities,
@@ -97,7 +107,22 @@ export async function prepareDigestForFan(
       };
     }
 
-    const subHash = subscriberHash(recipient.email);
+    const email = recipient.email.trim();
+    if (!email) {
+      return {
+        status: "error",
+        error: "Fan email is blank",
+        htmlBody: html,
+        textBody: text,
+        payloadCommunities,
+        payloadPostIds,
+        aiSummaryCount,
+      };
+    }
+
+    // Hash must be md5(trim + lowercase). A mismatch makes Mailchimp
+    // reject the member PUT before merge fields are written.
+    const subHash = subscriberHash(email);
     const url = `https://${server}.api.mailchimp.com/3.0/lists/${listId}/members/${subHash}`;
     const auth = `Basic ${Buffer.from(`anystring:${apiKey}`).toString("base64")}`;
 
@@ -105,7 +130,7 @@ export async function prepareDigestForFan(
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: auth },
       body: JSON.stringify({
-        email_address: recipient.email,
+        email_address: email,
         status_if_new: "subscribed",
         merge_fields: {
           ...(recipient.first_name ? { FNAME: recipient.first_name } : {}),
@@ -119,7 +144,7 @@ export async function prepareDigestForFan(
       const body = await res.text();
       return {
         status: "error",
-        error: `Mailchimp PUT member ${res.status}: ${body.slice(0, 300)}`,
+        error: formatMailchimpFailure("PUT member", res.status, body),
         htmlBody: html,
         textBody: text,
         payloadCommunities,
@@ -199,7 +224,7 @@ export async function fireDigestCampaign(
   if (!create.ok) {
     return {
       ok: false,
-      error: `Mailchimp campaigns POST ${create.status}: ${(await create.text()).slice(0, 300)}`,
+      error: formatMailchimpFailure("campaigns POST", create.status, await create.text()),
     };
   }
   const campaign = (await create.json()) as { id?: string };
@@ -220,7 +245,11 @@ export async function fireDigestCampaign(
   if (!setContent.ok) {
     return {
       ok: false,
-      error: `Mailchimp campaigns content PUT ${setContent.status}: ${(await setContent.text()).slice(0, 300)}`,
+      error: formatMailchimpFailure(
+        "campaigns content PUT",
+        setContent.status,
+        await setContent.text(),
+      ),
     };
   }
 
@@ -232,7 +261,11 @@ export async function fireDigestCampaign(
   if (!send.ok) {
     return {
       ok: false,
-      error: `Mailchimp campaigns send POST ${send.status}: ${(await send.text()).slice(0, 300)}`,
+      error: formatMailchimpFailure(
+        "campaigns send POST",
+        send.status,
+        await send.text(),
+      ),
     };
   }
 
@@ -247,7 +280,7 @@ export async function fireDigestCampaign(
 export async function recordDigestSent(args: {
   fan_id: string;
   week_start: string;
-  status: "merge_fields_updated" | "rendered" | "skipped_no_payload" | "error";
+  status: DigestAttemptStatus;
   campaign_id: string | null;
   html_body: string | null;
   text_body: string | null;
@@ -255,15 +288,19 @@ export async function recordDigestSent(args: {
   payload_communities: string[] | null;
   payload_post_ids: string[] | null;
   error_message: string | null;
-}): Promise<void> {
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = createAdminClient();
+  // skipped_no_payload is not in digest_log_status_check. Map it to skipped
+  // and keep the reason in error_message, or the upsert 400s and the only
+  // row that lands is the run-level "no merge fields" message.
+  const status = digestLogStatus(args.status);
 
-  await admin.from("digest_log").upsert(
+  const { error } = await admin.from("digest_log").upsert(
     {
       fan_id: args.fan_id,
       week_start: args.week_start,
       sent_at: new Date().toISOString(),
-      status: args.status,
+      status,
       mailchimp_campaign_id: args.campaign_id,
       html_body: args.html_body,
       text_body: args.text_body,
@@ -274,20 +311,25 @@ export async function recordDigestSent(args: {
     },
     { onConflict: "fan_id,week_start" },
   );
+  if (error) {
+    return { ok: false, error: `digest_log upsert failed: ${error.message}` };
+  }
 
   // Update fans.last_digest_sent_at only on real-send statuses so retries
   // for errored / skipped runs don't lock us out for 6 days.
-  if (args.status === "merge_fields_updated") {
-    await admin
+  if (status === "merge_fields_updated") {
+    const { error: fanErr } = await admin
       .from("fans")
       .update({ last_digest_sent_at: new Date().toISOString() })
       .eq("id", args.fan_id);
+    if (fanErr) {
+      return {
+        ok: false,
+        error: `fans.last_digest_sent_at update failed: ${fanErr.message}`,
+      };
+    }
   }
-}
-
-/** Mailchimp's subscriber hash is md5(lowercased email). */
-function subscriberHash(email: string): string {
-  return createHash("md5").update(email.toLowerCase()).digest("hex");
+  return { ok: true };
 }
 
 /** Master campaign template HTML. Uses *|DIGESTHTML|* and *|FNAME|*

@@ -13,7 +13,8 @@ export type NotificationType =
   | "redemption"
   | "drops"
   | "rsvp_confirmation"
-  | "leaderboard";
+  | "leaderboard"
+  | "streak_at_risk";
 
 export type Channel = "push" | "sms" | "email" | "in_app";
 
@@ -43,6 +44,8 @@ export interface NotificationPreferences {
   notify_drops: boolean;
   notify_rsvp_confirmation: boolean;
   notify_leaderboard: boolean;
+  /** Streak reminders (migration 0089). */
+  notify_streak: boolean;
   quiet_start: string | null;     // 'HH:MM' or null
   quiet_end: string | null;
   timezone: string;
@@ -76,5 +79,7 @@ export function preferenceColumnFor(type: NotificationType): keyof NotificationP
       return "notify_rsvp_confirmation";
     case "leaderboard":
       return "notify_leaderboard";
+    case "streak_at_risk":
+      return "notify_streak";
   }
 }

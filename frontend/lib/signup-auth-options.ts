@@ -10,6 +10,11 @@ export type SignupAuthOptionsInput = {
   smsOptedIn?: boolean;
   /** Date of birth as YYYY-MM-DD. The database refuses under-13 sign-ups. */
   birthDate?: string | null;
+  /**
+   * True only when a 13–17 fan ticked the parent or guardian box.
+   * The database refuses that age without it. Nothing is verified.
+   */
+  parentConsent?: boolean;
 };
 
 export type SignupAuthOptions = {
@@ -36,6 +41,7 @@ export function buildSignupAuthOptions(input: SignupAuthOptionsInput): SignupAut
   if (input.phone) data.phone = input.phone;
   if (input.smsOptedIn === true) data.sms_opted_in = "true";
   if (input.birthDate) data.birth_date = input.birthDate;
+  if (input.parentConsent === true) data.parent_consent = "true";
   if (Object.keys(data).length > 0) options.data = data;
 
   return options;

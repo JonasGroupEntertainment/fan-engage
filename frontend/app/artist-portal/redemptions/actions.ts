@@ -1,26 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cancelRedemption } from "@/lib/rewards/cancel";
+import { assertPortalRole } from "@/lib/artist-portal/access";
 
-async function requireOwner() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthenticated");
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-  if (!adminRow) throw new Error("Forbidden");
-  return { communityId: adminRow.community_id as string };
+/** Editors and above may fulfill/cancel (PORTAL_MIN_ROLE.redemptions). Throws. */
+async function requireEditor() {
+  const ctx = await assertPortalRole("redemptions");
+  return { communityId: ctx.communityId };
 }
 
 export async function fulfillRedemptionAction(formData: FormData) {
-  const { communityId } = await requireOwner();
+  const { communityId } = await requireEditor();
   const redemptionId = String(formData.get("redemption_id") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
   if (!redemptionId) return { error: "Missing redemption_id" };
@@ -42,7 +34,7 @@ export async function fulfillRedemptionAction(formData: FormData) {
 }
 
 export async function cancelRedemptionPortalAction(formData: FormData) {
-  const { communityId } = await requireOwner();
+  const { communityId } = await requireEditor();
   const redemptionId = String(formData.get("redemption_id") ?? "").trim();
   if (!redemptionId) return { error: "Missing redemption_id" };
 

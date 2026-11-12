@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getAdminContext, type AdminContext } from "@/lib/admin";
 import { decideAdminAccess, type AdminRequirement } from "@/lib/admin-authz";
 
@@ -58,4 +59,20 @@ export async function communityAdminUser(
   if (!communityId) return null;
   const guard = await authorizeAdmin({ communityId, minRole });
   return guard.ok ? guard.ctx.user : null;
+}
+
+/**
+ * Page-level super-admin gate for routes that span every community
+ * (network feed, fraud signals, daily briefs — see PRODUCT.md). Redirects
+ * signed-out callers to login and non-super-admins back to /admin.
+ * Server actions should use `assertAdmin({ superAdminOnly: true })`
+ * instead so they throw rather than redirect.
+ */
+export async function superAdminOnly(nextPath = "/admin"): Promise<AdminContext> {
+  const guard = await authorizeAdmin({ superAdminOnly: true });
+  if (guard.ok) return guard.ctx;
+  if (guard.reason === "signed_out") {
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  }
+  redirect("/admin");
 }

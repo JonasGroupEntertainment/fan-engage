@@ -83,7 +83,7 @@ describe("guest admin policy URLs", () => {
 
 describe("admin policy redirect wiring", () => {
   it("middleware redirects only logged-out visitors, with 307, before the login wall", () => {
-    const middleware = readRepo("../middleware.ts");
+    const middleware = readRepo("../proxy.ts");
     const policyAt = middleware.indexOf("guestAdminPolicyRedirect(pathname)");
     const loginAt = middleware.indexOf('loginUrl.searchParams.set("next", pathname)');
     assert.ok(policyAt > 0);

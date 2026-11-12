@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 /**
  * /api/cron/alt-text-backfill (FE)
  *
@@ -39,10 +39,11 @@ interface RunResult {
   }>;
 }
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "alt-text-backfill", () => altTextBackfill());
+}
 
+async function altTextBackfill() {
   const admin = createAdminClient();
 
   // Find posts with images but no alt text

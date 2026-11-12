@@ -2,8 +2,7 @@
 
 import type { PollData } from "@/lib/data/types";
 import { votePollAction } from "./actions";
-import PremiumCta from "@/components/premium-cta";
-import { PREMIUM_CTA } from "@/lib/entitlements-core";
+import { withPointsToast } from "@/components/points-toast";
 
 export default function PollBlock({
   postId,
@@ -34,7 +33,7 @@ export default function PollBlock({
           return (
             <form
               key={o.id}
-              action={votePollAction}
+              action={withPointsToast(votePollAction)}
               className="relative"
             >
               <input type="hidden" name="post_id" value={postId} />
@@ -71,12 +70,7 @@ export default function PollBlock({
       {!currentUserId && (
         <p className="text-xs text-white/50">Sign in to vote (+10 pts).</p>
       )}
-      {currentUserId && !canVote && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-white/60">{PREMIUM_CTA.available}</p>
-          <PremiumCta copy="upgrade" communityId={artistSlug} variant="chip" />
-        </div>
-      )}
+      {/* Voting is Free for every signed-in fan (+10 pts, up to 3/day). */}
       {currentUserId && canVote && !hasVoted && (
         <p className="text-xs text-white/50">
           Tap an option to cast your vote (+10 pts).

@@ -107,15 +107,19 @@ function postVisibility(row: Record<string, unknown>): Visibility {
 export const SOURCES: Record<SourceTable, SourceDescriptor> = {
   community_posts: {
     table: "community_posts",
-    // Fan Engage's community_posts uses artist_slug (not community_id) for
-    // tenant scope. The slug values are the same — see migration 0011.
+    // Fan Engage's community_posts uses artist_slug (not the community_id
+    // column) as the embedding tenant. Migration 0011 copied artist_slug
+    // into community_id, but later seed rows can disagree.
     columns: "id, artist_slug, title, body, visibility",
     buildText: (row) =>
       [row.title, row.body]
         .filter((s): s is string => typeof s === "string" && s.length > 0)
         .join("\n\n"),
+    // artist_slug is stored as content_embeddings.community_id. It has to
+    // be a communities.slug; community_posts.community_id is a different
+    // column and is not the tenant key for this pipeline.
     extractMeta: (row) => ({
-      community_id: String(row.artist_slug),
+      community_id: String(row.artist_slug ?? ""),
       visibility: postVisibility(row),
       source_id: String(row.id),
     }),

@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -23,9 +23,10 @@ export const dynamic = "force-dynamic";
  * active fans), runs in seconds even at 50k fans.
  */
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "compute-optimal-hours", () => computeOptimalHours());
+}
 
+async function computeOptimalHours() {
   const started = Date.now();
   const admin = createAdminClient();
 

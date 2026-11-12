@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { matchEvent } from "@/lib/event-matching";
@@ -32,9 +32,10 @@ interface PrepareSummary {
 }
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "event-match-prepare", () => eventMatchPrepare());
+}
 
+async function eventMatchPrepare() {
   const started = Date.now();
   const summary: PrepareSummary = {
     totalCandidates: 0,

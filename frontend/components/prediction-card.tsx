@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { pushPointsToast } from "@/components/points-toast";
 import {
   formatPredictionCountdown,
   predictionPhase,
@@ -90,6 +91,7 @@ export default function PredictionCard({
     startTransition(async () => {
       const result = await votePredictionAction(fd);
       if (result?.error) setError(result.error);
+      else if ("pointsAwarded" in result) pushPointsToast(result);
     });
   }
 

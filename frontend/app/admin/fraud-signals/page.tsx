@@ -6,9 +6,8 @@
  * No auto-action ever taken.
  */
 
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAdminUser } from "@/lib/admin";
+import { superAdminOnly } from "@/lib/admin-guard";
 import { dismissFraudSignalAction, confirmFraudSignalAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +38,9 @@ interface EvidenceShape {
 }
 
 export default async function FraudSignalsPage() {
-  const user = await getAdminUser();
-  if (!user) redirect("/login");
+  // Fraud signals are per fan across every community: super-admin only
+  // (matches ./actions.ts).
+  await superAdminOnly("/admin/fraud-signals");
 
   const admin = createAdminClient();
 

@@ -11,6 +11,11 @@ const KEYART: Record<string, string> = {
   "denise-jonas": "/images/artist-keyart/denise-jonas.jpg",
 };
 
+/** True when a processed key-art file exists for the slug (launch checklist). */
+export function hasArtistKeyArt(slug: string): boolean {
+  return Boolean(KEYART[slug]);
+}
+
 export function getArtistKeyArt(
   slug: string,
   genres: string[] | undefined,

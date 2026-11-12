@@ -1,6 +1,6 @@
 "use server";
 
-import { getAdminUser } from "@/lib/admin";
+import { authorizeAdmin } from "@/lib/admin-guard";
 import { getRecentFanEvents } from "@/lib/network/queries";
 import type { FanEvent } from "@/lib/network/types";
 
@@ -10,7 +10,8 @@ import type { FanEvent } from "@/lib/network/types";
  * the live feed polls this action instead (service-role read, admin-gated).
  */
 export async function fetchNewFanEvents(sinceId: number): Promise<FanEvent[]> {
-  const admin = await getAdminUser();
-  if (!admin) return [];
+  // Same gate as the page: cross-community data is super-admin only.
+  const guard = await authorizeAdmin({ superAdminOnly: true });
+  if (!guard.ok) return [];
   return getRecentFanEvents(50, sinceId);
 }

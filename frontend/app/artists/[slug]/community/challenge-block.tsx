@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import ImageUploader from "@/components/image-uploader";
+import { challengeEntryImageAlt } from "@/lib/community/challenge-entry-alt";
 import type { ChallengeEntry } from "@/lib/data/types";
 import { submitEntryAction } from "./actions";
-import PremiumCta from "@/components/premium-cta";
+import { pushPointsToast } from "@/components/points-toast";
 
 function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
@@ -45,7 +46,7 @@ export default function ChallengeBlock({
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
     try {
-      await submitEntryAction(formData);
+      pushPointsToast(await submitEntryAction(formData));
       formRef.current?.reset();
       setUploaderKey((k) => k + 1);
       setOpen(false);
@@ -69,9 +70,7 @@ export default function ChallengeBlock({
             {open ? "Cancel" : "Submit entry · +3 pts"}
           </button>
         )}
-        {currentUserId && !canEnter && !alreadyEntered && (
-          <PremiumCta copy="upgrade" communityId={artistSlug} variant="chip" />
-        )}
+        {/* Challenge entries are Free for every signed-in fan (+3 pts). */}
         {currentUserId && alreadyEntered && (
           <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-200">
             ✓ Entered
@@ -139,7 +138,7 @@ export default function ChallengeBlock({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={e.image_url}
-                  alt=""
+                  alt={challengeEntryImageAlt(e.body)}
                   className="mt-2 max-h-72 w-full rounded-xl object-cover"
                 />
               )}

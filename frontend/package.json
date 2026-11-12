@@ -11,10 +11,12 @@
     "test:types": "tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
+    "@sentry/nextjs": "^11.12.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "lucide-react": "^0.468.0",
-    "next": "^16.3.8",
+    "next": "^16.4.1",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
@@ -35,6 +38,9 @@
   },
   "overrides": {
     "sharp": "^0.35.0",
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    }
   }
 }

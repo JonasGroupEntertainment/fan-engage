@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminUser } from "@/lib/admin";
 import { rejectPlaceholderDraftPosts } from "@/lib/community/placeholder-draft";
+import { isTeamAuthored } from "@/lib/notifications/triggers/new-post";
+import { postViewerFromEntitlement, redactGatedPost, type PostViewer } from "@/lib/founder-gate/core";
+import { getViewerEntitlement } from "@/lib/entitlements";
 import type {
   ChallengeEntry,
   CommunityComment,
@@ -7,6 +12,45 @@ import type {
   PollData,
   PollOption,
 } from "./types";
+import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
+import { captureAppException } from "@/lib/sentry";
+import { isNextControlFlowError } from "@/lib/sentry-report";
+
+/**
+ * Which of these posts were written by the artist / their team?
+ *
+ * Same rule as the new-post notification (`isTeamAuthored` in
+ * lib/notifications/triggers/new-post.ts): announcements are always the
+ * artist's voice, and a plain post is the team's when its author holds an
+ * `admin_users` grant for this community (or `*`). One query for the whole
+ * page — never per post. Admin client because `admin_users` is not readable
+ * through the fan's RLS key.
+ */
+export async function getTeamAuthoredPostIds(
+  artistSlug: string,
+  posts: ReadonlyArray<Pick<CommunityPost, "id" | "author_id" | "kind">>,
+): Promise<Set<string>> {
+  const team = new Set<string>();
+  if (posts.length === 0) return team;
+  const authorIds = [...new Set(posts.map((p) => p.author_id))];
+  let granted = new Set<string>();
+  try {
+    const { data } = await createAdminClient()
+      .from("admin_users")
+      .select("user_id")
+      .in("user_id", authorIds)
+      .in("community_id", [artistSlug, "*"]);
+    granted = new Set((data ?? []).map((r) => r.user_id as string));
+  } catch {
+    // Grant lookup failed — announcements still get the artist byline.
+  }
+  for (const p of posts) {
+    if (isTeamAuthored({ kind: p.kind, hasTeamGrant: granted.has(p.author_id) })) {
+      team.add(p.id);
+    }
+  }
+  return team;
+}
 
 /**
  * Fetches the community feed for one artist, newest first with pinned
@@ -24,23 +68,36 @@ export async function getPostsByArtist(
       data: { user },
     } = await supabase.auth.getUser();
 
-    let postsQuery = supabase
-      .from("community_posts")
-      .select(
-        "id, artist_slug, author_id, kind, title, body, image_url, video_url, video_poster_url, pinned, visibility, created_at, tags, thread_summary, thread_summary_count",
-      )
-      .eq("artist_slug", artistSlug)
-      .order("pinned", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(limit + 20);
+    const buildPostsQuery = (withScheduledFilter: boolean) => {
+      let q = supabase
+        .from("community_posts")
+        .select(
+          "id, artist_slug, author_id, kind, title, body, image_url, video_url, video_poster_url, pinned, visibility, created_at, tags, thread_summary, thread_summary_count",
+        )
+        .eq("artist_slug", artistSlug);
+      // 0094: RLS already hides future-scheduled rows from fans, but the
+      // author_read / admin_read policies would surface the team's own
+      // scheduled posts in the public feed with no "scheduled" marker. The
+      // portal is the place to see those, so the feed filters them too.
+      if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
+      q = q
+        .order("pinned", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit + 20);
+      // Phase 5 #5: optional ?tag=foo filter from the community-feed URL.
+      // Uses pgvector-style array contains via Supabase's .contains().
+      if (options.tagFilter && options.tagFilter.length > 0) {
+        q = q.contains("tags", [options.tagFilter]);
+      }
+      return q;
+    };
 
-    // Phase 5 #5: optional ?tag=foo filter from the community-feed URL.
-    // Uses pgvector-style array contains via Supabase's .contains().
-    if (options.tagFilter && options.tagFilter.length > 0) {
-      postsQuery = postsQuery.contains("tags", [options.tagFilter]);
+    let { data: posts, error: postsErr } = await buildPostsQuery(true);
+    // Until 0094 is applied the column does not exist — degrade to the
+    // unfiltered feed rather than an empty one.
+    if (postsErr && isMissingScheduledColumnError(postsErr)) {
+      ({ data: posts, error: postsErr } = await buildPostsQuery(false));
     }
-
-    const { data: posts, error: postsErr } = await postsQuery;
 
     if (postsErr) throw postsErr;
     if (!posts || posts.length === 0) return [];
@@ -111,7 +168,9 @@ export async function getPostsByArtist(
           video_poster_url: p.video_poster_url as string | null,
           pinned: p.pinned as boolean,
           visibility:
-            ((p.visibility as "public" | "premium" | null) ?? "public"),
+            p.visibility === "premium" || p.visibility === "founder-only"
+              ? p.visibility
+              : "public",
           created_at: p.created_at as string,
           reaction_counts: reactionsByPost.get(p.id as string) ?? {},
           my_reactions: myReactionsByPost.get(p.id as string) ?? [],
@@ -125,7 +184,26 @@ export async function getPostsByArtist(
         }) as CommunityPost,
     );
     // Public + signed-in fan feeds share this loader — drafts stay in DB.
-    return rejectPlaceholderDraftPosts(mapped).slice(0, limit);
+    // Fail closed: if the tier lookup throws, gated bodies are stripped.
+    let viewer: PostViewer = postViewerFromEntitlement(null, {
+      isAdmin: false,
+      fanId: user?.id ?? null,
+    });
+    try {
+      const [entitlement, adminUser] = await Promise.all([
+        getViewerEntitlement(artistSlug),
+        getAdminUser(),
+      ]);
+      viewer = postViewerFromEntitlement(entitlement, {
+        isAdmin: adminUser !== null,
+        fanId: user?.id ?? null,
+      });
+    } catch {
+      // viewer stays free — gated fields are cleared below.
+    }
+    return rejectPlaceholderDraftPosts(mapped)
+      .slice(0, limit)
+      .map((post) => redactGatedPost(post, viewer));
   } catch {
     return [];
   }
@@ -191,7 +269,12 @@ export async function getPollData(postId: string): Promise<PollData | null> {
   }
 }
 
-/** Challenge entries for a single challenge post, newest first. */
+/**
+ * Challenge entries for a single challenge post, newest first.
+ * The table's columns are id, post_id, fan_id, body, image_url, created_at
+ * (0003). There is no image_alt column — selecting it is PostgREST 42703,
+ * and an empty catch used to turn that into "0 entries" for everyone.
+ */
 export async function getChallengeEntries(
   postId: string,
 ): Promise<ChallengeEntry[]> {
@@ -199,7 +282,7 @@ export async function getChallengeEntries(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("community_challenge_entries")
-      .select("id, post_id, fan_id, body, image_url, image_alt, created_at")
+      .select("id, post_id, fan_id, body, image_url, created_at")
       .eq("post_id", postId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -225,7 +308,13 @@ export async function getChallengeEntries(
           created_at: e.created_at as string,
         }) as ChallengeEntry,
     );
-  } catch {
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    console.error("getChallengeEntries failed:", error);
+    await captureAppException(error, {
+      route: "/artists/community",
+      step: "challenge-entries",
+    });
     return [];
   }
 }

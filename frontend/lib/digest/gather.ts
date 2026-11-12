@@ -20,6 +20,9 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canReadPostInCommunity, gatedPostTeaser } from "@/lib/founder-gate/core";
+import { isFoundingFanNumber } from "@/lib/points/economy";
+import { isMissingScheduledColumnError, scheduledPostsVisibleFilter } from "@/lib/data/scheduled-posts";
 import type {
   DigestCommunityBlock,
   DigestEvent,
@@ -28,6 +31,13 @@ import type {
   DigestRecipient,
   DigestRewardSuggestion,
 } from "./types";
+
+export type DigestGatherResult =
+  | { ok: true; payload: DigestPayload }
+  | { ok: false; reason: string };
+
+/** fan_artist_following stores followed_at, not created_at. */
+const FOLLOW_ORDER_COLUMN = "followed_at";
 
 const APP_BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
@@ -47,32 +57,43 @@ const EVENTS_PER_COMMUNITY = 2;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Build the full DigestPayload for one fan. Returns null if the fan has
- * no followed artists or no fresh content to summarize this week.
+ * Build the full DigestPayload for one fan.
+ *
+ * Query failures throw (the caller records them as a per-fan error).
+ * A fan who follows nobody, or whose followed communities have nothing
+ * new, returns ok:false with a reason — that is a skip, not an error.
  */
 export async function gatherDigestPayload(
   recipient: DigestRecipient,
-): Promise<DigestPayload | null> {
+): Promise<DigestGatherResult> {
   const admin = createAdminClient();
 
-  // 1. Followed communities.
-  const { data: follows } = await admin
-    .from("fan_artist_following")
-    .select("artist_slug, created_at")
-    .eq("fan_id", recipient.fan_id)
-    .order("created_at", { ascending: false });
-  const followedSlugs = (follows ?? []).map((r) => r.artist_slug as string);
-  if (followedSlugs.length === 0) return null;
+  // 1. Followed communities. Most recently followed first.
+  const follows = rowsOrThrow(
+    "fan_artist_following",
+    await admin
+      .from("fan_artist_following")
+      .select("artist_slug, followed_at")
+      .eq("fan_id", recipient.fan_id)
+      .order(FOLLOW_ORDER_COLUMN, { ascending: false }),
+  );
+  const followedSlugs = follows.map((r) => r.artist_slug as string);
+  if (followedSlugs.length === 0) {
+    return { ok: false, reason: "Fan follows no artists" };
+  }
 
   // Cap to MAX_COMMUNITIES_PER_DIGEST. Most-recently-followed first
   // (proxy for active interest). Easy to swap for engagement-ranked later.
   const targetSlugs = followedSlugs.slice(0, MAX_COMMUNITIES_PER_DIGEST);
 
   // 2. Pull community metadata for display names.
-  const { data: communityRows } = await admin
-    .from("communities")
-    .select("slug, display_name")
-    .in("slug", targetSlugs);
+  const communityRows = rowsOrThrow(
+    "communities",
+    await admin
+      .from("communities")
+      .select("slug, display_name")
+      .in("slug", targetSlugs),
+  );
   const displayNameBySlug = new Map<string, string>();
   for (const c of communityRows ?? []) {
     displayNameBySlug.set(c.slug as string, c.display_name as string);
@@ -82,14 +103,79 @@ export async function gatherDigestPayload(
   //    (anything not auto_hide is fine — pending rows might still be in
   //    classification but their content is real).
   const oneWeekAgoIso = new Date(Date.now() - WEEK_MS).toISOString();
-  const { data: postRows } = await admin
-    .from("community_posts")
-    .select("id, artist_slug, title, body, created_at, moderation_status")
-    .in("artist_slug", targetSlugs)
-    .gte("created_at", oneWeekAgoIso)
-    .in("moderation_status", ["pending", "safe", "flag_review"])
-    .order("created_at", { ascending: false })
-    .limit(targetSlugs.length * POSTS_CANDIDATES_PER_COMMUNITY);
+  // Scheduled-but-unpublished posts (0094 scheduled_for in the future) must not
+  // reach the digest. The column may not exist before 0094 is applied, so a
+  // missing-column error retries without the filter.
+  // Titles and visibility first. The body is loaded in a second query
+  // and only for posts this recipient can read, so a free fan's digest
+  // never contains a premium or founder-only body.
+  const [premiumRes, founderRes, staffRes] = await Promise.all([
+    admin
+      .from("fan_community_memberships")
+      .select("community_id")
+      .eq("fan_id", recipient.fan_id)
+      .in("subscription_tier", ["premium", "comped", "past_due"]),
+    admin
+      .from("fan_community_memberships")
+      .select("community_id, founding_fan_number")
+      .eq("fan_id", recipient.fan_id)
+      .gte("founding_fan_number", 1),
+    admin
+      .from("admin_users")
+      .select("community_id")
+      .eq("user_id", recipient.fan_id),
+  ]);
+  const postAccess = {
+    fanId: recipient.fan_id,
+    premiumCommunities: (premiumRes.data ?? []).map((r) => r.community_id as string),
+    founderCommunities: (founderRes.data ?? [])
+      .filter((r) => isFoundingFanNumber(r.founding_fan_number as number | null))
+      .map((r) => r.community_id as string),
+    staffCommunities: (staffRes.data ?? []).map((r) => r.community_id as string),
+  };
+
+  const postsQuery = (withScheduledFilter: boolean) => {
+    let q = admin
+      .from("community_posts")
+      .select("id, artist_slug, author_id, title, created_at, moderation_status, visibility")
+      .in("artist_slug", targetSlugs)
+      .gte("created_at", oneWeekAgoIso)
+      .in("moderation_status", ["pending", "safe", "flag_review"]);
+    if (withScheduledFilter) q = q.or(scheduledPostsVisibleFilter());
+    return q
+      .order("created_at", { ascending: false })
+      .limit(targetSlugs.length * POSTS_CANDIDATES_PER_COMMUNITY);
+  };
+  let postsRes = await postsQuery(true);
+  if (postsRes.error && isMissingScheduledColumnError(postsRes.error)) {
+    postsRes = await postsQuery(false);
+  }
+  const postRows = rowsOrThrow("community_posts", postsRes);
+  const readablePostIds = (postRows ?? [])
+    .filter((p) =>
+      canReadPostInCommunity(
+        {
+          visibility:
+            p.visibility === "premium" || p.visibility === "founder-only"
+              ? p.visibility
+              : "public",
+          author_id: (p.author_id as string | null) ?? null,
+          artist_slug: p.artist_slug as string,
+        },
+        postAccess,
+      ),
+    )
+    .map((p) => p.id as string);
+  const bodyById = new Map<string, string>();
+  if (readablePostIds.length > 0) {
+    const bodyRes = rowsOrThrow(
+      "community_posts",
+      await admin.from("community_posts").select("id, body").in("id", readablePostIds),
+    );
+    for (const row of bodyRes ?? []) {
+      bodyById.set(row.id as string, (row.body as string | null) ?? "");
+    }
+  }
 
   // 4. Pull reaction + comment counts for those posts in two batched queries.
   const candidatePostIds = (postRows ?? []).map((p) => p.id as string);
@@ -97,7 +183,7 @@ export async function gatherDigestPayload(
   const commentsByPost = new Map<string, number>();
 
   if (candidatePostIds.length > 0) {
-    const [{ data: reactionRows }, { data: commentRows }] = await Promise.all([
+    const [reactionResult, commentResult] = await Promise.all([
       admin
         .from("community_reactions")
         .select("post_id")
@@ -107,6 +193,8 @@ export async function gatherDigestPayload(
         .select("post_id, moderation_status")
         .in("post_id", candidatePostIds),
     ]);
+    const reactionRows = rowsOrThrow("community_reactions", reactionResult);
+    const commentRows = rowsOrThrow("community_comments", commentResult);
 
     for (const r of reactionRows ?? []) {
       const id = r.post_id as string;
@@ -126,11 +214,15 @@ export async function gatherDigestPayload(
     const slug = p.artist_slug as string;
     const id = p.id as string;
     const arr = postsByCommunity.get(slug) ?? [];
+    const visibility = (p.visibility as string | null) ?? "public";
+    const readable = readablePostIds.includes(id);
     arr.push({
       id,
       artist_slug: slug,
       title: (p.title as string | null) ?? null,
-      body: p.body as string,
+      body: readable
+        ? (bodyById.get(id) ?? "")
+        : gatedPostTeaser(visibility === "founder-only" ? "founder-only" : "premium"),
       reaction_count: reactionsByPost.get(id) ?? 0,
       comment_count: commentsByPost.get(id) ?? 0,
       created_at: p.created_at as string,
@@ -140,20 +232,26 @@ export async function gatherDigestPayload(
   }
 
   // 6. Upcoming events per community, filtered to those the fan hasn't RSVPed to.
-  const { data: rsvpRows } = await admin
-    .from("event_rsvps")
-    .select("event_id")
-    .eq("fan_id", recipient.fan_id);
+  const rsvpRows = rowsOrThrow(
+    "event_rsvps",
+    await admin
+      .from("event_rsvps")
+      .select("event_id")
+      .eq("fan_id", recipient.fan_id),
+  );
   const rsvpedIds = new Set<string>(
     (rsvpRows ?? []).map((r) => r.event_id as string),
   );
 
-  const { data: eventRows } = await admin
-    .from("artist_events")
-    .select("id, artist_slug, title, detail, event_date, url, sort_order, active")
-    .in("artist_slug", targetSlugs)
-    .eq("active", true)
-    .order("sort_order", { ascending: true });
+  const eventRows = rowsOrThrow(
+    "artist_events",
+    await admin
+      .from("artist_events")
+      .select("id, artist_slug, title, detail, event_date, url, sort_order, active")
+      .in("artist_slug", targetSlugs)
+      .eq("active", true)
+      .order("sort_order", { ascending: true }),
+  );
 
   const eventsByCommunity = new Map<string, DigestEvent[]>();
   for (const e of eventRows ?? []) {
@@ -200,17 +298,36 @@ export async function gatherDigestPayload(
     // sections in the email are noise.
     .filter((b) => b.topPosts.length > 0 || b.upcomingEvents.length > 0);
 
-  if (communities.length === 0) return null;
+  if (communities.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "No posts from the last 7 days and no upcoming events in followed communities",
+    };
+  }
 
   // 8. Reward suggestion — most-aspirational reward they can afford right now.
   const rewardSuggestion = await suggestReward(recipient, targetSlugs);
 
   return {
-    recipient,
-    week_start: monday00UTC(new Date()).toISOString().slice(0, 10),
-    communities,
-    rewardSuggestion,
+    ok: true,
+    payload: {
+      recipient,
+      week_start: monday00UTC(new Date()).toISOString().slice(0, 10),
+      communities,
+      rewardSuggestion,
+    },
   };
+}
+
+function rowsOrThrow<T>(
+  label: string,
+  result: { data: T[] | null; error: { message: string } | null },
+): T[] {
+  if (result.error) {
+    throw new Error(`${label}: ${result.error.message}`);
+  }
+  return result.data ?? [];
 }
 
 /** Pick the most-aspirational redeemable reward in the fan's followed
@@ -222,7 +339,7 @@ async function suggestReward(
   if (communitySlugs.length === 0) return null;
   const admin = createAdminClient();
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from("rewards_catalog")
     .select(
       "id, community_id, title, description, point_cost, requires_tier, active",
@@ -232,6 +349,7 @@ async function suggestReward(
     .lte("point_cost", recipient.total_points)
     .order("point_cost", { ascending: false }) // most expensive thing they can still afford
     .limit(20);
+  if (error) throw new Error(`rewards_catalog: ${error.message}`);
 
   // Filter out tier-gated rewards the fan can't access. V1 conservatively
   // skips premium / founder rewards (we'd need a join to fan_community_memberships

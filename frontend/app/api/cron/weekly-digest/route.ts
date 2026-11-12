@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -6,6 +6,10 @@ import {
   fireDigestCampaign,
   recordDigestSent,
 } from "@/lib/digest/send";
+import { unsentCampaignError } from "@/lib/digest/outcomes";
+import { runLapsedPass, type LapsedClient, type LapsedPassResult } from "@/lib/digest/lapsed-pass";
+import { cronAuthProblem } from "@/lib/cron-observability";
+import { getAdminContext } from "@/lib/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +36,17 @@ export const dynamic = "force-dynamic";
  *   * Anthropic: 200 fans × ~3 community summaries × ~$0.0001 ≈ $0.06
  *   * Mailchimp: 200 PUTs (free) + 1 campaign send (covered by plan)
  *   * Total: ~$0.06/week, ~$3/year
+ *
+ * After the digest, a "we miss you" pass (lib/digest/lapsed-pass.ts)
+ * nudges opted-in fans whose newest activity is 14–30 days old and who
+ * have not had a nudge in 30 days. Each send is a notification_log row
+ * (notification_type "lapsed_nudge") so later runs skip them. Its result
+ * is `summary.lapsed`; a lapsed failure never fails the digest.
+ *
+ * ?dryRun=1 — cron-authed, or a signed-in super-admin — skips the digest,
+ * runs only the lapsed selection, and returns bucket counts plus up to 10
+ * sample candidates. It sends nothing and records nothing (not even a
+ * cron_runs / digest_log row), so it bypasses runCron on purpose.
  */
 
 const BATCH_SIZE = 500;
@@ -44,14 +59,61 @@ interface DigestRunSummary {
   errors: Array<{ fan_id: string; error: string }>;
   campaignId: string | null;
   campaignError: string | null;
+  lapsed: LapsedPassResult | null;
+  lapsedError: string | null;
   weekStart: string;
   durationMs: number;
 }
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  const url = new URL(request.url);
+  if (url.searchParams.get("dryRun") === "1") {
+    return lapsedDryRun(request, url);
+  }
+  return runCron(request, "weekly-digest", () => weeklyDigest(request));
+}
 
+/**
+ * Dry run of the lapsed pass. Cron auth as always; a signed-in super-admin
+ * may also run it (it sends and records nothing) so the selection can be
+ * checked from a browser without handling CRON_SECRET.
+ */
+async function lapsedDryRun(request: Request, url: URL) {
+  const authProblem = cronAuthProblem(request);
+  if (authProblem) {
+    const ctx = await getAdminContext();
+    if (!ctx?.isSuperAdmin) {
+      return NextResponse.json(
+        { ok: false, error: authProblem.error },
+        { status: authProblem.status },
+      );
+    }
+  }
+  try {
+    const lapsed = await runLapsedPass({
+      // LapsedClient is the narrow, test-stubbable slice of the Supabase
+      // client; the structural check against SupabaseClient recurses too
+      // deep for tsc, hence the cast.
+      admin: createAdminClient() as unknown as LapsedClient,
+      testEmail: url.searchParams.get("testEmail"),
+      dryRun: true,
+    });
+    return NextResponse.json({
+      ok: true,
+      dryRun: true,
+      digest: "skipped (dryRun)",
+      lapsed,
+      ranAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, dryRun: true, error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+}
+
+async function weeklyDigest(request: Request) {
   // Don't 503 on missing ANTHROPIC_API_KEY — the digest still ships with
   // fallback summaries. But ANTHROPIC missing is a quality issue worth
   // surfacing, so include in the response.
@@ -67,6 +129,8 @@ export async function GET(request: Request) {
     errors: [],
     campaignId: null,
     campaignError: null,
+    lapsed: null,
+    lapsedError: null,
     weekStart,
     durationMs: 0,
   };
@@ -137,23 +201,16 @@ export async function GET(request: Request) {
 
       if (result.status === "error" && result.error) {
         summary.errors.push({ fan_id: r.fan_id, error: result.error });
+        logFanError(r.fan_id, result.error);
       }
 
       // Always write digest_log so we have a record of every attempt
-      // (including no-payload skips and errors).
-      const logStatus =
-        result.status === "merge_fields_updated"
-          ? "merge_fields_updated"
-          : result.status === "rendered"
-            ? "rendered"
-            : result.status === "skipped_no_payload"
-              ? "skipped_no_payload"
-              : "error";
-
-      await recordDigestSent({
+      // (including no-payload skips and errors). Skip reasons use the
+      // allowed status "skipped"; the reason stays in error_message.
+      const recorded = await recordDigestSent({
         fan_id: r.fan_id,
         week_start: weekStart,
-        status: logStatus as "merge_fields_updated" | "rendered" | "skipped_no_payload" | "error",
+        status: result.status,
         campaign_id: null, // filled in after the campaign fires
         html_body: result.htmlBody ?? null,
         text_body: result.textBody ?? null,
@@ -162,6 +219,10 @@ export async function GET(request: Request) {
         payload_post_ids: result.payloadPostIds ?? null,
         error_message: result.error ?? null,
       });
+      if (!recorded.ok) {
+        summary.errors.push({ fan_id: r.fan_id, error: recorded.error });
+        logFanError(r.fan_id, recorded.error);
+      }
     }
 
     // Fire the campaign — only if at least one fan got merge fields set.
@@ -178,16 +239,45 @@ export async function GET(request: Request) {
       } else {
         summary.campaignError = campaign.error;
       }
-    } else if (summary.totalCandidates > 0) {
-      summary.campaignError = "No fans had merge fields successfully updated; skipping campaign send.";
+    } else {
+      // No merge-field writes. That is a failure only when a fan errored
+      // (query, Mailchimp, or digest_log). An all-skip week is success
+      // with nothing to send.
+      summary.campaignError = unsentCampaignError({
+        totalCandidates: summary.totalCandidates,
+        errors: summary.errors,
+      });
+    }
+
+    // Second pass: fans the digest skipped because they went quiet. Its
+    // failures are reported in summary.lapsed / lapsedError, never as a
+    // digest failure (errorTextFromBody reads summary.errors and
+    // summary.campaignError only).
+    try {
+      summary.lapsed = await runLapsedPass({
+        admin: admin as unknown as LapsedClient,
+        testEmail,
+        dryRun: false,
+      });
+      if (summary.lapsed.error) {
+        summary.lapsedError = summary.lapsed.error;
+        console.error(`[cron weekly-digest] lapsed pass: ${summary.lapsed.error}`);
+      }
+    } catch (err) {
+      summary.lapsedError = err instanceof Error ? err.message : String(err);
+      console.error("[cron weekly-digest] lapsed pass failed:", summary.lapsedError);
     }
 
     summary.durationMs = Date.now() - started;
-    return NextResponse.json({
-      ok: true,
-      aiAvailable,
-      summary,
-    });
+    const failed = Boolean(summary.campaignError);
+    return NextResponse.json(
+      {
+        ok: !failed,
+        aiAvailable,
+        summary,
+      },
+      { status: failed ? 500 : 200 },
+    );
   } catch (err) {
     return NextResponse.json(
       {
@@ -197,6 +287,18 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function logFanError(fanId: string, error: string): void {
+  console.error(
+    JSON.stringify({
+      source: "cron",
+      job: "weekly-digest",
+      event: "fan_error",
+      fan_id: fanId,
+      error: error.slice(0, 800),
+    }),
+  );
 }
 
 /** Returns YYYY-MM-DD for Monday 00:00 UTC of the current week. */

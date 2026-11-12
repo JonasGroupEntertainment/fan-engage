@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { draftComment } from "@/lib/drafts";
 import { apiRateLimiter } from "@/lib/rate-limit";
-import { PREMIUM_CTA, requirePremiumFeature } from "@/lib/entitlements";
+import { PREMIUM_CTA, requireAiCommentDrafter } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,8 +15,18 @@ export const dynamic = "force-dynamic";
  * signed-in users can call this. The user's own auth.uid() is used as
  * the userId for fetching their prior comment style.
  *
+ * Gating: Premium perk (`ai_comment_drafter`) unless the community's gate is
+ * open — lib/ai-gates (0091 ai_feature_gates row, toggled at /admin/ai-gates,
+ * else the `AI_DRAFTER_FREE_COMMUNITIES` env fallback: comma-separated slugs,
+ * `*` = every community). When open, Free fans may use it under the same
+ * per-fan rate limit, which gives the +30% comment-lift hypothesis
+ * (LAUNCH_CHECKLIST.md) a non-Premium sample. Replies themselves are always
+ * Free; only the AI drafts are gated. See lib/entitlements.ts
+ * requireAiCommentDrafter.
+ *
  * Failure modes:
  *   401 — not signed in
+ *   403 — Premium required and the community gate is closed
  *   400 — missing postId
  *   503 — ANTHROPIC_API_KEY not set
  *   500 — anything else (logged for debugging)
@@ -51,15 +60,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing postId." }, { status: 400 });
   }
 
-  const admin = createAdminClient();
-  const { data: post } = await admin
+  // The fan's session, not the service role. 0096 hides a gated row
+  // here; before that migration the drafter still refuses the body.
+  const { data: post } = await supabase
     .from("community_posts")
     .select("artist_slug")
     .eq("id", postId)
     .maybeSingle();
   const communityId = (post?.artist_slug as string | null) ?? "";
+  if (!communityId) {
+    return NextResponse.json({ error: "That post is locked." }, { status: 403 });
+  }
   if (communityId) {
-    const gate = await requirePremiumFeature(user.id, communityId, "community_reply");
+    const gate = await requireAiCommentDrafter(user.id, communityId);
     if (!gate.allowed) {
       return NextResponse.json(
         { error: PREMIUM_CTA.unlock, upgrade: PREMIUM_CTA.href },
@@ -78,7 +91,8 @@ export async function POST(request: Request) {
   const result = await draftComment({ postId, userId: user.id });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+    const locked = result.error === "That post is locked.";
+    return NextResponse.json({ error: result.error }, { status: locked ? 403 : 500 });
   }
 
   return NextResponse.json(

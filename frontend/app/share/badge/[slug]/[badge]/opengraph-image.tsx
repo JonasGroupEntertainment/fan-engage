@@ -1,25 +1,44 @@
 import { ImageResponse } from "next/og";
 import { getArtistFromDb } from "@/lib/data/artists";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isFoundingFanBadgeSlug } from "@/lib/founding-fan-badge";
+import { publicFoundingFanDescription } from "@/lib/founding-fan-rule";
+import { TIER_MIN_POINTS, tierBadgeDescription } from "@/lib/tier-thresholds";
+import type { TierSlug } from "@/lib/data/types";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Badge unlocked on Fan Engage";
 
+/**
+ * Same rewrite as `publicBadgeDescription` in lib/data/badges.ts: tier and
+ * Founding Fan rows still carry the old 2,500 / 10,000 / 25,000 copy, so
+ * the public share card must never print `badges.description` raw.
+ */
+function publicBadgeDescription(slug: string, raw: string | null): string | null {
+  if (isFoundingFanBadgeSlug(slug)) return publicFoundingFanDescription(raw);
+  const tierSlug = slug.replace(/^tier-/, "") as TierSlug;
+  if (tierSlug in TIER_MIN_POINTS) {
+    return tierBadgeDescription(slug, TIER_MIN_POINTS[tierSlug]) ?? raw;
+  }
+  return raw;
+}
+
 export default async function BadgeOpengraphImage({
   params,
 }: {
-  params: { slug: string; badge: string };
+  params: Promise<{ slug: string; badge: string }>;
 }) {
+  const { slug: artistSlug, badge: badgeSlug } = await params;
   const [artist, badgeRow] = await Promise.all([
-    getArtistFromDb(params.slug).catch(() => null),
+    getArtistFromDb(artistSlug).catch(() => null),
     (async () => {
       const admin = createAdminClient();
       const { data } = await admin
         .from("badges")
         .select("name, description, icon")
-        .eq("slug", params.badge)
+        .eq("slug", badgeSlug)
         .maybeSingle();
       return data;
     })(),
@@ -30,7 +49,10 @@ export default async function BadgeOpengraphImage({
   const accentTo = artist?.accentTo ?? "#fb923c";
   const badgeName = badgeRow?.name ?? "Badge";
   const badgeIcon = badgeRow?.icon ?? "🏆";
-  const badgeDesc = badgeRow?.description ?? "Earned on Fan Engage";
+  const badgeDesc =
+    (badgeRow
+      ? publicBadgeDescription(badgeSlug, (badgeRow.description as string | null) ?? null)
+      : null) ?? "Earned on Fan Engage";
 
   return new ImageResponse(
     (
@@ -51,7 +73,7 @@ export default async function BadgeOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: "flex",
             background:
               `radial-gradient(circle at 20% 15%, ${accentFrom}aa, transparent 55%), ` +
@@ -62,7 +84,7 @@ export default async function BadgeOpengraphImage({
         <div
           style={{
             position: "absolute",
-            inset: 32,
+            top: 32, left: 32, right: 32, bottom: 32,
             display: "flex",
             border: "2px solid rgba(255,255,255,0.18)",
             borderRadius: 28,
@@ -135,7 +157,7 @@ export default async function BadgeOpengraphImage({
               color: "rgba(255,255,255,0.7)",
             }}
           >
-            for {artistName}
+            {`for ${artistName}`}
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 /**
  * /api/cron/post-drafts (FE)
  *
@@ -46,10 +46,11 @@ interface RunResult {
   }>;
 }
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "post-drafts", () => postDrafts());
+}
 
+async function postDrafts() {
   const admin = createAdminClient();
 
   // Pull active artists, oldest-first so quiet ones get attention

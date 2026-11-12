@@ -21,7 +21,16 @@ import {
   type TurnstileLoadState,
 } from "@/lib/turnstile-ux";
 import {
+  IMPORTED_RESET_CHECK_MESSAGE,
+  IMPORTED_RESET_FAILED_MESSAGE,
+  IMPORTED_RESET_LIMIT_MESSAGE,
+  IMPORTED_RESET_SENT_MESSAGE,
+  IMPORTED_SET_PASSWORD_MESSAGE,
+  postImportedAccount,
+} from "@/lib/imported-passwordless";
+import {
   SIGNUP_NOT_CREATED_MESSAGE,
+  didSignupCreateUser,
   interpretSignupCreate,
   reportSignupError,
   sanitizeSignupError,
@@ -36,7 +45,10 @@ import { SmsConsentCopy } from "@/components/sms-consent-copy";
 import {
   AGE_BLOCKED_MESSAGE,
   AGE_BLOCK_STORAGE_KEY,
+  PARENT_CONSENT_LABEL,
+  PARENT_CONSENT_MESSAGE,
   ageBand,
+  needsParentConsent,
   parseBirthDate,
   toIsoDate,
 } from "@/lib/age-gate";
@@ -89,6 +101,9 @@ export function SignupForm({
   const searchParams = useSearchParams();
   const community = searchParams.get("community");
   const ref = searchParams.get("ref");
+  // Explicit artist pick (?artist=<slug>) — independent of ?ref=, which may
+  // be an artist slug (Join CTA) or a fan invite code on older links.
+  const artistParam = searchParams.get("artist");
   const inviteCode = searchParams.get("invite");
   // Where to send the user after a successful signup. Preserve any
   // ?ref=<artist-slug> attribution from the artist-page Join CTA so the
@@ -97,7 +112,7 @@ export function SignupForm({
   // preview banners when a session expires mid-flow). Only relative paths —
   // anything else would be an open redirect.
   const rawNext = searchParams.get("next");
-  const onboardingHref = signupOnboardingHref(rawNext, ref);
+  const onboardingHref = signupOnboardingHref(rawNext, ref, artistParam);
   const fromOnboardingBounce =
     rawNext === "/onboarding" || (rawNext?.startsWith("/onboarding") ?? false);
   const loginHref =
@@ -108,8 +123,12 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "need-signin">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "error" | "need-signin" | "set-password" | "reset-sent"
+  >("idle");
   const [message, setMessage] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const turnstileConfigured = isTurnstileConfigured();
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
@@ -117,6 +136,7 @@ export function SignupForm({
     useState<TurnstileLoadState>("loading");
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [parentConsentChecked, setParentConsentChecked] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -130,6 +150,7 @@ export function SignupForm({
   const birthDate = parseBirthDate(birthYear, birthMonth, birthDay);
   // Texts are 18+. Until a full adult date is entered, the box stays off.
   const smsAllowed = birthDate != null && ageBand(birthDate) === "adult";
+  const parentConsentRequired = needsParentConsent(birthDate);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -195,7 +216,9 @@ export function SignupForm({
     loadState: turnstileLoadState,
   });
   const canSubmitSignup =
-    signupAllowsSubmit(turnstileGate) && (!hasConsentDocs || consentChecked);
+    signupAllowsSubmit(turnstileGate) &&
+    (!hasConsentDocs || consentChecked) &&
+    (!parentConsentRequired || parentConsentChecked);
 
   async function ensureCaptcha(): Promise<boolean> {
     const gate = nextSignupTurnstileGate({
@@ -225,7 +248,7 @@ export function SignupForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (status === "need-signin") return;
+    if (status === "need-signin" || status === "set-password" || status === "reset-sent") return;
 
     // Inline validation BEFORE we hit Supabase. Surface field-specific
     // errors so a 6-character password isn't silently rejected as a
@@ -258,11 +281,22 @@ export function SignupForm({
       return;
     }
 
+    if (needsParentConsent(birthDate) && !parentConsentChecked) {
+      setStatus("error");
+      setMessage(PARENT_CONSENT_MESSAGE);
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     const ok = await ensureCaptcha();
     if (!ok) return;
-    await createAccount(hasConsentDocs ? CONSENT_VERSION : undefined, sms, toIsoDate(birthDate));
+    await createAccount(
+      hasConsentDocs ? CONSENT_VERSION : undefined,
+      sms,
+      toIsoDate(birthDate),
+      needsParentConsent(birthDate),
+    );
   }
 
   function blockForAge() {
@@ -275,6 +309,7 @@ export function SignupForm({
     setPassword("");
     setPhone("");
     setSmsConsent(false);
+    setParentConsentChecked(false);
     setBirthMonth("");
     setBirthDay("");
     setBirthYear("");
@@ -287,6 +322,7 @@ export function SignupForm({
     consentVersion: string | undefined,
     sms: PublicSmsOptIn,
     birthDateIso: string,
+    parentConsent: boolean,
   ) {
     setStatus("loading");
     setMessage("");
@@ -308,6 +344,7 @@ export function SignupForm({
           phone: sms.phone,
           smsOptedIn: sms.smsOptedIn,
           birthDate: birthDateIso,
+          parentConsent,
         }),
       });
       resetChallenge();
@@ -337,6 +374,25 @@ export function SignupForm({
         } else if (signInError) {
           reportSignupError({ message: signInError });
         }
+        // Empty identities + failed password sign-in is the import dead end.
+        // The server returns set-password only for that cohort.
+        if (!error && !didSignupCreateUser(data.user)) {
+          const classified = await postImportedAccount({
+            email: email.trim(),
+            action: "classify",
+          });
+          if (classified.status === 429) {
+            setStatus("error");
+            setMessage(IMPORTED_RESET_LIMIT_MESSAGE);
+            return;
+          }
+          if (classified.body.outcome === "set-password") {
+            setStatus("set-password");
+            setMessage(IMPORTED_SET_PASSWORD_MESSAGE);
+            setResetNotice(null);
+            return;
+          }
+        }
         setStatus("error");
         setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
         return;
@@ -356,6 +412,44 @@ export function SignupForm({
       setStatus("error");
       setMessage(sanitizeSignupError(raw));
     }
+  }
+
+  async function sendSetPasswordEmail() {
+    if (sendingReset || status === "reset-sent") return;
+    const gate = nextSignupTurnstileGate({
+      configured: turnstileConfigured,
+      token: turnstileToken,
+      loadState: turnstileLoadState,
+    });
+    if (!signupAllowsSubmit(gate)) {
+      setResetNotice(
+        gate === "wait-load"
+          ? "Security check is still loading. Hang on a moment, then try again."
+          : IMPORTED_RESET_CHECK_MESSAGE,
+      );
+      requestAnimationFrame(() => scrollToTurnstileChallenge());
+      return;
+    }
+    setSendingReset(true);
+    setResetNotice(null);
+    const result = await postImportedAccount({
+      email: email.trim(),
+      action: "send-reset",
+      turnstileToken,
+    });
+    resetChallenge();
+    setSendingReset(false);
+    if (result.status === 429) {
+      setResetNotice(result.body.error || IMPORTED_RESET_LIMIT_MESSAGE);
+      return;
+    }
+    if (result.body.sent) {
+      setStatus("reset-sent");
+      setMessage(IMPORTED_RESET_SENT_MESSAGE);
+      setResetNotice(null);
+      return;
+    }
+    setResetNotice(result.body.error || IMPORTED_RESET_FAILED_MESSAGE);
   }
 
   // Contextual hero: when a visitor arrives via /signup?ref=<artist-slug>
@@ -482,6 +576,12 @@ export function SignupForm({
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (emailError) setEmailError(validateEmail(e.target.value));
+                if (status === "set-password" || status === "reset-sent") {
+                  setStatus("idle");
+                  setMessage("");
+                  setResetNotice(null);
+                  setSendingReset(false);
+                }
               }}
               onBlur={() => setEmailError(validateEmail(email))}
               aria-invalid={!!emailError}
@@ -662,17 +762,38 @@ export function SignupForm({
               )}
               {turnstileGate === "retry-required" && (
                 <p className="text-xs text-white/55">
-                  Security check is unavailable. Tap Retry — Create account
-                  stays disabled until the check succeeds.
+                  {status === "set-password"
+                    ? "Security check is unavailable. Tap Retry — Set your password stays disabled until the check succeeds."
+                    : "Security check is unavailable. Tap Retry — Create account stays disabled until the check succeeds."}
                 </p>
               )}
               {turnstileGate === "complete-check" && (
                 <p className="text-xs text-white/55">
-                  Complete the security check to enable Create account. If it
-                  never finishes, use Retry.
+                  {status === "set-password"
+                    ? "Complete the security check, then set your password. If it never finishes, use Retry."
+                    : "Complete the security check to enable Create account. If it never finishes, use Retry."}
                 </p>
               )}
             </div>
+          )}
+
+          {parentConsentRequired && (
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                name="parent-consent"
+                checked={parentConsentChecked}
+                onChange={(e) => {
+                  setParentConsentChecked(e.target.checked);
+                  if (status === "error") {
+                    setStatus("idle");
+                    setMessage("");
+                  }
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+              />
+              <span>{PARENT_CONSENT_LABEL}</span>
+            </label>
           )}
 
           {hasConsentDocs ? (
@@ -730,7 +851,37 @@ export function SignupForm({
             </p>
           )}
 
-          {status === "need-signin" ? (
+          {status === "set-password" || status === "reset-sent" ? (
+            <div className="space-y-3">
+              <p role="status" className="text-sm font-medium text-emerald-200">
+                {status === "reset-sent" ? message : IMPORTED_SET_PASSWORD_MESSAGE}
+              </p>
+              {status === "set-password" && (
+                <button
+                  type="button"
+                  onClick={() => void sendSetPasswordEmail()}
+                  disabled={sendingReset || !canSubmitSignup}
+                  className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
+                >
+                  {sendingReset ? "Sending…" : "Set your password"}
+                </button>
+              )}
+              {status === "set-password" && !sendingReset && !canSubmitSignup && (
+                <p className="text-center text-xs text-white/50">
+                  {turnstileGate === "wait-load"
+                    ? "Security check is loading. Set your password enables when it succeeds."
+                    : turnstileGate === "complete-check"
+                      ? "Complete the security check above, then set your password."
+                      : turnstileGate === "retry-required"
+                        ? "Tap Retry above. Set your password stays disabled until the security check succeeds."
+                        : "Agree to the Terms of Service to enable Set your password."}
+                </p>
+              )}
+              {resetNotice && (
+                <p role="alert" className="text-sm text-rose-300">{resetNotice}</p>
+              )}
+            </div>
+          ) : status === "need-signin" ? (
             <Link
               href={loginHref}
               className="block w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-center text-sm font-semibold text-white shadow-glass"
@@ -745,7 +896,7 @@ export function SignupForm({
                 className="w-full rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass disabled:opacity-60"
               >
                 {signupTurnstileButtonLabel({
-                  status,
+                  status: status === "loading" ? "loading" : "idle",
                   gate: turnstileGate,
                 })}
               </button>
@@ -772,7 +923,7 @@ export function SignupForm({
             </p>
           </div>
         )}
-        {message && status !== "need-signin" && (
+        {message && status !== "need-signin" && status !== "set-password" && status !== "reset-sent" && (
           <p
             role={status === "error" ? "alert" : "status"}
             className={`text-sm ${

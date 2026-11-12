@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gatherFanRecap, generateHypeLine } from "@/lib/recap/gather";
+import { getCurrentCommunityId } from "@/lib/community";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,16 @@ export default async function RecapPage({
   const admin = createAdminClient();
 
   // Resolve which community to recap: explicit ?community= (if the fan is
-  // a member), else their sole membership, else "raelynn".
-  const { data: memberships } = await admin
-    .from("fan_community_memberships")
-    .select("community_id")
-    .eq("fan_id", user.id);
+  // a member), else their earliest membership, else the hostname community
+  // (which itself falls back to DEFAULT_COMMUNITY_SLUG).
+  const [{ data: memberships }, hostCommunityId] = await Promise.all([
+    admin
+      .from("fan_community_memberships")
+      .select("community_id")
+      .eq("fan_id", user.id)
+      .order("joined_at", { ascending: true }),
+    getCurrentCommunityId(),
+  ]);
   const memberIds = ((memberships ?? []) as Array<{ community_id: string }>).map(
     (m) => m.community_id,
   );
@@ -34,7 +40,7 @@ export default async function RecapPage({
       ? params.community
       : memberIds.length === 1
         ? memberIds[0]
-        : memberIds[0] ?? "raelynn";
+        : memberIds[0] ?? hostCommunityId;
 
   const recap = await gatherFanRecap(user.id, communityId);
   const hype = await generateHypeLine(recap);

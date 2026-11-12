@@ -1,15 +1,18 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fanDisplayName } from "@/lib/format/fan-name";
 import type {
   ArtistMonthlyLeaderboard,
   LeaderboardEntry,
 } from "./types";
 
-const SCORE_WEIGHTS = {
-  reaction: 1,
-  comment: 3,
-  rsvp: 5,
-  redemption: 10,
-} as const;
+import {
+  aggregateScores,
+  rankScores,
+  SCORE_WEIGHTS,
+  type ActivityEvent,
+} from "./score";
+
+export { SCORE_WEIGHTS, aggregateScores } from "./score";
 
 /** Get the first day (UTC midnight) of the month containing `at`. */
 function startOfMonthUtc(at: Date): Date {
@@ -28,9 +31,11 @@ function formatMonthLabel(monthStart: Date): string {
  * Compute the per-artist monthly leaderboard. Returns top N + the viewer's
  * own rank if they have any activity this month.
  *
- * Implementation: 4 parallel COUNT-style queries scoped to the month and
- * artist, merged in TS into a per-fan score map. Then sort, slice, and
+ * Implementation: parallel row reads (reactions, comments, posts, RSVPs,
+ * check-ins, shares) scoped to the month and artist, folded in TS by the
+ * pure `aggregateScores` into a per-fan score map. Then sort, slice, and
  * resolve display names + avatars in a single batch read on `fans`.
+ * Weights live in `./score.ts` (SCORE_WEIGHTS).
  *
  * Failure mode: any error returns a benign empty leaderboard so the
  * page can render a "Be the first to top the chart" empty state.
@@ -123,78 +128,101 @@ export async function gatherArtistLeaderboard(opts: {
             .from("event_rsvps")
             .select("fan_id")
             .in("event_id", eventIds)
-            .gte("created_at", monthStartIso)
-            .lt("created_at", nextMonthIso)
+            // event_rsvps stamps `rsvp_at` (0007) — there is no created_at.
+            .gte("rsvp_at", monthStartIso)
+            .lt("rsvp_at", nextMonthIso)
         : Promise.resolve({ data: [] as Array<{ fan_id: string }> });
 
-    // Redemptions are scoped via reward_redemptions.community_id == artistSlug.
-    // Some platforms set community_id to null for global rewards; we
-    // intentionally exclude those from the per-artist leaderboard.
-    const redemptionsPromise = admin
-      .from("reward_redemptions")
-      .select("fan_id, status")
-      .eq("community_id", opts.artistSlug)
-      .neq("status", "cancelled")
+    // Posts started by fans this month. Admin-only kinds (announcement,
+    // poll, challenge, prediction) are excluded by `kind = post`; there is no
+    // author-role column on the row, so team members posting a plain post
+    // still count unless they are flagged fans.is_internal (dropped below).
+    const postsThisMonthPromise = admin
+      .from("community_posts")
+      .select("author_id")
+      .eq("artist_slug", opts.artistSlug)
+      .eq("kind", "post")
       .gte("created_at", monthStartIso)
       .lt("created_at", nextMonthIso);
 
-    const [reactionsRes, commentsRes, rsvpsRes, redemptionsRes] =
-      await Promise.all([
-        reactionsPromise,
-        commentsPromise,
-        rsvpsPromise,
-        redemptionsPromise,
-      ]);
+    // In-person check-ins (public.checkins, 20260620195039).
+    const checkinsPromise = admin
+      .from("checkins")
+      .select("fan_id")
+      .eq("artist_slug", opts.artistSlug)
+      .gte("created_at", monthStartIso)
+      .lt("created_at", nextMonthIso);
 
-    // Aggregate into per-fan score map.
-    const scores = new Map<
-      string,
-      Pick<LeaderboardEntry, "reactions" | "comments" | "rsvps" | "redemptions" | "score">
-    >();
+    // Shares have no table of their own: the durable record is the
+    // points_ledger row try_award_share_points (0053) writes with
+    // source = 'social_share' and community_id = artist slug. The SQL cap
+    // (3/day) therefore also caps what the board can see — acceptable.
+    const sharesPromise = admin
+      .from("points_ledger")
+      .select("fan_id")
+      .eq("community_id", opts.artistSlug)
+      .eq("source", "social_share")
+      .gt("delta", 0)
+      .gte("created_at", monthStartIso)
+      .lt("created_at", nextMonthIso);
 
-    function bump(
-      fanId: string,
-      key: "reactions" | "comments" | "rsvps" | "redemptions",
-      pts: number,
-    ) {
-      const cur = scores.get(fanId) ?? {
-        reactions: 0,
-        comments: 0,
-        rsvps: 0,
-        redemptions: 0,
-        score: 0,
-      };
-      cur[key] += 1;
-      cur.score += pts;
-      scores.set(fanId, cur);
-    }
+    // Redemptions are intentionally NOT fetched: SCORE_WEIGHTS.redemption is
+    // 0, so spending points neither raises nor lowers a fan's rank.
 
+    const [
+      reactionsRes,
+      commentsRes,
+      rsvpsRes,
+      postsThisMonthRes,
+      checkinsRes,
+      sharesRes,
+    ] = await Promise.all([
+      reactionsPromise,
+      commentsPromise,
+      rsvpsPromise,
+      postsThisMonthPromise,
+      checkinsPromise,
+      sharesPromise,
+    ]);
+
+    const events: ActivityEvent[] = [];
     for (const r of reactionsRes.data ?? [])
-      bump(r.fan_id as string, "reactions", SCORE_WEIGHTS.reaction);
+      events.push({ fanId: r.fan_id as string, kind: "reaction" });
     for (const c of commentsRes.data ?? [])
-      bump(c.author_id as string, "comments", SCORE_WEIGHTS.comment);
+      events.push({ fanId: c.author_id as string, kind: "comment" });
     for (const r of rsvpsRes.data ?? [])
-      bump(r.fan_id as string, "rsvps", SCORE_WEIGHTS.rsvp);
-    for (const r of redemptionsRes.data ?? [])
-      bump(r.fan_id as string, "redemptions", SCORE_WEIGHTS.redemption);
+      events.push({ fanId: r.fan_id as string, kind: "rsvp" });
+    for (const p of postsThisMonthRes.data ?? [])
+      events.push({ fanId: p.author_id as string, kind: "post" });
+    for (const c of checkinsRes.data ?? [])
+      events.push({ fanId: c.fan_id as string, kind: "checkin" });
+    for (const s of sharesRes.data ?? [])
+      events.push({ fanId: s.fan_id as string, kind: "share" });
+
+    const scores = aggregateScores(events, SCORE_WEIGHTS);
 
     if (scores.size === 0) {
       return { ...empty, artistName };
     }
 
-    // Sort by score desc; tie-break by fan_id for stability (could refine to
-    // earliest-activity timestamp if ties matter visually).
-    const sorted = Array.from(scores.entries()).sort((a, b) => {
-      if (b[1].score !== a[1].score) return b[1].score - a[1].score;
-      return a[0].localeCompare(b[0]);
-    });
+    // Sort by score desc; tie-break by fan_id for stability.
+    const sorted = rankScores(scores);
 
-    // Resolve display names + avatars + tier in a single batch
-    const fanIds = sorted.map(([fanId]) => fanId);
+    // Resolve display names + avatars + tier in a single batch. Internal /
+    // test accounts (fans.is_internal, 0073) never chart: they are dropped
+    // here, before ranks are assigned, so public fans keep real positions.
+    const candidateIds = sorted.map(([fanId]) => fanId);
     const { data: fanRows } = await admin
       .from("fans")
-      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled")
-      .in("id", fanIds);
+      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled, is_internal")
+      .in("id", candidateIds)
+      .eq("is_internal", false);
+    const publicIds = new Set((fanRows ?? []).map((f) => f.id as string));
+    for (const id of candidateIds) if (!publicIds.has(id)) scores.delete(id);
+    const ranked = sorted.filter(([fanId]) => publicIds.has(fanId));
+    if (ranked.length === 0) {
+      return { ...empty, artistName };
+    }
     const fanInfoById = new Map<
       string,
       {
@@ -205,9 +233,9 @@ export async function gatherArtistLeaderboard(opts: {
       }
     >();
     for (const f of fanRows ?? []) {
-      const first = (f.first_name as string | null) ?? "";
-      const last = (f.last_name as string | null) ?? "";
-      const display = [first, last].filter(Boolean).join(" ").trim() || "A fan";
+      const display = fanDisplayName(
+        f as { first_name: string | null; last_name: string | null },
+      );
       const publicProfileEnabled = (f.public_profile_enabled as boolean | null) ?? false;
       fanInfoById.set(f.id as string, {
         display_name: display,
@@ -228,20 +256,22 @@ export async function gatherArtistLeaderboard(opts: {
         current_tier: info?.current_tier ?? null,
         profile_slug: info?.profile_slug ?? null,
         score: s.score,
-        reactions: s.reactions,
-        comments: s.comments,
-        rsvps: s.rsvps,
-        redemptions: s.redemptions,
+        reactions: s.counts.reaction,
+        comments: s.counts.comment,
+        posts: s.counts.post,
+        shares: s.counts.share,
+        rsvps: s.counts.rsvp,
+        checkins: s.counts.checkin,
       };
     }
 
-    const top: LeaderboardEntry[] = sorted
+    const top: LeaderboardEntry[] = ranked
       .slice(0, topN)
       .map(([fanId], idx) => buildEntry(idx + 1, fanId));
 
     let viewerEntry: LeaderboardEntry | null = null;
     if (opts.viewerFanId) {
-      const viewerIdx = sorted.findIndex(([id]) => id === opts.viewerFanId);
+      const viewerIdx = ranked.findIndex(([id]) => id === opts.viewerFanId);
       if (viewerIdx !== -1) {
         viewerEntry = buildEntry(viewerIdx + 1, opts.viewerFanId);
       }
@@ -254,7 +284,7 @@ export async function gatherArtistLeaderboard(opts: {
       artistName,
       top,
       viewerEntry,
-      totalFans: sorted.length,
+      totalFans: ranked.length,
     };
   } catch (err) {
     console.warn("gatherArtistLeaderboard failed (non-blocking):", err);

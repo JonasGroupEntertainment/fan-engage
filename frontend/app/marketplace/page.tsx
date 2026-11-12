@@ -8,7 +8,9 @@ import type { Offer, OfferCategory } from "@/lib/data/types";
 import { MarketplaceEmptyState, MIN_INVENTORY } from "@/components/marketplace-empty-state";
 import PreviewSignupBanner from "@/components/preview-signup-banner";
 import { listRewardsForCommunity } from "@/lib/data/rewards";
-import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
+import { getCommunity } from "@/lib/community";
+import { communityPath } from "@/lib/community-default";
+import { getViewerCommunityId } from "@/lib/viewer-community";
 import {
   PREMIUM_CTA,
   getViewerPremiumAnywhere,
@@ -94,11 +96,21 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
   // Physical merch stays Coming soon. Premium fans can still redeem
   // digital launch SKUs — that is the only live marketplace surface.
   if (!isMarketplaceLive()) {
-    const digital = await listRewardsForCommunity(LAUNCH_COMMUNITY_ID);
+    // Digital unlocks belong to the viewer's community (membership → host
+    // → default), not a fixed launch artist.
+    const viewerCommunityId = await getViewerCommunityId();
+    const [digital, community] = await Promise.all([
+      listRewardsForCommunity(viewerCommunityId),
+      getCommunity(viewerCommunityId),
+    ]);
     return (
       <div className="min-h-screen bg-midnight">
         <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
-          <MarketplaceComingSoon artistName="RaeLynn" signedIn />
+          <MarketplaceComingSoon
+            artistSlug={viewerCommunityId}
+            artistName={community?.display_name ?? null}
+            signedIn
+          />
           {digital.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-lg font-semibold">Digital unlocks</h2>
@@ -109,7 +121,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                 {digital.map((r) => (
                   <Link
                     key={r.id}
-                    href={`/artists/${LAUNCH_COMMUNITY_ID}/rewards`}
+                    href={communityPath(viewerCommunityId, "rewards")}
                     className="rounded-2xl border border-white/10 bg-black/30 p-5 hover:border-white/25"
                   >
                     <p className="text-xs uppercase tracking-wide text-white/50">
@@ -226,7 +238,7 @@ export default async function MarketplacePage({ searchParams }: PageProps) {
                   ? PREMIUM_CTA.href
                   : isSignedIn
                     ? redeemHref
-                    : merchGuestSignupHref();
+                    : merchGuestSignupHref(primaryCommunityId);
               return (
               <Link
                 key={p.slug}

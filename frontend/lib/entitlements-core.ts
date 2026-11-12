@@ -5,12 +5,18 @@
  * the same isPremium signal the UI and APIs use.
  *
  * Free (always): browse artists/events, basic profile, read community,
- * legal pages, and limited points earn if already present.
+ * legal pages, and the whole engagement loop — replies, reactions, poll and
+ * prediction votes, challenge entries — with the daily point caps that live
+ * in SQL (see COMMUNITY_EARN_RULES below). Status is earned by engagement,
+ * not spend (PRODUCT.md), so none of that sits behind a paywall.
  *
- * Premium unlocks: community post/reply/react; rewards redeem; Premium
- * badge; referral extras if wired; Stripe billing portal; merch
- * (nav + /marketplace + merch drops).
+ * Premium unlocks: starting a top-level community post; rewards redeem;
+ * Premium badge; referral extras if wired; Stripe billing portal; merch
+ * (nav + /marketplace + merch drops); the AI comment drafter unless
+ * AI_DRAFTER_FREE_COMMUNITIES opens it for a community.
  */
+import { DEFAULT_COMMUNITY_SLUG } from "./community-default.ts";
+
 
 export type SubscriptionTier =
   | "free"
@@ -26,22 +32,33 @@ export interface MembershipEntitlement {
   isPremium: boolean;
   isFounder: boolean;
   founderNumber: number | null;
+  /**
+   * Awarded Founding Fan number on fan_community_memberships.
+   * >= 1 is a Founding Fan (see isFoundingFanNumber). Not founder_number.
+   */
+  foundingFanNumber: number | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   monthlyCreditCents: number;
   billingPeriod: "monthly" | "annual" | null;
 }
 
-/** Locked v1 Premium capabilities. */
+/**
+ * Locked v1 Premium capabilities.
+ *
+ * `community_post` is the top-level composer only. Replies, reactions,
+ * votes and challenge entries moved to FREE_V1_FEATURES (Sprint 1) so the
+ * +30% comment-lift gate in LAUNCH_CHECKLIST.md is measured on real fans,
+ * not a Premium-only cohort.
+ */
 export const PREMIUM_V1_FEATURES = [
   "community_post",
-  "community_reply",
-  "community_react",
   "rewards_redeem",
   "premium_badge",
   "referral_extras",
   "billing_portal",
   "merch_drops",
+  "ai_comment_drafter",
 ] as const;
 
 export type PremiumV1Feature = (typeof PREMIUM_V1_FEATURES)[number];
@@ -54,9 +71,72 @@ export const FREE_V1_FEATURES = [
   "read_community",
   "legal_pages",
   "points_earn",
+  "community_reply",
+  "community_react",
+  "community_vote",
+  "challenge_entry",
 ] as const;
 
 export type FreeV1Feature = (typeof FREE_V1_FEATURES)[number];
+
+/**
+ * What a signed-in Free fan earns in the community, per action, with the
+ * per-fan daily caps. These mirror the SQL award path and are display
+ * copy only — the ledger triggers are the enforcement:
+ *   - comments:  try_award_comment_points   (0053) +10, cap 5 per ET day
+ *   - votes:     try_award_poll_points      (0053) +10, cap 3 per ET day;
+ *                prediction votes share community_poll_votes, same cap
+ *   - entries:   award_challenge_entry_points (0078) +3, one per challenge
+ *   - reactions: no points today (no award trigger on community_reactions)
+ * Posts (+5, award_community_post_points) stay Premium.
+ */
+export const COMMUNITY_EARN_RULES = {
+  reply: { points: 10, dailyCap: 5 },
+  vote: { points: 10, dailyCap: 3 },
+  challengeEntry: { points: 3, dailyCap: null },
+  react: { points: 0, dailyCap: null },
+  post: { points: 5, dailyCap: null, premium: true },
+} as const;
+
+/** One-line earn copy for the community header, built from the rules above. */
+export function freeCommunityEarnCopy(): string {
+  const r = COMMUNITY_EARN_RULES;
+  return (
+    `Free for every fan: comments +${r.reply.points} pts (up to ${r.reply.dailyCap}/day) · ` +
+    `poll & prediction votes +${r.vote.points} pts (up to ${r.vote.dailyCap}/day) · ` +
+    `challenge entries +${r.challengeEntry.points} pts · reactions. ` +
+    `Starting a post (+${r.post.points} pts) is Premium.`
+  );
+}
+
+/**
+ * AI comment drafter rollout flag.
+ *
+ * Env `AI_DRAFTER_FREE_COMMUNITIES` — comma-separated community slugs for
+ * which Free fans may use /api/ai/draft-comment (still auth + per-fan rate
+ * limited). `*` opens every community. Unset/empty keeps the drafter a
+ * Premium perk. Lets the +30% comment-lift hypothesis get a Free sample.
+ */
+export const AI_DRAFTER_FREE_COMMUNITIES_ENV = "AI_DRAFTER_FREE_COMMUNITIES";
+
+export function parseAiDrafterFreeCommunities(
+  raw: string | null | undefined,
+): { all: boolean; slugs: Set<string> } {
+  const parts = (raw ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+  return { all: parts.includes("*"), slugs: new Set(parts.filter((s) => s !== "*")) };
+}
+
+export function isAiDrafterFreeForCommunity(
+  communityId: string | null | undefined,
+  raw: string | null | undefined = process.env[AI_DRAFTER_FREE_COMMUNITIES_ENV],
+): boolean {
+  if (!communityId) return false;
+  const parsed = parseAiDrafterFreeCommunities(raw);
+  return parsed.all || parsed.slugs.has(communityId.trim().toLowerCase());
+}
 
 /**
  * Locked CTA copy. Upgrade links go to /premium. "Manage billing" is only
@@ -79,8 +159,9 @@ export function premiumPath(communityId?: string | null): string {
 /** Merch lives at /marketplace. Do not rename the route. */
 export const MERCH_PATH = "/marketplace";
 
-export function merchGuestSignupHref(): string {
-  return `/signup?ref=raelynn&next=${encodeURIComponent(MERCH_PATH)}`;
+export function merchGuestSignupHref(communityId?: string | null): string {
+  const ref = communityId || DEFAULT_COMMUNITY_SLUG;
+  return `/signup?ref=${encodeURIComponent(ref)}&next=${encodeURIComponent(MERCH_PATH)}`;
 }
 
 export function merchGuestLoginHref(): string {
@@ -105,12 +186,14 @@ export type MerchAccess = {
 export function merchAccess(viewer: {
   signedIn: boolean;
   isPremium: boolean;
+  /** Resolved community for the guest signup `ref`; defaults to the launch community. */
+  communityId?: string | null;
 }): MerchAccess {
   if (!viewer.signedIn) {
     return {
       allowed: false,
       reason: "signed-out",
-      navHref: merchGuestSignupHref(),
+      navHref: merchGuestSignupHref(viewer.communityId),
       loginHref: merchGuestLoginHref(),
     };
   }
@@ -171,6 +254,7 @@ export function entitlementFromMembershipRow(row: {
   subscription_tier?: string | null;
   is_founder?: boolean | null;
   founder_number?: number | null;
+  founding_fan_number?: number | null;
   current_period_end?: string | null;
   cancel_at_period_end?: boolean | null;
   monthly_credit_cents?: number | null;
@@ -184,6 +268,8 @@ export function entitlementFromMembershipRow(row: {
     isPremium: isPremium(tier),
     isFounder: Boolean(row.is_founder),
     founderNumber: row.founder_number ?? null,
+    foundingFanNumber:
+      typeof row.founding_fan_number === "number" ? row.founding_fan_number : null,
     currentPeriodEnd: row.current_period_end ?? null,
     cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
     monthlyCreditCents: row.monthly_credit_cents ?? 0,
@@ -207,6 +293,10 @@ export function entitlementFromMembershipRow(row: {
  * - 'founder-only': allowed only if viewer has is_founder=true; else
  *                   'needs-founder' if authenticated but not a founder, or
  *                   'signed-out' if not authenticated
+ *
+ * Community posts do not use this helper. Post reads go through
+ * canReadPostBody, where an awarded founding_fan_number (>= 1) reads
+ * premium posts and is the founder-only check. Event tiers stay here.
  */
 export function canAccess(
   contentTier: "public" | "premium" | "founder-only",

@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { importFansAction, type ImportRow, type ImportResult } from "./actions";
+import {
+  importFansAction,
+  listImportCommunitiesAction,
+  type ImportCommunityOption,
+  type ImportRow,
+  type ImportResult,
+} from "./actions";
 
 const EXPECTED_COLUMNS = ["email", "first_name", "phone", "instagram", "tiktok", "city"];
 
@@ -36,14 +42,6 @@ function parseCSV(text: string): { rows: ImportRow[]; parseError: string | null 
   return { rows, parseError: null };
 }
 
-const COMMUNITIES = [
-  { slug: "raelynn", label: "RaeLynn" },
-  { slug: "danger-twins", label: "Danger Twins · Amy Stroup" },
-  { slug: "hunter-hawkins", label: "Hunter Hawkins" },
-  { slug: "teamjonasgroup", label: "Team Jonas Group" },
-  { slug: "nellies", label: "Nellies" },
-];
-
 export default function FanImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportRow[]>([]);
@@ -51,7 +49,24 @@ export default function FanImportPage() {
   const [status, setStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [communityId, setCommunityId] = useState<string>("");
+  // Loaded from the communities table — see listImportCommunitiesAction.
+  const [communities, setCommunities] = useState<ImportCommunityOption[]>([]);
+  const [communitiesError, setCommunitiesError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listImportCommunitiesAction()
+      .then((rows) => {
+        if (!cancelled) setCommunities(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCommunitiesError("Could not load communities — refresh and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleFile(f: File) {
     setFile(f);
@@ -136,10 +151,11 @@ export default function FanImportPage() {
           className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
         >
           <option value="">Choose a community (required)</option>
-          {COMMUNITIES.map((c) => (
+          {communities.map((c) => (
             <option key={c.slug} value={c.slug}>{c.label}</option>
           ))}
         </select>
+        {communitiesError && <p className="text-xs text-rose-300">{communitiesError}</p>}
         <p className="text-xs text-white/50">Fans will be segmented to this artist community. No emails will be sent.</p>
       </div>
 

@@ -6,7 +6,13 @@ import { AGE_ADULT_ONLY_MESSAGE, adultGate } from "@/lib/age-gate";
 import { BirthDateForm } from "@/components/birth-date-form";
 import { pointsToGold } from "@/lib/tier-thresholds";
 import { PreferencesForm } from "./preferences-form";
-import { DEFAULT_PREFS, TOGGLE_KEYS, type Prefs } from "./prefs";
+import {
+  DEFAULT_PREFS,
+  TOGGLE_KEYS,
+  isMissingPendingColumn,
+  type PendingColumn,
+  type Prefs,
+} from "./prefs";
 
 export const metadata = { title: "Notifications" };
 
@@ -14,6 +20,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const PREFS_SELECT = [...TOGGLE_KEYS, "quiet_start", "quiet_end"].join(", ");
+
+/** The same select minus a column prod does not have yet. */
+function prefsSelectWithout(column: PendingColumn): string {
+  return [...TOGGLE_KEYS.filter((k) => k !== column), "quiet_start", "quiet_end"].join(", ");
+}
 
 // Postgres time comes back as 'HH:MM:SS'; <input type="time"> wants 'HH:MM'.
 function toHhMm(value: unknown): string | null {
@@ -27,7 +38,7 @@ export default async function NotificationPreferencesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/me/notifications");
 
-  const [{ data: row }, { data: pushSubs }, { data: fan }] = await Promise.all([
+  const [prefsRes, { data: pushSubs }, { data: fan }] = await Promise.all([
     supabase
       .from("notification_preferences")
       .select(PREFS_SELECT)
@@ -45,6 +56,21 @@ export default async function NotificationPreferencesPage() {
       .maybeSingle(),
   ]);
 
+  // notify_streak is migration 0089; until it is applied the select fails
+  // (42703) and would blank the form to defaults, so retry without it and
+  // hide that toggle. Same pattern as app/me/profile/page.tsx for 0090.
+  let row = prefsRes.data;
+  const unavailable: PendingColumn[] = [];
+  const missing = isMissingPendingColumn(prefsRes.error);
+  if (missing) {
+    unavailable.push(missing);
+    const plain = await supabase
+      .from("notification_preferences")
+      .select(prefsSelectWithout(missing))
+      .eq("fan_id", user.id)
+      .maybeSingle();
+    row = plain.data;
+  }
   const stored = row as Partial<Record<string, unknown>> | null;
   const prefs: Prefs = stored
     ? {
@@ -107,6 +133,7 @@ export default async function NotificationPreferencesPage() {
         hadRow={!!stored}
         smsAllowed={smsAllowed}
         smsCopy={smsCopy}
+        unavailable={unavailable}
       />
 
       <p className="mt-8 text-xs text-white/50">

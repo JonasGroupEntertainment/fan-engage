@@ -17,6 +17,7 @@ export type Prefs = {
   notify_anniversaries: boolean;
   notify_leaderboard: boolean;
   notify_weekly_digest: boolean;
+  notify_streak: boolean;
   // Quiet hours, 'HH:MM' or null
   quiet_start: string | null;
   quiet_end: string | null;
@@ -37,6 +38,7 @@ export const TOGGLE_KEYS: ToggleKey[] = [
   "notify_anniversaries",
   "notify_leaderboard",
   "notify_weekly_digest",
+  "notify_streak",
 ];
 
 export const DEFAULT_PREFS: Prefs = {
@@ -52,6 +54,28 @@ export const DEFAULT_PREFS: Prefs = {
   notify_anniversaries: true,
   notify_leaderboard: true,
   notify_weekly_digest: true,
+  notify_streak: true,
   quiet_start: null,
   quiet_end: null,
 };
+
+/**
+ * Columns that may not exist yet in prod. notify_streak is migration 0089;
+ * until it is applied, the page selects without it and the save action
+ * strips it from the upsert, so the form keeps working either way.
+ */
+export const PENDING_COLUMNS = ["notify_streak"] as const;
+export type PendingColumn = (typeof PENDING_COLUMNS)[number];
+
+/** True when a PostgREST error is about one of the pending columns. */
+export function isMissingPendingColumn(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): PendingColumn | null {
+  if (!error) return null;
+  const text = `${error.message ?? ""}`;
+  for (const col of PENDING_COLUMNS) {
+    if (error.code === "42703" && text.includes(col)) return col;
+    if (new RegExp(`column .*${col}`, "i").test(text) || new RegExp(`${col}.* column`, "i").test(text)) return col;
+  }
+  return null;
+}

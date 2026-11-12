@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  OFFICIAL_CONTACT_EMAIL,
+  OFFICIAL_CONTACT_MAILTO,
+} from "@/lib/legal/official-contact";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -27,9 +31,13 @@ export default function HelpPage() {
         <article className="space-y-2">
           <h2 className="text-lg font-semibold text-white">What is Fan Engage Pro?</h2>
           <p className="text-sm leading-relaxed">
-            Fan Engage Pro is a fan experience for artists. Follow the artists
-            you care about, earn points for showing up, RSVP to events, and
-            unlock in-app rewards.
+            Fan Engage Pro is a fan experience for artists, operated by Fan
+            Engage Pro LLC, a Colorado limited liability company. Follow the
+            artists you care about, earn points for showing up, RSVP to events,
+            and unlock in-app rewards. Fans must be 13 or older. No one under
+            13 can create an account. If you are 13 to 17, a parent or guardian
+            has to say you can join. Paid memberships and text alerts stay 18
+            and older.
           </p>
         </article>
 
@@ -38,21 +46,22 @@ export default function HelpPage() {
           <p className="text-sm leading-relaxed">
             Founding Fan is free. It is not a paid plan, and it does not change
             the price of Premium. Perks are a numbered badge and 1.5× points,
-            plus 48-hour early RSVP.
+            plus 48-hour early RSVP. You keep that badge and the 1.5× points
+            as long as your account stays active. Cancelling Premium does not
+            remove them.
           </p>
         </article>
 
         <article className="space-y-2">
           <h2 className="text-lg font-semibold text-white">Premium billing</h2>
           <p className="text-sm leading-relaxed">
-            Premium is a separate optional subscription. It is billed monthly
-            or yearly at the price shown on the{" "}
+            Premium includes an eligible seven-day free trial, then monthly or
+            yearly billing. The price is shown on the{" "}
             <Link href="/premium" className="text-white underline underline-offset-4 hover:text-white/80">
               Premium
             </Link>{" "}
-            page and at checkout. Eligible new accounts can start a 7-day free
-            trial. There is one free trial per account. You are not charged
-            until the trial ends, and you can cancel before then.
+            page and at checkout. There is one free trial per account. You are
+            not charged until the trial ends, and you can cancel before then.
           </p>
         </article>
 
@@ -111,10 +120,10 @@ export default function HelpPage() {
         </p>
         {/* TODO: support@fanengagepro.com inbox is being set up. */}
         <a
-          href="mailto:support@fanengagepro.com"
+          href={OFFICIAL_CONTACT_MAILTO}
           className="text-sm text-white underline underline-offset-4 hover:text-white/80"
         >
-          support@fanengagepro.com
+          {OFFICIAL_CONTACT_EMAIL}
         </a>
       </section>
     </main>

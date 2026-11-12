@@ -1,25 +1,18 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePortalPage } from "@/lib/artist-portal/access";
 import EventsClient from "./events-client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Events · Artist Portal" };
 
 export default async function ArtistPortalEventsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/artist-portal/events");
+  // Events is a management surface: editor and above.
+  const ctx = await requirePortalPage("events", "/artist-portal/events");
+  const communityId = ctx.communityId;
 
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("community_id")
-    .eq("user_id", user.id)
-    .eq("role", "owner")
-    .maybeSingle();
-
-  if (!adminRow) redirect("/artist-portal");
-
-  const communityId = adminRow.community_id as string;
+  // Service role: artist_events RLS only exposes active rows publicly, and
+  // the portal needs to list inactive ones too. Access is gated above.
+  const supabase = createAdminClient();
 
   const { data: events } = await supabase
     .from("artist_events")
@@ -31,7 +24,7 @@ export default async function ArtistPortalEventsPage() {
   const rsvpCounts: Record<string, number> = {};
   if (eventIds.length > 0) {
     const { data: rsvps } = await supabase
-      .from("fan_event_rsvps")
+      .from("event_rsvps")
       .select("event_id")
       .in("event_id", eventIds);
     for (const r of rsvps ?? []) {

@@ -144,7 +144,7 @@ describe("next.config and middleware use the shared host redirect helper", () =>
   });
 
   it("middleware 308s via productionHostRedirect before other work", () => {
-    const middleware = readRepo("../middleware.ts");
+    const middleware = readRepo("../proxy.ts");
     assert.match(middleware, /productionHostRedirect\(/);
     assert.match(middleware, /NextResponse\.redirect\(\s*hostRedirect,\s*308\s*\)/);
   });

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ensureImportedFanMembership } from "@/app/auth/ensure-membership";
 import { isAuthEmailOtpType } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase/client";
 
@@ -21,6 +22,9 @@ export default function ResetPasswordForm({
   );
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "done">("idle");
   const [message, setMessage] = useState("");
+  // Recovery token from our own reset email. Kept in memory and only used on
+  // submit, so a mail scanner opening the link can't burn it.
+  const recoveryTokenHash = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +34,17 @@ export default function ResetPasswordForm({
     const type = searchParams.get("type");
 
     async function boot() {
+      if (recoveryTokenHash.current) {
+        setSessionState("ready");
+        return;
+      }
       try {
+        if (tokenHash && type === "recovery") {
+          recoveryTokenHash.current = tokenHash;
+          window.history.replaceState(null, "", "/reset-password");
+          if (!cancelled) setSessionState("ready");
+          return;
+        }
         if (tokenHash && isAuthEmailOtpType(type)) {
           const { error } = await supabase.auth.verifyOtp({
             token_hash: tokenHash,
@@ -48,6 +62,14 @@ export default function ResetPasswordForm({
         if (session && (code || tokenHash)) {
           window.history.replaceState(null, "", "/reset-password");
         }
+        if (session) {
+          try {
+            await ensureImportedFanMembership();
+          } catch {
+            // Setting a password still works if the membership repair cannot run.
+          }
+        }
+        if (cancelled) return;
         setSessionState(session ? "ready" : "missing");
       } catch {
         if (!cancelled) setSessionState("missing");
@@ -76,6 +98,23 @@ export default function ResetPasswordForm({
     setMessage("");
     try {
       const supabase = createClient();
+      if (recoveryTokenHash.current) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: recoveryTokenHash.current,
+          type: "recovery",
+        });
+        if (verifyError) {
+          setStatus("error");
+          setMessage("This reset link has expired or was already used. Ask for a new one.");
+          return;
+        }
+        recoveryTokenHash.current = null;
+        try {
+          await ensureImportedFanMembership();
+        } catch {
+          // Setting a password still works if the membership repair cannot run.
+        }
+      }
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setStatus("done");

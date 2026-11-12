@@ -45,8 +45,13 @@ export default async function InvitePage({
   const inviterName = inviter.firstName ?? "A Fan Engage fan";
   // Carry the invite code onto signup so fanengage_ref can still be written
   // after Accept if the guest skipped the banner on this page.
+  // ?ref= keeps the legacy artist attribution; ?artist= is the explicit
+  // pick that /onboarding validates and locks the invitee into.
   const signupParams = new URLSearchParams({ invite: code });
-  if (artist) signupParams.set("ref", artist.slug);
+  if (artist) {
+    signupParams.set("ref", artist.slug);
+    signupParams.set("artist", artist.slug);
+  }
   const signupHref = `/signup?${signupParams.toString()}`;
 
   return (
@@ -66,7 +71,7 @@ export default async function InvitePage({
         </p>
         {artist && (
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-5">
-            <p className="text-xs uppercase tracking-wide text-white/50">
+            <p className="text-xs uppercase tracking-wide text-white/70">
               {artist.genres.slice(0, 2).join(" · ") || "Artist hub"}
             </p>
             <p className="mt-2 text-xl font-semibold">{artist.name}</p>

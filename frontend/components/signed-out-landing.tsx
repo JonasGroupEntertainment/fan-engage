@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Artist } from "@/lib/artists";
 import type { LandingNextEvent, LandingStats } from "@/lib/data/landing-stats";
 import FoundingFanBlock from "@/components/founding-fan-block";
+import { communityPath, communitySignupHref } from "@/lib/community-default";
 import { getArtistKeyArt } from "@/lib/artist-keyart";
 import { Icon, type IconName } from "@/components/icon";
 import FanProfilePhone from "@/components/fan-profile-phone";
@@ -26,6 +27,8 @@ export default function SignedOutLanding({
   stats: LandingStats;
 }) {
   const featured = artists.slice(0, 5);
+  // Signup CTAs join the hostname community (stats are scoped to it too).
+  const joinHref = communitySignupHref(stats.communityId, "/onboarding");
 
   return (
     <main className="overflow-hidden">
@@ -72,7 +75,7 @@ export default function SignedOutLanding({
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                href="/signup?ref=raelynn&next=%2Fonboarding"
+                href={joinHref}
                 className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
               >
                 Create your fan profile →
@@ -107,7 +110,7 @@ export default function SignedOutLanding({
       <FoundingFanBlock stats={stats} />
 
       {/* ─── Next show countdown ──────────────────────────────────────────── */}
-      {stats.nextEvent && <NextShowCard event={stats.nextEvent} />}
+      {stats.nextEvent && <NextShowCard event={stats.nextEvent} communityId={stats.communityId} />}
 
       {/* ─── Live proof tiles (hidden until the numbers help) ─────────────── */}
       {shouldShowProofTiles(stats) && (
@@ -302,7 +305,7 @@ export default function SignedOutLanding({
                       {a.tagline}
                     </p>
                   )}
-                  <p className="mt-4 text-xs text-white/50 transition group-hover:text-white/80">
+                  <p className="mt-4 text-xs text-white/70 transition group-hover:text-white/90">
                     Visit page →
                   </p>
                 </div>
@@ -334,7 +337,7 @@ export default function SignedOutLanding({
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/signup?ref=raelynn&next=%2Fonboarding"
+              href={joinHref}
               className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
               Create fan profile →
@@ -385,13 +388,13 @@ function ProofTile({
   );
 }
 
-function NextShowCard({ event }: { event: LandingNextEvent }) {
+function NextShowCard({ event, communityId }: { event: LandingNextEvent; communityId: string }) {
   const label = countdownLabel(daysUntil(event.startsAt));
   const details = [event.date, event.location].filter(Boolean).join(" · ");
   return (
     <section className="mx-auto max-w-6xl px-6 pt-12">
       <Link
-        href="/artists/raelynn"
+        href={communityPath(communityId)}
         className="group flex flex-col gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-ember/20 via-slate-900 to-aurora/20 p-6 shadow-glass transition hover:border-white/25 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-center gap-4">

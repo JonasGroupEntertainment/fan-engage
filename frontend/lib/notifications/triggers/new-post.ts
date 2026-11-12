@@ -12,6 +12,20 @@ import { sendNotification } from "../send";
  * The payload is intentionally minimal: artist name + first ~80 chars of
  * the post body. Click target is the artist's community feed.
  */
+/**
+ * Announcements are always the artist's voice; a plain `post` is only the
+ * artist's when its author holds an admin_users grant for the community.
+ */
+export function isTeamAuthored(opts: { kind: string | null; hasTeamGrant: boolean }): boolean {
+  if (opts.kind === "announcement") return true;
+  return opts.hasTeamGrant;
+}
+
+/** "<Artist> posted" for the artist/team; fan posts speak for the community. */
+export function newPostTitle(artistName: string, fromTeam: boolean): string {
+  return fromTeam ? `${artistName} posted` : `New in ${artistName}'s community`;
+}
+
 export async function notifyNewPost(opts: {
   postId: string;
   artistSlug: string;
@@ -31,12 +45,31 @@ export async function notifyNewPost(opts: {
     // Excerpt the post body
     const { data: post } = await admin
       .from("community_posts")
-      .select("body, title, kind")
+      .select("body, title, kind, visibility")
       .eq("id", opts.postId)
       .maybeSingle();
     if (!post) return;
+    // Gated posts (premium / founder-only) must not leak their body to every
+    // follower's lock screen. The push still goes out (it's a nudge to the
+    // feed, where the paywall / founder card decides what they see) but
+    // carries the title only, or a generic line.
+    const gated = (post.visibility as string | null) != null && post.visibility !== "public";
 
-    const excerpt = String(post.body ?? post.title ?? "")
+    // Who wrote it? `admin_users.community_id` is the artist slug (or `*`
+    // for super-admins), so a grant row for this community means the
+    // author is the artist / their team. Fans have no row.
+    const { data: grants } = await admin
+      .from("admin_users")
+      .select("community_id")
+      .eq("user_id", opts.authorId)
+      .in("community_id", [opts.artistSlug, "*"])
+      .limit(1);
+    const fromTeam = isTeamAuthored({
+      kind: (post.kind as string | null) ?? null,
+      hasTeamGrant: (grants ?? []).length > 0,
+    });
+
+    const excerpt = String(gated ? (post.title ?? "") : (post.body ?? post.title ?? ""))
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 80);
@@ -45,7 +78,13 @@ export async function notifyNewPost(opts: {
     const { data: follows } = await admin
       .from("fan_artist_following")
       .select("fan_id")
-      .eq("artist_slug", opts.artistSlug);
+      .eq("artist_slug", opts.artistSlug)
+      // Deterministic under the MAX_CONCURRENT cap below: newest follows
+      // first, so organic follows win over the 0088 backfill (which copies
+      // each membership's joined_at). Without an order the capped 200 were
+      // whatever Postgres returned first.
+      .order("followed_at", { ascending: false })
+      .limit(1000);
 
     const fanIds = (follows ?? [])
       .map((r) => r.fan_id as string)
@@ -53,7 +92,7 @@ export async function notifyNewPost(opts: {
 
     if (fanIds.length === 0) return;
 
-    const title = `${artist.name as string} posted`;
+    const title = newPostTitle(artist.name as string, fromTeam);
     const body = excerpt || "Check out the new post.";
     const url = `/artists/${opts.artistSlug}/community`;
 

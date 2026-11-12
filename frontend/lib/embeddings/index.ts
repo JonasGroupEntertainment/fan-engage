@@ -32,3 +32,20 @@ export {
   indexRowAsync,
   type IndexResult,
 } from "./index-row";
+
+export {
+  CONTENT_EMBEDDINGS_COMMUNITY_FK,
+  isKnownCommunity,
+  isMissingCommunityError,
+  orphanSkipLog,
+  partitionEmbeddingCandidates,
+  selectEmbeddingWork,
+} from "./orphans";
+
+export {
+  emptyBackfillSummary,
+  noteIndexResult,
+  noteSkippedOrphan,
+  type BackfillSummary,
+  type SkippedOrphan,
+} from "./backfill-summary";

@@ -45,28 +45,44 @@ const SEVERITY_TONE: Record<number, string> = {
 
 export default async function AdminModerationPage() {
   const adminContext = await getAdminContext();
-  if (!adminContext) redirect("/login");
+  if (!adminContext) redirect("/login?next=/admin/moderation");
+
+  // Community admins only ever see their current community's queue.
+  // Super-admins see everything (the actions re-check the row's own
+  // community via authorizeAdmin, so the page filter is UX, not authz).
+  const scopeCommunityId = adminContext.isSuperAdmin
+    ? null
+    : adminContext.currentCommunityId;
+  if (!adminContext.isSuperAdmin && !scopeCommunityId) redirect("/admin");
 
   const admin = createAdminClient();
 
   // Pull recent flag_review + auto_hide rows across community_posts +
   // community_comments. Limit to the last 200 to keep the page bounded;
   // we'll add pagination if volume warrants.
+  let postsQuery = admin
+    .from("community_posts")
+    .select(
+      "id, artist_slug, body, title, moderation_status, moderation_severity, moderation_categories, moderation_reason, moderation_self_harm, moderation_classified_at, created_at, duplicate_of",
+    )
+    .in("moderation_status", ["flag_review", "auto_hide"]);
+  if (scopeCommunityId) postsQuery = postsQuery.eq("artist_slug", scopeCommunityId);
+
+  let commentsQuery = admin
+    .from("community_comments")
+    .select(
+      "id, post_id, body, moderation_status, moderation_severity, moderation_categories, moderation_reason, moderation_self_harm, moderation_classified_at, created_at, community_posts!inner(artist_slug)",
+    )
+    .in("moderation_status", ["flag_review", "auto_hide"]);
+  if (scopeCommunityId) {
+    commentsQuery = commentsQuery.eq("community_posts.artist_slug", scopeCommunityId);
+  }
+
   const [postsRes, commentsRes] = await Promise.all([
-    admin
-      .from("community_posts")
-      .select(
-        "id, artist_slug, body, title, moderation_status, moderation_severity, moderation_categories, moderation_reason, moderation_self_harm, moderation_classified_at, created_at, duplicate_of",
-      )
-      .in("moderation_status", ["flag_review", "auto_hide"])
+    postsQuery
       .order("moderation_classified_at", { ascending: false, nullsFirst: false })
       .limit(100),
-    admin
-      .from("community_comments")
-      .select(
-        "id, post_id, body, moderation_status, moderation_severity, moderation_categories, moderation_reason, moderation_self_harm, moderation_classified_at, created_at, community_posts!inner(artist_slug)",
-      )
-      .in("moderation_status", ["flag_review", "auto_hide"])
+    commentsQuery
       .order("moderation_classified_at", { ascending: false, nullsFirst: false })
       .limit(100),
   ]);
@@ -136,6 +152,11 @@ export default async function AdminModerationPage() {
         >
           Moderation queue
         </h1>
+        {scopeCommunityId && (
+          <p className="text-xs text-white/50">
+            Showing the queue for <span className="text-white/80">{scopeCommunityId}</span>.
+          </p>
+        )}
         <p className="max-w-2xl text-sm text-white/70">
           Posts and comments the AI classifier flagged for human review.
           Self-harm signals stay visible by design — surface crisis

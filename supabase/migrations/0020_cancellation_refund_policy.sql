@@ -9,7 +9,7 @@ insert into public.policy_pages (slug, title, content_md, is_draft) values
    E'# Cancellation & Refund Policy — DRAFT\n\n_This is a placeholder. Final policy pending legal review._\n\n' ||
    E'## 1. Subscription cancellation\nYou may cancel your Fan Engage subscription at any time via your account settings or by contacting support@fanengage.app.\n\n' ||
    E'Cancellation takes effect at the end of your current billing period. You will retain access to premium features until that date.\n\n' ||
-   E'## 2. Refund eligibility\nRefunds are available within 30 days of a new subscription purchase if you have not substantially used the service.\n\n' ||
+   E'## 2. Refund eligibility\nPremium includes an eligible seven-day free trial, then monthly or yearly billing.\n\n' ||
    E'Refunds are not available for past billing periods or for services already rendered. Points and rewards redeemed or earned under a subscription cannot be refunded.\n\n' ||
    E'## 3. Founder tier proration\nFor Founder Tier members: if you downgrade during a billing period, any unused days will be prorated at the monthly rate and credited toward your next billing cycle, subject to review by the support team.\n\n' ||
    E'## 4. Contact\nTo request a refund or to discuss your cancellation, please email support@fanengage.app with your account email and the reason for your request.\n\n' ||

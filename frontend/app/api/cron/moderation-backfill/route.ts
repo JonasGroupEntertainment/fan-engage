@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moderateRow, type ModerateSourceTable } from "@/lib/moderation";
@@ -37,19 +37,10 @@ interface BackfillSummary {
 }
 
 export async function GET(request: Request) {
-  const authErr = verifyCronAuth(request);
-  if (authErr) return authErr;
+  return runCron(request, "moderation-backfill", () => moderationBackfill());
+}
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      {
-        error:
-          "ANTHROPIC_API_KEY not configured. Skipping moderation backfill until the env var is set in Vercel.",
-      },
-      { status: 503 },
-    );
-  }
-
+async function moderationBackfill() {
   const started = Date.now();
   const summary: BackfillSummary = {
     totalCandidates: 0,

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LAUNCH_COMMUNITY_ID } from "@/lib/launch-catalog";
+import { getCurrentCommunityId } from "@/lib/community";
+import { DEFAULT_COMMUNITY_SLUG } from "@/lib/community-default";
 import {
   FOUNDING_FAN_CAP,
   getFoundingFanClaimState,
@@ -12,8 +13,10 @@ import {
  *
  * First 100 Founding Fan is a persisted membership number, not a date
  * window and not paid Premium. Claimed/remaining/cap come
- * from `getFoundingFanClaimState` — same helper as /artists/raelynn and
- * /premium.
+ * from `getFoundingFanClaimState` — same helper as the artist hub and
+ * /premium. Stats are scoped to the hostname community (DEFAULT_COMMUNITY_SLUG
+ * on the apex / legacy hosts), and `communityId` says which one so the
+ * landing CTAs can link into it.
  */
 
 export const FOUNDING_TARGET = FOUNDING_FAN_CAP;
@@ -27,6 +30,8 @@ export type LandingNextEvent = {
 };
 
 export type LandingStats = {
+  /** Community the founding-fan numbers and signup CTAs refer to. */
+  communityId: string;
   activeArtists: number;
   activeEvents: number;
   foundingFans: number;
@@ -38,7 +43,9 @@ export type LandingStats = {
 };
 
 export async function getLandingStats(): Promise<LandingStats> {
+  const communityId = await getCurrentCommunityId().catch(() => DEFAULT_COMMUNITY_SLUG);
   const fallback: LandingStats = {
+    communityId,
     activeArtists: 0,
     activeEvents: 0,
     foundingFans: 0,
@@ -62,12 +69,12 @@ export async function getLandingStats(): Promise<LandingStats> {
         .select("id", { count: "exact", head: true })
         .eq("active", true)
         .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`),
-      getFoundingFanClaimState(LAUNCH_COMMUNITY_ID),
+      getFoundingFanClaimState(communityId),
       admin
         .from("artist_events")
         .select("title, event_date, location, starts_at")
         .eq("active", true)
-        .eq("artist_slug", LAUNCH_COMMUNITY_ID)
+        .eq("artist_slug", communityId)
         .or(`starts_at.gte.${nowIso},ends_at.gte.${nowIso}`)
         .order("starts_at", { ascending: true, nullsFirst: false })
         .limit(1)
@@ -88,6 +95,7 @@ export async function getLandingStats(): Promise<LandingStats> {
     } | null;
 
     return {
+      communityId,
       activeArtists: artistsRes.count ?? 0,
       activeEvents: eventsRes.count ?? 0,
       foundingFans,

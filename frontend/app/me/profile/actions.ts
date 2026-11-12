@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { normalizePhoneE164 } from "@/lib/phone";
+import { resolveCityCoords } from "@/lib/geo/resolve";
 import {
   readProfileFormValues,
   rejectedProfileSubmit,
@@ -40,19 +41,36 @@ export async function updateProfileAction(
     instagram_or_tiktok: orNull(values.instagramOrTiktok),
   };
 
-  const { error } = await supabase
+  const base = {
+    first_name: orNull(values.firstName),
+    last_name: orNull(values.lastName),
+    city: orNull(values.city),
+    phone: phoneResult.phone,
+    interest: orNull(values.interest),
+    music_outlet: orNull(values.musicOutlet),
+    socials,
+    avatar_url: orNull(values.avatarUrl),
+  };
+
+  // 0090: resolve "City" + "State" to home coordinates from the bundled US
+  // city table so events can show "· 42 mi" / "Near you". A city we cannot
+  // resolve stores null coordinates (no distance shown), never a guess.
+  const resolved = resolveCityCoords(values.city, values.homeRegion);
+  const geo = {
+    home_region: orNull(values.homeRegion.toUpperCase()),
+    home_lat: resolved?.lat ?? null,
+    home_lng: resolved?.lng ?? null,
+  };
+
+  let { error } = await supabase
     .from("fans")
-    .update({
-      first_name: orNull(values.firstName),
-      last_name: orNull(values.lastName),
-      city: orNull(values.city),
-      phone: phoneResult.phone,
-      interest: orNull(values.interest),
-      music_outlet: orNull(values.musicOutlet),
-      socials,
-      avatar_url: orNull(values.avatarUrl),
-    })
+    .update({ ...base, ...geo })
     .eq("id", user.id);
+  // Until migration 0090 is applied the geo columns do not exist; keep the
+  // rest of the profile save working.
+  if (error && /home_(region|lat|lng)/i.test(error.message ?? "")) {
+    ({ error } = await supabase.from("fans").update(base).eq("id", user.id));
+  }
 
   if (error) {
     console.error("[me/profile] update failed", { userId: user.id, message: error.message });

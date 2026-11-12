@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentCommunityId } from "@/lib/community";
 import { fmtPrice, isFanTrialEligible } from "@/lib/stripe-helpers";
 import { TRIAL_DAYS } from "@/lib/premium-trial";
 import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
-import { createCheckoutSessionAction } from "./actions";
+import { createCheckoutSessionAction, resolvePremiumCommunityId } from "./actions";
 import { FounderSlotsCounter } from "./founder-slots-counter";
 import PromoCodeForm from "@/app/account/promo/promo-code-form";
 import { PREMIUM_CTA, isPremium as isPremiumSignal } from "@/lib/entitlements";
@@ -34,6 +33,7 @@ export default async function PremiumPage({
     canceled?: string;
     already_active?: string;
     age?: string;
+    c?: string | string[];
   }>;
 }) {
   const params = (await searchParams) ?? {};
@@ -44,7 +44,9 @@ export default async function PremiumPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const communityId = await getCurrentCommunityId();
+  // `?c=<slug>` (from paywalls and Premium CTAs) picks the community;
+  // unknown or inactive slugs fall back to the hostname community.
+  const communityId = await resolvePremiumCommunityId(params.c);
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("communities")
@@ -88,7 +90,7 @@ export default async function PremiumPage({
   const annualMonthlyEquiv = Math.round(annual / 12);
   const annualSavings = Math.max(0, monthly * 12 - annual);
   const annualSavingsPct = monthly > 0 ? Math.round(annualSavings / (monthly * 12) * 100) : 0;
-  const premiumNextPath = "/premium";
+  const premiumNextPath = `/premium?c=${encodeURIComponent(communityId)}`;
   const premiumSignupHref = `/signup?ref=${encodeURIComponent(communityId)}&next=${encodeURIComponent(premiumNextPath)}`;
   const premiumLoginHref = `/login?next=${encodeURIComponent(premiumNextPath)}`;
 
@@ -96,6 +98,7 @@ export default async function PremiumPage({
   // "On the way" line under the grid so nothing unbuilt is sold as live.
   const perks: Array<{ icon: string; title: string; body: string }> = [
     { icon: "🎙️", title: "Backstage feed", body: "Posts only Premium fans see — raw tour moments and works-in-progress." },
+    { icon: "✍️", title: "Start the conversation", body: "Post your own threads to the community feed (+5 pts). Replies, reactions, poll votes and challenge entries are free for every fan." },
     { icon: "📱", title: "Phone & lyric wallpapers", body: "Exclusive wallpapers you redeem with points inside the app." },
     { icon: "🏆", title: "Premium badges", body: "The full status ladder — Silver, Gold, Platinum, and event badges." },
     { icon: "⚡", title: "1.5× points", body: "Every fan action earns 1.5× more toward rewards." },
@@ -135,7 +138,7 @@ export default async function PremiumPage({
         )}
         {params.age === "required" && user && (
           <div className="mb-8 rounded-xl border border-white/15 bg-white/5 px-4 py-4">
-            <BirthDateForm next="/premium" />
+            <BirthDateForm next={premiumNextPath} />
           </div>
         )}
 
@@ -332,6 +335,7 @@ export default async function PremiumPage({
             {/* Monthly */}
             <form action={createCheckoutSessionAction} className="contents">
               <input type="hidden" name="billing_period" value="monthly" />
+              <input type="hidden" name="community" value={communityId} />
               <button
                 type="submit"
                 disabled={!community.stripe_product_id}
@@ -368,6 +372,7 @@ export default async function PremiumPage({
             {/* Annual */}
             <form action={createCheckoutSessionAction} className="contents">
               <input type="hidden" name="billing_period" value="annual" />
+              <input type="hidden" name="community" value={communityId} />
               <button
                 type="submit"
                 disabled={!community.stripe_product_id}

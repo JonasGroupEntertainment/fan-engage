@@ -27,13 +27,25 @@ describe("help, pricing perk, and header copy", () => {
   it("help answers the public questions and does not show a founding count", () => {
     const help = readRepo("../app/help/page.tsx");
     assert.match(help, /What is Fan Engage Pro\?/);
+    assert.match(help, /Fans must be 13 or older/);
+    assert.match(help, /parent or guardian/);
+    assert.match(help, /No one under\s+13/);
     assert.match(help, /Founding Fan perks/);
     assert.match(help, /Premium billing/);
+    assert.match(help, /Colorado limited liability company/);
+    assert.match(help, /eligible seven-day free trial, then monthly or\s+yearly billing/);
+    assert.doesNotMatch(help, /\$5 monthly store credit/);
+    assert.doesNotMatch(help, /redeemable toward marketplace/);
+    assert.doesNotMatch(help, /Rules for Use/);
+    assert.doesNotMatch(help, /within 30 days of a new subscription/);
     assert.match(help, /How to cancel/);
     assert.match(help, /href="\/cancellation-refund"/);
     assert.match(help, /href="\/terms"/);
     assert.match(help, /How points work/);
     assert.match(help, /numbered badge and 1\.5× points,\s+plus 48-hour early RSVP/);
+    assert.match(help, /as long as your account stays active/);
+    assert.match(help, /Cancelling Premium does not\s+remove them/);
+    assert.match(help, /OFFICIAL_CONTACT_EMAIL/);
     assert.match(help, /support@fanengagepro\.com/);
     assert.match(help, /TODO: support@fanengagepro\.com inbox is being set up/);
     assert.equal(help.includes("raymond@jonasgroup.com"), false);

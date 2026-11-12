@@ -27,6 +27,7 @@ import type {
   SearchResults,
   SearchSourceTable,
 } from "./types";
+import { scheduledPostsVisibleFilter, withScheduledFilterFallback } from "@/lib/data/scheduled-posts";
 
 /** How many candidate hits to pull from pgvector before grouping/trimming. */
 const RAW_LIMIT = 30;
@@ -285,10 +286,16 @@ async function fetchAllSourceRows(
   if (idsByTable.community_posts.length > 0) {
     tasks.push(
       (async () => {
-        const { data } = await admin
-          .from("community_posts")
-          .select("id, artist_slug, title, body, created_at, moderation_status")
-          .in("id", idsByTable.community_posts);
+        // Service-role read on a fan's behalf: hide scheduled posts (0094);
+        // retried without the filter until the column exists.
+        const { data } = await withScheduledFilterFallback((withFilter) => {
+          const q = admin
+            .from("community_posts")
+            .select("id, artist_slug, title, body, created_at, moderation_status, visibility")
+            .eq("visibility", "public")
+            .in("id", idsByTable.community_posts);
+          return withFilter ? q.or(scheduledPostsVisibleFilter()) : q;
+        });
         for (const row of (data ?? []) as Array<{
           id: string;
           artist_slug: string;
@@ -296,10 +303,14 @@ async function fetchAllSourceRows(
           body: string;
           created_at: string;
           moderation_status: string | null;
+          visibility: string | null;
         }>) {
           // Defensive: filter out auto_hide posts in case the embedding
-          // exists but moderation flagged the row after.
+          // exists but moderation flagged the row after. Search is the
+          // public index — a premium or founder-only body never ships,
+          // even if its embedding was tagged public by mistake.
           if (row.moderation_status === "auto_hide") continue;
+          if (row.visibility && row.visibility !== "public") continue;
           if (isPlaceholderDraftPost(row)) continue;
           out.community_posts.set(row.id, {
             kind: "post",
@@ -321,8 +332,9 @@ async function fetchAllSourceRows(
         const { data } = await admin
           .from("community_comments")
           .select(
-            "id, post_id, body, created_at, moderation_status, community_posts!inner(artist_slug)",
+            "id, post_id, body, created_at, moderation_status, community_posts!inner(artist_slug, visibility)",
           )
+          .eq("community_posts.visibility", "public")
           .in("id", idsByTable.community_comments);
         for (const row of (data ?? []) as unknown as Array<{
           id: string;
@@ -330,9 +342,10 @@ async function fetchAllSourceRows(
           body: string;
           created_at: string;
           moderation_status: string | null;
-          community_posts: { artist_slug: string };
+          community_posts: { artist_slug: string; visibility?: string | null };
         }>) {
           if (row.moderation_status === "auto_hide") continue;
+          if (row.community_posts?.visibility && row.community_posts.visibility !== "public") continue;
           out.community_comments.set(row.id, {
             kind: "comment",
             id: row.id,

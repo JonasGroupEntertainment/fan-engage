@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { challengeEntryImageAlt } from "@/lib/community/challenge-entry-alt";
+import { captureAppException } from "@/lib/sentry";
 import { createAdminClient } from "@/lib/supabase/admin";
 import EntryActions from "./entry-actions";
 
@@ -32,10 +34,10 @@ async function load(): Promise<ChallengeWithEntries[]> {
     .limit(50);
   if (!posts || posts.length === 0) return [];
   const ids = posts.map((p) => p.id as string);
-  const [{ data: entries }, { data: fans }, { data: winners }] = await Promise.all([
+  const [{ data: entries, error: entriesError }, { data: fans }, { data: winners }] = await Promise.all([
     admin
       .from("community_challenge_entries")
-      .select("id,post_id,fan_id,body,image_url, image_alt,created_at")
+      .select("id, post_id, fan_id, body, image_url, created_at")
       .in("post_id", ids)
       .order("created_at", { ascending: false }),
     admin.from("fans").select("id,first_name"),
@@ -45,6 +47,14 @@ async function load(): Promise<ChallengeWithEntries[]> {
       .eq("item_kind", "challenge_winner")
       .in("ref_id", ids),
   ]);
+  if (entriesError) {
+    console.error("admin challenges: entries query failed", entriesError);
+    await captureAppException(entriesError, {
+      route: "/admin/challenges",
+      step: "challenge-entries",
+    });
+  }
+
   const nameById = new Map<string, string | null>(
     (fans ?? []).map((f) => [f.id as string, (f.first_name as string | null) ?? null]),
   );
@@ -159,7 +169,7 @@ export default async function AdminChallengesPage() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={e.image_url}
-                            alt=""
+                            alt={challengeEntryImageAlt(e.body)}
                             className="mt-2 max-h-48 w-full rounded-lg object-cover"
                           />
                         )}

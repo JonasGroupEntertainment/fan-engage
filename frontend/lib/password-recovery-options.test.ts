@@ -19,7 +19,7 @@ describe("password recovery CAPTCHA binding", () => {
   it("does not consume the token in a separate verification request", () => {
     const source = readFileSync(new URL("../app/forgot-password/forgot-password-form.tsx", import.meta.url), "utf8");
     assert.doesNotMatch(source, /verifyTurnstileToken/);
-    assert.match(source, /resetPasswordForEmail\(email.trim\(\), buildPasswordRecoveryOptions/);
+    assert.match(source, /requestPasswordResetAction\(email\.trim\(\), turnstileToken\)/);
     assert.match(source, /finally\s*\{[\s\S]*resetChallenge\(\)/);
   });
 });

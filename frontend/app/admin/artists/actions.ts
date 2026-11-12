@@ -1,4 +1,7 @@
 "use server";
+
+import { buildEventRow, eventOwnerColumns, resolveEventGeo } from "@/lib/events/build-event-row";
+import { isMissingEventGeoColumn } from "@/lib/data/event-select";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
@@ -120,6 +123,19 @@ export async function updateArtistAction(formData: FormData) {
  * { error } on validation/DB failure. The client form (CreateEventForm)
  * uses useFormSave for retry-on-503 + visible status feedback.
  */
+/**
+ * 0090 venue location from the admin event forms — see resolveEventGeo in
+ * lib/events/build-event-row.ts (shared with the portal bulk importer).
+ */
+function eventGeoFromForm(formData: FormData) {
+  return resolveEventGeo({
+    city: String(formData.get("city") ?? ""),
+    region: String(formData.get("region") ?? ""),
+    lat: String(formData.get("lat") ?? ""),
+    lng: String(formData.get("lng") ?? ""),
+  });
+}
+
 export async function createEventAction(formData: FormData) {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
@@ -141,20 +157,22 @@ export async function createEventAction(formData: FormData) {
 
   const supa = createAdminClient();
   const row = {
-    artist_slug: artistSlug,
-    title,
-    detail: detail || null,
-    event_date: eventDate || null,
-    starts_at: startsAt || null,
-    location: location || null,
-    url: url || null,
-    capacity: Number.isFinite(capacity) ? capacity : null,
-    sort_order: sortOrder,
+    ...eventOwnerColumns(artistSlug),
+    ...buildEventRow({ title, detail, eventDate, startsAt, location, url, capacity, sortOrder }),
   };
+  const geo = eventGeoFromForm(formData);
   let { error } = await supa.from("artist_events").insert({
     ...row,
+    ...geo,
     rsvp_opens_at: opensAt.value,
   });
+  if (error && isMissingEventGeoColumn(error)) {
+    // Migration 0090 not applied yet: save without the venue location.
+    ({ error } = await supa.from("artist_events").insert({
+      ...row,
+      rsvp_opens_at: opensAt.value,
+    }));
+  }
   if (error && isMissingRsvpOpensColumn(error)) {
     if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
     ({ error } = await supa.from("artist_events").insert(row));
@@ -213,21 +231,23 @@ export async function updateEventAction(formData: FormData) {
 
   const supa = createAdminClient();
   const row = {
-    title,
-    detail: detail || null,
-    event_date: eventDate || null,
-    starts_at: startsAt || null,
-    location: location || null,
-    url: url || null,
-    capacity: Number.isFinite(capacity) ? capacity : null,
-    sort_order: sortOrder,
+    ...buildEventRow({ title, detail, eventDate, startsAt, location, url, capacity, sortOrder }),
     active,
   };
+  const geo = eventGeoFromForm(formData);
   let { error } = await supa
     .from("artist_events")
-    .update({ ...row, rsvp_opens_at: opensAt.value })
+    .update({ ...row, ...geo, rsvp_opens_at: opensAt.value })
     .eq("id", eventId)
     .eq("artist_slug", artistSlug);
+  if (error && isMissingEventGeoColumn(error)) {
+    // Migration 0090 not applied yet: save without the venue location.
+    ({ error } = await supa
+      .from("artist_events")
+      .update({ ...row, rsvp_opens_at: opensAt.value })
+      .eq("id", eventId)
+      .eq("artist_slug", artistSlug));
+  }
   if (error && isMissingRsvpOpensColumn(error)) {
     if (opensAt.value) return { error: RSVP_OPENS_MIGRATION_ERROR };
     ({ error } = await supa

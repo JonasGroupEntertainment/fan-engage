@@ -18,6 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlaceholderDraftPost } from "@/lib/community/placeholder-draft";
+import { scheduledPostsVisibleFilter, withScheduledFilterFallback } from "@/lib/data/scheduled-posts";
 
 const LOOKBACK_DAYS = 60;
 const CANDIDATE_LIMIT = 60;
@@ -77,18 +78,24 @@ export async function getPickedForYou(args: {
   );
 
   // 2. Pull candidates.
-  const { data: candidatesData } = await admin
-    .from("community_posts")
-    .select(
-      "id, kind, title, body, image_url, image_alt, tags, created_at, author_id",
-    )
-    .eq("artist_slug", args.artistSlug)
-    .eq("moderation_status", "safe")
-    .eq("visibility", "public")
-    .neq("author_id", args.fanId)
-    .gte("created_at", cutoffIso)
-    .order("created_at", { ascending: false })
-    .limit(CANDIDATE_LIMIT);
+  // Service-role read on a fan's behalf: hide scheduled posts (0094);
+  // retried without the filter until the column exists.
+  const { data: candidatesData } = await withScheduledFilterFallback((withFilter) => {
+    let q = admin
+      .from("community_posts")
+      .select(
+        "id, kind, title, body, image_url, image_alt, tags, created_at, author_id",
+      )
+      .eq("artist_slug", args.artistSlug)
+      .eq("moderation_status", "safe")
+      .eq("visibility", "public");
+    if (withFilter) q = q.or(scheduledPostsVisibleFilter());
+    return q
+      .neq("author_id", args.fanId)
+      .gte("created_at", cutoffIso)
+      .order("created_at", { ascending: false })
+      .limit(CANDIDATE_LIMIT);
+  });
 
   const candidates = (candidatesData ?? []) as CandidateRow[];
   const eligible = candidates.filter(

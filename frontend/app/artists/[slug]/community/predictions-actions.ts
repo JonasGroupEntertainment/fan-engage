@@ -10,8 +10,8 @@ import { indexRowAsync } from "@/lib/embeddings";
 import { moderateRowAsync } from "@/lib/moderation";
 import { tagRowAsync } from "@/lib/tagging";
 import { resolvePrediction } from "@/lib/predictions/resolve";
+import { withPointsProgress } from "@/lib/points/lifetime";
 import { notifyPredictionResolved } from "@/lib/notifications/triggers/prediction";
-import { premiumPath, requirePremiumFeature } from "@/lib/entitlements";
 
 type Visibility = "public" | "premium" | "founder-only";
 
@@ -117,11 +117,9 @@ export async function votePredictionAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const adminUser = await communityAdminUser(artistSlug, "viewer");
-  if (!adminUser) {
-    const gate = await requirePremiumFeature(user.id, artistSlug, "community_react");
-    if (!gate.allowed) redirect(premiumPath(artistSlug));
-  }
+  // Prediction votes are Free for every signed-in fan (community_vote in
+  // FREE_V1_FEATURES). Points: +10, cap 3/day, enforced by the SQL trigger
+  // on community_poll_votes (try_award_poll_points, 0053).
 
   // Confirm prediction is still open
   const { data: post } = await supabase
@@ -145,17 +143,23 @@ export async function votePredictionAction(formData: FormData) {
     .eq("post_id", postId)
     .eq("fan_id", user.id);
 
-  const { error: insertErr } = await supabase
-    .from("community_poll_votes")
-    .insert({
-      post_id: postId,
-      fan_id: user.id,
-      option_id: optionId,
-    });
+  const {
+    result: { error: insertErr },
+    progress,
+  } = await withPointsProgress(user.id, () =>
+    supabase
+      .from("community_poll_votes")
+      .insert({
+        post_id: postId,
+        fan_id: user.id,
+        option_id: optionId,
+      }),
+  );
   if (insertErr) return { error: insertErr.message };
 
   revalidatePath(`/artists/${artistSlug}/community`);
-  return { success: true };
+  // Additive: { pointsAwarded, lifetimePoints, nextTier } for the points toast.
+  return { success: true as const, ...progress };
 }
 
 /**

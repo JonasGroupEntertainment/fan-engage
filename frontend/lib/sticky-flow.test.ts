@@ -7,14 +7,16 @@ function readRepo(relFromLib: string): string {
   return readFileSync(fileURLToPath(new URL(relFromLib, import.meta.url)), "utf8");
 }
 
-describe("sticky-flow: forgot-password HOLD", () => {
+describe("sticky-flow: forgot-password door", () => {
   it("server page 404s when the door is closed; form is not the route default", () => {
     const page = readRepo("../app/forgot-password/page.tsx");
     assert.match(page, /if\s*\(\s*!isForgotPasswordEnabled\(\)\s*\)\s*notFound\(\)/);
     assert.doesNotMatch(page, /"use client"/);
     const doors = readRepo("./auth-doors.ts");
-    assert.match(doors, /Production HOLD until NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=true/);
-    assert.match(doors, /return vercelEnvOf\(env\) !== "production";/);
+    // The flag can still close the door; default is open now that the reset
+    // link survives mail scanners (token verified on submit only).
+    assert.match(doors, /Turn it off\s*\n\s*\* with NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=false/);
+    assert.match(doors, /if \(explicit === "false" \|\| explicit === "0"\) return false;/);
   });
 
   it("does not add a /magic-link page", () => {
@@ -35,13 +37,16 @@ describe("sticky-flow: marketplace guest digital path", () => {
     const market = readRepo("../app/marketplace/page.tsx");
     const soon = readRepo("../components/marketplace-coming-soon.tsx");
     const rewards = readRepo("../app/rewards/page.tsx");
-    assert.match(layout, /label: "Merch"/);
+    assert.match(layout, /label: "Unlocks"/);
     assert.match(layout, /merchAccess/);
     assert.match(market, /reason === "signed-out"/);
     assert.match(market, /redirect\(access\.navHref\)/);
-    assert.match(soon, /\/artists\/raelynn\/rewards/);
+    // Digital unlocks live under the viewer's resolved community (membership
+    // → host → DEFAULT_COMMUNITY_SLUG), never a hard-coded artist slug.
+    assert.match(soon, /communityPath\(artistSlug, "rewards"\)/);
     assert.match(rewards, /Redeem digital unlocks/);
-    assert.match(rewards, /href:\s*"\/artists\/raelynn\/rewards"/);
+    assert.match(rewards, /href:\s*communityPath\(communityId, "rewards"\)/);
+    assert.match(rewards, /getViewerCommunityId\(\)/);
     assert.doesNotMatch(soon, /jgos\.io/);
     assert.doesNotMatch(market, /jgos\.io/);
   });

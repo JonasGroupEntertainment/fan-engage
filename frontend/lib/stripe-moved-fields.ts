@@ -15,21 +15,40 @@
  */
 
 type SubscriptionLike = {
-  current_period_end?: number | null;
-  items?: { data?: Array<{ current_period_end?: number | null }> | null } | null;
+  current_period_end?: unknown;
+  items?:
+    | { data?: Array<{ current_period_end?: unknown }> | null }
+    | Array<{ current_period_end?: unknown }>
+    | null;
 };
 
 type SubscriptionRef = string | { id?: string | null } | null | undefined;
 
 type InvoiceLike = {
   subscription?: SubscriptionRef;
+  period_end?: unknown;
   parent?: {
     subscription_details?: { subscription?: SubscriptionRef } | null;
   } | null;
+  lines?: {
+    data?: Array<{ period?: { end?: unknown } | null } | null> | null;
+  } | null;
 };
 
-function isUnixSeconds(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
+function unixSeconds(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    const parsed = Number(value);
+    return parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
+function subscriptionItems(sub: SubscriptionLike): Array<{ current_period_end?: unknown }> {
+  const items = sub.items;
+  if (Array.isArray(items)) return items;
+  if (items && Array.isArray(items.data)) return items.data;
+  return [];
 }
 
 /**
@@ -42,12 +61,12 @@ export function subscriptionPeriodEndSeconds(sub: unknown): number | null {
   if (!sub || typeof sub !== "object") return null;
   const s = sub as SubscriptionLike;
 
-  const itemEnds = (s.items?.data ?? [])
-    .map((item) => item?.current_period_end)
-    .filter(isUnixSeconds);
+  const itemEnds = subscriptionItems(s)
+    .map((item) => unixSeconds(item?.current_period_end))
+    .filter((value): value is number => value != null);
   if (itemEnds.length > 0) return Math.max(...itemEnds);
 
-  return isUnixSeconds(s.current_period_end) ? s.current_period_end : null;
+  return unixSeconds(s.current_period_end);
 }
 
 /** ISO timestamp version of subscriptionPeriodEndSeconds. */
@@ -75,4 +94,29 @@ export function invoiceSubscriptionId(invoice: unknown): string | null {
     refToId(inv.parent?.subscription_details?.subscription) ??
     refToId(inv.subscription)
   );
+}
+
+/**
+ * Period end carried on an invoice when the subscription object is not
+ * expanded. Prefers an expanded subscription (items, then top-level),
+ * then the latest invoice line period.end, then the legacy invoice
+ * period_end. Subscription-item current_period_end is the source of
+ * truth once the subscription is loaded.
+ */
+export function invoicePeriodEndIso(invoice: unknown): string | null {
+  if (!invoice || typeof invoice !== "object") return null;
+  const inv = invoice as InvoiceLike;
+  const expanded = inv.parent?.subscription_details?.subscription ?? inv.subscription;
+  if (expanded && typeof expanded === "object") {
+    const fromSub = subscriptionPeriodEndIso(expanded);
+    if (fromSub) return fromSub;
+  }
+  const lineEnds = (inv.lines?.data ?? [])
+    .map((line) => unixSeconds(line?.period?.end))
+    .filter((value): value is number => value != null);
+  if (lineEnds.length > 0) {
+    return new Date(Math.max(...lineEnds) * 1000).toISOString();
+  }
+  const top = unixSeconds(inv.period_end);
+  return top == null ? null : new Date(top * 1000).toISOString();
 }

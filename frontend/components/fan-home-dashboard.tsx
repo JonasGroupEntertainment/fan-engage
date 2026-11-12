@@ -3,6 +3,7 @@ import WeeklyRecapTile from "@/components/weekly-recap-tile";
 import type { WeeklyRecap } from "@/lib/personal-recap/types";
 import PushOptInBanner from "@/components/push-opt-in-banner";
 import StreakTile from "@/components/streak-tile";
+import TodayRow from "@/components/today-row";
 import type { FanHomeData, FanHomeUpcomingEvent } from "@/lib/data/fan-home";
 import { focalPointStyle } from "@/lib/images/focal-point";
 
@@ -25,11 +26,11 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
     recentActivity,
     badgesInProgress,
     premiumCommunities,
-    founderCommunities,
   } = data;
 
-  // Pick the first community for the rewards link (or fallback)
-  const primaryCommunity = followedArtists[0]?.slug || "raelynn";
+  // Resolved in getFanHomeData: host community if followed, else first
+  // followed artist, else host/default. Never a hard-coded artist.
+  const primaryCommunity = data.primaryCommunity;
 
   return (
     <section className="space-y-6">
@@ -47,6 +48,11 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
           </h1>
         </div>
       </header>
+
+      {/* "Today" — what can I do right now. Sits under the first-72-hours
+          checklist (rendered by app/page.tsx above this component) and
+          above everything else. Renders nothing when there is nothing to do. */}
+      <TodayRow items={data.today ?? []} />
 
       {/* Followed artists strip */}
       <PushOptInBanner />
@@ -82,8 +88,6 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
         <RecentActivityFeed
           posts={recentActivity}
           hasFollows={followedArtists.length > 0}
-          premiumCommunities={premiumCommunities}
-          founderCommunities={founderCommunities}
         />
 
         {/* Badges in progress */}
@@ -142,7 +146,6 @@ function FollowedArtistsStrip({
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-black/40">
               {a.hero_image ? (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={a.hero_image}
@@ -245,6 +248,12 @@ function UpcomingEventsList({
                 <p className="mt-1 text-xs text-white/60">
                   {e.artist_name ? `${e.artist_name} · ` : ""}
                   {e.location ? `📍 ${e.location}` : "Location TBA"}
+                  {e.distanceMiles != null ? ` · ${e.distanceMiles} mi` : ""}
+                  {e.nearYou && (
+                    <span className="ml-2 inline-flex rounded-full bg-aurora/20 px-1.5 py-0.5 text-[10px] font-medium text-aurora">
+                      Near you
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="shrink-0 text-right">
@@ -309,13 +318,9 @@ function ActiveCtasBlock({ ctas }: { ctas: FanHomeData["ctas"] }) {
 function RecentActivityFeed({
   posts,
   hasFollows,
-  premiumCommunities,
-  founderCommunities,
 }: {
   posts: FanHomeData["recentActivity"];
   hasFollows: boolean;
-  premiumCommunities: string[];
-  founderCommunities: string[];
 }) {
   if (posts.length === 0) {
     return (
@@ -336,14 +341,8 @@ function RecentActivityFeed({
       <ul className="mt-4 space-y-3">
         {posts.slice(0, 5).map((post) => {
           const badge = postKindBadge(post.kind);
-          // Gate body for premium / founder-only posts unless the viewer has
-          // the right membership. Title + kind chip still surface either way.
-          const bodyAccessible =
-            post.visibility === "public" ||
-            (post.visibility === "premium" &&
-              premiumCommunities.includes(post.artist_slug)) ||
-            (post.visibility === "founder-only" &&
-              founderCommunities.includes(post.artist_slug));
+          // Server already cleared body when this is false (tier, staff, author).
+          const bodyAccessible = post.canReadBody === true;
           // Pick the most useful display string:
           //   1. Title if present (announcements, polls with a title, challenges)
           //   2. Body excerpt if accessible (regular posts, body-bearing types)

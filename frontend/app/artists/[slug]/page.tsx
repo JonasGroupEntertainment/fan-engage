@@ -29,6 +29,10 @@ import { viewerFoundingFanNumber, viewerManagesEventRsvps } from "@/lib/rsvp-acc
 import { evaluateRsvpWindow, rsvpWindowView } from "@/lib/rsvp-window";
 import { focalPointStyle } from "@/lib/images/focal-point";
 import { isMarketplaceLive } from "@/lib/marketplace-live";
+import { withArtistParam } from "@/lib/onboarding/artist-param";
+import { eventDistance, fanHomeCoords } from "@/lib/geo/near";
+import { getLivePresavesForArtist } from "@/lib/presave/read";
+import PresaveCard from "./community/presave-card";
 
 
 // Per-artist hero focal-point now comes from artists.hero_focal_x /
@@ -64,11 +68,12 @@ export default async function ArtistPage({
 }) {
   const { slug } = await params;
   const { welcome } = await searchParams;
-  const [artist, fan, isFollowing, entitlement] = await Promise.all([
+  const [artist, fan, isFollowing, entitlement, presaves] = await Promise.all([
     getArtistFromDb(slug),
     getCurrentFan(),
     doesFanFollowArtist(slug),
     getViewerEntitlement(slug),
+    getLivePresavesForArtist(slug),
   ]);
   if (!artist) notFound();
   const isSignedIn = fan !== null;
@@ -95,6 +100,10 @@ export default async function ArtistPage({
       viewerManagesEventRsvps(slug),
     ]);
   const rsvpNow = new Date();
+  // 0090: fan home coordinates for "· 42 mi" / "Near you" on each event.
+  // Null until the fan saves a resolvable home city; then only events that
+  // also carry venue coordinates show a distance.
+  const fanHome = fanHomeCoords(fan);
 
   const heroGradient = `linear-gradient(to bottom right, ${artist.accentFrom}66, #0f172a, #000000)`;
   const ctaGradient = `linear-gradient(to right, ${artist.accentFrom}, ${artist.accentTo})`;
@@ -105,9 +114,9 @@ export default async function ArtistPage({
   // - signed in, profile done → drops / rewards (marketplace not open at soft launch)
   const marketplaceLive = isMarketplaceLive();
   const primaryCta = !isSignedIn
-    ? { label: "Create your fan profile", href: `/signup?ref=${artist.slug}` }
+    ? { label: "Create your fan profile", href: withArtistParam(`/signup?ref=${artist.slug}`, artist.slug) }
     : needsProfile
-      ? { label: "Complete your profile", href: `/onboarding?ref=${artist.slug}` }
+      ? { label: "Complete your profile", href: withArtistParam(`/onboarding?ref=${artist.slug}`, artist.slug) }
       : marketplaceLive
         ? { label: "Shop drops", href: "/marketplace" }
         : { label: "My rewards", href: "/rewards" };
@@ -251,7 +260,7 @@ export default async function ArtistPage({
             </p>
           )}
           {!artist.heroImage && (
-            <p className="mt-6 text-xs text-white/50">
+            <p className="mt-6 text-xs text-white/70">
               Hero imagery pending Box asset drop.
             </p>
           )}
@@ -263,6 +272,19 @@ export default async function ArtistPage({
         <WelcomeQuest
           artistName={artist.name}
           artistSlug={artist.slug}
+          accentFrom={artist.accentFrom}
+          accentTo={artist.accentTo}
+        />
+      )}
+
+      {/* Pre-save CTA — live fan_actions rows of kind 'pre_save' (0005 / 0091).
+          Points are a thank-you for the click-through; the card says so. */}
+      {presaves.length > 0 && (
+        <PresaveCard
+          artistSlug={artist.slug}
+          presaves={presaves}
+          signedIn={isSignedIn}
+          signInHref={`/login?next=${encodeURIComponent(`/artists/${artist.slug}`)}`}
           accentFrom={artist.accentFrom}
           accentTo={artist.accentTo}
         />
@@ -309,7 +331,7 @@ export default async function ArtistPage({
               {goal.linkHref && goal.linkLabel && (
                 <Link
                   href={goal.linkHref}
-                  className="text-xs text-white/50 hover:text-white/70 transition"
+                  className="text-xs text-white/70 hover:text-white/90 transition"
                 >
                   {goal.linkLabel}
                 </Link>
@@ -377,6 +399,10 @@ export default async function ArtistPage({
             const atCapacity =
               e.capacity != null && e.capacity > 0 && count >= e.capacity;
             const rsvped = eventId ? myRsvps.has(eventId) : false;
+            const { distanceMiles, nearYou } = eventDistance(fanHome, {
+              lat: e.lat ?? null,
+              lng: e.lng ?? null,
+            });
             const rsvpView = rsvpWindowView(
               evaluateRsvpWindow({
                 now: rsvpNow,
@@ -394,8 +420,17 @@ export default async function ArtistPage({
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{e.title}</p>
                     <p className="text-xs text-white/60">{e.detail}</p>
-                    {e.location && (
-                      <p className="mt-1 text-xs text-white/60">📍 {e.location}</p>
+                    {(e.location || distanceMiles != null) && (
+                      <p className="mt-1 text-xs text-white/60">
+                        {e.location ? `📍 ${e.location}` : ""}
+                        {e.location && distanceMiles != null ? " · " : ""}
+                        {distanceMiles != null ? `${distanceMiles} mi` : ""}
+                        {nearYou && (
+                          <span className="ml-2 inline-flex rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            Near you
+                          </span>
+                        )}
+                      </p>
                     )}
                     <p className="mt-3 text-xs uppercase tracking-wide text-white/50">
                       {e.date}

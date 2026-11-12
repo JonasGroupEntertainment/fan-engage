@@ -6,11 +6,15 @@
  * (`active = false`). Do not expand this set without a Dash decision.
  */
 
+import { DEFAULT_COMMUNITY_SLUG } from "./community-default.ts";
 import { isDigitallyRedeemableTitle } from "./points/economy.ts";
 
 export { FOUNDING_FAN_CAP } from "./points/economy.ts";
 
-export const LAUNCH_COMMUNITY_ID = "raelynn";
+/** The launch community. Alias of DEFAULT_COMMUNITY_SLUG (single source of
+ *  truth in lib/community-default.ts) — the imported-fan membership repair
+ *  and the launch catalog both target that community. */
+export const LAUNCH_COMMUNITY_ID: string = DEFAULT_COMMUNITY_SLUG;
 
 export const ACTIVITY_POINTS = {
   comment: 10,

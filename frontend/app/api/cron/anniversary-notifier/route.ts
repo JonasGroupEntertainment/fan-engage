@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { runDailyAnniversaryScan } from "@/lib/anniversaries/celebrate";
 
@@ -23,10 +23,11 @@ import { runDailyAnniversaryScan } from "@/lib/anniversaries/celebrate";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "anniversary-notifier", () => anniversaryNotifier());
+}
 
+async function anniversaryNotifier() {
   try {
     const result = await runDailyAnniversaryScan();
     return NextResponse.json({ ok: true, ...result, ranAt: new Date().toISOString() });

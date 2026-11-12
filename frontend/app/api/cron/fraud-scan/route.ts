@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 /**
  * /api/cron/fraud-scan (FE)
  *
@@ -28,10 +28,11 @@ interface RunResult {
   errors: number;
 }
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "fraud-scan", () => fraudScan());
+}
 
+async function fraudScan() {
   const admin = createAdminClient();
   const result: RunResult = {
     ok: true,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LandingStats } from "@/lib/data/landing-stats";
+import { communitySignupHref } from "@/lib/community-default";
 
 /**
  * Founding-fan urgency block shown to anonymous visitors below the hero.
@@ -58,7 +59,7 @@ export default function FoundingFanBlock({ stats }: { stats: LandingStats }) {
               Status persists on your account — not a restyle-only badge.
             </p>
             <Link
-              href="/signup?ref=raelynn"
+              href={communitySignupHref(stats.communityId)}
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-aurora to-ember px-5 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"
             >
               Claim your Founding badge

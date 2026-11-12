@@ -1,4 +1,4 @@
-import { verifyCronAuth } from "@/lib/cron-auth";
+import { runCron } from "@/lib/cron-run";
 /**
  * /api/cron/moderation-explain (FE)
  *
@@ -40,10 +40,11 @@ interface RunResult {
   }>;
 }
 
-export async function GET(req: Request) {
-  const authErr = verifyCronAuth(req);
-  if (authErr) return authErr;
+export async function GET(request: Request) {
+  return runCron(request, "moderation-explain", () => moderationExplain());
+}
 
+async function moderationExplain() {
   const admin = createAdminClient();
 
   const { data: posts, error: queryErr } = await admin
