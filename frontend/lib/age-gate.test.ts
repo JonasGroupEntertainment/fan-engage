@@ -6,6 +6,7 @@ import {
   AGE_REQUIRED_MESSAGE,
   adultGate,
   ageBand,
+  needsParentConsent,
   adultSmsOptIn,
   birthDateReturnPath,
   ageOn,
@@ -69,6 +70,13 @@ describe("ageBand", () => {
     assert.equal(ageBand(parseBirthDate("2013", "10", "11", NOW)!, NOW), "teen");
     assert.equal(ageBand(parseBirthDate("2008", "10", "12", NOW)!, NOW), "teen");
     assert.equal(ageBand(parseBirthDate("2008", "10", "11", NOW)!, NOW), "adult");
+    const teen = parseBirthDate("2013", "10", "11", NOW)!;
+    const adult = parseBirthDate("2008", "10", "11", NOW)!;
+    const child = parseBirthDate("2013", "10", "12", NOW)!;
+    assert.equal(needsParentConsent(teen, NOW), true);
+    assert.equal(needsParentConsent(adult, NOW), false);
+    assert.equal(needsParentConsent(child, NOW), false);
+    assert.equal(needsParentConsent(null, NOW), false);
   });
 
   it("has matching helpers", () => {

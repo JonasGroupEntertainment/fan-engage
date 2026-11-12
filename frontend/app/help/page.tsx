@@ -34,7 +34,10 @@ export default function HelpPage() {
             Fan Engage Pro is a fan experience for artists, operated by Fan
             Engage Pro LLC, a Colorado limited liability company. Follow the
             artists you care about, earn points for showing up, RSVP to events,
-            and unlock in-app rewards.
+            and unlock in-app rewards. Fans must be 13 or older. No one under
+            13 can create an account. If you are 13 to 17, a parent or guardian
+            has to say you can join. Paid memberships and text alerts stay 18
+            and older.
           </p>
         </article>
 

@@ -54,32 +54,43 @@ describe("terms and cancellation agree on Founding Fan status", () => {
 });
 
 describe("terms and privacy age", () => {
-  it("leaves the published 18+ terms paragraphs alone and rewrites the 13+ seed", () => {
+  it("rewrites the 18+ account lines and the 13+ seed to parent OK for 13–17", () => {
     const published = [
       "IF YOU ARE UNDER AGE 18, YOU MAY NOT USE THIS SITE.",
       "The Services are intended for people 18 and older. You may not register as a User unless you are 18 or older.",
+      "Fan Engage is run by FEP, Inc.",
     ].join("\n\n");
-    assert.equal(applyTermsMinimumAge(published), published);
-    assert.equal(
+    const next = applyTermsMinimumAge(published);
+    assert.match(next, /UNDER AGE 13/);
+    assert.match(next, /13 and older/);
+    assert.match(next, /parent or guardian must say you can join/);
+    assert.equal(next.includes("UNDER AGE 18"), false);
+    assert.match(next, /Fan Engage Pro LLC/);
+    assert.equal(next.includes("FEP, Inc."), false);
+    assert.match(
       applyTermsMinimumAge("## 2. Eligibility\nYou must be 13 years or older to use Fan Engage.\n"),
-      "## 2. Eligibility\nYou must be 18 years or older to use Fan Engage.\n",
+      /parent or guardian's OK/,
     );
   });
 
-  it("softens the privacy under-13 section to 18+ and does not keep parental consent", () => {
+  it("states 13+ with parent OK on privacy and still blocks under 13", () => {
     const stored = `${PRIVACY_UNDER_13_HEADING}\r\n\r\n${PRIVACY_UNDER_13_BODY}\r\n\r\nADDITIONAL INFORMATION`;
     const next = applyPrivacyAgeRequirement(stored);
     assert.equal(next.includes(PRIVACY_AGE_18_HEADING), true);
-    assert.equal(next.includes(PRIVACY_AGE_18_BODY), true);
-    assert.equal(next.includes("under 13"), false);
+    assert.match(next, /Fans must be 13 or older/);
+    assert.match(next, /parent or guardian's OK/);
+    assert.match(next, /No one under 13/);
+    assert.equal(next.includes(PRIVACY_AGE_18_BODY), false);
     assert.equal(next.includes("CHILDREN UNDER"), false);
-    assert.equal(next.includes("parental consent"), false);
-    assert.match(next, /18 and older/);
     assert.match(next, /ADDITIONAL INFORMATION/);
     assert.equal(applyPrivacyAgeRequirement(next), next);
+    const already18 = `${PRIVACY_AGE_18_HEADING}\n\n${PRIVACY_AGE_18_BODY}\n\nFEP, Inc.`;
+    const from18 = applyPrivacyAgeRequirement(already18);
+    assert.match(from18, /13 or older/);
+    assert.equal(from18.includes("FEP, Inc."), false);
+    assert.match(from18, /Fan Engage Pro LLC/);
     const viaScrub = applyPrivacyCounselScrub(stored);
-    assert.equal(viaScrub.includes(PRIVACY_AGE_18_BODY), true);
-    assert.equal(applyPrivacyCounselScrub(viaScrub), viaScrub);
+    assert.match(viaScrub, /parent or guardian's OK/);
   });
 });
 
