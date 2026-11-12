@@ -49,6 +49,7 @@ export const VERCEL_CRON_JOBS = [
   "streak-at-risk",
   "publish-scheduled-posts",
   "weekly-team-brief",
+  "reengagement-email",
 ] as const;
 
 export type VercelCronJob = (typeof VERCEL_CRON_JOBS)[number];
