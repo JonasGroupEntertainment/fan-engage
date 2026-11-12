@@ -45,6 +45,7 @@ export function RedeemForm({
     const formData = new FormData();
     formData.append("rewardId", rewardId);
     formData.append("deliveryDetails", deliveryDetails);
+    formData.append("communitySlug", artistSlug);
 
     const result = await redeemRewardAction(formData);
 
