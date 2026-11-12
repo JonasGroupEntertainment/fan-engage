@@ -35,7 +35,7 @@ export {
 } from "@/lib/entitlements-core";
 
 const MEMBERSHIP_SELECT =
-  "fan_id, community_id, subscription_tier, is_founder, founder_number, current_period_end, cancel_at_period_end, monthly_credit_cents, billing_period";
+  "fan_id, community_id, subscription_tier, is_founder, founder_number, founding_fan_number, current_period_end, cancel_at_period_end, monthly_credit_cents, billing_period";
 
 /**
  * Fetch the current viewer's entitlement for a specific community. Returns

@@ -80,4 +80,27 @@ describe("buildSignupAuthOptions", () => {
     });
     assert.deepEqual(options.data, { birth_date: "1990-05-01" });
   });
+
+  it("records parent consent only when the box was ticked", () => {
+    const ticked = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      birthDate: "2012-04-02",
+      parentConsent: true,
+    });
+    assert.deepEqual(ticked.data, {
+      birth_date: "2012-04-02",
+      parent_consent: "true",
+    });
+
+    const skipped = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      birthDate: "2012-04-02",
+      parentConsent: false,
+    });
+    assert.deepEqual(skipped.data, { birth_date: "2012-04-02" });
+  });
 });

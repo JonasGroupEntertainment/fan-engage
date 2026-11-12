@@ -44,10 +44,17 @@ describe("isMagicLinkEnabled", () => {
 });
 
 describe("isForgotPasswordEnabled", () => {
-  it("is off in production unless explicitly enabled", () => {
-    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "production" }), false);
+  it("is on in production unless explicitly disabled", () => {
+    assert.equal(isForgotPasswordEnabled({ VERCEL_ENV: "production" }), true);
     assert.equal(
       isForgotPasswordEnabled({ NEXT_PUBLIC_VERCEL_ENV: "production" }),
+      true,
+    );
+    assert.equal(
+      isForgotPasswordEnabled({
+        VERCEL_ENV: "production",
+        NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED: "false",
+      }),
       false,
     );
     assert.equal(
@@ -86,14 +93,15 @@ describe("login / signup doors", () => {
     assert.doesNotMatch(form, /fan-engage-pearl\.vercel\.app/);
   });
 
-  it("production /forgot-password is not a public reset form", () => {
+  it("/forgot-password page is gated by the flag and the form uses the server action", () => {
     const page = readRepo("../app/forgot-password/page.tsx");
     assert.match(page, /isForgotPasswordEnabled\(\)/);
     assert.match(page, /notFound\(\)/);
     assert.doesNotMatch(page, /resetPasswordForEmail/);
     assert.doesNotMatch(page, /TurnstileWidget/);
     const form = readRepo("../app/forgot-password/forgot-password-form.tsx");
-    assert.match(form, /resetPasswordForEmail/);
+    assert.match(form, /requestPasswordResetAction/);
+    assert.doesNotMatch(form, /resetPasswordForEmail/);
   });
 
   it("no public /magic-link route", () => {

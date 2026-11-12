@@ -1,15 +1,15 @@
 /**
- * Factual entity / governing-law / venue corrections for Terms of Use only.
+ * Entity correction for Terms of Use only.
  *
- * Live `policy_pages.slug = 'terms'` still stores North Carolina. Fan Engage
- * Pro LLC is a Colorado LLC (CO reg #20261702886). This helper rewrites only
- * the entity phrase so /terms and signup consent stay accurate even before
- * the matching SQL migration is applied. Privacy and other policies pass
- * through unchanged.
+ * Fan Engage Pro LLC is a Colorado LLC (CO reg #20261702886). This helper
+ * rewrites only the entity phrase so /terms and signup consent stay
+ * accurate even when the stored row still says a North Carolina LLC.
+ * Privacy and other policies pass through unchanged.
  *
- * Governing law stays "laws of the State of North Carolina". The arbitration
- * place stays North Carolina. Raymond left both for Kevin and counsel.
- * Do not rewrite either sentence here.
+ * Governing law and the arbitration place are North Carolina. Counsel set
+ * governing law there. This helper does not rewrite either sentence.
+ * applyItem4PolicyCopy maps a stored Colorado governing-law or arbitration
+ * sentence back to North Carolina on terms, rewards terms, and cancellation.
  *
  * Notices address (if present) is left as-is — Belmont, NC is an allowed
  * notices address; it is not the entity state.

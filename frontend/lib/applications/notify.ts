@@ -148,7 +148,7 @@ export async function sendInviteEmail(opts: {
   const mcKey = process.env.MAILCHIMP_API_KEY;
   const mcServer = process.env.MAILCHIMP_SERVER_PREFIX;
   if (mcKey && mcServer) {
-    return sendViaMailchimpCampaign(mcKey, mcServer, opts);
+    return sendViaMailchimpCampaign();
   }
 
   console.warn(
@@ -244,17 +244,7 @@ async function sendViaMandrill(
   }
 }
 
-async function sendViaMailchimpCampaign(
-  apiKey: string,
-  server: string,
-  opts: {
-    to: string;
-    toName: string | null;
-    artistDisplayName: string;
-    approvedSlug: string;
-    reviewerNotes?: string | null;
-  },
-): Promise<{ sent: boolean; reason?: string }> {
+async function sendViaMailchimpCampaign(): Promise<{ sent: boolean; reason?: string }> {
   // Mailchimp Marketing API isn't really designed for transactional sends,
   // but in a pinch we can create a one-off campaign and send. The cleaner
   // path is Mandrill — see above.

@@ -44,6 +44,20 @@ describe("applyTermsColoradoEntityFacts", () => {
     );
   });
 
+  it("leaves a stored Colorado governing-law line for the item 4 rewrite", () => {
+    const stored = LIVE_TERMS_EXCERPTS.replace(
+      "laws of the State of North Carolina",
+      "laws of the State of Colorado",
+    );
+    const corrected = applyTermsColoradoEntityFacts("terms", stored);
+    assert.match(corrected, /a Colorado limited liability company/);
+    assert.match(corrected, /laws of the State of Colorado/);
+    assert.match(
+      corrected,
+      /The place of the arbitration and each in person hearing shall be North Carolina\./,
+    );
+  });
+
   it("does not rewrite Privacy or Rewards Terms even if they still say North Carolina", () => {
     assert.equal(
       applyTermsColoradoEntityFacts("privacy", UNRELATED_POLICY),

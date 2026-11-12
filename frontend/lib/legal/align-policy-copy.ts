@@ -56,8 +56,30 @@ export const PRIVACY_AGE_18_HEADING = "AGE REQUIREMENT";
 export const PRIVACY_AGE_18_BODY =
   "The Services are intended for people 18 and older. You may not use this Website or register unless you are 18 or older. We do not knowingly collect Personal Information from anyone under 18. If you are under 18, do not use or provide any information on this Website, register on the Website, make any purchases through the Website, or provide any information about yourself to us, including your name, address, telephone number, e-mail address, or any screen name or user name you may use. If we learn we have collected or received Personal Information from someone under 18, we will delete that information. If you believe we might have any information from or about someone under 18, please contact us (please see the ''Contact Us'' section below).";
 
-const TERMS_PLACEHOLDER_AGE_FROM = "You must be 13 years or older to use Fan Engage.";
-const TERMS_PLACEHOLDER_AGE_TO = "You must be 18 years or older to use Fan Engage.";
+/** Kevin, in writing: 13+, parent or guardian OK for 13–17, no one under 13. */
+export const ACCOUNT_AGE_RULE =
+  "Fans must be 13 or older. No one under 13 may create an account. Fans ages 13 to 17 may join only with a parent or guardian's OK.";
+
+export const PRIVACY_AGE_RULE_BODY =
+  "Fans must be 13 or older. No one under 13 may use this Website or give us personal information. Fans ages 13 to 17 may join only with a parent or guardian's OK. We do not knowingly keep personal information from anyone under 13. If we learn we have, we will delete it. If you believe we might have information from someone under 13, please contact us (please see the ''Contact Us'' section below).";
+
+const TERMS_AGE_SENTENCES: ReadonlyArray<readonly [string, string]> = [
+  ["You must be 18 years or older to use Fan Engage.", ACCOUNT_AGE_RULE],
+  ["You must be 13 years or older to use Fan Engage.", ACCOUNT_AGE_RULE],
+  ["IF YOU ARE UNDER AGE 18, YOU MAY NOT USE THIS SITE.", "IF YOU ARE UNDER AGE 13, YOU MAY NOT USE THIS SITE."],
+  [
+    "The Services are intended for people 18 and older. You may not register as a User unless you are 18 or older.",
+    "The Services are intended for people 13 and older. You may not register as a User unless you are 13 or older. If you are 13 to 17, a parent or guardian must say you can join.",
+  ],
+  [
+    "We will terminate with or without notice any User who we believe is under the age of 18.",
+    "We will terminate with or without notice any User who we believe is under the age of 13.",
+  ],
+  [
+    "You are 18 years old or older.",
+    "You are 13 years old or older. If you are under 18, a parent or guardian has said you can join.",
+  ],
+];
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -76,18 +98,32 @@ export function applyTermsFoundingFanStatus(content: string): string {
   return replaceFlexible(content, TERMS_FOUNDING_FAN_FORFEITURE, TERMS_FOUNDING_FAN_REPLACEMENT);
 }
 
-/** Seed terms in 0009 still say 13+. Published terms already say 18+. */
+/** Account age is 13+. Paid memberships and texts stay 18+ in product code. */
 export function applyTermsMinimumAge(content: string): string {
-  return content.replaceAll(TERMS_PLACEHOLDER_AGE_FROM, TERMS_PLACEHOLDER_AGE_TO);
+  let next = applyLegalEntityName(content);
+  for (const [from, to] of TERMS_AGE_SENTENCES) {
+    next = next.replaceAll(from, to);
+  }
+  return next;
+}
+
+export function applyLegalEntityName(content: string): string {
+  return content.replaceAll("FEP, Inc.", "Fan Engage Pro LLC").replaceAll("FEP Inc.", "Fan Engage Pro LLC");
 }
 
 export function applyPrivacyAgeRequirement(content: string): string {
-  if (!content.includes(PRIVACY_UNDER_13_HEADING)) return content;
-  return replaceFlexible(
-    content,
-    `${PRIVACY_UNDER_13_HEADING}\n\n${PRIVACY_UNDER_13_BODY}`,
-    `${PRIVACY_AGE_18_HEADING}\n\n${PRIVACY_AGE_18_BODY}`,
-  );
+  let next = applyLegalEntityName(content);
+  if (next.includes(PRIVACY_UNDER_13_HEADING)) {
+    next = replaceFlexible(
+      next,
+      `${PRIVACY_UNDER_13_HEADING}\n\n${PRIVACY_UNDER_13_BODY}`,
+      `${PRIVACY_AGE_18_HEADING}\n\n${PRIVACY_AGE_RULE_BODY}`,
+    );
+  }
+  if (next.includes(PRIVACY_AGE_18_BODY)) {
+    next = replaceFlexible(next, PRIVACY_AGE_18_BODY, PRIVACY_AGE_RULE_BODY);
+  }
+  return next;
 }
 
 export function applyRewardsFoundingFanStatus(content: string): string {

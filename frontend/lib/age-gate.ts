@@ -86,6 +86,17 @@ export function isUnder13(dob: Date, now: Date = new Date()): boolean {
   return ageBand(dob, now) === "under13";
 }
 
+/** 13–17 may join only after a parent or guardian says so. Not verified. */
+export function needsParentConsent(dob: Date | null | undefined, now: Date = new Date()): boolean {
+  return dob != null && ageBand(dob, now) === "teen";
+}
+
+export const PARENT_CONSENT_LABEL =
+  "A parent or guardian says I can create this account.";
+
+export const PARENT_CONSENT_MESSAGE =
+  "A parent or guardian must say you can join before we can create this account.";
+
 /** False when the date is unknown, so adult-only features stay closed. */
 export function isAdult(dob: Date | null | undefined, now: Date = new Date()): boolean {
   return dob != null && ageBand(dob, now) === "adult";

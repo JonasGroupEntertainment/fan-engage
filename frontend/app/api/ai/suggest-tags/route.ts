@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         .from("community_posts")
         .select("tags")
         .eq("artist_slug", artistSlug)
+        .eq("visibility", "public")
         .not("tags", "is", null)
         .limit(200);
       if (tagRows && tagRows.length > 0) {

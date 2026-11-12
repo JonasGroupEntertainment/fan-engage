@@ -117,6 +117,16 @@ const ARBITRATION_IN_COLORADO =
 const ARBITRATION_IN_NORTH_CAROLINA =
   "The place of the arbitration and each in person hearing shall be North Carolina.";
 
+/**
+ * Counsel set governing law to North Carolina. Arbitration was already
+ * North Carolina. 0058, if it was run, stored both sentences as Colorado.
+ * These replacements map a stored Colorado sentence back. They do not
+ * touch "a Colorado limited liability company".
+ */
+const GOVERNING_LAW_IN_COLORADO = "laws of the State of Colorado";
+
+const GOVERNING_LAW_IN_NORTH_CAROLINA = "laws of the State of North Carolina";
+
 const ITEM4_SLUGS = new Set(["terms", "rewards_terms", "cancellation_refund"]);
 
 /**
@@ -130,6 +140,7 @@ export function applyItem4PolicyCopy(slug: string, content: string): string {
     "a Colorado limited liability company",
   );
   next = next.replaceAll(ARBITRATION_IN_COLORADO, ARBITRATION_IN_NORTH_CAROLINA);
+  next = next.replaceAll(GOVERNING_LAW_IN_COLORADO, GOVERNING_LAW_IN_NORTH_CAROLINA);
   if (slug === "terms") next = applyTermsPremiumBilling(next);
   if (next.includes("eligible seven-day free trial, then monthly or yearly billing")) {
     next = replaceFlexible(next, NEW_SUBSCRIPTION_REFUND_WINDOW, "");

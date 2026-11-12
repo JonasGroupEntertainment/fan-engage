@@ -152,10 +152,22 @@ describe("auth callback wiring", () => {
     assert.match(home, /sanitizeNextPath/);
   });
 
-  it("forgot-password surfaces callback errors and still binds Turnstile to Auth", () => {
+  it("forgot-password surfaces callback errors and sends through the server action", () => {
     const form = readRepo("../app/forgot-password/forgot-password-form.tsx");
     assert.match(form, /searchParams\.get\("error"\)/);
-    assert.match(form, /buildPasswordRecoveryOptions/);
-    assert.match(form, /resetPasswordForEmail/);
+    assert.match(form, /requestPasswordResetAction\(email\.trim\(\), turnstileToken\)/);
+    const action = readRepo("../app/forgot-password/actions.ts");
+    assert.match(action, /turnstilePassed/);
+    assert.match(action, /generateLink\(\{ type: "recovery"/);
+  });
+
+  it("reset-password keeps our recovery token until submit", () => {
+    const form = readRepo("../app/reset-password/reset-password-form.tsx");
+    assert.match(form, /recoveryTokenHash\.current = tokenHash/);
+    const submit = form.slice(form.indexOf("async function handleSubmit"));
+    assert.ok(
+      submit.indexOf("verifyOtp(") > -1 && submit.indexOf("verifyOtp(") < submit.indexOf("updateUser("),
+      "token must be verified on submit, before updateUser",
+    );
   });
 });
