@@ -24,7 +24,7 @@ export default async function FanCardPage() {
     getCurrentFan(),
     getCurrentFanKpis(),
     getTiers(),
-    getFanProfileSlug(user.id),
+    getFanProfileSlug(user.id).catch(() => null),
   ]);
   if (!fan) redirect("/login?next=/me/card");
 
@@ -42,7 +42,7 @@ export default async function FanCardPage() {
   // the fan id, which that page did not recognise, so every shared link
   // landed on "not found" (BEP #191). The profile page now accepts both.
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? CANONICAL_PRODUCTION_APP_URL}/fans/${encodeURIComponent(
-    profileSlug ?? fan.id,
+    profileSlug || fan.id,
   )}`;
 
   return (

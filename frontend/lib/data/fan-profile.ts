@@ -73,18 +73,6 @@ export function looksLikeFanId(value: string): boolean {
   return UUID_RE.test(value.trim().toLowerCase());
 }
 
-/** The fan's public profile handle, or null when none is set. */
-export async function getFanProfileSlug(fanId: string): Promise<string | null> {
-  try {
-    const admin = createAdminClient();
-    const { data } = await admin.from("fans").select("profile_slug").eq("id", fanId).maybeSingle();
-    const slug = (data?.profile_slug as string | null) ?? null;
-    return slug && slug.trim() ? slug : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function getFanProfileBySlug(
   slug: string,
 ): Promise<PublicFanProfile | null> {
