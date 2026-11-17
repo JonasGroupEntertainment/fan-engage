@@ -99,7 +99,7 @@ function CookieBannerInner() {
     <div
       role="region"
       aria-label="Cookie choices"
-      className="fixed inset-x-3 bottom-3 z-50 rounded-2xl border border-white/15 bg-slate-950/95 p-3 shadow-xl backdrop-blur sm:inset-x-4 sm:bottom-4 sm:p-4 md:inset-x-auto md:right-4 md:max-w-sm"
+      className="fixed inset-x-3 bottom-[calc(var(--tab-bar-h,0px)+0.75rem)] z-50 rounded-2xl border border-white/15 bg-slate-950/95 p-3 shadow-xl backdrop-blur sm:inset-x-4 sm:bottom-[calc(var(--tab-bar-h,0px)+1rem)] sm:p-4 md:inset-x-auto md:right-4 md:max-w-sm"
     >
       <p className="text-xs text-white/90 sm:text-sm">
         <span className="sm:hidden">

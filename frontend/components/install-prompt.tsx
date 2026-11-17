@@ -190,7 +190,7 @@ export default function InstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-40 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-xl backdrop-blur md:inset-x-auto md:right-4 md:max-w-sm">
+    <div className="fixed inset-x-4 bottom-[calc(var(--tab-bar-h,0px)+1rem)] z-40 rounded-2xl border border-white/15 bg-slate-950/95 p-4 shadow-xl backdrop-blur md:inset-x-auto md:right-4 md:max-w-sm">
       <p className="text-sm font-semibold">Install Fan Engage</p>
       {isIos ? (
         <p className="mt-1 text-xs text-white/70">

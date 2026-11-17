@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sharePayload } from "@/lib/share-payload";
 
 interface Props {
   url: string;
@@ -25,7 +26,8 @@ export default function NativeShareButton({ url, text, title }: Props) {
     // Prefer the native share sheet on supported platforms (mobile, Safari).
     if (typeof nav.share === "function") {
       try {
-        await nav.share({ url, text: shareText, title: shareTitle });
+        // Link inside the text: some apps drop a separate url field (BEP #196).
+        await nav.share(sharePayload({ url, text: shareText, title: shareTitle }));
         setShared(true);
         setTimeout(() => setShared(false), 2000);
         return;

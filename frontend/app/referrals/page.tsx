@@ -112,7 +112,9 @@ export default async function ReferralsPage() {
             {isSignedIn && (
               <>
                 <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <code className="flex-1 rounded-2xl bg-black/40 px-4 py-3 text-sm">{inviteUrl}</code>
+                  <code className="min-w-0 basis-full break-all rounded-2xl bg-black/40 px-4 py-3 text-sm sm:flex-1 sm:basis-0">
+                    {inviteUrl}
+                  </code>
                   <CopyLinkButton url={inviteUrl} />
                   <NativeShareButton
                     url={inviteUrl}

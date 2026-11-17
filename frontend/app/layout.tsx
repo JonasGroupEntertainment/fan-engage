@@ -12,6 +12,7 @@ import AdminPill from "@/components/admin-pill";
 import SearchInput from "@/components/search-input";
 import UserMenu from "@/components/user-menu";
 import { MobileNav } from "@/components/mobile-nav";
+import MobileTabBar from "@/components/mobile-tab-bar";
 import { DesktopNav } from "@/components/desktop-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/lib/data/notifications";
@@ -157,7 +158,7 @@ export default async function RootLayout({
     communityId: hostCommunityId,
   });
   const navItems = [
-    { href: "/", label: "Fan Home" },
+    { href: "/", label: "Home" },
     { href: "/community", label: "Community" },
     { href: "/rewards", label: "Rewards" },
     // "Unlocks" until physical merch ships — /marketplace still says coming soon.
@@ -194,12 +195,16 @@ export default async function RootLayout({
               <SearchInput compact placeholder="Search Fan Engage…" />
             </div>
             {user ? (
-              <div className="flex items-center gap-3">
-                <PremiumBadge
-                  isPremium={isPremium}
-                  isFounder={isFounder}
-                  founderNumber={founderNumber}
-                />
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                {/* Hidden on phones, where it crowded the logo and menu
+                    button (BEP #196). The profile page still shows it. */}
+                <span className="hidden sm:inline-flex">
+                  <PremiumBadge
+                    isPremium={isPremium}
+                    isFounder={isFounder}
+                    founderNumber={founderNumber}
+                  />
+                </span>
                 <AdminPill show={isAdmin} />
                 <Link
                   href="/inbox"
@@ -240,6 +245,8 @@ export default async function RootLayout({
         </header>
         {children}
         <Footer />
+        {/* Phones, signed-in fans only: Home, Card, Rewards, Artists. */}
+        {user && <MobileTabBar />}
         <CookieBanner />
         <InstallPrompt />
         <RegisterSW />

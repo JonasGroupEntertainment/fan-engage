@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentFan, getCurrentFanKpis } from "@/lib/data/fan";
 import { getTiers, tierIcon } from "@/lib/data/tiers";
 import ShareButton from "@/components/share-button";
+import { getFanProfileSlug } from "@/lib/data/fan-profile";
+import { CANONICAL_PRODUCTION_APP_URL } from "@/lib/app-url";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +20,11 @@ export default async function FanCardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/me/card");
 
-  const [fan, kpis, tiers] = await Promise.all([
+  const [fan, kpis, tiers, profileSlug] = await Promise.all([
     getCurrentFan(),
     getCurrentFanKpis(),
     getTiers(),
+    getFanProfileSlug(user.id),
   ]);
   if (!fan) redirect("/login?next=/me/card");
 
@@ -35,10 +38,12 @@ export default async function FanCardPage() {
       ? `${fan.first_name} ${fan.last_name}`
       : fan.first_name ?? "Fan";
 
-  const shareUrl =
-    process.env.NEXT_PUBLIC_APP_URL
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/fans/${fan.id}`
-      : `https://fan-engage-pearl.vercel.app/fans/${fan.id}`;
+  // The public profile lives at /fans/<handle>. The card's share link used
+  // the fan id, which that page did not recognise, so every shared link
+  // landed on "not found" (BEP #191). The profile page now accepts both.
+  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? CANONICAL_PRODUCTION_APP_URL}/fans/${encodeURIComponent(
+    profileSlug ?? fan.id,
+  )}`;
 
   return (
     <main className="mx-auto max-w-lg px-4 py-10 sm:py-16 space-y-6">
