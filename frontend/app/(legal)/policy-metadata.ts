@@ -9,10 +9,12 @@ import { policyDocumentTitle, policyRobots } from "@/lib/data/policy-seo";
 export function policyMetadataFromRecord(
   policy: PolicyPage | null,
   fallbackTitle: string,
+  canonicalPath?: string,
 ): Metadata {
   return {
     title: policyDocumentTitle(policy, fallbackTitle),
     robots: policyRobots(policy),
+    ...(canonicalPath ? { alternates: { canonical: canonicalPath } } : {}),
   };
 }
 
@@ -20,5 +22,8 @@ export async function generatePolicyMetadata(
   slug: string,
   fallbackTitle: string,
 ): Promise<Metadata> {
-  return policyMetadataFromRecord(await getPolicy(slug), fallbackTitle);
+  // Each policy page names its own canonical address (slug "cookie_policy"
+  // lives at /cookie-policy). The root layout no longer sets a default.
+  const canonicalPath = `/${slug.replace(/_/g, "-")}`;
+  return policyMetadataFromRecord(await getPolicy(slug), fallbackTitle, canonicalPath);
 }

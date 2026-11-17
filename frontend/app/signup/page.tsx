@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPolicy } from "@/lib/data/policies";
 import { SignupForm, type ReferrerArtist } from "./signup-form";
 
-export const metadata = { title: "Sign up" };
+export const metadata = { title: "Sign up", alternates: { canonical: "/signup" } };
 
 async function getReferrerName(): Promise<string | null> {
   const cookieStore = await cookies();

@@ -56,6 +56,7 @@ export async function generateMetadata(
   return {
     title: `${artist.name}`,
     description: artist.tagline,
+    alternates: { canonical: `/artists/${slug}` },
   };
 }
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -51,6 +52,10 @@ function formatPts(n: number | null | undefined) {
   if (n == null) return "—";
   return new Intl.NumberFormat("en-US").format(n) + " pts";
 }
+
+// The homepage is the only page whose canonical address is "/". Other pages
+// set their own, so none of them claims to be a copy of this one.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function Home({
   searchParams,

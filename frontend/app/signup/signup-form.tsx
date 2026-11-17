@@ -34,6 +34,8 @@ import {
   interpretSignupCreate,
   reportSignupError,
   sanitizeSignupError,
+  SIGNUP_PASSWORD_RULES_MESSAGE,
+  SIGNUP_WEAK_PASSWORD_MESSAGE,
 } from "@/lib/signup-outcome";
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
 import { CONSENT_VERSION } from "@/lib/consent";
@@ -123,6 +125,10 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  // A password the server refused (too common, or seen in a data breach).
+  // Shown at the field for as long as that same password is still typed
+  // in, so the strength bar never calls a refused password "Strong".
+  const [rejectedPassword, setRejectedPassword] = useState<{ value: string; message: string } | null>(null);
   const [status, setStatus] = useState<
     "idle" | "loading" | "error" | "need-signin" | "set-password" | "reset-sent"
   >("idle");
@@ -395,6 +401,12 @@ export function SignupForm({
         }
         setStatus("error");
         setMessage(decision.message || SIGNUP_NOT_CREATED_MESSAGE);
+        if (
+          decision.message === SIGNUP_WEAK_PASSWORD_MESSAGE ||
+          decision.message === SIGNUP_PASSWORD_RULES_MESSAGE
+        ) {
+          setRejectedPassword({ value: password, message: decision.message });
+        }
         return;
       }
 
@@ -460,6 +472,9 @@ export function SignupForm({
   const ctaGradient = referrerArtist
     ? `linear-gradient(90deg, ${referrerArtist.accentFrom}, ${referrerArtist.accentTo})`
     : null;
+
+  const shownPasswordError =
+    rejectedPassword && rejectedPassword.value === password ? rejectedPassword.message : passwordError;
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
@@ -610,19 +625,24 @@ export function SignupForm({
                 if (passwordError) setPasswordError(validatePassword(e.target.value));
               }}
               onBlur={() => setPasswordError(validatePassword(password))}
-              aria-invalid={!!passwordError}
+              aria-invalid={!!shownPasswordError}
               className={
                 "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none " +
-                (passwordError
+                (shownPasswordError
                   ? "border-rose-500/60 focus:border-rose-400"
                   : "border-white/10 focus:border-white/40")
               }
               placeholder="at least 8 characters"
             />
-            {passwordError && (
-              <span className="text-xs text-rose-300">{passwordError}</span>
+            {shownPasswordError ? (
+              <span className="block text-sm text-rose-300">{shownPasswordError}</span>
+            ) : (
+              <span className="block text-xs text-white/60">
+                Use a password you don&apos;t use anywhere else. Common passwords and ones
+                found in data breaches are not accepted.
+              </span>
             )}
-            {password && !passwordError && (() => {
+            {password && !shownPasswordError && (() => {
               let score = 0;
               if (password.length >= 8) score += 1;
               if (password.length >= 12) score += 1;
@@ -634,8 +654,8 @@ export function SignupForm({
                 { label: "Weak", color: "bg-rose-500", w: "20%" },
                 { label: "Fair", color: "bg-amber-400", w: "45%" },
                 { label: "Good", color: "bg-emerald-400", w: "70%" },
-                { label: "Strong", color: "bg-emerald-500", w: "95%" },
-                { label: "Strong", color: "bg-emerald-500", w: "100%" },
+                { label: "Good", color: "bg-emerald-500", w: "95%" },
+                { label: "Good", color: "bg-emerald-500", w: "100%" },
               ];
               const t = tiers[score];
               return (

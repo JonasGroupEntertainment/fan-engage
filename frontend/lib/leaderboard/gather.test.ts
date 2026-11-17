@@ -123,6 +123,9 @@ describe("gather keeps the honesty + exclusion rules", () => {
   it("still drops is_internal fans before ranks are assigned", () => {
     assert.ok(gatherTs.includes('.eq("is_internal", false)'));
   });
+  it("drops suspended fans (e.g. a merged duplicate) before ranks are assigned", () => {
+    assert.ok(gatherTs.includes('.eq("suspended", false)'));
+  });
   it("still scopes RSVPs by rsvp_at (no created_at on event_rsvps)", () => {
     assert.ok(gatherTs.includes('.gte("rsvp_at", monthStartIso)'));
   });

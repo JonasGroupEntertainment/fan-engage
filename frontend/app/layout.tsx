@@ -53,7 +53,6 @@ export const metadata: Metadata = {
     "digital drops",
   ],
   manifest: "/manifest.json",
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     url: "/",
