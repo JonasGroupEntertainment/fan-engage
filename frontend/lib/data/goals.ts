@@ -12,7 +12,8 @@ import { getFoundingFanClaimState } from "@/lib/data/founding-fans";
  *                   Cap is FOUNDING_FAN_CAP, not the goal row target and
  *                   not paid `is_founder` slots.
  *   rsvp_total    → passed in by the caller (page already fetches it)
- *   ledger_count  → count of points_ledger rows where source = metric_ref
+ *   ledger_count  → count of this community's points_ledger rows where
+ *                   source = metric_ref, internal fans excluded
  *                   (e.g. one row per pre-save with source 'presave_american_made')
  *   manual        → the row's manual_current column
  */
@@ -65,6 +66,18 @@ export async function getCampaignGoals(
       return true;
     });
 
+    // Ids of internal / test fans (fans.is_internal) as a PostgREST "in"
+    // list, fetched once and only when a ledger goal needs it.
+    let internalFilter: Promise<string | null> | null = null;
+    const internalFanFilter = () => {
+      internalFilter ??= (async () => {
+        const { data } = await admin.from("fans").select("id").eq("is_internal", true).limit(2000);
+        const ids = ((data ?? []) as Array<{ id: string }>).map((f) => f.id);
+        return ids.length > 0 ? `(${ids.join(",")})` : null;
+      })();
+      return internalFilter;
+    };
+
     const needsFounding = inWindow.some((r) => r.metric === "founder_count");
     const founding = needsFounding
       ? await getFoundingFanClaimState(communityId)
@@ -80,10 +93,17 @@ export async function getCampaignGoals(
         } else if (r.metric === "rsvp_total") current = live.rsvpTotal;
         else if (r.metric === "manual") current = r.manual_current;
         else if (r.metric === "ledger_count" && r.metric_ref) {
-          const { count } = await admin
+          // Scoped to this community, and internal / test fans never count
+          // (port of BEP #187): progress is shown to guests, and staff and
+          // QA activity made it look further along than it was.
+          let q = admin
             .from("points_ledger")
             .select("id", { count: "exact", head: true })
+            .eq("community_id", communityId)
             .eq("source", r.metric_ref);
+          const internalIds = await internalFanFilter();
+          if (internalIds) q = q.not("fan_id", "in", internalIds);
+          const { count } = await q;
           current = count ?? 0;
         }
         return {
