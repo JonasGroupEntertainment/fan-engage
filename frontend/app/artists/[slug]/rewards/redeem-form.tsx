@@ -85,7 +85,7 @@ export function RedeemForm({
             </p>
             <p className="mt-1 text-xs text-white/50">
               {pointCost.toLocaleString()} points spent. {artistName} will be in
-              touch about delivery.
+              touch about delivery. It is saved, so there is no need to redeem again.
             </p>
 
             <div className="mt-6 flex flex-col items-center gap-3">

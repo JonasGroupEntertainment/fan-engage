@@ -76,7 +76,9 @@ export default async function InboxPage({
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
-      <div className="mb-8 flex items-end justify-between gap-4">
+      {/* The action buttons wrap onto their own row on phones, so they
+          never squeeze or run off the edge (BEP #197). */}
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-widest text-white/50">Notifications</p>
           <h1
@@ -92,20 +94,20 @@ export default async function InboxPage({
           </p>
         </div>
         {all.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Link href="/me/notifications" className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-white/70 transition hover:border-white/20 hover:text-white">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <Link href="/me/notifications" className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1.5 text-sm text-white/70 transition hover:border-white/20 hover:text-white">
               Preferences
             </Link>
             {unreadCount > 0 && (
               <form action={markAllReadAction}>
-                <button type="submit" className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white/80 hover:bg-white/10">
+                <button type="submit" className="whitespace-nowrap rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white/80 hover:bg-white/10">
                   Mark all read
                 </button>
               </form>
             )}
             {all.length > unreadCount && (
               <form action={archiveReadAction}>
-                <button type="submit" className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/10">
+                <button type="submit" className="whitespace-nowrap rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/10">
                   Archive read
                 </button>
               </form>

@@ -38,6 +38,8 @@ import {
   SIGNUP_WEAK_PASSWORD_MESSAGE,
 } from "@/lib/signup-outcome";
 import { buildSignupAuthOptions } from "@/lib/signup-auth-options";
+import { isBreachedPassword } from "@/lib/password-breach-check";
+import { nextBirthDateInput, splitBirthDateInput } from "@/lib/birth-date-input";
 import { CONSENT_VERSION } from "@/lib/consent";
 import { persistSignupChannelOptIn } from "@/lib/channel-opt-in";
 import { tagInternalAccountOnSignup } from "@/app/signup/tag-internal-account";
@@ -129,6 +131,31 @@ export function SignupForm({
   // Shown at the field for as long as that same password is still typed
   // in, so the strength bar never calls a refused password "Strong".
   const [rejectedPassword, setRejectedPassword] = useState<{ value: string; message: string } | null>(null);
+  // The password that passed the early breach check, if any.
+  const [clearedPassword, setClearedPassword] = useState<string | null>(null);
+
+  // Early warning (BEP #195): once typing pauses, check the password against
+  // the public breach list so a leaked one is flagged before "Create
+  // account". Only the first five characters of its SHA-1 hash leave the
+  // browser. If the check cannot run, say nothing; Supabase still enforces
+  // the rule on sign-up.
+  useEffect(() => {
+    if (password.length < 8) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const breached = await isBreachedPassword(password);
+      if (cancelled) return;
+      if (breached === true) {
+        setRejectedPassword({ value: password, message: SIGNUP_WEAK_PASSWORD_MESSAGE });
+      } else if (breached === false) {
+        setClearedPassword(password);
+      }
+    }, 700);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [password]);
   const [status, setStatus] = useState<
     "idle" | "loading" | "error" | "need-signin" | "set-password" | "reset-sent"
   >("idle");
@@ -146,14 +173,16 @@ export function SignupForm({
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(false);
-  const [birthMonth, setBirthMonth] = useState("");
-  const [birthDay, setBirthDay] = useState("");
-  const [birthYear, setBirthYear] = useState("");
+  // One self-formatting box (port of BEP #201): 03151985 shows as 03/15/1985.
+  const [birthDateText, setBirthDateText] = useState("");
+  const typedBirthDate = splitBirthDateInput(birthDateText);
   const [birthError, setBirthError] = useState<string | null>(null);
   const [ageBlockedNow, setAgeBlocked] = useState(false);
   const ageBlockedEarlier = useSyncExternalStore(noopSubscribe, readAgeBlock, () => false);
   const ageBlocked = ageBlockedNow || ageBlockedEarlier;
-  const birthDate = parseBirthDate(birthYear, birthMonth, birthDay);
+  const birthDate = typedBirthDate
+    ? parseBirthDate(typedBirthDate.year, typedBirthDate.month, typedBirthDate.day)
+    : null;
   // Texts are 18+. Until a full adult date is entered, the box stays off.
   const smsAllowed = birthDate != null && ageBand(birthDate) === "adult";
   const parentConsentRequired = needsParentConsent(birthDate);
@@ -262,7 +291,9 @@ export function SignupForm({
     if (ageBlocked) return;
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
-    const bErr = birthDate ? null : "Enter a valid date of birth.";
+    const bErr = birthDate
+      ? null
+      : "Enter your date of birth as month, day and year, like 03/15/1985.";
     const sms = publicSmsOptIn(smsConsent && smsAllowed, phone);
     setEmailError(eErr);
     setPasswordError(pErr);
@@ -316,9 +347,7 @@ export function SignupForm({
     setPhone("");
     setSmsConsent(false);
     setParentConsentChecked(false);
-    setBirthMonth("");
-    setBirthDay("");
-    setBirthYear("");
+    setBirthDateText("");
     setAgeBlocked(true);
     setStatus("idle");
     setMessage("");
@@ -638,8 +667,15 @@ export function SignupForm({
               <span className="block text-sm text-rose-300">{shownPasswordError}</span>
             ) : (
               <span className="block text-xs text-white/60">
-                Use a password you don&apos;t use anywhere else. Common passwords and ones
-                found in data breaches are not accepted.
+                {clearedPassword === password && password ? (
+                  <span className="font-medium text-emerald-300">✓ This password can be used.</span>
+                ) : (
+                  <>
+                    Use a password you don&apos;t use anywhere else. Common passwords and ones
+                    found in data breaches are not accepted. Tip: if your phone offers to
+                    suggest a strong password, let it.
+                  </>
+                )}
               </span>
             )}
             {password && !shownPasswordError && (() => {
@@ -669,39 +705,37 @@ export function SignupForm({
             })()}
           </div>
 
-          <fieldset className="space-y-1">
-            <legend className="text-xs uppercase tracking-wide text-white/60">Date of birth</legend>
-            <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2">
-              {[
-                { label: "Month", value: birthMonth, set: setBirthMonth, max: 2, auto: "bday-month", ph: "MM" },
-                { label: "Day", value: birthDay, set: setBirthDay, max: 2, auto: "bday-day", ph: "DD" },
-                { label: "Year", value: birthYear, set: setBirthYear, max: 4, auto: "bday-year", ph: "YYYY" },
-              ].map((f) => (
-                <input
-                  key={f.label}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete={f.auto}
-                  aria-label={`Birth ${f.label.toLowerCase()}`}
-                  maxLength={f.max}
-                  value={f.value}
-                  onChange={(e) => {
-                    f.set(e.target.value.replace(/\D/g, ""));
-                    if (birthError) setBirthError(null);
-                  }}
-                  aria-invalid={!!birthError}
-                  className={
-                    "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none " +
-                    (birthError
-                      ? "border-rose-500/60 focus:border-rose-400"
-                      : "border-white/10 focus:border-white/40")
-                  }
-                  placeholder={f.ph}
-                />
-              ))}
-            </div>
-            {birthError && <span className="text-xs text-rose-300">{birthError}</span>}
-          </fieldset>
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wide text-white/60">Date of birth</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="bday"
+              aria-label="Date of birth"
+              maxLength={10}
+              value={birthDateText}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setBirthDateText((prev) => nextBirthDateInput(prev, raw));
+                if (birthError) setBirthError(null);
+              }}
+              aria-invalid={!!birthError}
+              className={
+                "w-full rounded-2xl border bg-black/40 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none " +
+                (birthError
+                  ? "border-rose-500/60 focus:border-rose-400"
+                  : "border-white/10 focus:border-white/40")
+              }
+              placeholder="MM/DD/YYYY"
+            />
+            {birthError ? (
+              <span className="text-xs text-rose-300">{birthError}</span>
+            ) : (
+              <span className="block text-xs text-white/50">
+                Just type the numbers, like 03151985. We add the slashes.
+              </span>
+            )}
+          </label>
 
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wide text-white/60">

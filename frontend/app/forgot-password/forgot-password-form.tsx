@@ -199,6 +199,16 @@ export default function ForgotPasswordForm() {
             {message}
           </p>
         )}
+        {status === "sent" && (
+          <p className="text-sm text-white/70">
+            No email after a few minutes? Check your spam folder. If you have not joined
+            yet, there is no password to reset:{" "}
+            <Link href="/signup" className="font-medium text-white underline underline-offset-4">
+              create your account
+            </Link>
+            .
+          </p>
+        )}
 
         <p className="text-center text-sm text-white/60">
           Remembered your password?{" "}
