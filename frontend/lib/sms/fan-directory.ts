@@ -6,7 +6,7 @@ function digits(value: string | null | undefined): string {
 }
 
 /**
- * Phone match used by the Twilio inbound webhook: load fans and compare
+ * Phone match used by the Mailchimp inbound webhook: load fans and compare
  * digits, because stored numbers and carrier numbers are not always the
  * same string. Deletes are not involved; this only reads and sets
  * sms_opted_in.

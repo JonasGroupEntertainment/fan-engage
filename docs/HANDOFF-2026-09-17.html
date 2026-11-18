@@ -169,7 +169,7 @@ gh api "repos/JonasGroupEntertainment/fan-engage/deployments/$ID/statuses" -q '.
 <ul>
 <li>Migrations live only in root <code>supabase/migrations/</code>. COLLABORATING.md still points at <code>frontend/supabase/migrations/</code>; that is stale.</li>
 <li>Every phone number write goes through <code>frontend/lib/phone.ts</code> and is stored as E.164.</li>
-<li>Env var names only, never values: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FAD_SUPABASE_URL, FAD_SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET.</li>
+<li>Env var names only, never values: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FAD_SUPABASE_URL, FAD_SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, MAILCHIMP_TRANSACTIONAL_API_KEY, MAILCHIMP_SMS_FROM, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET.</li>
 <li>The FAD service role key is read only by the server-side client for the Radar page. It never reaches the browser.</li>
 <li>To check which env vars exist on the Vercel project, use <code>npx vercel env ls production --scope jonas-group</code> from <code>frontend/</code> (names only), or the Vercel REST API with the CLI's own token, printing only key, target, type, and createdAt. The Vercel MCP env listing returns 403 for this token on every project.</li>
 <li>Commits end with <code>Co-Authored-By: Claude Fable 5.1 &lt;noreply@anthropic.com&gt;</code>. PR bodies end with the Claude Code attribution line.</li>
@@ -185,7 +185,7 @@ gh api "repos/JonasGroupEntertainment/fan-engage/deployments/$ID/statuses" -q '.
 <li><span class="who">Agents</span><span class="what">Branch, test, open the pull request, wait for checks, merge only with Kevin's go-ahead, verify the deploy, and report. Never type a secret value anywhere, never print a token, never decrypt an env value.</span></li>
 <li><span class="who">Database</span><span class="what">Confirm the project ref before every query. Fan Engage and Super Fan Radar are different projects.</span></li>
 <li><span class="who">Artist content</span><span class="what">Nothing about an artist goes live without that artist's day-to-day manager clearing it. See docs/ARTIST_AGREEMENT_RIGHTS.md.</span></li>
-<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase, Mailchimp, or Twilio. No exports to chat or local files.</span></li>
+<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase or Mailchimp. No exports to chat or local files.</span></li>
 </ul>
 </section>
 

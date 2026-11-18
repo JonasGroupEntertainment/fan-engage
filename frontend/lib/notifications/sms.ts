@@ -1,22 +1,25 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { deliverSms, smsProviderName } from "@/lib/sms/deliver";
+import { deliverSms } from "@/lib/sms/deliver";
+import { type SmsMessageType, smsSendClass } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
 
 /**
  * Send a single SMS to a fan. Tier-gated by default — only Gold/Platinum
- * fans receive SMS so the channel stays signal, not spam. The active
- * provider is SMS_PROVIDER (default Twilio).
+ * fans receive SMS so the channel stays signal, not spam. Mailchimp
+ * Transactional is the only sender.
  *
  * The caller is responsible for higher-level opt-in checks (preferences
  * table, quiet hours). This module only enforces:
- *   1. The active provider is configured
+ *   1. Mailchimp SMS is configured
  *   2. Fan has a phone + sms_opted_in
  *   3. Fan is 18+ when a birth date is on file (unknown dates stay
  *      grandfathered, matching the fans age trigger)
  *   4. Fan tier ≥ Gold (unless `bypassTierGate` is true)
+ *   5. Promotional types stay blocked until the promotional flag is set
  *
  * Returns { sent, suppressionReason } so the caller can record the
- * audit log entry with the right reason.
+ * audit log entry with the right reason. A missing provider or a
+ * blocked promotional type is logged and does not throw.
  */
 
 const TIER_RANK: Record<string, number> = {
@@ -30,8 +33,8 @@ const TIER_RANK: Record<string, number> = {
 export interface SendSmsResult {
   sent: boolean;
   suppressionReason?:
-    | "twilio_not_configured"
     | "mailchimp_not_configured"
+    | "promotional_disabled"
     | "no_phone"
     | "not_opted_in"
     | "under_18"
@@ -43,6 +46,7 @@ export interface SendSmsResult {
 export async function sendSmsToFan(opts: {
   fanId: string;
   body: string;
+  messageType: SmsMessageType;
   /** If true, skip the Gold-tier gate (e.g., RSVP confirmations to anyone with SMS opt-in). */
   bypassTierGate?: boolean;
 }): Promise<SendSmsResult> {
@@ -67,14 +71,17 @@ export async function sendSmsToFan(opts: {
     }
   }
 
-  const result = await deliverSms({ to: fan.phone as string, body: opts.body });
+  const result = await deliverSms({
+    to: fan.phone as string,
+    body: opts.body,
+    ...smsSendClass(opts.messageType),
+  });
   if (result.ok) return { sent: true };
+  if (result.blocked === "promotional_disabled") {
+    return { sent: false, suppressionReason: "promotional_disabled", error: result.error };
+  }
   if (!result.configured) {
-    return {
-      sent: false,
-      suppressionReason:
-        smsProviderName() === "mailchimp" ? "mailchimp_not_configured" : "twilio_not_configured",
-    };
+    return { sent: false, suppressionReason: "mailchimp_not_configured", error: result.error };
   }
   if (result.optOut) {
     await admin.from("fans").update({ sms_opted_in: false }).eq("id", opts.fanId);

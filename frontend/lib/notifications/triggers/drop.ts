@@ -49,6 +49,7 @@ export async function notifyDropLaunched(opts: {
         sendNotification({
           fanId,
           type: "drops",
+          smsMessageType: "drop_launched",
           payload: {
             title: `${artist.name as string} — new drop`,
             body,
@@ -115,6 +116,7 @@ export async function notifyDropExpiring(opts: {
         sendNotification({
           fanId,
           type: "drops",
+          smsMessageType: "drop_expiring",
           payload: {
             title: `${opts.rewardTitle} ends soon`,
             body: `Last ${minutesLeft} min to redeem this drop.`,

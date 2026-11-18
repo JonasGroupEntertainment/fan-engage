@@ -25,7 +25,7 @@ The rate limiter uses an in-memory store with a sliding window approach. Request
 - `POST /api/fan-engage/sms` - SMS opt-in and notifications
 - `POST /api/fan-engage/mailchimp` - Email list subscription
 
-**Rationale:** Fan data endpoints handle sensitive user information and trigger external API calls (Twilio, Mailchimp). The 30-request limit per minute prevents bulk data exfiltration and DOS-style hammering of dependent services.
+**Rationale:** Fan data endpoints handle sensitive user information and trigger external API calls (Mailchimp). The 30-request limit per minute prevents bulk data exfiltration and DOS-style hammering of dependent services.
 
 ### Rate Limit Response
 

@@ -389,7 +389,7 @@ export default function OnboardingWizard({
 
   /**
    * Final-step submit: persists the profile, awards the signup bonus, sends
-   * the Twilio SMS (if a phone is provided), fires Mailchimp, and routes
+   * the Mailchimp SMS (if a phone is provided), fires the email subscribe, and routes
    * home. Doesn't require a phone — the wizard shouldn't dead-end on an
    * optional field.
    */
@@ -434,7 +434,7 @@ export default function OnboardingWizard({
       // Text only a fan who ticked the SMS box, and only once.
       if (hasSendablePhone(formState.phone) && smsConsent && smsStatus !== "success") {
         sendConfirmationText().catch((err) =>
-          console.warn("Twilio SMS did not complete:", err),
+          console.warn("Mailchimp SMS did not complete:", err),
         );
       }
 
@@ -708,7 +708,7 @@ export default function OnboardingWizard({
               {smsStatus === "loading" ? "Sending..." : "Send confirmation text"}
             </button>
             {smsStatus === "success" && (
-              <p className="mt-2 text-sm text-emerald-300">Opt-in confirmed via Twilio.</p>
+              <p className="mt-2 text-sm text-emerald-300">Opt-in confirmed via Mailchimp.</p>
             )}
             {smsStatus === "error" && (
               <p className="mt-2 text-sm text-rose-300">Issue sending SMS. Try again.</p>

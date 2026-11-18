@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as OnboardPayload;
 
     // Phone is optional, but anything provided must normalize to E.164 so
-    // Twilio and phone-based lookups always see one canonical shape.
+    // Mailchimp and phone-based lookups always see one canonical shape.
     const phoneResult = normalizePhoneE164(payload.phone);
     if (!phoneResult.ok) {
       return NextResponse.json(

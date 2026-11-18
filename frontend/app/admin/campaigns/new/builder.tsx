@@ -520,7 +520,7 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
           className="w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
         />
         <p className="text-xs text-white/50">
-          Recorded as a campaign item; sends via Twilio to opted-in fans.
+          Recorded as a campaign item; sends via Mailchimp to opted-in fans.
         </p>
       </Section>
 

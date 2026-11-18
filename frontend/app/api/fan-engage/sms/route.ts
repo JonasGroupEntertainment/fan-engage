@@ -3,7 +3,8 @@ import { AGE_ADULT_ONLY_MESSAGE } from "@/lib/age-gate";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { deliverSms, smsConfigurationError, smsProviderName } from "@/lib/sms/deliver";
+import { deliverSms } from "@/lib/sms/deliver";
+import { smsSendClass } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
 import { SMS_WELCOME_MESSAGE, smsRecipientForFan } from "@/lib/sms/welcome";
 
@@ -40,24 +41,11 @@ export async function POST(request: NextRequest) {
       },
     );
   }
-  const configError = smsConfigurationError();
-  if (configError) {
-    return NextResponse.json(
-      {
-        error:
-          smsProviderName() === "mailchimp"
-            ? "Mailchimp SMS is not configured"
-            : "Twilio credentials are not configured",
-      },
-      { status: 500 },
-    );
-  }
-
   try {
     // Only ever text the signed-in fan's own stored number, and only after
     // they ticked the SMS consent box (recorded as fans.sms_opted_in by the
     // onboard route). The request body is ignored: no client-supplied
-    // number or wording reaches Twilio.
+    // number or wording is sent.
     const { data: fan, error: fanErr } = await supabase
       .from("fans")
       .select("phone, sms_opted_in, birth_date")
@@ -78,7 +66,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: AGE_ADULT_ONLY_MESSAGE }, { status: 403 });
     }
 
-    const sent = await deliverSms({ to: recipient.phone, body: SMS_WELCOME_MESSAGE });
+    const sent = await deliverSms({
+      to: recipient.phone,
+      body: SMS_WELCOME_MESSAGE,
+      ...smsSendClass("welcome"),
+    });
     if (!sent.ok) {
       if (sent.optOut) {
         const admin = createAdminClient();
@@ -93,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to send Twilio opt-in:", error);
+    console.error("Failed to send Mailchimp opt-in:", error);
     return NextResponse.json(
       { error: "Unable to send confirmation text." },
       { status: 500 }

@@ -179,7 +179,7 @@ describe("official contact alignment", () => {
     const holding = readRepo("../../app/(legal)/policy-page.tsx");
     const login = readRepo("../../app/login/login-form.tsx");
     const unsubscribe = readRepo("../../app/unsubscribe/page.tsx");
-    const helpSms = readRepo("../../app/api/twilio/inbound/route.ts");
+    const helpSms = readRepo("../../app/api/mailchimp/sms/inbound/route.ts");
     for (const src of [footer, holding, login, unsubscribe, helpSms]) {
       assert.match(src, /OFFICIAL_CONTACT_EMAIL|OFFICIAL_CONTACT_MAILTO/);
       assert.equal(src.includes("support@fanengage.app"), false);

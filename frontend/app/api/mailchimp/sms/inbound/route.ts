@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { resolveAppUrl } from "@/lib/app-url";
 import { OFFICIAL_CONTACT_EMAIL } from "@/lib/legal/official-contact";
-import { deliverSms, smsProviderName, syncSmsOptInWithProvider } from "@/lib/sms/deliver";
+import { deliverSms, syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 import { supabaseSmsFanDirectory } from "@/lib/sms/fan-directory";
+import { buildSmsForwardEvent, forwardInboundSms } from "@/lib/sms/forward";
 import { handleInboundSms } from "@/lib/sms/inbound";
+import { smsSendClass } from "@/lib/sms/kinds";
 import {
   inboundTexts,
   keywordRepliesEnabled,
@@ -16,7 +18,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Inbound SMS from a Mailchimp Transactional inbound route.
+ * Inbound SMS from the Mailchimp Transactional inbound route.
+ *
+ * This is the only inbound URL for +16152377488. Brand Engage Pro
+ * uses the same number and does not register its own route. After
+ * Fan Engage handles the message, the event is forwarded.
+ * See docs/sms-mailchimp.md.
  *
  * Register with POST https://mandrillapp.com/api/1.4/inbound/add-route
  * (`phone` = the approved sending number, `url` = this route).
@@ -66,31 +73,46 @@ export async function POST(request: Request) {
   }
 
   const directory = supabaseSmsFanDirectory();
-  const provider = smsProviderName();
-  try {
-    for (const message of inboundTexts(events)) {
+  const repliesOn = keywordRepliesEnabled(process.env);
+  let failed = false;
+  for (const message of inboundTexts(events)) {
+    try {
       const outcome = await handleInboundSms({
         from: message.from,
         text: message.text,
-        provider: "mailchimp",
         directory,
         supportEmail: OFFICIAL_CONTACT_EMAIL,
-        sendKeywordReplies: keywordRepliesEnabled(process.env),
+        sendKeywordReplies: repliesOn,
       });
-      if (outcome.action === "stop") {
-        await syncSmsOptInWithProvider(message.from, false);
-      } else if (outcome.action === "start" && outcome.optedIn === true) {
-        await syncSmsOptInWithProvider(message.from, true);
+      if (outcome.underAge) {
+        console.warn("Mailchimp SMS START ignored for an under-18 fan", outcome.fanId);
       }
-      if (outcome.reply && provider === "mailchimp") {
-        const sent = await deliverSms({ to: message.from, body: outcome.reply });
+      if (outcome.providerOptIn !== null) {
+        await syncSmsOptInWithProvider(message.from, outcome.providerOptIn);
+      }
+      if (outcome.reply) {
+        const sent = await deliverSms({
+          to: message.from,
+          body: outcome.reply,
+          ...smsSendClass("keyword_reply"),
+        });
         if (!sent.ok) console.warn("Mailchimp SMS keyword reply failed", sent.error);
       }
+    } catch (err) {
+      failed = true;
+      console.error("Mailchimp SMS inbound failed", err);
     }
-  } catch (err) {
-    console.error("Mailchimp SMS inbound failed", err);
-    return new NextResponse("error", { status: 500 });
+    await forwardInboundSms(
+      buildSmsForwardEvent({
+        from: message.from,
+        to: message.to,
+        text: message.text,
+        ts: message.ts,
+        eventId: message.eventId,
+      }),
+    );
   }
 
+  if (failed) return new NextResponse("error", { status: 500 });
   return new NextResponse("ok", { status: 200 });
 }

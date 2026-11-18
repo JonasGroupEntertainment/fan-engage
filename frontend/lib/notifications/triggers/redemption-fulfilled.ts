@@ -62,6 +62,7 @@ export async function notifyRedemptionDenied(opts: {
       },
       bypassQuietHours: true,
       bypassSmsTierGate: true,
+      smsMessageType: "redemption_denied",
     });
   } catch (err) {
     console.warn("notifyRedemptionDenied failed (non-blocking):", err);

@@ -11,6 +11,7 @@ import {
   classifySmsKeyword,
   smsHelpReply,
 } from "./keywords.ts";
+import { smsSendClass } from "./kinds.ts";
 import {
   MANDRILL_SMS_ALLOW_URL,
   MANDRILL_SMS_DENY_URL,
@@ -23,7 +24,7 @@ import {
   transactionalOptOutPhones,
   type FetchLike,
 } from "./mandrill.ts";
-import { deliverSms, smsProviderName, syncSmsOptInWithProvider } from "./deliver.ts";
+import { deliverSms, promotionalSmsEnabled, syncSmsOptInWithProvider } from "./deliver.ts";
 import { smsAgeAllowsSend } from "./policy.ts";
 
 const SUPPORT = "support@fanengagepro.com";
@@ -59,13 +60,14 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-describe("SMS provider setting", () => {
-  it("defaults to twilio until the setting is mailchimp", () => {
-    assert.equal(smsProviderName({}), "twilio");
-    assert.equal(smsProviderName({ SMS_PROVIDER: "" }), "twilio");
-    assert.equal(smsProviderName({ SMS_PROVIDER: "twilio" }), "twilio");
-    assert.equal(smsProviderName({ SMS_PROVIDER: "MAILCHIMP" }), "mailchimp");
-    assert.equal(smsProviderName({ SMS_PROVIDER: "mailchimo" }), "twilio");
+describe("promotional SMS flag", () => {
+  it("stays off unless the setting is an explicit yes", () => {
+    assert.equal(promotionalSmsEnabled({}), false);
+    assert.equal(promotionalSmsEnabled({ MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "" }), false);
+    assert.equal(promotionalSmsEnabled({ MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "false" }), false);
+    assert.equal(promotionalSmsEnabled({ MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "true" }), true);
+    assert.equal(promotionalSmsEnabled({ MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "1" }), true);
+    assert.equal(promotionalSmsEnabled({ MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "yes" }), true);
   });
 });
 
@@ -94,12 +96,12 @@ describe("18+ send gate", () => {
 
 describe("Mailchimp Transactional send", () => {
   const env = {
-    SMS_PROVIDER: "mailchimp",
     MAILCHIMP_TRANSACTIONAL_API_KEY: "test-key",
     MAILCHIMP_SMS_FROM: "+16155550199",
+    MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "true",
   };
 
-  it("posts one E.164 recipient to messages/send-sms and does not call Twilio", async () => {
+  it("posts one E.164 recipient to messages/send-sms", async () => {
     const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
     const fetchImpl: FetchLike = async (url, init) => {
       calls.push({ url, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
@@ -108,7 +110,7 @@ describe("Mailchimp Transactional send", () => {
       ]);
     };
     const result = await deliverSms(
-      { to: "6155550123", body: "Hello from Fan Engage" },
+      { to: "6155550123", body: "Hello from Fan Engage", ...smsSendClass("rsvp_confirmation") },
       { env, fetchImpl },
     );
     assert.equal(result.ok, true);
@@ -127,7 +129,10 @@ describe("Mailchimp Transactional send", () => {
   it("treats a denylist rejection as an opt-out and refuses a bad consent value", async () => {
     const fetchImpl: FetchLike = async () =>
       jsonResponse([{ status: "rejected", reject_reason: "unsub", _id: "nope" }]);
-    const rejected = await deliverSms({ to: "+16155550123", body: "Hi" }, { env, fetchImpl });
+    const rejected = await deliverSms(
+      { to: "+16155550123", body: "Hi", ...smsSendClass("redemption_fulfilled") },
+      { env, fetchImpl },
+    );
     assert.equal(rejected.ok, false);
     assert.equal(rejected.optOut, true);
 
@@ -137,30 +142,96 @@ describe("Mailchimp Transactional send", () => {
       return jsonResponse([]);
     };
     const bad = await deliverSms(
-      { to: "+16155550123", body: "Hi" },
+      { to: "+16155550123", body: "Hi", ...smsSendClass("redemption_fulfilled") },
       { env: { ...env, MAILCHIMP_SMS_CONSENT: "marketing" }, fetchImpl: blocked },
     );
     assert.equal(bad.configured, false);
     assert.equal(called, false);
   });
 
-  it("stays on Twilio and does not call Mailchimp when the setting is unset", async () => {
+  it("logs and skips the send when Mailchimp is not configured", async () => {
+    let called = false;
+    const fetchImpl: FetchLike = async () => {
+      called = true;
+      return jsonResponse([]);
+    };
+    const warnings: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
+    try {
+      const result = await deliverSms(
+        { to: "+16155550123", body: "Hi", ...smsSendClass("rsvp_confirmation") },
+        { env: {}, fetchImpl },
+      );
+      assert.equal(result.ok, false);
+      assert.equal(result.configured, false);
+      assert.match(result.error ?? "", /Mailchimp SMS is not configured/);
+      assert.match(warnings.join("\n"), /rsvp_confirmation send skipped/);
+      assert.equal(called, false);
+    } finally {
+      console.warn = original;
+    }
+  });
+
+  it("blocks promotional sends until the flag is set and still sends transactional ones", async () => {
+    const calls: string[] = [];
+    const fetchImpl: FetchLike = async (url) => {
+      calls.push(url);
+      return jsonResponse([{ status: "sent", _id: "ok" }]);
+    };
+    const warnings: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
+    const quiet = {
+      MAILCHIMP_TRANSACTIONAL_API_KEY: "test-key",
+      MAILCHIMP_SMS_FROM: "+16155550199",
+    };
+    try {
+      const blocked = await deliverSms(
+        { to: "+16155550123", body: "Earn points", ...smsSendClass("welcome") },
+        { env: quiet, fetchImpl },
+      );
+      assert.equal(blocked.ok, false);
+      assert.equal(blocked.blocked, "promotional_disabled");
+      assert.match(blocked.error ?? "", /MAILCHIMP_SMS_PROMOTIONAL_ENABLED is not set/);
+      assert.match(warnings.join("\n"), /blocked promotional welcome/);
+      const allowed = await deliverSms(
+        { to: "+16155550123", body: "You're going", ...smsSendClass("rsvp_confirmation") },
+        { env: quiet, fetchImpl },
+      );
+      assert.equal(allowed.ok, true);
+      assert.equal(calls.length, 1);
+      const opened = await deliverSms(
+        { to: "+16155550123", body: "Earn points", ...smsSendClass("welcome") },
+        { env: { ...quiet, MAILCHIMP_SMS_PROMOTIONAL_ENABLED: "true" }, fetchImpl },
+      );
+      assert.equal(opened.ok, true);
+      assert.equal(calls.length, 2);
+    } finally {
+      console.warn = original;
+    }
+  });
+
+  it("refuses a send whose kind does not match the classification", async () => {
     let called = false;
     const fetchImpl: FetchLike = async () => {
       called = true;
       return jsonResponse([]);
     };
     const result = await deliverSms(
-      { to: "+16155550123", body: "Hi" },
-      { env: {}, fetchImpl },
+      { to: "+16155550123", body: "Hi", messageType: "welcome", messageKind: "transactional" },
+      { env, fetchImpl },
     );
     assert.equal(result.ok, false);
-    assert.equal(result.configured, false);
-    assert.match(result.error ?? "", /Twilio/);
+    assert.match(result.error ?? "", /does not match the classification/);
     assert.equal(called, false);
   });
 
-  it("syncs opt-out and opt-in only while Mailchimp is selected", async () => {
+  it("syncs opt-out and opt-in when the transactional key is set", async () => {
     const urls: string[] = [];
     const fetchImpl: FetchLike = async (url) => {
       urls.push(url);
@@ -192,87 +263,112 @@ describe("STOP, HELP, and START", () => {
     assert.equal(classifySmsKeyword("see you there"), "other");
   });
 
-  it("opts out on STOP for both providers and only Twilio replies", async () => {
-    for (const provider of ["twilio", "mailchimp"] as const) {
-      const store = directory(fans);
-      const outcome = await handleInboundSms({
-        from: "+1 (615) 555-0123",
-        text: "STOP",
-        provider,
-        directory: store,
-        supportEmail: SUPPORT,
-        now: NOW,
-      });
-      assert.equal(outcome.action, "stop");
-      assert.equal(store.opted.get("fan-1"), false);
-      assert.equal(outcome.reply, provider === "twilio" ? SMS_STOP_REPLY : null);
-    }
+  it("opts a known fan out on STOP and does not reply or touch an unknown number", async () => {
+    const store = directory(fans);
+    const outcome = await handleInboundSms({
+      from: "+1 (615) 555-0123",
+      text: "STOP",
+      directory: store,
+      supportEmail: SUPPORT,
+      now: NOW,
+    });
+    assert.equal(outcome.action, "stop");
+    assert.equal(store.opted.get("fan-1"), false);
+    assert.equal(outcome.providerOptIn, false);
+    assert.equal(outcome.reply, null);
+    assert.notEqual(outcome.reply, SMS_STOP_REPLY);
+
+    const unknown = directory([]);
+    const stranger = await handleInboundSms({
+      from: "+16155550999",
+      text: "STOPALL",
+      directory: unknown,
+      supportEmail: SUPPORT,
+      now: NOW,
+    });
+    assert.equal(stranger.optedIn, null);
+    assert.equal(stranger.providerOptIn, null);
+    assert.equal(stranger.reply, null);
+    assert.equal(unknown.opted.size, 0);
   });
 
-  it("answers HELP without changing opt-in, and can leave Mailchimp's own reply alone", async () => {
-    for (const provider of ["twilio", "mailchimp"] as const) {
-      const store = directory(fans);
-      const outcome = await handleInboundSms({
-        from: "+16155550123",
-        text: "HELP",
-        provider,
-        directory: store,
-        supportEmail: SUPPORT,
-        now: NOW,
-      });
-      assert.equal(outcome.action, "help");
-      assert.equal(outcome.optedIn, null);
-      assert.equal(store.opted.size, 0);
-      assert.equal(outcome.reply, smsHelpReply(SUPPORT));
-    }
+  it("does not answer HELP unless keyword replies are explicitly on", async () => {
     const quiet = await handleInboundSms({
       from: "+16155550123",
       text: "HELP",
-      provider: "mailchimp",
       directory: directory(fans),
       supportEmail: SUPPORT,
-      sendKeywordReplies: false,
+      now: NOW,
     });
+    assert.equal(quiet.action, "help");
+    assert.equal(quiet.optedIn, null);
     assert.equal(quiet.reply, null);
-    const twilioStillReplies = await handleInboundSms({
+
+    const answered = await handleInboundSms({
       from: "+16155550123",
       text: "HELP",
-      provider: "twilio",
       directory: directory(fans),
       supportEmail: SUPPORT,
-      sendKeywordReplies: false,
+      now: NOW,
+      sendKeywordReplies: true,
     });
-    assert.equal(twilioStillReplies.reply, smsHelpReply(SUPPORT));
+    assert.equal(answered.reply, smsHelpReply(SUPPORT));
+    assert.equal(answered.providerOptIn, null);
   });
 
-  it("opts an adult back in on START and refuses a known under-18", async () => {
-    for (const provider of ["twilio", "mailchimp"] as const) {
-      const adults = directory(fans);
-      const back = await handleInboundSms({
-        from: "+16155550123",
-        text: "START",
-        provider,
-        directory: adults,
-        supportEmail: SUPPORT,
-        now: NOW,
-      });
-      assert.equal(back.optedIn, true);
-      assert.equal(adults.opted.get("fan-1"), true);
-      assert.equal(back.reply, SMS_START_REPLY);
+  it("opts an adult back in on START, ignores an unknown number, and refuses a known under-18", async () => {
+    const adults = directory(fans);
+    const back = await handleInboundSms({
+      from: "+16155550123",
+      text: "START",
+      directory: adults,
+      supportEmail: SUPPORT,
+      now: NOW,
+      sendKeywordReplies: true,
+    });
+    assert.equal(back.optedIn, true);
+    assert.equal(adults.opted.get("fan-1"), true);
+    assert.equal(back.providerOptIn, true);
+    assert.equal(back.reply, SMS_START_REPLY);
 
-      const minors = directory([{ id: "kid", phone: "+16155550124", birthDate: UNDER_18 }]);
-      const blocked = await handleInboundSms({
-        from: "+16155550124",
-        text: "START please",
-        provider,
-        directory: minors,
-        supportEmail: SUPPORT,
-        now: NOW,
-      });
-      assert.equal(blocked.optedIn, null);
-      assert.equal(minors.opted.size, 0);
-      assert.equal(blocked.reply, AGE_ADULT_ONLY_MESSAGE);
-    }
+    const silent = await handleInboundSms({
+      from: "+16155550123",
+      text: "START",
+      directory: directory(fans),
+      supportEmail: SUPPORT,
+      now: NOW,
+    });
+    assert.equal(silent.optedIn, true);
+    assert.equal(silent.reply, null);
+
+    const stranger = await handleInboundSms({
+      from: "+16155550999",
+      text: "START",
+      directory: directory([]),
+      supportEmail: SUPPORT,
+      now: NOW,
+      sendKeywordReplies: true,
+    });
+    assert.equal(stranger.optedIn, null);
+    assert.equal(stranger.providerOptIn, null);
+    assert.equal(stranger.reply, null);
+    assert.equal(stranger.fanId, null);
+
+    const minors = directory([{ id: "kid", phone: "+16155550124", birthDate: UNDER_18 }]);
+    const blocked = await handleInboundSms({
+      from: "+16155550124",
+      text: "START please",
+      directory: minors,
+      supportEmail: SUPPORT,
+      now: NOW,
+      sendKeywordReplies: true,
+    });
+    assert.equal(blocked.optedIn, null);
+    assert.equal(blocked.underAge, true);
+    assert.equal(blocked.providerOptIn, false);
+    assert.equal(minors.opted.size, 0);
+    assert.equal(blocked.reply, null);
+    assert.notEqual(blocked.reply, AGE_ADULT_ONLY_MESSAGE);
   });
 });
 
@@ -334,7 +430,15 @@ describe("Mailchimp webhook parsing", () => {
         msg: { from_email: "fan@example.com", text: "STOP", email: "inbound@example.com" },
       },
     ]);
-    assert.deepEqual(messages, [{ from: "+16155550123", text: "STOP" }]);
+    assert.deepEqual(messages, [
+      {
+        from: "+16155550123",
+        to: null,
+        text: "STOP",
+        ts: null,
+        eventId: null,
+      },
+    ]);
   });
 
   it("opts out SMS unsubscribes and denylist adds, not email unsubscribes", () => {

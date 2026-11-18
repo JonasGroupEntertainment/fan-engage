@@ -1,14 +1,14 @@
 /**
- * Keyword sets used by both providers.
+ * Keyword sets for the Mailchimp inbound route.
  *
- * Twilio's inbound route already treated STOP / STOPALL / UNSUB /
- * UNSUBSCRIBE / CANCEL / END / QUIT as opt-out, HELP / INFO as help, and
- * START / YES / UNSTOP as opt-in.
+ * STOP / STOPALL / UNSUB / UNSUBSCRIBE / CANCEL / END / QUIT opt out.
+ * HELP / INFO ask for help. START / YES / UNSTOP opt back in.
  *
  * Mailchimp's SMS Marketing help center adds OPTOUT, REVOKE, and the
  * non-English stop words (ARRET, HALTE, PARA, FEMA, DETENER) plus AIDE
- * for help. Those are recognized here so a reply to the Mailchimp 10DLC
- * updates the same fan flag.
+ * for help. Those are recognized here so a reply to the 10DLC updates
+ * the same fan flag. Mailchimp auto-answers HELP and STOP, so this app
+ * does not send those replies.
  * https://mailchimp.com/help/about-sms-marketing/
  */
 

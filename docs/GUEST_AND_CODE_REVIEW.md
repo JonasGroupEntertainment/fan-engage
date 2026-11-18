@@ -151,15 +151,15 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 
 ### P1 — high risk for guests, admins, or launch ops
 
-#### A-P1-1. Twilio inbound signature verification fails open if token missing
-- **Path:** `frontend/app/api/twilio/inbound/route.ts` (~57–68)
-- **Why:** Verification only runs `if (twilioAuthToken)`. Missing env = forgeable STOP/START. Also loads all `fans` phones into memory to match.
-- **Fix:** Fail closed (403) when `TWILIO_AUTH_TOKEN` unset in production. Query by normalized phone / E.164 index.
+#### A-P1-1. Inbound SMS signature failed open if the token was missing — **resolved**
+- **Path:** `frontend/app/api/mailchimp/sms/inbound/route.ts` (the Twilio route is gone)
+- **Why:** The old check ran only when the auth token was set, so a missing token accepted forged STOP and START posts. Mailchimp inbound now rejects a real event when `MAILCHIMP_SMS_WEBHOOK_KEY` is unset (403). An empty URL-check body signed with Mailchimp's `test-webhook` key is still accepted.
+- **Fix:** Shipped with the Mailchimp-only SMS path. Phone matching still loads fan phones to compare digits.
 
-#### A-P1-2. Twilio URL depends on `NEXT_PUBLIC_APP_URL`; `.env.example` omits it
-- **Paths:** Twilio route; `frontend/lib/app-url.ts`; `frontend/.env.example`
-- **Why:** Signature check uses exact webhook URL. Wrong/missing app URL → all Twilio posts 403 (compliance breakage) or wrong host. Checklist still flags APP_URL hygiene.
-- **Fix:** Document and require `NEXT_PUBLIC_APP_URL` in `.env.example`; align Twilio console URL with `https://fanengagepro.com`.
+#### A-P1-2. Webhook URL depends on `NEXT_PUBLIC_APP_URL` — **still true for Mailchimp**
+- **Paths:** `frontend/app/api/mailchimp/sms/inbound/route.ts`; `frontend/app/api/mailchimp/sms/events/route.ts`; `frontend/lib/app-url.ts`; `frontend/.env.example`
+- **Why:** The Mandrill signature covers the exact webhook URL. A wrong app URL makes real posts 403. `.env.example` sets `NEXT_PUBLIC_APP_URL=https://www.fanengagepro.com`. Override with `MAILCHIMP_SMS_INBOUND_URL` or `MAILCHIMP_SMS_EVENTS_URL` when the registered URL differs.
+- **Fix:** Register `https://www.fanengagepro.com/api/mailchimp/sms/inbound` and `/events`. See `docs/sms-mailchimp.md`.
 
 #### A-P1-3. Broken admin RLS on `reward_redemptions`
 - **Path:** `supabase/migrations/0021_rewards_redemption.sql` (admin policy uses `is_admin = true` on `fan_community_memberships`)
@@ -292,7 +292,7 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 - **Fix:** Soft-launch: nav label “RaeLynn” / “RaeLynn community”, or interstitial “Continue to RaeLynn’s community” before redirect.
 
 #### B-P1-1. Onboarding reads like an internal admin tool
-- **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Twilio/Mailchimp error copy
+- **Path:** `frontend/app/onboarding/page.tsx` — “Capture the basics…”, “Experience preview”, “Launch checklist”, “Fan is live in the journey”, Mailchimp error copy
 - **Why:** First-time fans feel like they’re in a demo/ops screen, not joining an artist’s SUPERFAN experience (profile → interests → drops/rewards access).
 - **Fix:** Fan-facing titles/hints (artist, points, drops, backstage); hide SMS debug panel; plain “Couldn’t send text — try again.”
 
@@ -453,7 +453,7 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 - [ ] Cookie banner does not cover forgot/reset/onboarding CTAs or hero (B-P1-4, B-P2-11)
 - [ ] Signed-out premium/rewards CTAs prefer Create account (B-P1-7, B-P1-8)
 - [ ] Published legal/rewards terms for consent modal (B-P1-11)
-- [ ] Twilio fail-closed + `NEXT_PUBLIC_APP_URL` aligned (A-P1-1, A-P1-2)
+- [x] Mailchimp inbound fails closed without `MAILCHIMP_SMS_WEBHOOK_KEY` (A-P1-1). Register the exact `www` webhook URLs (A-P1-2) — see `docs/sms-mailchimp.md`
 - [ ] Unify `/premium` founder counter copy (B-P1-13)
 - [ ] Nav Community explicit for soft launch (B-P1-14)
 

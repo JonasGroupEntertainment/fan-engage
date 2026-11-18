@@ -234,12 +234,13 @@ export async function createAndPublishCampaign(formData: FormData) {
     });
   }
 
-  // 9) SMS blast — iterate opted-in fans via Twilio (throttled).
+  // 9) SMS blast — opted-in adults through Mailchimp (throttled). Promotional.
   //    Honors the per-event RSVP filter when attached.
   const smsBody = String(formData.get("sms_body") ?? "").trim();
   if (smsBody) {
     const result = await broadcastSms({
       body: smsBody,
+      messageType: "campaign_sms",
       artistSlug,
       eventId: targetEventRsvpers ? attachedEventId : null,
     });

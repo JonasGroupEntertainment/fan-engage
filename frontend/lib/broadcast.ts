@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { deliverSms, smsConfigurationError } from "@/lib/sms/deliver";
+import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
+import { smsSendClass, type SmsMessageType } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
 
 /**
@@ -68,16 +69,20 @@ async function loadRecipients(opts: {
   }>;
 }
 
-/** Send an SMS to every opted-in adult fan through the active provider. */
+/** Send an SMS to every opted-in adult fan through Mailchimp. */
 export async function broadcastSms(params: {
   body: string;
+  messageType: SmsMessageType;
   artistSlug?: string | null;
   eventId?: string | null;
 }): Promise<BroadcastResult> {
   const result: BroadcastResult = { attempted: 0, sent: 0, failed: 0, recipients: 0 };
-
-  const configError = smsConfigurationError();
-  if (configError) return { ...result, error: configError };
+  const smsClass = smsSendClass(params.messageType);
+  const blocked = smsBlockReason(smsClass);
+  if (blocked) {
+    console.warn(blocked.error);
+    return { ...result, error: blocked.error };
+  }
 
   const recipients = await loadRecipients({
     artistSlug: params.artistSlug,
@@ -94,7 +99,7 @@ export async function broadcastSms(params: {
     if (!smsAgeAllowsSend(fan.birth_date)) continue;
     result.attempted += 1;
     try {
-      const sent = await deliverSms({ to: fan.phone, body: params.body });
+      const sent = await deliverSms({ to: fan.phone, body: params.body, ...smsClass });
       if (sent.ok) {
         result.sent += 1;
       } else {

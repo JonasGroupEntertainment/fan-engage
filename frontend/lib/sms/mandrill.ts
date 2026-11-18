@@ -63,8 +63,13 @@ export function mailchimpSmsConsent(env: Env): { ok: true; value: SmsConsent } |
   return { ok: false };
 }
 
+/**
+ * Off unless set to true. Mailchimp auto-answers HELP and STOP on
+ * 10DLC, so a second reply is a duplicate. STOP is never answered
+ * by this app even when this is true.
+ */
 export function keywordRepliesEnabled(env: Env): boolean {
-  return env.MAILCHIMP_SMS_SEND_KEYWORD_REPLIES?.trim().toLowerCase() !== "false";
+  return env.MAILCHIMP_SMS_SEND_KEYWORD_REPLIES?.trim().toLowerCase() === "true";
 }
 
 export function safeEqual(a: string, b: string): boolean {
@@ -130,7 +135,13 @@ export function mandrillWebhookAuthorized(input: {
   return keys.some((key) => safeEqual(header, mandrillWebhookSignature(key, input.url, input.params)));
 }
 
-export type InboundText = { from: string; text: string };
+export type InboundText = {
+  from: string;
+  to: string | null;
+  text: string;
+  ts: string | null;
+  eventId: string | null;
+};
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -170,6 +181,15 @@ function uniquePhones(value: unknown): string[] {
   return [...new Set(found)];
 }
 
+function stringField(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
 function textFromMessage(message: Record<string, unknown>): string | null {
   for (const key of ["text", "body"]) {
     const value = message[key];
@@ -200,6 +220,20 @@ function phoneFromMessage(message: Record<string, unknown>): string | null {
  * envelope, so a dedicated inbound URL accepts any event that carries
  * a sender phone and message text.
  */
+function destinationFromMessage(message: Record<string, unknown>): string | null {
+  for (const key of ["to_phone", "to", "recipient"]) {
+    const phone = phoneFromValue(message[key]);
+    if (phone) return phone;
+  }
+  const sms = asRecord(message.sms);
+  if (!sms) return null;
+  for (const key of ["to_phone", "to", "recipient"]) {
+    const phone = phoneFromValue(sms[key]);
+    if (phone) return phone;
+  }
+  return null;
+}
+
 export function inboundTexts(events: unknown[]): InboundText[] {
   const out: InboundText[] = [];
   for (const event of events) {
@@ -208,7 +242,17 @@ export function inboundTexts(events: unknown[]): InboundText[] {
     const message = asRecord(record.msg) ?? record;
     const text = textFromMessage(message);
     const from = phoneFromMessage(message);
-    if (text && from) out.push({ from, text });
+    if (!text || !from) continue;
+    const to = destinationFromMessage(message);
+    out.push({
+      from,
+      to: to && to !== from ? to : null,
+      text,
+      ts: stringField(message, ["ts", "timestamp", "date"]) ?? stringField(record, ["ts", "timestamp", "date"]),
+      eventId:
+        stringField(message, ["_id", "id", "event_id"]) ??
+        stringField(record, ["_id", "id", "event_id"]),
+    });
   }
   return out;
 }

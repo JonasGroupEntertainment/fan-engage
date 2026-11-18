@@ -7,8 +7,9 @@
  *   1. Write a row to public.notifications (in-app inbox) with a
  *      stable dedup_key so re-running can't double-fire.
  *   2. If the fan has sms_opted_in = true, a phone number, and is 18+
- *      (or has no birth date on file), send one SMS through the active
- *      provider. SMS_PROVIDER defaults to Twilio.
+ *      (or has no birth date on file), send one SMS through Mailchimp.
+ *      Event matches are promotional, so they stay blocked until
+ *      MAILCHIMP_SMS_PROMOTIONAL_ENABLED is set. In-app rows still write.
  *   3. Stamp event_match_log with sent_at + channels_sent.
  *
  * Idempotent: skipping rows that already have sent_at means re-clicks
@@ -17,7 +18,8 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { deliverSms, smsConfigurationError } from "@/lib/sms/deliver";
+import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
+import { smsSendClass } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
 
 export interface SendEventMatchResult {
@@ -103,7 +105,10 @@ export async function sendEventMatchNotifications(
     event.starts_at as string | null,
   );
 
-  const smsReady = smsConfigurationError() == null;
+  const eventMatchSms = smsSendClass("event_match");
+  const smsBlocked = smsBlockReason(eventMatchSms);
+  if (smsBlocked) console.warn(smsBlocked.error);
+  const smsReady = smsBlocked == null;
 
   for (const c of candidates) {
     result.attempted += 1;
@@ -153,7 +158,7 @@ export async function sendEventMatchNotifications(
       });
       result.sms_attempted += 1;
       try {
-        const sent = await deliverSms({ to: c.fans.phone, body: smsBody });
+        const sent = await deliverSms({ to: c.fans.phone, body: smsBody, ...eventMatchSms });
         if (sent.ok) {
           result.sms_sent += 1;
           channels.push("sms");

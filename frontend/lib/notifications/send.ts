@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPush } from "./push";
+import { smsSendClassForNotification, type SmsMessageType } from "@/lib/sms/kinds";
 import { sendSmsToFan } from "./sms";
 import { getPreferences, isOptedIn, isInQuietHours } from "./preferences";
 import type { NotificationType, PushPayload, Channel } from "./types";
@@ -15,8 +16,8 @@ import type { NotificationType, PushPayload, Channel } from "./types";
  * goes sideways we still want the action to succeed.
  *
  * Quiet hours suppress push only — SMS is always urgent enough to
- * override. Neither Twilio nor Mailchimp Transactional snoozes these
- * sends. Easy to flip later if behavior should change.
+ * override. Mailchimp does not snooze these sends. Easy to flip later
+ * if behavior should change.
  */
 export async function sendNotification(opts: {
   fanId: string;
@@ -28,6 +29,11 @@ export async function sendNotification(opts: {
   bypassSmsTierGate?: boolean;
   /** Bypass quiet-hours check (for high-priority confirmations). */
   bypassQuietHours?: boolean;
+  /**
+   * Which SMS this is. Defaults from the notification type.
+   * Anniversary and prediction reuse `drops` and pass their own type.
+   */
+  smsMessageType?: SmsMessageType;
 }): Promise<void> {
   try {
     const channels = opts.channels ?? ["push", "sms"];
@@ -93,9 +99,13 @@ export async function sendNotification(opts: {
         });
       } else {
         const smsBody = `${opts.payload.title}: ${opts.payload.body}`.slice(0, 280);
+        const smsClass = opts.smsMessageType
+          ? { messageType: opts.smsMessageType }
+          : smsSendClassForNotification(opts.type);
         const smsResult = await sendSmsToFan({
           fanId: opts.fanId,
           body: smsBody,
+          messageType: smsClass.messageType,
           bypassTierGate: opts.bypassSmsTierGate,
         });
         logRows.push({
