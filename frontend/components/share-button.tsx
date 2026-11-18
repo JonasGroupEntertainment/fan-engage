@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sharePayload } from "@/lib/share-payload";
 
 /**
  * Reusable share button.
@@ -48,7 +49,8 @@ export default function ShareButton({
     // dismisses, which we silently swallow.
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
-        await navigator.share({ title, text, url });
+        // Link inside the text: some apps drop a separate url field (BEP #196).
+        await navigator.share(sharePayload({ title, text, url }));
         return;
       } catch (err) {
         // User cancelled — don't fall through to clipboard. Detected

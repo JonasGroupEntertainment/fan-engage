@@ -10,6 +10,26 @@ export const SIGNUP_CREATE_FAILED_MESSAGE =
 export const SIGNUP_EMAIL_IN_USE_MESSAGE =
   "That email is already in use. Sign in, or try a different email.";
 
+export const SIGNUP_WEAK_PASSWORD_MESSAGE =
+  "That password is too common or has appeared in a data breach, so it can’t be used. Please choose a different password.";
+
+export const SIGNUP_PASSWORD_RULES_MESSAGE =
+  "That password doesn’t meet the requirements. Use at least 8 characters and try again.";
+
+/** Supabase's leaked or easy-to-guess password check. */
+const WEAK_PASSWORD_RE = /known to be weak|easy to guess|weak[_ ]password|pwned|data breach/i;
+/** Supabase's own length and character rules. */
+const PASSWORD_RULES_RE = /password should (?:be|contain)|password.*at least \d+ characters/i;
+
+/** A clear line for a rejected password, or null when the error is about something else. */
+export function passwordRejectionMessage(raw: string | null | undefined): string | null {
+  const text = (raw ?? "").trim();
+  if (!text) return null;
+  if (WEAK_PASSWORD_RE.test(text)) return SIGNUP_WEAK_PASSWORD_MESSAGE;
+  if (PASSWORD_RULES_RE.test(text)) return SIGNUP_PASSWORD_RULES_MESSAGE;
+  return null;
+}
+
 const EMAIL_IN_USE_RE =
   /already registered|already been registered|already exists|email.*(?:in use|taken)|user already/i;
 
@@ -36,7 +56,14 @@ export function sanitizeSignupError(raw: string | null | undefined): string {
   if (text === SIGNUP_NOT_CREATED_MESSAGE) return SIGNUP_NOT_CREATED_MESSAGE;
   if (text === SIGNUP_CREATE_FAILED_MESSAGE) return SIGNUP_CREATE_FAILED_MESSAGE;
   if (text === SIGNUP_EMAIL_IN_USE_MESSAGE) return SIGNUP_EMAIL_IN_USE_MESSAGE;
+  if (text === SIGNUP_WEAK_PASSWORD_MESSAGE) return SIGNUP_WEAK_PASSWORD_MESSAGE;
+  if (text === SIGNUP_PASSWORD_RULES_MESSAGE) return SIGNUP_PASSWORD_RULES_MESSAGE;
   if (EMAIL_IN_USE_RE.test(text)) return SIGNUP_EMAIL_IN_USE_MESSAGE;
+  // A rejected password must say so (BEP #184): the generic line sent a
+  // guest round the form nine times with no way to know the password was
+  // the problem.
+  const passwordMessage = passwordRejectionMessage(text);
+  if (passwordMessage) return passwordMessage;
   return SIGNUP_CREATE_FAILED_MESSAGE;
 }
 

@@ -60,3 +60,12 @@ body {
     animation: none !important;
   }
 }
+
+/* Phone bottom tab bar (components/mobile-tab-bar.tsx): lift the cookie
+   banner, install prompt and points toast above it. Zero from md up,
+   where it is hidden. */
+@media (max-width: 767px) {
+  body:has(nav[data-tab-bar]) {
+    --tab-bar-h: 4.5rem;
+  }
+}

@@ -10,6 +10,8 @@ import {
   didSignupCreateUser,
   interpretSignupCreate,
   sanitizeSignupError,
+  SIGNUP_PASSWORD_RULES_MESSAGE,
+  SIGNUP_WEAK_PASSWORD_MESSAGE,
 } from "./signup-outcome.ts";
 
 function readRepo(relFromLib: string): string {
@@ -176,5 +178,28 @@ describe("signup form stays on /signup after a failed create", () => {
     assert.match(route, /if \(!rl\.allowed\)/);
     assert.match(route, /rl\.reason === "backend_unavailable"/);
     assert.doesNotMatch(route, /Database error saving new user/);
+  });
+});
+
+describe("rejected password (BEP #184 / #194 port)", () => {
+  it("tells the fan when the password itself was rejected", () => {
+    assert.equal(
+      sanitizeSignupError("Password is known to be weak and easy to guess, please choose a different one."),
+      SIGNUP_WEAK_PASSWORD_MESSAGE,
+    );
+    assert.equal(
+      sanitizeSignupError("Password should be at least 8 characters."),
+      SIGNUP_PASSWORD_RULES_MESSAGE,
+    );
+  });
+
+  const form = readRepo("../app/signup/signup-form.tsx");
+  it("shows the refusal at the field and hides the strength bar for that password", () => {
+    assert.match(form, /setRejectedPassword\(\{ value: password, message: decision\.message \}\)/);
+    assert.match(form, /rejectedPassword\.value === password \? rejectedPassword\.message : passwordError/);
+    assert.match(form, /\{password && !shownPasswordError && \(\(\) => \{/);
+  });
+  it("never labels a password Strong before the server has checked it", () => {
+    assert.doesNotMatch(form, /label: "Strong"/);
   });
 });

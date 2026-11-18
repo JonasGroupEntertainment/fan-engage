@@ -73,6 +73,8 @@ export function LoginForm({
     callbackError ? "error" : "idle",
   );
   const [message, setMessage] = useState(callbackError ?? "");
+  // After a failed password sign-in, point people who never joined to Join.
+  const [showJoinHint, setShowJoinHint] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileLoadState, setTurnstileLoadState] =
@@ -202,6 +204,7 @@ export function LoginForm({
     }
     setStatus("loading");
     setMessage("");
+    setShowJoinHint(false);
     try {
       const supabase = createClient();
       const credentials = buildPasswordAuthCredentials({
@@ -221,7 +224,15 @@ export function LoginForm({
       router.refresh();
     } catch (err) {
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Unable to sign in.");
+      const raw = err instanceof Error ? err.message : "";
+      if (/invalid login credentials/i.test(raw)) {
+        // The same error covers a wrong password and an email that never
+        // joined, so say both and offer the way to join (BEP #195).
+        setMessage("That email and password didn’t match. Check both and try again.");
+        setShowJoinHint(true);
+      } else {
+        setMessage(raw || "Unable to sign in.");
+      }
     } finally {
       resetChallenge();
     }
@@ -464,6 +475,17 @@ export function LoginForm({
           >
             {message}
           </p>
+        )}
+        {showJoinHint && status === "error" && (
+          <div className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80">
+            <p>New here? You may not have an account yet.</p>
+            <Link
+              href={signupHref}
+              className="mt-2 inline-block rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-2 text-sm font-semibold text-white"
+            >
+              Create your account
+            </Link>
+          </div>
         )}
 
         <p className="text-center text-sm text-white/60">

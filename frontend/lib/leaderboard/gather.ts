@@ -209,14 +209,16 @@ export async function gatherArtistLeaderboard(opts: {
     const sorted = rankScores(scores);
 
     // Resolve display names + avatars + tier in a single batch. Internal /
-    // test accounts (fans.is_internal, 0073) never chart: they are dropped
-    // here, before ranks are assigned, so public fans keep real positions.
+    // test accounts (fans.is_internal, 0073) and suspended accounts (e.g. a
+    // merged duplicate) never chart: they are dropped here, before ranks are
+    // assigned, so public fans keep real positions.
     const candidateIds = sorted.map(([fanId]) => fanId);
     const { data: fanRows } = await admin
       .from("fans")
       .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled, is_internal")
       .in("id", candidateIds)
-      .eq("is_internal", false);
+      .eq("is_internal", false)
+      .eq("suspended", false);
     const publicIds = new Set((fanRows ?? []).map((f) => f.id as string));
     for (const id of candidateIds) if (!publicIds.has(id)) scores.delete(id);
     const ranked = sorted.filter(([fanId]) => publicIds.has(fanId));

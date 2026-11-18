@@ -7,9 +7,11 @@ import { legacyGuestRedirect } from "@/lib/legacy-path-redirects";
 import { isSignOutPath } from "@/lib/auth-signout";
 import { shouldRedirectGuestFromOnboarding } from "@/lib/session-presence";
 import { guestAdminPolicyRedirect } from "@/lib/admin-policy-redirect";
+import { isProtectedPath } from "@/lib/protected-paths";
 
 /**
- * Routes a signed-in user must be able to reach.
+ * Routes a signed-in user must be able to reach: see lib/protected-paths.ts
+ * (/admin, /inbox, /me — matched by whole segment).
  * Everything else under /app that's not here or public is open.
  *
  * Note: /rewards, /marketplace, /referrals are intentionally NOT in this
@@ -18,7 +20,6 @@ import { guestAdminPolicyRedirect } from "@/lib/admin-policy-redirect";
  * signed-in fans. Removing them from the gate is what enables the
  * preview pattern; the pages themselves do their own auth-aware render.
  */
-const PROTECTED_PREFIXES = ["/admin", "/inbox"] as const;
 
 /**
  * Optional extra protection: a second HTTP Basic Auth layer on /admin/*.
@@ -141,7 +142,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isProtected = isProtectedPath(pathname);
 
   // Mailchimp links /admin/policies/terms and /privacy. Logged-out
   // reviewers are not admins — send them to the public policy (307).

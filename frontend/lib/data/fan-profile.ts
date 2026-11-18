@@ -66,19 +66,31 @@ export interface PublicFanProfile {
   recentPosts: PublicPost[];
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** True when a /fans/<x> path segment is a fan id, not a profile handle. */
+export function looksLikeFanId(value: string): boolean {
+  return UUID_RE.test(value.trim().toLowerCase());
+}
+
 export async function getFanProfileBySlug(
   slug: string,
 ): Promise<PublicFanProfile | null> {
   const admin = createAdminClient();
   const normalized = slug.toLowerCase();
 
-  const { data: fan, error: fanError } = await admin
+  // The Fan Card used to put the fan id in its QR code and share link
+  // (port of BEP #191). Those links and saved screenshots must keep
+  // working, so an id is accepted here as well as the profile handle.
+  const base = admin
     .from("fans")
     .select(
       "id, profile_slug, first_name, avatar_url, current_tier, total_points, created_at, public_profile_enabled, socials",
-    )
-    .ilike("profile_slug", normalized)
-    .maybeSingle();
+    );
+  const { data: fan, error: fanError } = await (looksLikeFanId(normalized)
+    ? base.eq("id", normalized)
+    : base.ilike("profile_slug", normalized)
+  ).maybeSingle();
 
   if (fanError || !fan) return null;
   if (fan.public_profile_enabled === false) return null;

@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
+import { CANONICAL_PRODUCTION_APP_URL } from "@/lib/app-url";
 import { listArtistsFromDb } from "@/lib/data/artists";
 
 const appUrl =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
+  process.env.NEXT_PUBLIC_APP_URL ?? CANONICAL_PRODUCTION_APP_URL;
 
 // Dynamic sitemap — lists the public, crawlable surfaces of Fan Engage:
 // marketing root, every active artist page, and the legal pages. We omit

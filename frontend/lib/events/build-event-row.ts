@@ -43,15 +43,48 @@ export interface EventRow {
   sort_order: number;
 }
 
-const text = (v: string | null | undefined): string | null => {
+/**
+ * Length caps and the capacity ceiling (port of BEP #157). Every writer
+ * (admin, artist portal, tour-list import) goes through buildEventRow, so
+ * the caps hold for all three.
+ */
+export const EVENT_LIMITS = {
+  title: 120,
+  detail: 2000,
+  eventDate: 80,
+  location: 160,
+  url: 2048,
+  capacity: 100_000,
+} as const;
+
+const text = (v: string | null | undefined, max?: number): string | null => {
   const s = (v ?? "").trim();
-  return s ? s : null;
+  if (!s) return null;
+  return max ? s.slice(0, max) : s;
 };
+
+/**
+ * Fans tap this link, so only http and https are kept (BEP #157). Anything
+ * else (javascript:, data:, a bare word) is dropped rather than stored.
+ */
+export function safeEventLink(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  if (!s || s.length > EVENT_LIMITS.url) return null;
+  try {
+    const url = new URL(s);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Normalise the text columns of an artist_events row exactly as the admin form does. */
 export function buildEventRow(input: EventRowInput): EventRow {
   const capacity =
-    typeof input.capacity === "number" && Number.isFinite(input.capacity)
+    typeof input.capacity === "number" &&
+    Number.isInteger(input.capacity) &&
+    input.capacity >= 1 &&
+    input.capacity <= EVENT_LIMITS.capacity
       ? input.capacity
       : null;
   const sortOrder =
@@ -59,12 +92,12 @@ export function buildEventRow(input: EventRowInput): EventRow {
       ? input.sortOrder
       : 0;
   return {
-    title: input.title.trim(),
-    detail: text(input.detail),
-    event_date: text(input.eventDate),
+    title: input.title.trim().slice(0, EVENT_LIMITS.title),
+    detail: text(input.detail, EVENT_LIMITS.detail),
+    event_date: text(input.eventDate, EVENT_LIMITS.eventDate),
     starts_at: text(input.startsAt),
-    location: text(input.location),
-    url: text(input.url),
+    location: text(input.location, EVENT_LIMITS.location),
+    url: safeEventLink(input.url),
     capacity,
     sort_order: sortOrder,
   };

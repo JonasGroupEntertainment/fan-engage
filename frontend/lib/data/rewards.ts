@@ -158,6 +158,10 @@ export async function countPendingRedemptions(communityId: string): Promise<numb
  * Callers cannot supply another fan id (A-P0-2).
  * Returns { ok, redemptionId?, error? }
  */
+/** Shown when the fan already has this reward waiting to be fulfilled. */
+export const ALREADY_WAITING_MESSAGE =
+  "You already redeemed this and it is waiting to be fulfilled. No more points were spent.";
+
 export async function redeemReward({
   rewardId,
   deliveryDetails,
@@ -198,6 +202,21 @@ export async function redeemReward({
       : await requirePremiumAnywhere(user.id);
     if (!gate.allowed) {
       return { ok: false, error: PREMIUM_CTA.unlock };
+    }
+
+    // One waiting redemption per reward (port of BEP #197). A second press,
+    // whether a double tap or a retry because the first seemed not to work,
+    // must not spend the points again. Once the team fulfils or cancels it,
+    // the reward can be redeemed again.
+    const { data: waiting } = await supabase
+      .from("reward_redemptions")
+      .select("id")
+      .eq("fan_id", user.id)
+      .eq("reward_id", rewardId)
+      .eq("status", "pending")
+      .limit(1);
+    if (waiting && waiting.length > 0) {
+      return { ok: false, error: ALREADY_WAITING_MESSAGE };
     }
 
     const { data, error } = await supabase.rpc("redeem_reward", {

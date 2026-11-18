@@ -81,10 +81,12 @@ const steps: { title: string; description: string; fields: Field[] }[] = [
     description: "Fans choose what they care about—rewards, marketplace drops, live moments.",
     fields: [
       {
-        label: "What are your areas of interest?",
+        // One tap, not a blank box (port of BEP #199). As a required
+        // free-text field this is where BEP's new members stopped joining.
+        label: "What are you most interested in?",
         name: "interest",
-        placeholder: "Rewards, VIP, Marketplace",
-        type: "text",
+        type: "radio",
+        options: ["Rewards", "VIP perks", "Merch & drops", "Live events", "A bit of everything"],
         required: true,
       },
       {

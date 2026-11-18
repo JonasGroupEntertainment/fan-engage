@@ -111,7 +111,7 @@ export default function PointsToastHost() {
     <div
       aria-live="polite"
       aria-atomic="true"
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tab-bar-h,0px)+5rem)] z-50 flex justify-center px-4 sm:bottom-[calc(var(--tab-bar-h,0px)+1.5rem)]"
     >
       {isActive && toast && (
         <div

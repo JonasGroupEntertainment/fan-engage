@@ -86,9 +86,11 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0, isPremium = fa
             {initial}
           </span>
         )}
-        <span>{displayName}</span>
+        {/* Name and arrow hidden on phones so the header fits; the avatar
+            opens the menu (BEP #196, #198). */}
+        <span className="hidden sm:inline">{displayName}</span>
         <span
-          className="text-white/60 transition"
+          className="hidden text-white/60 transition sm:inline"
           style={{
             transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
           }}
@@ -113,6 +115,16 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0, isPremium = fa
               onClick={() => setIsOpen(false)}
             >
               Fan home
+            </Link>
+
+            {/* Fan Card — easy to find (BEP #192) */}
+            <Link
+              href="/me/card"
+              className="block px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+              role="menuitem"
+              onClick={() => setIsOpen(false)}
+            >
+              Fan card
             </Link>
 
             {/* Edit Profile */}

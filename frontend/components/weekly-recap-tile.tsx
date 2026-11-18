@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sharePayload } from "@/lib/share-payload";
 import type { WeeklyRecap } from "@/lib/personal-recap/types";
 import { dateRange } from "@/lib/format/relative-time";
 
@@ -78,11 +79,9 @@ export default function WeeklyRecapTile({
         share?: (data: ShareData) => Promise<void>;
       };
       if (nav.share) {
-        await nav.share({
-          title: "My week on Fan Engage",
-          text,
-          url: shareUrl,
-        });
+        await nav.share(
+          sharePayload({ title: "My week on Fan Engage", text, url: shareUrl }),
+        );
         setShareState("idle");
       } else {
         await navigator.clipboard.writeText(`${text}\n${shareUrl}`);

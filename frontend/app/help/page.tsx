@@ -7,6 +7,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Help",
+  alternates: { canonical: "/help" },
   description:
     "What Fan Engage Pro is, Founding Fan perks, Premium billing, how to cancel, refunds, and how points work.",
 };
