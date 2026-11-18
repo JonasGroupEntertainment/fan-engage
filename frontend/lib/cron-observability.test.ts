@@ -99,6 +99,26 @@ describe("missing env", () => {
       }) ?? "",
       /TWILIO_ACCOUNT_SID/,
     );
+    assert.match(
+      optionalEnvWarning("send-event-reminders", {
+        SMS_PROVIDER: "mailchimp",
+        MAILCHIMP_API_KEY: "k",
+        MAILCHIMP_SERVER_PREFIX: "us1",
+        MAILCHIMP_AUDIENCE_ID: "aud",
+      }) ?? "",
+      /MAILCHIMP_TRANSACTIONAL_API_KEY or MANDRILL_API_KEY/,
+    );
+    assert.equal(
+      optionalEnvWarning("send-event-reminders", {
+        SMS_PROVIDER: "mailchimp",
+        MAILCHIMP_API_KEY: "k",
+        MAILCHIMP_SERVER_PREFIX: "us1",
+        MAILCHIMP_AUDIENCE_ID: "aud",
+        MAILCHIMP_TRANSACTIONAL_API_KEY: "tx",
+        MAILCHIMP_SMS_FROM: "+16155550199",
+      }),
+      null,
+    );
   });
 });
 

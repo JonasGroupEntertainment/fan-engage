@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { OFFICIAL_CONTACT_EMAIL } from "@/lib/legal/official-contact";
+import { supabaseSmsFanDirectory } from "@/lib/sms/fan-directory";
+import { handleInboundSms } from "@/lib/sms/inbound";
+import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,12 +20,11 @@ export const dynamic = "force-dynamic";
  * HELP / INFO                                               → help text
  * START / YES / UNSTOP                                      → opt back in
  * Anything else                                             → silent ack (empty TwiML)
+ *
+ * Mailchimp's extra compliance words (OPTOUT, REVOKE, and the non-English
+ * stop words) take the same opt-out path. A known under-18 fan who texts
+ * START is not opted back in.
  */
-const STOP_KEYWORDS = new Set([
-  "STOP", "STOPALL", "UNSUB", "UNSUBSCRIBE", "CANCEL", "END", "QUIT",
-]);
-const HELP_KEYWORDS = new Set(["HELP", "INFO"]);
-const START_KEYWORDS = new Set(["START", "YES", "UNSTOP"]);
 
 function twimlResponse(message: string | null): NextResponse {
   const body = message
@@ -42,11 +43,6 @@ function escapeXml(s: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
-}
-
-// Normalize a phone number to a loose compare string (strip everything but digits)
-function normalizePhone(p: string | null | undefined): string {
-  return (p ?? "").replace(/\D/g, "");
 }
 
 export async function POST(request: Request) {
@@ -69,56 +65,24 @@ export async function POST(request: Request) {
     }
 
     const from = String(form.get("From") ?? "");
-    const bodyRaw = String(form.get("Body") ?? "").trim();
-    const keyword = bodyRaw.toUpperCase().split(/\s+/)[0] ?? "";
-
+    const bodyRaw = String(form.get("Body") ?? "");
     if (!from) return twimlResponse(null);
 
-    const admin = createAdminClient();
+    const outcome = await handleInboundSms({
+      from,
+      text: bodyRaw,
+      provider: "twilio",
+      directory: supabaseSmsFanDirectory(),
+      supportEmail: OFFICIAL_CONTACT_EMAIL,
+    });
 
-    if (STOP_KEYWORDS.has(keyword)) {
-      // Match by normalized phone in case formatting drifts
-      const digits = normalizePhone(from);
-      const { data: fans } = await admin
-        .from("fans")
-        .select("id, phone, first_name");
-      const target = (fans ?? []).find(
-        (f) => normalizePhone(f.phone as string | null) === digits,
-      );
-      if (target) {
-        await admin.from("fans").update({ sms_opted_in: false }).eq("id", target.id);
-      }
-      // Twilio also auto-handles STOP at the carrier level, but we reply explicitly
-      // so both systems stay in sync.
-      return twimlResponse(
-        "You're unsubscribed from Fan Engage. Reply START to opt back in. Reply HELP for help.",
-      );
+    if (outcome.action === "stop") {
+      await syncSmsOptInWithProvider(from, false);
+    } else if (outcome.action === "start" && outcome.optedIn === true) {
+      await syncSmsOptInWithProvider(from, true);
     }
 
-    if (START_KEYWORDS.has(keyword)) {
-      const digits = normalizePhone(from);
-      const { data: fans } = await admin
-        .from("fans")
-        .select("id, phone, first_name");
-      const target = (fans ?? []).find(
-        (f) => normalizePhone(f.phone as string | null) === digits,
-      );
-      if (target) {
-        await admin.from("fans").update({ sms_opted_in: true }).eq("id", target.id);
-      }
-      return twimlResponse(
-        "You're back in for Fan Engage updates. Reply STOP anytime to opt out.",
-      );
-    }
-
-    if (HELP_KEYWORDS.has(keyword)) {
-      return twimlResponse(
-        `Fan Engage: artist alerts + fan rewards. Msg & data rates may apply. Reply STOP to opt out. Support: ${OFFICIAL_CONTACT_EMAIL}`,
-      );
-    }
-
-    // Anything else — silent 200
-    return twimlResponse(null);
+    return twimlResponse(outcome.reply);
   } catch {
     // Never 500 on this endpoint — Twilio will retry and duplicate messages.
     return twimlResponse(null);

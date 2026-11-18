@@ -8,6 +8,7 @@ import {
   smsTierAllowed,
 } from "@/lib/sms-send-gate";
 import { adultGate } from "@/lib/age-gate";
+import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 import { TOGGLE_KEYS, isMissingPendingColumn, type Prefs } from "./prefs";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
@@ -107,6 +108,7 @@ export async function savePreferencesAction(
       console.error("notifications: failed to sync sms_opted_in", optInError);
       return { error: "Could not save your SMS setting. Please try again." };
     }
+    await syncSmsOptInWithProvider(fan?.phone as string | null, smsOptIn);
   }
 
   revalidatePath("/me/notifications");

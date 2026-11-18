@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deliverSms, smsConfigurationError } from "@/lib/sms/deliver";
+import { smsAgeAllowsSend } from "@/lib/sms/policy";
 
 /**
  * Campaign broadcast helpers — send a single email or SMS blast to every fan
@@ -47,7 +49,7 @@ async function loadRecipients(opts: {
 
   let query = admin
     .from("fans")
-    .select("id, first_name, email, phone, sms_opted_in, email_opted_in, suspended")
+    .select("id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date")
     .eq(optColumn, true)
     .eq("suspended", false)
     .not(contactColumn, "is", null);
@@ -62,10 +64,11 @@ async function loadRecipients(opts: {
     first_name: string | null;
     email: string | null;
     phone: string | null;
+    birth_date: string | null;
   }>;
 }
 
-/** Send an SMS to every opted-in fan via Twilio. */
+/** Send an SMS to every opted-in adult fan through the active provider. */
 export async function broadcastSms(params: {
   body: string;
   artistSlug?: string | null;
@@ -73,13 +76,8 @@ export async function broadcastSms(params: {
 }): Promise<BroadcastResult> {
   const result: BroadcastResult = { attempted: 0, sent: 0, failed: 0, recipients: 0 };
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const defaultFrom = process.env.TWILIO_DEFAULT_FROM;
-  if (!accountSid || !authToken || (!messagingServiceSid && !defaultFrom)) {
-    return { ...result, error: "Twilio not configured" };
-  }
+  const configError = smsConfigurationError();
+  if (configError) return { ...result, error: configError };
 
   const recipients = await loadRecipients({
     artistSlug: params.artistSlug,
@@ -89,32 +87,27 @@ export async function broadcastSms(params: {
   result.recipients = recipients.length;
   if (recipients.length === 0) return result;
 
-  const { default: twilio } = await import("twilio");
-  const client = twilio(accountSid, authToken);
-
-  // Append the carrier-required STOP footer once per message. Twilio also
-  // handles STOP automatically, but the explicit footer keeps us in good
-  // standing with US carriers (10DLC compliance).
-  const smsBody =
-    params.body + (params.body.toUpperCase().includes("STOP") ? "" : " Reply STOP to opt out.");
+  const admin = createAdminClient();
 
   for (const fan of recipients) {
     if (!fan.phone) continue;
+    if (!smsAgeAllowsSend(fan.birth_date)) continue;
     result.attempted += 1;
     try {
-      await client.messages.create({
-        to: fan.phone,
-        body: smsBody,
-        ...(messagingServiceSid
-          ? { messagingServiceSid }
-          : { from: defaultFrom as string }),
-      });
-      result.sent += 1;
+      const sent = await deliverSms({ to: fan.phone, body: params.body });
+      if (sent.ok) {
+        result.sent += 1;
+      } else {
+        result.failed += 1;
+        if (sent.optOut) {
+          await admin.from("fans").update({ sms_opted_in: false }).eq("id", fan.id);
+        }
+      }
     } catch (err) {
       console.error("broadcastSms: send failed for", fan.id, err);
       result.failed += 1;
     }
-    // Throttle to stay under Twilio trial rate limits (1 msg/sec).
+    // Throttle to stay under provider rate limits (1 msg/sec).
     await new Promise((r) => setTimeout(r, 250));
   }
 

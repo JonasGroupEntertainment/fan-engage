@@ -112,6 +112,14 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | `MAILCHIMP_API_KEY`, `MAILCHIMP_SERVER_PREFIX`, `MAILCHIMP_AUDIENCE_ID` | Email subscribe + broadcast | ✅ set |
 | `MANDRILL_API_KEY` (optional `MANDRILL_FROM_EMAIL`, `MANDRILL_FROM_NAME`) | Transactional email (`lib/email/transactional.ts`). **Required for `/api/cron/weekly-team-brief`** (Sprint 4 B) — the brief is staff mail and never falls back to Mailchimp, which would enrol team members in the fan audience; without it the cron warns, skips every artist and sends nothing. The lapsed nudge prefers it when set and otherwise uses Mailchimp. | ⏳ not set — set before the first Monday brief |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` | SMS outbound | ✅ set |
+| `SMS_PROVIDER` | `twilio` (default, including unset) or `mailchimp`. Mailchimp Transactional SMS. Do not set `mailchimp` until one real test send is confirmed. | ⏳ unset — stays on Twilio |
+| `MAILCHIMP_TRANSACTIONAL_API_KEY` | Transactional SMS API key. Not the Marketing key. Falls back to `MANDRILL_API_KEY` when unset. The Mailchimp account owner creates it under Transactional → Settings. | ⏳ not set |
+| `MAILCHIMP_SMS_FROM` | Approved Jonas Group US 10DLC, `+16152377488` (+1 615 237-7488, approved 16 Oct 2026). | ⏳ not set |
+| `MAILCHIMP_SMS_CONSENT` | Optional. `onetime`, `recurring`, or `recurring-no-confirm`. Unset sends `recurring-no-confirm`. | optional |
+| `MAILCHIMP_SMS_WEBHOOK_KEY` | `auth_key` from Transactional `webhooks/add`. Signs `/api/mailchimp/sms/inbound` and `/api/mailchimp/sms/events`. | ⏳ not set |
+| `MAILCHIMP_SMS_INBOUND_URL`, `MAILCHIMP_SMS_EVENTS_URL` | Optional exact URLs when the registered webhook is not `https://www.fanengagepro.com/api/mailchimp/sms/inbound` or `/events`. | optional |
+| `MAILCHIMP_AUDIENCE_WEBHOOK_SECRET` | Query secret for `/api/mailchimp/sms/audience?key=…` (Marketing “SMS unsubscribes”). | ⏳ not set |
+| `MAILCHIMP_SMS_SEND_KEYWORD_REPLIES` | Optional. Set `false` if Mailchimp already auto-replies to HELP/START and a test showed two replies. | optional (default: send HELP and START replies) |
 | `ADMIN_EMAILS` | Allowlist for `/admin/*` access | ✅ set |
 | `CRON_SECRET` | Protects `/api/cron/send-event-reminders` from public hits | ✅ set |
 | `ADMIN_BASIC_USER` + `ADMIN_BASIC_PASS` | Optional extra HTTP Basic Auth on `/admin/*` | ✅ set |

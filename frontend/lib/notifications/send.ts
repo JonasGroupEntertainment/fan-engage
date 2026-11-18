@@ -15,8 +15,8 @@ import type { NotificationType, PushPayload, Channel } from "./types";
  * goes sideways we still want the action to succeed.
  *
  * Quiet hours suppress push only — SMS is always urgent enough to
- * override (and Twilio doesn't have a snooze concept). Easy to flip
- * later if behavior should change.
+ * override. Neither Twilio nor Mailchimp Transactional snoozes these
+ * sends. Easy to flip later if behavior should change.
  */
 export async function sendNotification(opts: {
   fanId: string;
