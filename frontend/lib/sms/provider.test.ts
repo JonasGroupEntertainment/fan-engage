@@ -18,6 +18,8 @@ import {
   MANDRILL_SMS_SEND_URL,
   MANDRILL_URL_CHECK_KEY,
   inboundTexts,
+  mailchimpSmsPostAuthorized,
+  mailchimpSmsWebhookKeys,
   mandrillWebhookAuthorized,
   mandrillWebhookSignature,
   marketingSmsOptOutPhone,
@@ -415,6 +417,169 @@ describe("Mailchimp webhook parsing", () => {
         params: { mandrill_events: JSON.stringify([{ event: "unsub" }]) },
         webhookKey: "hook-key",
       }),
+      false,
+    );
+  });
+
+  it("accepts the inbound key and rejects the events key when both are set", () => {
+    const url = "https://www.fanengagepro.com/api/mailchimp/sms/inbound";
+    const params = {
+      mandrill_events: JSON.stringify([{ event: "inbound", msg: { text: "STOP" } }]),
+    };
+    const env = {
+      MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY: "inbound-key",
+      MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY: "events-key",
+      MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key",
+    };
+    const signed = (key: string) => mandrillWebhookSignature(key, url, params);
+
+    assert.equal(
+      mailchimpSmsPostAuthorized("inbound", { header: signed("inbound-key"), url, params }, env),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized("inbound", { header: signed("events-key"), url, params }, env),
+      false,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized("inbound", { header: signed("shared-key"), url, params }, env),
+      false,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized("events", { header: signed("events-key"), url, params }, env),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized("events", { header: signed("inbound-key"), url, params }, env),
+      false,
+    );
+
+    const inbound = readRepo("../../app/api/mailchimp/sms/inbound/route.ts");
+    const events = readRepo("../../app/api/mailchimp/sms/events/route.ts");
+    const audience = readRepo("../../app/api/mailchimp/sms/audience/route.ts");
+    assert.match(inbound, /mailchimpSmsPostAuthorized\(\s*"inbound"/);
+    assert.match(events, /mailchimpSmsPostAuthorized\(\s*"events"/);
+    assert.equal(inbound.includes("MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY"), false);
+    assert.equal(events.includes("MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY"), false);
+    assert.match(audience, /MAILCHIMP_AUDIENCE_WEBHOOK_SECRET/);
+    assert.equal(audience.includes("MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY"), false);
+    assert.equal(audience.includes("MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY"), false);
+  });
+
+  it("falls back to MAILCHIMP_SMS_WEBHOOK_KEY when a route key is unset", () => {
+    const url = "https://www.fanengagepro.com/api/mailchimp/sms/events";
+    const params = { mandrill_events: JSON.stringify([{ event: "unsub" }]) };
+    const header = mandrillWebhookSignature("shared-key", url, params);
+
+    assert.equal(
+      mailchimpSmsPostAuthorized("inbound", { header, url, params }, { MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" }),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized("events", { header, url, params }, { MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" }),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "inbound",
+        { header, url, params },
+        { MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY: "   ", MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" },
+      ),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "events",
+        { header, url, params },
+        { MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY: "", MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" },
+      ),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "inbound",
+        { header, url, params },
+        { MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY: "events-key", MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" },
+      ),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "events",
+        { header, url, params },
+        { MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY: "inbound-key", MAILCHIMP_SMS_WEBHOOK_KEY: "shared-key" },
+      ),
+      true,
+    );
+  });
+
+  it("accepts any key in a comma-separated list", () => {
+    const url = "https://www.fanengagepro.com/api/mailchimp/sms/inbound";
+    const params = { mandrill_events: JSON.stringify([{ event: "inbound" }]) };
+    const inboundEnv = { MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY: " old-key, new-key " };
+    assert.deepEqual(mailchimpSmsWebhookKeys(inboundEnv, "inbound"), ["old-key", "new-key"]);
+    for (const key of ["old-key", "new-key"]) {
+      assert.equal(
+        mailchimpSmsPostAuthorized(
+          "inbound",
+          { header: mandrillWebhookSignature(key, url, params), url, params },
+          inboundEnv,
+        ),
+        true,
+      );
+    }
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "inbound",
+        { header: mandrillWebhookSignature("other-key", url, params), url, params },
+        inboundEnv,
+      ),
+      false,
+    );
+
+    const eventsEnv = { MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY: "left,right," };
+    assert.deepEqual(mailchimpSmsWebhookKeys(eventsEnv, "events"), ["left", "right"]);
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "events",
+        { header: mandrillWebhookSignature("right", url, params), url, params },
+        eventsEnv,
+      ),
+      true,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "events",
+        { header: mandrillWebhookSignature("left", url, params), url, params },
+        { MAILCHIMP_SMS_WEBHOOK_KEY: "left, right" },
+      ),
+      true,
+    );
+  });
+
+  it("accepts the empty-batch URL check when no keys are set", () => {
+    const url = "https://www.fanengagepro.com/api/mailchimp/sms/inbound";
+    const params = { mandrill_events: "[]" };
+    const header = mandrillWebhookSignature(MANDRILL_URL_CHECK_KEY, url, params);
+    assert.equal(mailchimpSmsPostAuthorized("inbound", { header, url, params }, {}), true);
+    assert.equal(mailchimpSmsPostAuthorized("events", { header, url, params }, {}), true);
+    assert.equal(mailchimpSmsPostAuthorized("inbound", { header: "nope", url, params }, {}), false);
+
+    const real = { mandrill_events: JSON.stringify([{ event: "inbound" }]) };
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "inbound",
+        { header: mandrillWebhookSignature(MANDRILL_URL_CHECK_KEY, url, real), url, params: real },
+        {},
+      ),
+      false,
+    );
+    assert.equal(
+      mailchimpSmsPostAuthorized(
+        "inbound",
+        { header: null, url, params: real },
+        { MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY: "inbound-key" },
+      ),
       false,
     );
   });

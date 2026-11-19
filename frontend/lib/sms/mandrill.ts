@@ -18,8 +18,10 @@ import { normalizePhoneE164 } from "../phone.ts";
  *
  * Webhooks are form-encoded `mandrill_events` and signed with
  * X-Mandrill-Signature (HMAC-SHA1 of the exact webhook URL plus each
- * sorted POST key and value, base64). A URL-check POST sends an empty
- * array signed with the literal key "test-webhook".
+ * sorted POST key and value, base64). Each webhook has its own key.
+ * The inbound route from inbound/add-route is signed with that route's
+ * key. The events webhook is signed with its own auth_key. A URL-check
+ * POST sends an empty array signed with the literal key "test-webhook".
  *   https://mailchimp.com/developer/transactional/guides/track-respond-activity-webhooks/
  *   https://mailchimp.com/developer/transactional/docs/webhooks/
  */
@@ -72,6 +74,32 @@ export function keywordRepliesEnabled(env: Env): boolean {
   return env.MAILCHIMP_SMS_SEND_KEYWORD_REPLIES?.trim().toLowerCase() === "true";
 }
 
+export type MailchimpSmsWebhookKind = "inbound" | "events";
+
+/** Comma-separated keys. Blank pieces are dropped. */
+export function splitMailchimpWebhookKeys(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+/**
+ * Keys that may sign this endpoint.
+ *
+ * The inbound route and the events webhook each have their own key.
+ * When that var is unset or blank, MAILCHIMP_SMS_WEBHOOK_KEY is used.
+ * A value may list several keys, separated by commas, so a key can be
+ * rotated without downtime. Any one of them is accepted.
+ */
+export function mailchimpSmsWebhookKeys(env: Env, kind: MailchimpSmsWebhookKind): string[] {
+  const dedicated =
+    kind === "inbound" ? env.MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY : env.MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY;
+  const chosen = dedicated?.trim() ? dedicated : env.MAILCHIMP_SMS_WEBHOOK_KEY;
+  return splitMailchimpWebhookKeys(chosen);
+}
+
 export function safeEqual(a: string, b: string): boolean {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
@@ -114,25 +142,54 @@ export function mandrillEventsAreEmpty(raw: string | undefined): boolean {
   }
 }
 
+function configuredWebhookKeys(input: {
+  webhookKey?: string | null;
+  webhookKeys?: readonly string[] | null;
+}): string[] {
+  const pieces = [input.webhookKey, ...(input.webhookKeys ?? [])].filter(
+    (key): key is string => typeof key === "string",
+  );
+  return splitMailchimpWebhookKeys(pieces.join(","));
+}
+
 /**
  * Fail closed for real events. An empty `mandrill_events` array is
- * Mailchimp's URL check and is signed with "test-webhook".
+ * Mailchimp's URL check and is signed with "test-webhook", including
+ * when no webhook key is configured. A non-empty batch needs one of
+ * the configured keys. `webhookKey` and `webhookKeys` may each be a
+ * comma-separated list.
  */
 export function mandrillWebhookAuthorized(input: {
   header: string | null;
   url: string;
   params: Record<string, string>;
-  webhookKey: string | undefined;
+  webhookKey?: string | null;
+  webhookKeys?: readonly string[] | null;
 }): boolean {
   const header = input.header?.trim() ?? "";
   if (!header) return false;
-  const raw = input.params.mandrill_events;
-  const empty = mandrillEventsAreEmpty(raw);
-  const keys = empty
-    ? [MANDRILL_URL_CHECK_KEY, input.webhookKey?.trim()].filter((key): key is string => !!key)
-    : [input.webhookKey?.trim()].filter((key): key is string => !!key);
+  const configured = configuredWebhookKeys(input);
+  const keys = mandrillEventsAreEmpty(input.params.mandrill_events)
+    ? [MANDRILL_URL_CHECK_KEY, ...configured]
+    : configured;
   if (keys.length === 0) return false;
   return keys.some((key) => safeEqual(header, mandrillWebhookSignature(key, input.url, input.params)));
+}
+
+/** Signature check for one SMS endpoint, using that endpoint's keys. */
+export function mailchimpSmsPostAuthorized(
+  kind: MailchimpSmsWebhookKind,
+  input: {
+    header: string | null;
+    url: string;
+    params: Record<string, string>;
+  },
+  env: Env,
+): boolean {
+  return mandrillWebhookAuthorized({
+    ...input,
+    webhookKeys: mailchimpSmsWebhookKeys(env, kind),
+  });
 }
 
 export type InboundText = {

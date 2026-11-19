@@ -9,7 +9,7 @@ import { smsSendClass } from "@/lib/sms/kinds";
 import {
   inboundTexts,
   keywordRepliesEnabled,
-  mandrillWebhookAuthorized,
+  mailchimpSmsPostAuthorized,
   parseMandrillEvents,
   readFormParams,
 } from "@/lib/sms/mandrill";
@@ -31,7 +31,11 @@ export const dynamic = "force-dynamic";
  *
  * Mailchimp checks the URL with HEAD, then a POST whose mandrill_events
  * is [] signed with the key "test-webhook". Real events are signed with
- * the webhook auth key (MAILCHIMP_SMS_WEBHOOK_KEY).
+ * this route's own key (MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY), the key
+ * Mailchimp assigns when the route is added. That is not the events
+ * webhook's auth_key. When the inbound key is unset,
+ * MAILCHIMP_SMS_WEBHOOK_KEY is used. Either value may be a
+ * comma-separated list.
  */
 
 function webhookUrl(): string {
@@ -56,12 +60,15 @@ export async function POST(request: Request) {
     return new NextResponse("ok", { status: 200 });
   }
 
-  const authorized = mandrillWebhookAuthorized({
-    header: request.headers.get("x-mandrill-signature"),
-    url: webhookUrl(),
-    params,
-    webhookKey: process.env.MAILCHIMP_SMS_WEBHOOK_KEY,
-  });
+  const authorized = mailchimpSmsPostAuthorized(
+    "inbound",
+    {
+      header: request.headers.get("x-mandrill-signature"),
+      url: webhookUrl(),
+      params,
+    },
+    process.env,
+  );
   if (!authorized) return new NextResponse("Forbidden", { status: 403 });
 
   let events: unknown[];

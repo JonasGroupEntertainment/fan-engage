@@ -153,7 +153,7 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 
 #### A-P1-1. Inbound SMS signature failed open if the token was missing — **resolved**
 - **Path:** `frontend/app/api/mailchimp/sms/inbound/route.ts` (the Twilio route is gone)
-- **Why:** The old check ran only when the auth token was set, so a missing token accepted forged STOP and START posts. Mailchimp inbound now rejects a real event when `MAILCHIMP_SMS_WEBHOOK_KEY` is unset (403). An empty URL-check body signed with Mailchimp's `test-webhook` key is still accepted.
+- **Why:** The old check ran only when the auth token was set, so a missing token accepted forged STOP and START posts. Mailchimp inbound now rejects a real event when no inbound key is set (403). That key is `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY`, and it falls back to `MAILCHIMP_SMS_WEBHOOK_KEY` when unset. The events route uses `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY` the same way. An empty URL-check body signed with Mailchimp's `test-webhook` key is still accepted.
 - **Fix:** Shipped with the Mailchimp-only SMS path. Phone matching still loads fan phones to compare digits.
 
 #### A-P1-2. Webhook URL depends on `NEXT_PUBLIC_APP_URL` — **still true for Mailchimp**
@@ -453,7 +453,7 @@ Use these when fans hit the issues below. Soft-launch CS merch script **matches*
 - [ ] Cookie banner does not cover forgot/reset/onboarding CTAs or hero (B-P1-4, B-P2-11)
 - [ ] Signed-out premium/rewards CTAs prefer Create account (B-P1-7, B-P1-8)
 - [ ] Published legal/rewards terms for consent modal (B-P1-11)
-- [x] Mailchimp inbound fails closed without `MAILCHIMP_SMS_WEBHOOK_KEY` (A-P1-1). Register the exact `www` webhook URLs (A-P1-2) — see `docs/sms-mailchimp.md`
+- [x] Mailchimp inbound fails closed without `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY` (or `MAILCHIMP_SMS_WEBHOOK_KEY` when that is unset) (A-P1-1). Events uses `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY` the same way. Register the exact `www` webhook URLs (A-P1-2) — see `docs/sms-mailchimp.md`
 - [ ] Unify `/premium` founder counter copy (B-P1-13)
 - [ ] Nav Community explicit for soft launch (B-P1-14)
 

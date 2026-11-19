@@ -82,7 +82,13 @@ Production host is `https://www.fanengagepro.com`.
 | Transactional events (SMS unsub, denylist, reject) | `https://www.fanengagepro.com/api/mailchimp/sms/events` |
 | Marketing audience, event "SMS unsubscribes" | `https://www.fanengagepro.com/api/mailchimp/sms/audience?key=<MAILCHIMP_AUDIENCE_WEBHOOK_SECRET>` |
 
-The inbound route is added with `POST https://mandrillapp.com/api/1.4/inbound/add-route` (`phone` = `+16152377488`). The events webhook is Transactional → Webhooks, or `POST /webhooks/add`. Its `auth_key` is `MAILCHIMP_SMS_WEBHOOK_KEY`. The signature covers the exact URL, so set `MAILCHIMP_SMS_INBOUND_URL` or `MAILCHIMP_SMS_EVENTS_URL` only when the registered URL is not the one above.
+The inbound route is added with `POST https://mandrillapp.com/api/1.4/inbound/add-route` (`phone` = `+16152377488`). Mailchimp signs posts to that URL with the inbound route's own key. Put that key in `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY`.
+
+The events webhook is Transactional → Webhooks, or `POST /webhooks/add`. Its `auth_key` is a different key. Put that in `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY`. One shared key cannot verify both URLs.
+
+When a route's own var is unset, that route uses `MAILCHIMP_SMS_WEBHOOK_KEY`. Each of the three vars may hold several comma-separated keys. Any one of them is accepted, so a key can be rotated without downtime.
+
+The signature covers the exact URL, so set `MAILCHIMP_SMS_INBOUND_URL` or `MAILCHIMP_SMS_EVENTS_URL` only when the registered URL is not the one above.
 
 An email unsubscribe does not clear SMS consent.
 
@@ -91,15 +97,31 @@ An email unsubscribe does not clear SMS consent.
 | Name | Required | Notes |
 |---|---|---|
 | `MAILCHIMP_TRANSACTIONAL_API_KEY` | yes, unless `MANDRILL_API_KEY` is set | Transactional → Settings. Not the Marketing key. |
-| `MAILCHIMP_SMS_FROM` | yes | `+16152377488` |
-| `MAILCHIMP_SMS_WEBHOOK_KEY` | yes, before real inbound or event posts | `auth_key` from `webhooks/add` |
-| `MAILCHIMP_AUDIENCE_WEBHOOK_SECRET` | yes, before the audience webhook | `openssl rand -hex 32`. Put the same value in the `key` query. |
-| `BEP_SMS_FORWARD_URL` | when Brand Engage is ready | `https://<bep-domain>/api/sms/inbound-forward` |
+| `MAILCHIMP_SMS_FROM` | yes, at rollout step (e) | `+16152377488`. Leave unset until then. Every send is skipped and logged. |
+| `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY` | yes, before real inbound posts | The inbound route's key, from the route added with `inbound/add-route`. Not the events webhook's `auth_key`. Comma-separated keys are accepted. Falls back to `MAILCHIMP_SMS_WEBHOOK_KEY` when unset. |
+| `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY` | yes, before real event posts | The events webhook's `auth_key`, from `webhooks/add` or Transactional → Webhooks. Not the inbound route's key. Comma-separated keys are accepted. Falls back to `MAILCHIMP_SMS_WEBHOOK_KEY` when unset. |
+| `MAILCHIMP_SMS_WEBHOOK_KEY` | fallback only | Used by inbound and by events only when that route's own var is unset. Same comma-separated form. |
+| `MAILCHIMP_AUDIENCE_WEBHOOK_SECRET` | yes, before the audience webhook | `openssl rand -hex 32`. Put the same value in the `key` query. The audience route does not use the Transactional signing keys. |
+| `BEP_SMS_FORWARD_URL` | before merge | `https://www.brandengagepro.com/api/sms/inbound-forward` |
 | `SMS_FORWARD_SECRET` | with the URL above | Shared with Brand Engage. `openssl rand -hex 32`. |
 | `MAILCHIMP_SMS_PROMOTIONAL_ENABLED` | no | Unset blocks promotional sends. `true` allows them on Transactional. |
 | `MAILCHIMP_SMS_CONSENT` | no | Unset sends `recurring-no-confirm`. |
 | `MAILCHIMP_SMS_INBOUND_URL`, `MAILCHIMP_SMS_EVENTS_URL` | no | Only if the registered URL is not the production path. |
 | `MAILCHIMP_SMS_SEND_KEYWORD_REPLIES` | no | Unset means do not send HELP or START replies. |
+
+## Rollout order
+
+(a) Before merge, set in Vercel Production: the Transactional key (`MAILCHIMP_TRANSACTIONAL_API_KEY`, or confirm `MANDRILL_API_KEY` is already there), `MAILCHIMP_AUDIENCE_WEBHOOK_SECRET`, `SMS_FORWARD_SECRET`, and `BEP_SMS_FORWARD_URL=https://www.brandengagepro.com/api/sms/inbound-forward`. Leave `MAILCHIMP_SMS_FROM` unset, so every send is skipped and logged.
+
+(b) Merge and deploy Brand Engage Pro #247, then this PR.
+
+(c) Register the inbound route, the events webhook, and the audience webhook, using the exact www URLs in the table above.
+
+(d) Set `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY` (the inbound route's key) and `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY` (the events webhook's `auth_key`), then redeploy. `MAILCHIMP_SMS_WEBHOOK_KEY` still works as the fallback for a route whose own var is unset.
+
+(e) Set `MAILCHIMP_SMS_FROM`, redeploy, and send one test text to an opted-in 18+ staff phone, then check HELP, STOP, and START.
+
+(f) Then delete the Twilio environment variables.
 
 ## Legal copy still stored in the database
 
