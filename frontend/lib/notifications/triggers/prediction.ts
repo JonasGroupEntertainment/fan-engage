@@ -77,6 +77,7 @@ export async function notifyPredictionResolved(opts: {
         sendNotification({
           fanId,
           type: "drops",
+          smsMessageType: "prediction_resolved",
           payload: {
             title: `🎯 You got it! ${promptTitle}`,
             body:
@@ -93,6 +94,7 @@ export async function notifyPredictionResolved(opts: {
         sendNotification({
           fanId,
           type: "drops",
+          smsMessageType: "prediction_resolved",
           payload: {
             title: `${artistName} resolved a prediction`,
             body: reveal,

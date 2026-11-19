@@ -87,7 +87,7 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <h3>Stack</h3>
 <ul>
 <li>Next.js 16, React 19, Supabase with row level security, Vercel.</li>
-<li>Stripe for paid tiers. Mailchimp audience 554139 for email, with DIGESTHTML and DIGESTTEXT merge fields fed by the weekly-digest cron. Twilio for SMS. Web Push with VAPID keys. OpenAI plus pgvector for search and recommendations.</li>
+<li>Stripe for paid tiers. Mailchimp audience 554139 for email, with DIGESTHTML and DIGESTTEXT merge fields fed by the weekly-digest cron. Mailchimp Transactional for SMS. Web Push with VAPID keys. OpenAI plus pgvector for search and recommendations.</li>
 <li>Cloudflare Turnstile on signup, password login, and magic link, all fail-closed.</li>
 </ul>
 <h3>Communities</h3>
@@ -137,7 +137,7 @@ select count(*) from public.fan_profiles;</code></pre>
 <p class="eyebrow">Conventions</p>
 <h2>House rules for this codebase</h2>
 <ul>
-<li>Env var names only: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET. Values stay in Vercel.</li>
+<li>Env var names only: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILCHIMP_API_KEY, MAILCHIMP_TRANSACTIONAL_API_KEY, MAILCHIMP_SMS_FROM, TURNSTILE_SECRET_KEY, OPENAI_API_KEY, CRON_SECRET. Values stay in Vercel.</li>
 <li>Production magic links must land on www.fanengagepro.com. The redirect allow list in Supabase must include it.</li>
 <li>Every new RPC that is SECURITY DEFINER gets anon EXECUTE revoked in the same migration.</li>
 <li>LAUNCH_CHECKLIST.md is the migration ledger. Update it when you add a file.</li>
@@ -151,7 +151,7 @@ select count(*) from public.fan_profiles;</code></pre>
 <li><span class="who">Kevin</span><span class="what">Only person who pushes to GitHub and flips production Supabase settings.</span></li>
 <li><span class="who">Agents</span><span class="what">Branch, commit, and report. No push, no production SQL without confirming the project first.</span></li>
 <li><span class="who">Artist content</span><span class="what">Nothing about an artist goes live without that artist's day-to-day manager clearing it. See docs/ARTIST_AGREEMENT_RIGHTS.md.</span></li>
-<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase, Mailchimp, or Twilio. No exports to chat or local files.</span></li>
+<li><span class="who">Fan data</span><span class="what">Phone numbers and emails never leave Supabase or Mailchimp. No exports to chat or local files.</span></li>
 </ul>
 </section>
 

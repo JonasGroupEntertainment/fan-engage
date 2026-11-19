@@ -1,15 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import twilio from "twilio";
+import { AGE_ADULT_ONLY_MESSAGE } from "@/lib/age-gate";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { deliverSms } from "@/lib/sms/deliver";
+import { smsSendClass } from "@/lib/sms/kinds";
+import { smsAgeAllowsSend } from "@/lib/sms/policy";
 import { SMS_WELCOME_MESSAGE, smsRecipientForFan } from "@/lib/sms/welcome";
 
 export const runtime = "nodejs";
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-const defaultFrom = process.env.TWILIO_DEFAULT_FROM;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -42,21 +41,14 @@ export async function POST(request: NextRequest) {
       },
     );
   }
-  if (!accountSid || !authToken || (!messagingServiceSid && !defaultFrom)) {
-    return NextResponse.json(
-      { error: "Twilio credentials are not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     // Only ever text the signed-in fan's own stored number, and only after
     // they ticked the SMS consent box (recorded as fans.sms_opted_in by the
     // onboard route). The request body is ignored: no client-supplied
-    // number or wording reaches Twilio.
+    // number or wording is sent.
     const { data: fan, error: fanErr } = await supabase
       .from("fans")
-      .select("phone, sms_opted_in")
+      .select("phone, sms_opted_in, birth_date")
       .eq("id", user.id)
       .maybeSingle();
     if (fanErr) {
@@ -70,24 +62,30 @@ export async function POST(request: NextRequest) {
     if (!recipient.ok) {
       return NextResponse.json({ error: recipient.error }, { status: recipient.status });
     }
-
-    const client = twilio(accountSid, authToken);
-    const config: Parameters<typeof client.messages.create>[0] = {
-      to: recipient.phone,
-      body: SMS_WELCOME_MESSAGE,
-    };
-
-    if (messagingServiceSid) {
-      config.messagingServiceSid = messagingServiceSid;
-    } else if (defaultFrom) {
-      config.from = defaultFrom;
+    if (!smsAgeAllowsSend(fan?.birth_date as string | null)) {
+      return NextResponse.json({ error: AGE_ADULT_ONLY_MESSAGE }, { status: 403 });
     }
 
-    await client.messages.create(config);
+    const sent = await deliverSms({
+      to: recipient.phone,
+      body: SMS_WELCOME_MESSAGE,
+      ...smsSendClass("welcome"),
+    });
+    if (!sent.ok) {
+      if (sent.optOut) {
+        const admin = createAdminClient();
+        await admin.from("fans").update({ sms_opted_in: false }).eq("id", user.id);
+      }
+      console.error("Failed to send opt-in SMS", sent.error);
+      return NextResponse.json(
+        { error: "Unable to send confirmation text." },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to send Twilio opt-in:", error);
+    console.error("Failed to send Mailchimp opt-in:", error);
     return NextResponse.json(
       { error: "Unable to send confirmation text." },
       { status: 500 }

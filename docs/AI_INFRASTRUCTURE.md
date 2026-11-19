@@ -1194,19 +1194,21 @@ floor (prevents spamming when the follower pool is small).
 1. **In-app notifications** — always written, regardless of SMS
    opt-in. Idempotent via `notifications.dedup_key =
    'event-match:<event_id>:<fan_id>'`.
-2. **SMS** — only if Twilio is configured AND `fans.sms_opted_in =
-   true` AND `fans.phone` is non-empty. Includes the 10DLC-required
-   "Reply STOP to opt out" footer.
+2. **SMS** — only if Mailchimp Transactional SMS is configured AND
+   `fans.sms_opted_in = true` AND `fans.phone` is non-empty AND the
+   fan is 18+ when a birth date is on file. Event-match texts are
+   promotional, so they also wait on `MAILCHIMP_SMS_PROMOTIONAL_ENABLED`.
+   Includes the 10DLC-required "Reply STOP to opt out" footer.
 
-If Twilio isn't configured, in-app notifications still fire — SMS is
-treated as best-effort enrichment.
+If Mailchimp isn't configured, in-app notifications still fire — SMS is
+treated as best-effort enrichment. The send is logged and does not throw.
 
 ### Costs
 
 Zero AI cost for v1. The recs doc mentions an optional Claude step to
 rewrite SMS bodies per fan ("Hey Sarah, you'd love this one") — that's
 deferred until we have data to validate it's worth the per-message
-spend. Current SMS cost is just Twilio's per-message fee.
+spend. Current SMS cost is Mailchimp's per-message fee.
 
 ### Tunables
 
@@ -1226,9 +1228,10 @@ In `lib/event-matching/score.ts`:
   candidates; admin sees an empty table.
 - **No past events for this artist** — `past_rsvp_rate` is 0 for
   everyone; engagement + tier carry the score.
-- **Twilio not configured** — `sendEventMatchNotifications()` still
-  writes in-app rows; SMS counters are 0.
-- **Twilio rate-limited** — per-send try/catch records the failure
+- **Mailchimp not configured, or promotional SMS still disabled** —
+  `sendEventMatchNotifications()` still writes in-app rows; SMS
+  counters are 0.
+- **Mailchimp rate-limited** — per-send try/catch records the failure
   in `event_match_log.errors[]` but doesn't stop the loop. Throttle
   is 250ms between sends.
 - **Re-clicked Send** — already-sent rows are skipped; in-app

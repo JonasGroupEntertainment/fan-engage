@@ -36,7 +36,7 @@ A multi-tenant fan engagement platform for recording artists. Members sign up fo
 - **Storage:** Supabase Storage buckets — `community-uploads`, `avatars`, `community-videos`
 - **Payments:** Stripe Checkout for Premium subscriptions, Stripe Connect on roadmap (G.6) for artist payouts
 - **Email:** Mailchimp for transactional + digest blasts
-- **SMS:** Twilio
+- **SMS:** Mailchimp Transactional (`docs/sms-mailchimp.md`). Shared 10DLC `+16152377488` with Brand Engage Pro. Twilio is not used.
 - **Push:** Web Push API with VAPID keys (Stickiness Phase 2)
 - **AI:** OpenAI (embeddings + GPT-4 family) — see `lib/embeddings`, `lib/moderation`, `lib/drafts`, `lib/captions`, etc.
 - **Cron:** Vercel cron entries in `vercel.json`

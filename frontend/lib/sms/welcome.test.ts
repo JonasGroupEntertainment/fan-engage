@@ -64,6 +64,8 @@ describe("SMS route", () => {
     const wizard = readRepo("../../app/onboarding/onboarding-wizard.tsx");
     assert.match(wizard, /fetch\("\/api\/fan-engage\/sms", \{ method: "POST" \}\)/);
     assert.match(wizard, /!smsConsent/);
-    assert.doesNotMatch(wizard, /interest: formState\.interest,\n\s*\}\),\n\s*\}\)\.catch\(\(err\) => console\.warn\("Twilio/);
+    assert.doesNotMatch(wizard, /interest: formState\.interest,\n\s*\}\),\n\s*\}\)\.catch\(\(err\) => console\.warn\("Mailchimp SMS/);
+    assert.equal(wizard.includes("Twilio"), false);
+    assert.match(wizard, /Opt-in confirmed via Mailchimp/);
   });
 });

@@ -117,7 +117,12 @@ export async function sendEventReminder(
   const smsBody = event.reminder_sms_template || copy.sms;
 
   const [smsResult, emailResult] = await Promise.all([
-    broadcastSms({ body: smsBody, artistSlug: event.artist_slug, eventId: event.id }),
+    broadcastSms({
+      body: smsBody,
+      messageType: "event_reminder",
+      artistSlug: event.artist_slug,
+      eventId: event.id,
+    }),
     broadcastEmail({ subject: copy.subject, body: copy.email }),
   ]);
 

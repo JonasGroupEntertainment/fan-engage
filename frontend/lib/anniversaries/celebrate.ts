@@ -92,6 +92,7 @@ export async function celebrateAnniversary(opts: {
     await sendNotification({
       fanId: opts.fanId,
       type: "drops",   // V1 reuses the drops bucket; dedicated pref column is V2
+      smsMessageType: "anniversary",
       payload: {
         title: `🎉 ${opts.milestone.label} with ${opts.artistName}`,
         body:

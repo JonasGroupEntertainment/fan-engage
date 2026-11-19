@@ -20,6 +20,7 @@ import {
   applyTermsMinimumAge,
 } from "@/lib/legal/align-policy-copy";
 import { applyItem4PolicyCopy } from "@/lib/legal/premium-billing-wording";
+import { applyStoredSmsVendorName } from "@/lib/legal/sms-vendor-name";
 
 export type PolicySlug =
   | "terms"
@@ -90,6 +91,7 @@ function applyPublishedPolicyFacts(policy: PolicyPage): PolicyPage {
   ) {
     contentMd = applyItem4PolicyCopy(policy.slug, contentMd);
   }
+  contentMd = applyStoredSmsVendorName(contentMd);
   return {
     ...policy,
     content_md: contentMd,

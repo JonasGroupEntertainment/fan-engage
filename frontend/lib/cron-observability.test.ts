@@ -97,7 +97,17 @@ describe("missing env", () => {
         MAILCHIMP_SERVER_PREFIX: "us1",
         MAILCHIMP_AUDIENCE_ID: "aud",
       }) ?? "",
-      /TWILIO_ACCOUNT_SID/,
+      /MAILCHIMP_TRANSACTIONAL_API_KEY or MANDRILL_API_KEY/,
+    );
+    assert.equal(
+      optionalEnvWarning("send-event-reminders", {
+        MAILCHIMP_API_KEY: "k",
+        MAILCHIMP_SERVER_PREFIX: "us1",
+        MAILCHIMP_AUDIENCE_ID: "aud",
+        MAILCHIMP_TRANSACTIONAL_API_KEY: "tx",
+        MAILCHIMP_SMS_FROM: "+16155550199",
+      }),
+      null,
     );
   });
 });

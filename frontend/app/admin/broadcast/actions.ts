@@ -92,10 +92,16 @@ export async function sendBroadcast(
 
   let smsSent = 0;
   let emailSent = 0;
+  let smsError: string | undefined;
 
   if (channel === "sms" || channel === "both") {
-    const result = await broadcastSms({ body: tierLabel + message, artistSlug });
+    const result = await broadcastSms({
+      body: tierLabel + message,
+      messageType: "admin_owner_blast",
+      artistSlug,
+    });
     smsSent = result.sent;
+    smsError = result.error;
   }
 
   if (channel === "email" || channel === "both") {
@@ -124,8 +130,23 @@ export async function sendBroadcast(
       campaign_id: campaign.id,
       item_kind: channel === "both" ? "sms" : channel,
       ref_id: null,
-      metadata: { sent: smsSent + emailSent, tier_filter: tierFilter },
+      metadata: {
+        sent: smsSent + emailSent,
+        tier_filter: tierFilter,
+        sms_error: smsError ?? null,
+      },
     });
+  }
+
+  if (smsError && smsSent === 0) {
+    const emailNote =
+      channel === "both" && emailSent > 0 ? ` Email was sent (${emailSent}).` : "";
+    return {
+      ok: false,
+      error: `${smsError}${emailNote}`,
+      smsSent,
+      emailSent,
+    };
   }
 
   return {

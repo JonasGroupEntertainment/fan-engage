@@ -111,7 +111,18 @@ Last updated: April 26, 2026 — **Signup unblocked** (migration 0023 patches `a
 | `SUPABASE_SERVICE_ROLE_KEY` | Admin-scoped Supabase operations | ✅ set |
 | `MAILCHIMP_API_KEY`, `MAILCHIMP_SERVER_PREFIX`, `MAILCHIMP_AUDIENCE_ID` | Email subscribe + broadcast | ✅ set |
 | `MANDRILL_API_KEY` (optional `MANDRILL_FROM_EMAIL`, `MANDRILL_FROM_NAME`) | Transactional email (`lib/email/transactional.ts`). **Required for `/api/cron/weekly-team-brief`** (Sprint 4 B) — the brief is staff mail and never falls back to Mailchimp, which would enrol team members in the fan audience; without it the cron warns, skips every artist and sends nothing. The lapsed nudge prefers it when set and otherwise uses Mailchimp. | ⏳ not set — set before the first Monday brief |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` | SMS outbound | ✅ set |
+| `MAILCHIMP_TRANSACTIONAL_API_KEY` | Transactional SMS API key. Not the Marketing key. Falls back to `MANDRILL_API_KEY` when unset. The Mailchimp account owner creates it under Transactional → Settings. The only SMS sender. | ⏳ not set |
+| `MAILCHIMP_SMS_FROM` | Approved Jonas Group US 10DLC, `+16152377488` (+1 615 237-7488, approved 16 Oct 2026). Shared with Brand Engage Pro. Leave unset until rollout step (e) in `docs/sms-mailchimp.md`. While unset, every send is skipped and logged. | ⏳ not set |
+| `MAILCHIMP_SMS_CONSENT` | Optional. `onetime`, `recurring`, or `recurring-no-confirm`. Unset sends `recurring-no-confirm`. | optional |
+| `MAILCHIMP_SMS_PROMOTIONAL_ENABLED` | Optional. Unset blocks promotional SMS (welcome, blasts, campaigns, drops, posts, event matches and reminders, leaderboard, anniversary, predictions). `true` lets those use Transactional SMS. Transactional confirmations send either way. See `docs/sms-mailchimp.md`. | unset — promotional blocked |
+| `MAILCHIMP_SMS_INBOUND_WEBHOOK_KEY` | Key that signs `/api/mailchimp/sms/inbound`. This is the inbound route's key from `inbound/add-route`, not the events webhook's `auth_key`. Comma-separated keys are accepted (rotation without downtime). Falls back to `MAILCHIMP_SMS_WEBHOOK_KEY` when unset. | ⏳ not set |
+| `MAILCHIMP_SMS_EVENTS_WEBHOOK_KEY` | Key that signs `/api/mailchimp/sms/events`. This is the events webhook's `auth_key` from Transactional `webhooks/add` (or Transactional → Webhooks). Not the inbound route's key. Comma-separated keys are accepted. Falls back to `MAILCHIMP_SMS_WEBHOOK_KEY` when unset. | ⏳ not set |
+| `MAILCHIMP_SMS_WEBHOOK_KEY` | Fallback only. Used by inbound and by events when that route's own var above is unset. Same comma-separated form. | ⏳ not set |
+| `MAILCHIMP_SMS_INBOUND_URL`, `MAILCHIMP_SMS_EVENTS_URL` | Optional exact URLs when the registered webhook is not `https://www.fanengagepro.com/api/mailchimp/sms/inbound` or `/events`. | optional |
+| `MAILCHIMP_AUDIENCE_WEBHOOK_SECRET` | Query secret for `/api/mailchimp/sms/audience?key=…` (Marketing “SMS unsubscribes”). Unchanged. Not a Transactional signing key. | ⏳ not set |
+| `MAILCHIMP_SMS_SEND_KEYWORD_REPLIES` | Optional. Unset: do not send HELP or START replies (Mailchimp auto-answers HELP and STOP on 10DLC). `true` sends HELP and START replies. STOP is never replied to by us. | optional (default off) |
+| `BEP_SMS_FORWARD_URL` | Brand Engage inbound forward. Production value: `https://www.brandengagepro.com/api/sms/inbound-forward`. Set before merge (rollout step (a) in `docs/sms-mailchimp.md`). Skipped when unset. Fan Engage is the only inbound route for `+16152377488`. | ⏳ not set — set before merge |
+| `SMS_FORWARD_SECRET` | Shared HMAC secret for `X-SMS-Forward-Signature`. `openssl rand -hex 32`. Set before merge, with the URL above. Skipped when unset. | ⏳ not set — set before merge |
 | `ADMIN_EMAILS` | Allowlist for `/admin/*` access | ✅ set |
 | `CRON_SECRET` | Protects `/api/cron/send-event-reminders` from public hits | ✅ set |
 | `ADMIN_BASIC_USER` + `ADMIN_BASIC_PASS` | Optional extra HTTP Basic Auth on `/admin/*` | ✅ set |
@@ -137,11 +148,11 @@ Policy pages and SMS webhook are already live — text is placeholder until coun
 - [ ] **Terms of Service** — paste final copy into `/admin/policies/terms`, set `effective_date`, uncheck DRAFT
 - [ ] **Privacy Policy** — paste final copy into `/admin/policies/privacy`, set `effective_date`, uncheck DRAFT
 - [ ] **Cookie Policy** — paste final copy into `/admin/policies/cookie_policy`, set `effective_date`, uncheck DRAFT
-- [ ] **Terms audit** — confirm references to Fan Engage, Anthropic, Supabase, Twilio, Mailchimp all match what we actually do
+- [ ] **Terms audit** — confirm references to Fan Engage, Anthropic, Supabase, and Mailchimp all match what we actually do
 - [ ] **Privacy — data retention + deletion** — lawyer to confirm retention periods (account deletion, post retention, referral log retention)
 - [ ] **DMCA / content takedown policy** — if user-uploaded images become a real volume
-- [ ] **SMS 10DLC brand + campaign registration** (US carrier requirement) — submit via Twilio Console
-- [ ] **Twilio inbound webhook** — point Messaging Service inbound URL to `https://fan-engage-pearl.vercel.app/api/twilio/inbound` so STOP/HELP compliance actually fires. Verify a real STOP message flips the opt-in flag.
+- [ ] **SMS 10DLC** — Jonas Group number `+16152377488` is the approved Mailchimp 10DLC (16 Oct 2026). Register the three Mailchimp webhooks in `docs/sms-mailchimp.md`. Fan Engage is the only inbound route for that number.
+- [ ] **Mailchimp inbound webhook** — point the Transactional inbound route for `+16152377488` at `https://www.fanengagepro.com/api/mailchimp/sms/inbound` so STOP/HELP compliance runs. Verify a real STOP from a Fan Engage fan flips `sms_opted_in`. Do not also register that number on Brand Engage.
 - [ ] **COPPA** — if we expect under-13 users, need parental consent flow. Current ToS draft says 13+; confirm with counsel.
 - [ ] **Mailchimp welcome automation** — we now tag every new fan with `welcome` at signup (Phase 3e). Configure a Mailchimp Automation in the dashboard to fire a welcome email when the `welcome` tag is applied. Suggested copy: "Welcome to Fan Engage — here's how to earn your first 100 points" with a CTA back to `/artists`.
 
@@ -799,8 +810,10 @@ When ready, run through:
    `event_match_log.sent_at` for one fan. Re-click Send. The fan
    gets stamped sent_at again but the `notifications` row is NOT
    duplicated (dedup_key holds the line).
-9. **Twilio missing** — Temporarily unset `TWILIO_ACCOUNT_SID` env
-   var and Send. In-app rows still write; SMS counters are 0.
+9. **Mailchimp SMS missing** — Temporarily unset `MAILCHIMP_TRANSACTIONAL_API_KEY` and `MANDRILL_API_KEY`
+   and Send. In-app rows still write; SMS counters are 0. With the keys set and
+   `MAILCHIMP_SMS_PROMOTIONAL_ENABLED` unset, event-match SMS is still skipped
+   (it is promotional) and in-app rows still write.
 10. **No followers** — Trigger Match preview for an event whose
     artist has zero followers. Page should render the empty-state
     message gracefully.
@@ -1312,7 +1325,7 @@ Recorded for the paper trail:
 - Phase 3a — DB-backed artists + editor + per-artist following
 - Phase 3b — Event RSVPs + capacity + .ics + per-event campaign audiences
 - Phase 3c — Automated 24h + 1h reminders via Vercel Cron
-- Phase 3d — Policy pages (DRAFT) + cookie banner + footer + onboarding consent + unsubscribe + Twilio STOP webhook
+- Phase 3d — Policy pages (DRAFT) + cookie banner + footer + onboarding consent + unsubscribe + Mailchimp STOP webhook
 - Phase 5a — Premium tier gating (community posts visibility, event tier)
 - Phase 5b — Stripe subscriptions + founder slots + paid memberships
 - Phase 5c — Points multipliers + cancellation policy

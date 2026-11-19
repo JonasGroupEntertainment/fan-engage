@@ -4,6 +4,7 @@ import {
   OFFICIAL_CONTACT_EMAIL,
   OFFICIAL_CONTACT_MAILTO,
 } from "@/lib/legal/official-contact";
+import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function UnsubscribePage({
       const admin = createAdminClient();
       const { data: fan } = await admin
         .from("fans")
-        .select("id, first_name")
+        .select("id, first_name, phone")
         .eq("unsubscribe_token", token)
         .maybeSingle();
       if (!fan) {
@@ -40,6 +41,13 @@ export default async function UnsubscribePage({
             ? { sms_opted_in: false }
             : { email_opted_in: false };
         await admin.from("fans").update(update).eq("id", fan.id);
+        if (ch === "sms") {
+          try {
+            await syncSmsOptInWithProvider(fan.phone as string | null, false);
+          } catch (err) {
+            console.warn("unsubscribe: SMS provider sync failed", err);
+          }
+        }
         status = "ok";
         firstName = (fan.first_name as string | null) ?? null;
       }

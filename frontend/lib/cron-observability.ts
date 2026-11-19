@@ -11,6 +11,8 @@
  * 401/503, or a 200, with no row and sometimes no log line.
  */
 
+import { missingSmsProviderEnv } from "./sms/deliver.ts";
+
 export const DIGEST_JOB = "weekly-digest";
 
 export const MAILCHIMP_ENV = [
@@ -164,25 +166,16 @@ export function optionalEnvWarning(
     const parts: string[] = [];
     const mailchimp = missingEnvVars(MAILCHIMP_ENV, env);
     if (mailchimp.length > 0) parts.push(missingEnvMessage(mailchimp));
-    const twilio = twilioEnvWarning(env);
-    if (twilio) parts.push(twilio);
+    const sms = smsProviderEnvWarning(env);
+    if (sms) parts.push(sms);
     return parts.length > 0 ? parts.join("; ") : null;
   }
   return null;
 }
 
-function twilioEnvWarning(env: Record<string, string | undefined>): string | null {
-  const missing = missingEnvVars(
-    ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
-    env,
-  );
-  const hasFrom = Boolean(
-    env.TWILIO_MESSAGING_SERVICE_SID?.trim() || env.TWILIO_DEFAULT_FROM?.trim(),
-  );
-  if (missing.length === 0 && hasFrom) return null;
-  const names = [...missing];
-  if (!hasFrom) names.push("TWILIO_MESSAGING_SERVICE_SID or TWILIO_DEFAULT_FROM");
-  return missingEnvMessage(names);
+function smsProviderEnvWarning(env: Record<string, string | undefined>): string | null {
+  const missing = missingSmsProviderEnv(env);
+  return missing.length > 0 ? missingEnvMessage(missing) : null;
 }
 
 export function buildCronLog(

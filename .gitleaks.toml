@@ -14,7 +14,7 @@ paths = [
   '''^frontend/\.env\.example$''',
 ]
 regexes = [
-  # Twilio placeholder SID/token patterns in .env.example
+  # Retired SMS-vendor placeholder patterns. .env.example no longer contains them.
   '''ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX''',
   '''xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx''',
   '''MGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX''',

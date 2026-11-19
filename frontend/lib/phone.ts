@@ -4,7 +4,7 @@
  *
  * Phone is optional everywhere, so blank input is accepted and stored as null.
  * Anything non-blank must normalize to E.164 (+ country code, up to 15 digits)
- * so Twilio and phone-based lookups always see one canonical shape.
+ * so Mailchimp and phone-based lookups always see one canonical shape.
  */
 
 export const INVALID_PHONE_MESSAGE =

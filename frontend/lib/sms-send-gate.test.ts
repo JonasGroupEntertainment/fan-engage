@@ -35,7 +35,7 @@ describe("SMS send is blocked when phone is empty", () => {
     assert.match(EMPTY_PHONE_SMS_MESSAGE, /phone/i);
   });
 
-  it("onboarding Send is disabled and the SMS route rejects empty phone before Twilio", () => {
+  it("onboarding Send is disabled and the SMS route rejects empty phone before a send", () => {
     const wizard = readRepo("../app/onboarding/onboarding-wizard.tsx");
     const route = readRepo("../app/api/fan-engage/sms/route.ts");
     assert.match(wizard, /hasSendablePhone|smsSendBlockedReason/);

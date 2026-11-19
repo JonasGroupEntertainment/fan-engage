@@ -67,7 +67,7 @@ Confirmed mechanisms, in the order they are actually defensible:
 
 **Cron.** 16 Vercel cron entries in `frontend/vercel.json`, all bearer-authenticated with `CRON_SECRET`. Safety ritual: `?testEmail=` on `weekly-digest` — never run a real full-audience cron outside its window.
 
-**Integrations confirmed in code.** Supabase (Postgres, Auth, Storage, pgvector), Stripe (Checkout, webhooks, Connect Express), Mailchimp (audience `554139`, digest merge fields), Twilio (SMS + inbound STOP/HELP), Web Push/VAPID, Cloudflare Turnstile on auth, OpenAI (`text-embedding-3-small`, 1536-dim), Anthropic Claude (moderation, alt text, drafts, briefs), Slack (admin brief + application alerts), QR codes (invite, fan card, check-in), Jonas Network SDK. **No POS integration exists** — the nearest shipped analogue is QR self-check-in and stamp cards, both ported from BEP.
+**Integrations confirmed in code.** Supabase (Postgres, Auth, Storage, pgvector), Stripe (Checkout, webhooks, Connect Express), Mailchimp (audience `554139`, digest merge fields, Transactional SMS + inbound STOP/HELP on `+16152377488`), Web Push/VAPID, Cloudflare Turnstile on auth, OpenAI (`text-embedding-3-small`, 1536-dim), Anthropic Claude (moderation, alt text, drafts, briefs), Slack (admin brief + application alerts), QR codes (invite, fan card, check-in), Jonas Network SDK. **No POS integration exists** — the nearest shipped analogue is QR self-check-in and stamp cards, both ported from BEP.
 
 **Admin/ops processes.** The `/admin/launch` wizard is a four-step artist launch: initialise → assign owner → review hero, goals, rewards → flip `communities.active`. Applications promise a 48-hour response and live in two to four weeks. Moderation is audited weekly. Hero focal point is an admin-tunable field (`hero_focal_x/y`), replacing hardcoded focal maps.
 
@@ -91,7 +91,7 @@ Confirmed mechanisms, in the order they are actually defensible:
 
 **Growth.** Referral codes with QR, influencer promo codes with UTM attribution, leaderboards with podium and snapshots, share CTAs across events/RSVP/rewards/posts/tier/rank, and fraud detection on signups and redemptions.
 
-**Messaging.** Weekly personalised Mailchimp digest, transactional email, Twilio SMS with STOP compliance, web push, in-app `/inbox`, per-channel preferences, computed optimal send hours, admin broadcast and campaigns.
+**Messaging.** Weekly personalised Mailchimp digest, transactional email, Mailchimp Transactional SMS with STOP compliance, web push, in-app `/inbox`, per-channel preferences, computed optimal send hours, admin broadcast and campaigns.
 
 **Schema hard rules — repeated as gotchas in three separate docs:**
 
@@ -141,7 +141,7 @@ Confirmed mechanisms, in the order they are actually defensible:
 - `frontend/lib/artists.ts` is a legacy hardcoded fallback roster containing stubs with "Placeholder bio — awaiting assets from Box drop." **These are not real artists.** The database is the source of truth.
 - Missing artist content: Danger Twins bio and hero, several artists' tour dates, per-artist social links.
 - Not wired: error tracking, uptime monitoring, admin audit log, AI cost alerts, Apple SSO, Google OAuth buttons, custom domain, app-store presence, per-artist Mailchimp segmentation, live streaming, DMs, multi-language.
-- Not yet true: Stripe is in test mode; Stripe Connect has zero approved KYB; SMS 10DLC is unregistered; the Twilio inbound STOP webhook is unverified end to end.
+- Not yet true: Stripe is in test mode; Stripe Connect has zero approved KYB; the Mailchimp inbound STOP webhook for `+16152377488` is unverified end to end. Promotional SMS stays off until `MAILCHIMP_SMS_PROMOTIONAL_ENABLED` is set.
 
 **Documentation is stale relative to code.** The newest doc lags HEAD by roughly six weeks; `CONTEXT_HANDOFF.md` claims 36 migrations and 9 of 20 AI features while HEAD has 47 migrations through 0046 with the artist portal, Jonas Network, Turnstile, password reset, and the economy rebalance all shipped since. Read the code, not the docs.
 

@@ -6,8 +6,10 @@
  *
  *   1. Write a row to public.notifications (in-app inbox) with a
  *      stable dedup_key so re-running can't double-fire.
- *   2. If the fan has sms_opted_in = true and a phone number, send
- *      one SMS via Twilio.
+ *   2. If the fan has sms_opted_in = true, a phone number, and is 18+
+ *      (or has no birth date on file), send one SMS through Mailchimp.
+ *      Event matches are promotional, so they stay blocked until
+ *      MAILCHIMP_SMS_PROMOTIONAL_ENABLED is set. In-app rows still write.
  *   3. Stamp event_match_log with sent_at + channels_sent.
  *
  * Idempotent: skipping rows that already have sent_at means re-clicks
@@ -16,6 +18,9 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
+import { smsSendClass } from "@/lib/sms/kinds";
+import { smsAgeAllowsSend } from "@/lib/sms/policy";
 
 export interface SendEventMatchResult {
   event_id: string;
@@ -69,7 +74,7 @@ export async function sendEventMatchNotifications(
   const { data: rows, error: listErr } = await admin
     .from("event_match_log")
     .select(
-      "fan_id, channels_sent, fans!inner(first_name, phone, sms_opted_in)",
+      "fan_id, channels_sent, fans!inner(first_name, phone, sms_opted_in, birth_date)",
     )
     .eq("event_id", eventId)
     .eq("is_candidate", true)
@@ -85,6 +90,7 @@ export async function sendEventMatchNotifications(
       first_name: string | null;
       phone: string | null;
       sms_opted_in: boolean;
+      birth_date: string | null;
     };
   }>);
 
@@ -99,19 +105,10 @@ export async function sendEventMatchNotifications(
     event.starts_at as string | null,
   );
 
-  // Twilio config (only required if any candidate is sms_opted_in).
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const defaultFrom = process.env.TWILIO_DEFAULT_FROM;
-  const twilioReady =
-    !!accountSid && !!authToken && (!!messagingServiceSid || !!defaultFrom);
-
-  let twilioClient: import("twilio").Twilio | null = null;
-  if (twilioReady) {
-    const { default: twilio } = await import("twilio");
-    twilioClient = twilio(accountSid as string, authToken as string);
-  }
+  const eventMatchSms = smsSendClass("event_match");
+  const smsBlocked = smsBlockReason(eventMatchSms);
+  if (smsBlocked) console.warn(smsBlocked.error);
+  const smsReady = smsBlocked == null;
 
   for (const c of candidates) {
     result.attempted += 1;
@@ -144,12 +141,13 @@ export async function sendEventMatchNotifications(
       channels.push("in_app");
     }
 
-    // 2) SMS — only if Twilio is configured + fan opted in + has phone.
+    // 2) SMS — provider configured, fan opted in, has a phone, and is 18+.
     if (
-      twilioClient &&
+      smsReady &&
       c.fans.sms_opted_in === true &&
       c.fans.phone &&
-      c.fans.phone.trim().length > 0
+      c.fans.phone.trim().length > 0 &&
+      smsAgeAllowsSend(c.fans.birth_date)
     ) {
       const smsBody = formatSms({
         firstName: c.fans.first_name,
@@ -160,15 +158,17 @@ export async function sendEventMatchNotifications(
       });
       result.sms_attempted += 1;
       try {
-        await twilioClient.messages.create({
-          to: c.fans.phone,
-          body: smsBody,
-          ...(messagingServiceSid
-            ? { messagingServiceSid }
-            : { from: defaultFrom as string }),
-        });
-        result.sms_sent += 1;
-        channels.push("sms");
+        const sent = await deliverSms({ to: c.fans.phone, body: smsBody, ...eventMatchSms });
+        if (sent.ok) {
+          result.sms_sent += 1;
+          channels.push("sms");
+        } else {
+          result.sms_failed += 1;
+          result.errors.push({ fan_id: c.fan_id, error: sent.error ?? "SMS send failed" });
+          if (sent.optOut) {
+            await admin.from("fans").update({ sms_opted_in: false }).eq("id", c.fan_id);
+          }
+        }
       } catch (err) {
         result.sms_failed += 1;
         result.errors.push({
@@ -176,7 +176,7 @@ export async function sendEventMatchNotifications(
           error: err instanceof Error ? err.message : String(err),
         });
       }
-      // Twilio rate-limit politeness — same throttle broadcast.ts uses.
+      // Rate-limit politeness — same throttle broadcast.ts uses.
       await new Promise((r) => setTimeout(r, 250));
     }
 
