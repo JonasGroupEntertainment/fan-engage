@@ -1,6 +1,6 @@
 -- 0106_point_source_badge.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-22 (ledger version 20261122232032).
 --
 -- Adds 'badge' to the point_source enum so badge bonus points can be told
 -- apart from true hand adjustments. Port of Brand Engage Pro 0120.
