@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getArtistFromDb } from "@/lib/data/artists";
+import { shareNumber } from "@/lib/share-number";
 
 // ─── Founder share card OG ──────────────────────────────────────────────
 // "I'm Founder #N for <Artist>" certificate-style card. Generated when a
@@ -19,12 +20,12 @@ export default async function FounderOpengraphImage({
 }) {
   const routeParams = await params;
   const artist = await getArtistFromDb(routeParams.slug).catch(() => null);
-  const number = parseInt(routeParams.number, 10);
+  const number = shareNumber(routeParams.number);
 
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
-  const founderNumber = Number.isFinite(number) && number > 0 ? number : 1;
+  const founderNumber = number ?? 1;
 
   return new ImageResponse(
     (
