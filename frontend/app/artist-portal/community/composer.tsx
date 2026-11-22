@@ -15,6 +15,7 @@ import {
   POST_TITLE_MAX,
   type PostKind,
 } from "@/lib/community/post-input";
+import { newSubmitId } from "@/lib/community/submit-id";
 import { SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
 import { createPortalPostAction, discardPortalDraftAction } from "./actions";
 
@@ -144,7 +145,9 @@ export default function PortalComposer({
 
     // One fresh key per press of the button. An automatic retry of this
     // press reuses this same form data, so the server saves the post once.
-    formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
+    // On a browser that cannot make one the key is empty and the post still
+    // saves, as it always did.
+    formData.set(SUBMIT_KEY_FIELD, newSubmitId());
 
     setLastResult(null);
     const ok = await invoke(async () => {

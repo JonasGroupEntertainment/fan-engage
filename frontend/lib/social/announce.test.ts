@@ -355,7 +355,7 @@ describe("only the announcement action can send", () => {
 
   it("the form sends a fresh submit key and the action passes it on", () => {
     const formSrc = readFileSync(join(frontendRoot, "app/artists/[slug]/community/new-post-form.tsx"), "utf8");
-    assert.match(formSrc, /crypto\.randomUUID\(\)/);
+    assert.match(formSrc, /formData\.set\(SUBMIT_KEY_FIELD, newSubmitId\(\)\)/);
     assert.match(formSrc, /SUBMIT_KEY_FIELD/);
     const actions = readFileSync(join(frontendRoot, "app/artists/[slug]/community/actions.ts"), "utf8");
     assert.match(actions, /formData\.get\(SUBMIT_KEY_FIELD\)/);

@@ -35,6 +35,10 @@
 -- The app is safe to deploy before this is applied: while the column is
 -- missing it saves each post without it, exactly as before.
 --
+-- The index is created without `concurrently`, so it takes a brief write
+-- lock on community_posts while it scans the table. Apply this at a quiet
+-- moment.
+--
 -- No new enum values. Safely re-runnable. Two statements: if you paste
 -- this into the Supabase SQL editor, run them one at a time.
 

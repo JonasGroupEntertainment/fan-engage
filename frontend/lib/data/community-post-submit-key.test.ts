@@ -158,10 +158,11 @@ describe("the artist portal composer saves once too", () => {
 
   it("the portal form sets one fresh key per press, before the retry helper runs", () => {
     const form = readFrontend(PORTAL_FORM);
-    assert.equal(form.match(/crypto\.randomUUID\(\)/g)?.length, 1);
-    const setAt = form.indexOf("formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());");
+    assert.equal(form.match(/newSubmitId\(\)/g)?.length, 1);
+    const setAt = form.indexOf("formData.set(SUBMIT_KEY_FIELD, newSubmitId());");
     const invokeAt = form.indexOf("await invoke(");
     assert.ok(setAt > 0 && setAt < invokeAt);
+    assert.equal(form.includes("randomUUID"), false);
   });
 });
 
@@ -181,8 +182,8 @@ describe("the post form", () => {
   const form = readFrontend(FORM);
 
   it("sets one fresh key on every press, whatever the kind and whether or not social is ticked", () => {
-    assert.equal(form.match(/crypto\.randomUUID\(\)/g)?.length, 1);
-    const setAt = form.indexOf("formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());");
+    assert.equal(form.match(/newSubmitId\(\)/g)?.length, 1);
+    const setAt = form.indexOf("formData.set(SUBMIT_KEY_FIELD, newSubmitId());");
     const socialIfAt = form.indexOf("if (showSocialCheckbox && alsoPostToSocial) {");
     const invokeAt = form.indexOf("await invoke(");
     assert.ok(setAt > 0, "key is set");
@@ -192,6 +193,10 @@ describe("the post form", () => {
 
   it("makes the key outside the retried call, so a retry cannot get a new one", () => {
     const invokeAt = form.indexOf("await invoke(");
-    assert.equal(form.slice(invokeAt).includes("randomUUID"), false);
+    assert.equal(form.slice(invokeAt).includes("newSubmitId"), false);
+  });
+
+  it("never calls crypto.randomUUID directly, which older browsers do not have", () => {
+    assert.equal(form.includes("randomUUID"), false);
   });
 });
