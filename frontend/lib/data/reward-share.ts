@@ -1,14 +1,18 @@
+import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRewardId, isRewardShareable, type ShareableRewardFields } from "@/lib/reward-share";
 
-/** What the public reward share page and its picture show. */
+/**
+ * What the public reward share page and its picture show. The reward's
+ * description is left out on purpose: the public page uses its own fixed
+ * wording, so nothing typed for signed-in fans can reach it.
+ */
 export type ShareableReward = ShareableRewardFields & {
-  description: string | null;
   point_cost: number;
 };
 
 const SHARE_COLUMNS =
-  "id, community_id, title, description, point_cost, active, requires_tier, stock, drops_at, expires_at, clip_url";
+  "id, community_id, title, point_cost, active, requires_tier, stock, drops_at, expires_at, clip_url, in_app_only";
 
 /**
  * One reward for the public share page, or null when it does not exist or

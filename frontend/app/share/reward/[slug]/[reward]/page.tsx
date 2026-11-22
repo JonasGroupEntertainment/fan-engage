@@ -7,8 +7,9 @@ import { SHARE_PAGE_PREMIUM_NOTE, pointsLabel, rewardShareCopy, rewardSharePath 
 import ShareButton from "@/components/share-button";
 
 // Built once per reward and refreshed every ten minutes, like the other
-// share pages, so a reward that is switched off leaves this public page
-// within ten minutes. force-static also means no visitor session is read.
+// share pages. A reward that is switched off leaves this public page at
+// the next refresh, so within about ten to twenty minutes. force-static
+// also means no visitor session is read.
 export const dynamic = "force-static";
 export const revalidate = 600;
 
@@ -74,7 +75,9 @@ export default async function RewardSharePage({ params }: { params: RouteParams 
             {artist.name} · {cost}
           </p>
         </div>
-        {reward.description && <p className="text-white/60 text-sm max-w-xs">{reward.description}</p>}
+        <p className="text-white/60 text-sm max-w-xs">
+          A reward {artist.name} made for fans. Earn the points and it is yours to keep.
+        </p>
         <Link
           href={`/artists/${artist.slug}`}
           className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold text-white shadow-glass transition hover:brightness-110"

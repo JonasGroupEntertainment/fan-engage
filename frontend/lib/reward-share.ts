@@ -40,6 +40,7 @@ export type ShareableRewardFields = {
   drops_at?: string | null;
   expires_at?: string | null;
   clip_url?: string | null;
+  in_app_only?: boolean;
 };
 
 export function isRewardId(value: string | null | undefined): value is string {
@@ -69,6 +70,8 @@ export function isRewardShareable(
   if (!isDigitallyRedeemableTitle(reward.title, { active: reward.active, clipUrl: reward.clip_url })) {
     return false;
   }
+  // A reward marked to stay inside the app is never public.
+  if (reward.in_app_only === true) return false;
   // Tier-only rewards are not open to every fan.
   if (reward.requires_tier) return false;
   // null stock means unlimited; the database refuses zero or less.

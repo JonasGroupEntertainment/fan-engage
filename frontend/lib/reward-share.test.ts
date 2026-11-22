@@ -81,6 +81,11 @@ describe("isRewardShareable: state of the reward", () => {
     assert.equal(isRewardShareable(reward(), { artistSlug: "other-artist", now: NOW }), false);
   });
 
+  it("does not show a reward marked to stay inside the app", () => {
+    assert.equal(isRewardShareable(reward({ in_app_only: true }), forArtist), false);
+    assert.equal(isRewardShareable(reward({ in_app_only: false }), forArtist), true);
+  });
+
   it("does not show a tier-only reward", () => {
     assert.equal(isRewardShareable(reward({ requires_tier: "premium" }), forArtist), false);
     assert.equal(isRewardShareable(reward({ requires_tier: "founder-only" }), forArtist), false);
@@ -183,6 +188,12 @@ describe("where the reward share page is wired", () => {
     }
     assert.match(read("./data/reward-share.ts"), /isRewardShareable\(/);
     assert.match(read("./data/reward-share.ts"), /isRewardId\(/);
+  });
+
+  it("the public page never prints the reward's stored description", () => {
+    assert.doesNotMatch(read("../app/share/reward/[slug]/[reward]/page.tsx"), /reward\.description/);
+    assert.doesNotMatch(read("./data/reward-share.ts"), /SHARE_COLUMNS =\s*"[^"]*description/);
+    assert.match(read("./data/reward-share.ts"), /in_app_only/);
   });
 
   it("the page says that redeeming is part of Premium", () => {
