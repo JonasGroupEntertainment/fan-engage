@@ -3,15 +3,36 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminContext } from "@/lib/admin";
 import { authorizeAdmin } from "@/lib/admin-guard";
-import { broadcastSms, broadcastEmail } from "@/lib/broadcast";
+import { broadcastSms } from "@/lib/broadcast";
+import {
+  emailItemMetadata,
+  hasRecentCampaign,
+  loadArtistFanIds,
+  loadTierFanIds,
+  sendAudienceEmail,
+} from "@/lib/admin-audience";
+import { chooseAudienceFanIds, parseTierFilter, tiersAtOrAbove, type TierFilter } from "@/lib/audience-email";
+import type { AudienceEmailResult } from "@/lib/audience-email-send";
+import { broadcastClaimDescription, releasedClaimDescription } from "@/lib/broadcast-claim";
+import { sendDeadline } from "@/lib/send-budget";
+import {
+  DUPLICATE_BROADCAST_MESSAGE,
+  describeAudienceSend,
+  type SmsOutcome,
+} from "@/lib/audience-send-outcome";
 
 export type BroadcastFormResult = {
+  /** True when at least one message went out. */
   ok: boolean;
-  smsSent?: number;
-  emailSent?: number;
-  recipientCount?: number;
+  /** One plain line per channel: sent, skipped, failed. */
+  lines?: string[];
   error?: string;
 };
+
+type BroadcastChannel = "sms" | "email" | "both";
+
+const BROADCAST_CHANNELS: readonly BroadcastChannel[] = ["sms", "email", "both"];
+const TITLE_PREVIEW_LENGTH = 60;
 
 export type BroadcastTarget = { slug: string; displayName: string };
 
@@ -34,24 +55,102 @@ export async function getBroadcastTarget(): Promise<BroadcastTarget | null> {
   };
 }
 
+function broadcastTitle(message: string): string {
+  const preview = message.slice(0, TITLE_PREVIEW_LENGTH);
+  return `Broadcast: ${preview}${message.length > TITLE_PREVIEW_LENGTH ? "…" : ""}`;
+}
+
+function tierLabel(tier: TierFilter): string {
+  return tier === "all" ? "" : `[${tier[0].toUpperCase() + tier.slice(1)}+ fans] `;
+}
+
+/**
+ * The fans this broadcast is for: the community's followers, and when a
+ * tier is picked only those at that tier or above. Text and email both
+ * use this one list.
+ */
+async function loadChosenFanIds(artistSlug: string, tier: TierFilter): Promise<string[]> {
+  const tiers = tiersAtOrAbove(tier);
+  const [followerIds, tierFanIds] = await Promise.all([
+    loadArtistFanIds(artistSlug),
+    tiers ? loadTierFanIds(artistSlug, tiers) : Promise.resolve(null),
+  ]);
+  return chooseAudienceFanIds(followerIds, tierFanIds);
+}
+
+/** Text the chosen fans. Never throws. */
+async function sendBroadcastSms(
+  body: string,
+  artistSlug: string,
+  fanIds: readonly string[],
+  deadlineAt: number,
+): Promise<SmsOutcome> {
+  try {
+    const result = await broadcastSms({ body, messageType: "admin_owner_blast", artistSlug, fanIds, deadlineAt });
+    return {
+      recipients: result.recipients,
+      sent: result.sent,
+      failed: result.failed,
+      notSent: result.notSent ?? 0,
+      error: result.error ?? null,
+    };
+  } catch (err) {
+    console.error("sendBroadcast: SMS failed for", artistSlug, err);
+    return { recipients: 0, sent: 0, failed: 0, error: "something went wrong on our side. Please try again." };
+  }
+}
+
+async function recordBroadcastItems(
+  campaignId: string,
+  tier: TierFilter,
+  outcome: { sms?: SmsOutcome; email?: AudienceEmailResult },
+): Promise<void> {
+  const rows = [
+    ...(outcome.sms
+      ? [{ item_kind: "sms", metadata: { ...outcome.sms, error: outcome.sms.error ?? null, tier_filter: tier } }]
+      : []),
+    ...(outcome.email
+      ? [{ item_kind: "email", metadata: { ...emailItemMetadata(outcome.email), tier_filter: tier } }]
+      : []),
+  ].map((row) => ({ ...row, campaign_id: campaignId, ref_id: null }));
+  const { error } = await createAdminClient().from("campaign_items").insert(rows);
+  if (error) console.error("sendBroadcast: could not save results for campaign", campaignId, error.message);
+}
+
+/**
+ * Nothing went out, so the claim must not block a retry: its description
+ * is changed so the duplicate check no longer matches it.
+ */
+async function releaseClaim(campaignId: string, description: string): Promise<void> {
+  const { error } = await createAdminClient()
+    .from("campaigns")
+    .update({ description: releasedClaimDescription(description) })
+    .eq("id", campaignId);
+  if (error) console.error("sendBroadcast: could not release claim", campaignId, error.message);
+}
+
 export async function sendBroadcast(
   formData: FormData,
 ): Promise<BroadcastFormResult> {
+  const deadlineAt = sendDeadline();
   const ctx = await getAdminContext();
   if (!ctx) return { ok: false, error: "Unauthorized" };
 
-  // Target is the admin's current community — form input is ignored so a
+  // Target is the admin's current community. Form input is ignored so a
   // tampered field can't redirect a broadcast elsewhere.
   const artistSlug = ctx.currentCommunityId ?? "";
   const message = String(formData.get("message") ?? "").trim();
-  const tierFilter = String(formData.get("tier_filter") ?? "all");
-  const channel = String(formData.get("channel") ?? "sms") as "sms" | "email" | "both";
+  const tier = parseTierFilter(String(formData.get("tier_filter") ?? "all"));
+  const channel = String(formData.get("channel") ?? "sms") as BroadcastChannel;
 
   if (!artistSlug) {
     return { ok: false, error: "Pick a community in the admin switcher before broadcasting." };
   }
   if (!message) {
     return { ok: false, error: "Message is required." };
+  }
+  if (!tier || !BROADCAST_CHANNELS.includes(channel)) {
+    return { ok: false, error: "Pick a fan tier and a channel, then try again." };
   }
 
   // Sending to every opted-in fan is a write with real-world blast radius:
@@ -64,143 +163,67 @@ export async function sendBroadcast(
     };
   }
 
-  let allowedFanIds: string[] | null = null;
-  if (tierFilter !== "all") {
-    const admin = createAdminClient();
-    const tierRank: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
-    const minRank = tierRank[tierFilter] ?? 0;
-    const allowedTiers = Object.entries(tierRank)
-      .filter(([, rank]) => rank >= minRank)
-      .map(([slug]) => slug);
-
-    const { data: memberships } = await admin
-      .from("fan_community_memberships")
-      .select("fan_id, current_tier")
-      .eq("community_id", artistSlug)
-      .in("current_tier", allowedTiers);
-
-    allowedFanIds = (memberships ?? []).map((m) => m.fan_id as string);
-    if (allowedFanIds.length === 0) {
-      return { ok: false, error: "No fans match this tier filter." };
-    }
-  }
-
-  const tierLabel =
-    tierFilter === "all"
-      ? ""
-      : `[${tierFilter[0].toUpperCase() + tierFilter.slice(1)}+ fans] `;
-
-  let smsSent = 0;
-  let emailSent = 0;
-  let smsError: string | undefined;
-
-  if (channel === "sms" || channel === "both") {
-    const result = await broadcastSms({
-      body: tierLabel + message,
-      messageType: "admin_owner_blast",
-      artistSlug,
-    });
-    smsSent = result.sent;
-    smsError = result.error;
-  }
-
-  if (channel === "email" || channel === "both") {
-    const result = await broadcastEmail({
-      subject: `Message from ${artistSlug}`,
-      body: `<p>${(tierLabel + message).replace(/\n/g, "<br>")}</p>`,
-    });
-    emailSent = result.sent;
-  }
-
   const admin = createAdminClient();
-  const { data: campaign } = await admin
+  const title = broadcastTitle(message);
+  // The description carries a fingerprint of the whole message, so only a
+  // truly identical send is treated as a duplicate.
+  const description = broadcastClaimDescription(tier, channel, message);
+
+  let chosenFanIds: string[];
+  try {
+    chosenFanIds = await loadChosenFanIds(artistSlug, tier);
+    // A double click or a retried submit must not send the same thing twice.
+    if (await hasRecentCampaign({ artistSlug, title, description })) {
+      return { ok: false, error: DUPLICATE_BROADCAST_MESSAGE };
+    }
+  } catch (err) {
+    console.error("sendBroadcast: could not prepare broadcast for", artistSlug, err);
+    return { ok: false, error: "Nothing was sent because the list of fans could not be read. Please try again." };
+  }
+  if (chosenFanIds.length === 0) {
+    return { ok: false, error: "No fans match this choice, so nothing was sent." };
+  }
+
+  // The campaign row is written first, as a claim. If it cannot be
+  // written, nothing is sent.
+  const { data: campaign, error: claimError } = await admin
     .from("campaigns")
     .insert({
       artist_slug: artistSlug,
-      title: `Broadcast: ${message.slice(0, 60)}${message.length > 60 ? "…" : ""}`,
-      description: `Tier: ${tierFilter} · Channel: ${channel}`,
+      title,
+      description,
       created_by: ctx.user.id,
       published_at: new Date().toISOString(),
     })
     .select("id")
     .single();
-
-  if (campaign) {
-    await admin.from("campaign_items").insert({
-      campaign_id: campaign.id,
-      item_kind: channel === "both" ? "sms" : channel,
-      ref_id: null,
-      metadata: {
-        sent: smsSent + emailSent,
-        tier_filter: tierFilter,
-        sms_error: smsError ?? null,
-      },
-    });
+  if (claimError || !campaign) {
+    console.error("sendBroadcast: could not record broadcast for", artistSlug, claimError?.message);
+    return { ok: false, error: "Nothing was sent because the broadcast could not be recorded. Please try again." };
   }
 
-  if (smsError && smsSent === 0) {
-    const emailNote =
-      channel === "both" && emailSent > 0 ? ` Email was sent (${emailSent}).` : "";
-    return {
-      ok: false,
-      error: `${smsError}${emailNote}`,
-      smsSent,
-      emailSent,
-    };
-  }
+  const target = await getBroadcastTarget();
+  const body = tierLabel(tier) + message;
+  const wantsSms = channel === "sms" || channel === "both";
+  const wantsEmail = channel === "email" || channel === "both";
+  const [sms, email] = await Promise.all([
+    wantsSms ? sendBroadcastSms(body, artistSlug, chosenFanIds, deadlineAt) : undefined,
+    wantsEmail
+      ? sendAudienceEmail(
+          {
+            subject: `Message from ${target?.displayName ?? artistSlug}`,
+            body,
+            artistName: target?.displayName ?? artistSlug,
+            reason: "follower",
+          },
+          chosenFanIds,
+          deadlineAt,
+        )
+      : undefined,
+  ]);
 
-  return {
-    ok: true,
-    smsSent,
-    emailSent,
-    recipientCount: allowedFanIds?.length ?? smsSent + emailSent,
-  };
-}
-
-export async function previewRecipientCount(
-  artistSlug: string,
-  tierFilter: string,
-  channel: "sms" | "email" | "both",
-): Promise<number> {
-  // Exposed as a server action, so it needs the same gate as sending.
-  const guard = await authorizeAdmin({ communityId: artistSlug, minRole: "admin" });
-  if (!guard.ok) return 0;
-
-  const admin = createAdminClient();
-  const optCol = channel === "email" ? "email_opted_in" : "sms_opted_in";
-
-  const { data: followers } = await admin
-    .from("fan_artist_following")
-    .select("fan_id")
-    .eq("artist_slug", artistSlug);
-
-  const followerIds = (followers ?? []).map((f) => f.fan_id as string);
-  if (followerIds.length === 0) return 0;
-
-  let query = admin
-    .from("fans")
-    .select("id", { count: "exact", head: true })
-    .eq(optCol, true)
-    .eq("suspended", false)
-    .in("id", followerIds);
-
-  if (tierFilter !== "all") {
-    const tierRank: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
-    const minRank = tierRank[tierFilter] ?? 0;
-    const allowedTiers = Object.entries(tierRank)
-      .filter(([, r]) => r >= minRank)
-      .map(([t]) => t);
-
-    const { data: tieredFans } = await admin
-      .from("fan_community_memberships")
-      .select("fan_id")
-      .eq("community_id", artistSlug)
-      .in("current_tier", allowedTiers);
-
-    const tieredIds = (tieredFans ?? []).map((m) => m.fan_id as string);
-    query = query.in("id", tieredIds);
-  }
-
-  const { count } = await query;
-  return count ?? 0;
+  await recordBroadcastItems(campaign.id as string, tier, { sms, email });
+  const described = describeAudienceSend({ sms, email });
+  if (!described.ok) await releaseClaim(campaign.id as string, description);
+  return described;
 }

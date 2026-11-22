@@ -8,6 +8,7 @@ import CaptionSuggester from "./caption-suggester";
 import AltTextSuggester from "@/components/community/alt-text-suggester";
 import TagSuggester from "@/components/community/tag-suggester";
 import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
+import { newSubmitId } from "@/lib/community/submit-id";
 import {
   ALSO_POST_FIELD,
   ALSO_POST_VALUE,
@@ -117,12 +118,15 @@ export default function NewPostForm({
     // The checkbox is controlled here, so the field is set from state and
     // only when the box was on screen and ticked.
     formData.delete(ALSO_POST_FIELD);
-    formData.delete(SUBMIT_KEY_FIELD);
+    // One fresh key per press of the button, for every kind of post. An
+    // automatic retry of this press reuses this same form data, so the
+    // server can tell it has already saved the post (and already sent it
+    // to social). A later, separate press gets a new key. On a browser that
+    // cannot make one the key is empty: the post still saves, as it always
+    // did, and only the send to social is refused.
+    formData.set(SUBMIT_KEY_FIELD, newSubmitId());
     if (showSocialCheckbox && alsoPostToSocial) {
       formData.set(ALSO_POST_FIELD, ALSO_POST_VALUE);
-      // One fresh key per submit. A retry of this submit reuses this same
-      // form data, so the server can tell it has already sent to social.
-      formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
     }
 
     setSocialNotice(null);
