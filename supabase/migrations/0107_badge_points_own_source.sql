@@ -1,6 +1,10 @@
 -- 0107_badge_points_own_source.sql
 --
--- Not yet applied to production. Apply 0106 first, in its own run.
+-- Applied to production on 2026-11-22 (ledger version 20261122232048),
+-- after 0106 in its own run. Checked after: 1,621 rows renamed to 'badge',
+-- 22 rows moved to 'daily_drop', 6 rows left as 'manual_adjustment', and
+-- the sums of the ledger, fans.total_points and membership points did not
+-- change.
 --
 -- Port of Brand Engage Pro 0121, without its brand retag (every badge row
 -- here already names raelynn).
