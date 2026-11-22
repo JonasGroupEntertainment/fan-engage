@@ -106,6 +106,58 @@ export function rewardShareAddress(input: {
   return `${origin}${rewardSharePath(input.artistSlug, input.reward.id)}`;
 }
 
+/**
+ * What a fan's share says about a reward, from the rewards page.
+ *
+ * A message a fan sends goes outside the app, so it names a reward only
+ * when that reward may be shown publicly (the two wallpapers). For every
+ * other reward, Fan Spotlight included, the wording says "a fan reward"
+ * and the link goes to the artist's page.
+ */
+export type RewardShareMessages = {
+  /** The reward's share page when it may be public, else the artist's page. */
+  url: string;
+  /** Whether these messages name the reward. */
+  namesReward: boolean;
+  /** After a redemption: title and text of the share. */
+  redeemedTitle: string;
+  redeemedText: string;
+  /** On a reward card, before redeeming: title and text of the share. */
+  browseTitle: string;
+  browseText: string;
+};
+
+export function rewardShareMessages(input: {
+  /** Site address, such as https://www.fanengagepro.com. */
+  appUrl: string;
+  artistSlug: string;
+  artistName: string;
+  reward: ShareableRewardFields & { point_cost: number };
+  now: Date;
+}): RewardShareMessages {
+  const { reward, artistName } = input;
+  const url = rewardShareAddress(input);
+  const cost = pointsLabel(reward.point_cost);
+  if (!isRewardShareable(reward, input)) {
+    return {
+      url,
+      namesReward: false,
+      redeemedTitle: "I just redeemed a fan reward on Fan Engage",
+      redeemedText: `Cashed in my points for a fan reward from ${artistName}'s fan experience. ${url}`,
+      browseTitle: `${artistName} fan rewards`,
+      browseText: `Check out the fan rewards from ${artistName} on Fan Engage.`,
+    };
+  }
+  return {
+    url,
+    namesReward: true,
+    redeemedTitle: `I just redeemed ${reward.title} on Fan Engage`,
+    redeemedText: `Cashed in ${cost} for ${reward.title} from ${artistName}'s fan experience. ${url}`,
+    browseTitle: reward.title,
+    browseText: `Check out this drop on Fan Engage: ${reward.title} for ${cost}.`,
+  };
+}
+
 /** "500 points", "1 point". */
 export function pointsLabel(pointCost: number): string {
   const whole = Number.isFinite(pointCost) ? Math.max(0, Math.round(pointCost)) : 0;
