@@ -9,10 +9,6 @@
       "schedule": "0 4 * * *"
     },
     {
-      "path": "/api/cron/embeddings-backfill",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/cron/moderation-backfill",
       "schedule": "*/15 * * * *"
     },
