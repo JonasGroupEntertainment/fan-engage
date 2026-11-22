@@ -1,6 +1,6 @@
 -- 0105_community_post_submit_key.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-22 (ledger version 20261122181612).
 --
 -- Saves a community post once per press of the button. Port of Brand
 -- Engage Pro 0119.

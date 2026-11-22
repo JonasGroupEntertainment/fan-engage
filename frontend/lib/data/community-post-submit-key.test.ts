@@ -48,8 +48,8 @@ describe(MIGRATION, () => {
   const raw = readMigration(MIGRATION);
   const sql = stripComments(raw);
 
-  it("says in its header that it is not yet applied to production", () => {
-    assert.match(raw.split("\n").slice(0, 5).join("\n"), /Not yet applied to production\./);
+  it("says in its header that it is applied to production", () => {
+    assert.match(raw.split("\n").slice(0, 5).join("\n"), /Applied to production on 2026-11-22 \(ledger version 20261122181612\)\./);
   });
 
   it("adds a nullable uuid column with no default, so nothing is backfilled", () => {
