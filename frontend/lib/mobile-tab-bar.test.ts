@@ -19,6 +19,19 @@ describe("phone bottom tab bar (BEP #193 port)", () => {
     }
   });
 
+  it("offers Community, lit on an artist's community page with Artists unlit", () => {
+    assert.ok(bar.includes('{ href: COMMUNITY_TAB_PATH, label: "Community", icon: "community" }'));
+    assert.match(bar, /export const COMMUNITY_TAB_PATH = "\/community";/);
+    assert.match(read("../app/community/route.ts"), /\/artists\/\$\{communityId\}\/community/);
+    assert.match(bar, /if \(href === COMMUNITY_TAB_PATH && onArtistCommunity\) return true;/);
+    assert.match(bar, /if \(href === "\/artists" && onArtistCommunity\) return false;/);
+    // The same rule as ARTIST_COMMUNITY_PATH in the component, on real paths.
+    const ARTIST_COMMUNITY_PATH = /^\/artists\/[^/]+\/community(\/|$)/;
+    assert.ok(ARTIST_COMMUNITY_PATH.test("/artists/raelynn/community"));
+    assert.ok(!ARTIST_COMMUNITY_PATH.test("/artists/raelynn"));
+    assert.ok(!ARTIST_COMMUNITY_PATH.test("/artists/raelynn/communityx"));
+  });
+
   it("is phone-only and only for signed-in fans", () => {
     assert.match(bar, /fixed inset-x-0 bottom-0 z-40[^"]*md:hidden/);
     assert.match(layout, /\{user && <MobileTabBar \/>\}/);
