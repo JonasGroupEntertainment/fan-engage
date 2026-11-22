@@ -60,7 +60,7 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <ul class="meta">
 <li><b>Date</b> 2026-09-24, updated 2026-11-11 (twentieth update: the Mac checkout is on main and the merged forgot-password branch is deleted. Nineteenth update, same day: PR #161 merged, forgot password and the admin Events tab are live. Eighteenth update, same day: Hermes shortcut and launchers removed, added to Update 14. Seventeenth update, same day: Hermes data archived and removed, Syncnatra kept off, added to Update 14. Sixteenth update, same day: the stage0 branches, Hermes and the Mac checkout, Update 14. Fifteenth update, same day: three draft migrations in PR #166, Update 13. Fourteenth update, same day: artist status, hidden placeholder pages and community tag corrections, Update 12. Thirteenth update, same day: PRs #112 to #148 written up as Update 10b. Twelfth update, same day: launch-readiness review, share image and event time fixes, CI build retry, dependency fixes)</li>
 <li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
-<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, last code change 2d1a046 (PR #161, forgot password and the admin Events tab), four draft PRs open (#122, #143, #152 and #166, the migration drafts), zero open Dependabot alerts. <span class="status-warn">Six must-fix items before launch, see Update 11.</span></li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at d9c9842 (PR #181) on 2026-11-22 before this docs change, no open pull requests (checked with gh that day). See "Update 2026-11-22" for the latest. The rest of this line is the 2026-11-11 state and was not rechecked: last code change 2d1a046 (PR #161, forgot password and the admin Events tab), four draft PRs open (#122, #143, #152 and #166, the migration drafts), zero open Dependabot alerts. <span class="status-warn">Six must-fix items before launch, see Update 11.</span></li>
 <li><b>Supersedes</b> the 2026-09-17 handoff for state and open items. The 2026-09-17 workflow recipe and the 2026-09-14 product overview still apply.</li>
 </ul>
 </header>
@@ -554,6 +554,59 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 <ul>
 <li><b>Copy list.</b> Kevin changed the standing rule for messages sent to the team: DJ Archer is copied in place of Syncnatra. Do not copy Syncnatra's address any more.</li>
 <li><b>Brand Engage Pro.</b> The 38 local <code>stage0</code> branches in <code>~/Downloads/brand-engage-pro</code> were deleted after a verified backup, and 8 small cleanups from them merged as KevinJonasSr/brand-engage-pro#160. A member profile edit page and a commit carrying a migration file were left out; they are in <code>~/Downloads/brand-engage-pro-stage0-backup-2026-11-11.bundle</code> waiting for a decision. Details are in the Brand Engage notes, not here.</li>
+</ul>
+</section>
+
+<section>
+<p class="eyebrow">Update 2026-11-22</p>
+<h2>2026-11-22: Community tab, invite link on shares, and announcements to Facebook and Instagram (PRs #180 to #182)</h2>
+<p>Three changes came over from Brand Engage Pro on 2026-11-22, each merged by Kevin with all required checks green. This update covers those three only. PRs #176 to #179 (2026-11-11 to 2026-11-19: Terms governing law, a Next.js bump, the Brand Engage ports audit and Mailchimp as the only SMS sender) were merged by other sessions and are not written up here; see the pull requests.</p>
+
+<h3>What merged</h3>
+<ul>
+<li><b>#180 (4f35edd), Community tab.</b> The phone bottom bar is now Home, Card, Rewards, Community, Artists. Fans earn most of their points in the community and it was not in the bar. The tab uses the existing <code>/community</code> resolver and stays lit on an artist's community page. File: <code>frontend/components/mobile-tab-bar.tsx</code>.</li>
+<li><span class="status-good">#181 (d9c9842), live: a fan's share carries their invite link.</span> When a signed-in fan taps Share on a share page (badge, drop, founder, rank, RSVP, tier) or an artist page, the link that goes out is <code>/invite/&lt;their code&gt;?artist=&lt;slug&gt;&amp;card=&lt;share page&gt;</code>, so a friend who joins is credited to them through the referral that already exists. The points promised on the invite page are unchanged. A fan profile, the fan card, any other page and the invite links the artist page already builds (including those with <code>&amp;event=</code>) are shared as before. Rules in <code>frontend/lib/invite-share.ts</code>; the code (<code>fans.referral_code</code>, 12 hex characters, readable under <code>fans_self_select</code>) is read by <code>frontend/components/use-invite-code.ts</code> and read again when the signed-in fan changes; <code>frontend/components/share-button.tsx</code> uses both. <code>frontend/app/invite/[code]/page.tsx</code> now validates <code>artist</code>, uses the shared picture for the social preview and is marked noindex. <code>InlineShareButton</code> and the weekly recap tile have their own share code and are unchanged.</li>
+<li><span class="status-warn">#182 (876cee0), merged and switched off: team announcements can also go to the artist's Facebook Page and Instagram.</span> On the announcement form in an artist's Community a box appears, "Also post this to {artist}'s Facebook and Instagram". If ticked, the announcement's text goes out through Blotato's API, ending with "Join the community free:" and <code>/signup?artist=&lt;slug&gt;</code>. Code: <code>frontend/lib/social/</code> (<code>social-post.ts</code>, <code>blotato.ts</code>, <code>announce.ts</code>, <code>alcohol-terms.ts</code>), <code>frontend/lib/data/social-accounts.ts</code>, and the announcement action, page and form in <code>frontend/app/artists/[slug]/community/</code>.</li>
+</ul>
+
+<h3>Guard rails in #182, all on the server</h3>
+<ul>
+<li>Only team announcements, only by someone who may already publish them for that artist (<code>communityAdminUser(slug, "editor")</code>). Fan posts, comments, polls and challenge entries have no path out, and no fan name or data is sent.</li>
+<li>Only announcements whose visibility is exactly <code>public</code>. Premium and Founders announcements stay inside.</li>
+<li>An announcement that mentions alcohol or tobacco is not sent. Fan Engage Pro had no such detector, so Brand Engage Pro's word list was copied to <code>frontend/lib/social/alcohol-terms.ts</code> for this feature only. It is not an app-wide age rule.</li>
+<li>At most 3 a day per artist, with the record written as pending before the send. A retried save cannot send twice (a per-submit key). An image is sent only when it is on our own storage; Instagram needs a photo, so with none it goes to Facebook only and the team is told. A slow or failed send never blocks the announcement.</li>
+</ul>
+
+<h3>Checked on 2026-11-22</h3>
+<ul>
+<li><span class="status-good">Deploy and tests.</span> Vercel production succeeded and Frontend tests and Secret Scan are green on d9c9842.</li>
+<li><span class="status-good">#181 on the live site, with a test fan's code.</span> For RaeLynn the invite page title names her, the tier picture is the preview and loads, the site name is kept, the page is noindex, and the join link carries the invite code and the artist. A made-up picture address is ignored. Only RaeLynn is an active artist (1 of 9), so a share from an inactive artist's page gives a plain invite page that does not name the artist; the fan is still credited. Every fan's invite code is in the expected format.</li>
+<li><span class="status-good">#182 is off in production.</span> The tables <code>artist_social_accounts</code> and <code>artist_social_posts</code> do not exist, Vercel production has neither <code>BLOTATO_API_KEY</code> nor <code>SOCIAL_POSTING_ENABLED</code>, the live RaeLynn community page shows no box, and no artist's accounts are linked in Blotato.</li>
+<li><span class="status-warn">Not checked.</span> Any share tapped while signed in. Anything in #182 against Blotato or a real database; its request shape matches the Brand Engage Pro version, which came from Blotato's published API reference. The form has not been seen in a browser. "Sent" means Blotato accepted the post; the final publish status is not polled.</li>
+</ul>
+
+<h3>To switch #182 on for one artist, in order</h3>
+<ol>
+<li>The artist links their Facebook Page and Instagram in Blotato; the Instagram must be a business account connected to that Page.</li>
+<li>Read the account ids and the Page id from Blotato.</li>
+<li>Apply <code>supabase/migrations/0104_artist_social_posts.sql</code>, one statement at a time, with Kevin's yes. It is on main and <b>not applied</b>.</li>
+<li>Insert the artist's <code>artist_social_accounts</code> rows, with Kevin's yes.</li>
+<li>Set <code>BLOTATO_API_KEY</code> and <code>SOCIAL_POSTING_ENABLED=1</code> in Vercel and redeploy.</li>
+<li>Test one announcement with the artist's team watching.</li>
+</ol>
+
+<h3>Known and left as is</h3>
+<ul>
+<li>From the security review of #182, all low: deleting an announcement after sending it can undercount the daily limit; two different announcements submitted at the same instant can both pass it; an image from any public bucket on our storage is accepted, not only announcement images.</li>
+<li>The community page shows the team composer to any admin, while the actions need a grant for that artist, so an admin of another artist sees a form that does nothing. It cannot cause a send.</li>
+<li><code>LAUNCH_CHECKLIST.md</code> has rows for 0104 and the two settings.</li>
+</ul>
+
+<h3>Notes for the next session</h3>
+<ul>
+<li>The highest numbered migration on main is 0104, not applied. The next free number is 0105.</li>
+<li>This Mac's Node 24 rejects the flag in <code>npm test</code>. Run <code>node --test --experimental-strip-types 'lib/**/*.test.ts'</code> from <code>frontend</code>. CI uses Node 22 and a secret scanner, and both failed on the Brand Engage Pro version of #182 before it was fixed: the scanner flags any random-looking value on a line whose name contains "key", and a test that waits on <code>AbortSignal.timeout</code> ends early on Node 22 unless the stand-in request keeps the process busy. Wait for the GitHub checks before saying a pull request is ready.</li>
+<li>Housekeeping: the #181 and #182 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. No open pull requests on 2026-11-22.</li>
 </ul>
 </section>
 
