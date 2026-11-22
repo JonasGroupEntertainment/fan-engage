@@ -4,6 +4,7 @@ import type { WeeklyRecap } from "@/lib/personal-recap/types";
 import PushOptInBanner from "@/components/push-opt-in-banner";
 import StreakTile from "@/components/streak-tile";
 import TodayRow from "@/components/today-row";
+import NextStepCard from "@/components/next-step-card";
 import type { FanHomeData, FanHomeUpcomingEvent } from "@/lib/data/fan-home";
 import { focalPointStyle } from "@/lib/images/focal-point";
 
@@ -17,7 +18,7 @@ import { focalPointStyle } from "@/lib/images/focal-point";
  * above the existing marketing content. All data comes from getFanHomeData()
  * so there are no client-side fetches here.
  */
-export default function FanHomeDashboard({ data, streak, recap, totalPoints }: { data: FanHomeData; streak?: { currentStreakDays: number; longestStreakDays: number; pointsAwardedThisVisit: number; newMilestone: number | null; isNewToday: boolean; lastActiveDate: string | null } | null; recap?: WeeklyRecap | null; totalPoints?: number | null }) {
+export default function FanHomeDashboard({ data, streak, recap, totalPoints, lifetimePoints }: { data: FanHomeData; streak?: { currentStreakDays: number; longestStreakDays: number; pointsAwardedThisVisit: number; newMilestone: number | null; isNewToday: boolean; lastActiveDate: string | null } | null; recap?: WeeklyRecap | null; totalPoints?: number | null; lifetimePoints?: number | null }) {
   const {
     fan,
     followedArtists,
@@ -53,6 +54,18 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints }: {
           checklist (rendered by app/page.tsx above this component) and
           above everything else. Renders nothing when there is nothing to do. */}
       <TodayRow items={data.today ?? []} />
+
+      {/* "Your next step": the one goal the fan is closest to. Uses the
+          ledger balance the page read (totalPoints), which is what a
+          redemption is checked against; nothing shows when it is unknown. */}
+      <NextStepCard
+        spendablePoints={totalPoints ?? null}
+        lifetimePoints={lifetimePoints ?? null}
+        rewards={data.rewardCandidates ?? []}
+        premiumCommunities={premiumCommunities}
+        founderCommunities={data.founderCommunities ?? []}
+        tiersHref="/rewards"
+      />
 
       {/* Followed artists strip */}
       <PushOptInBanner />

@@ -7,7 +7,7 @@ import { selectWithOptionalEventGeo } from "@/lib/data/event-select";
 import { isPastEvent } from "@/lib/data/artists";
 import { eventDistance, fanHomeCoords } from "@/lib/geo/near";
 import { eventDayKey } from "@/lib/today/event-day";
-import { selectTodayItems, type TodayItem } from "@/lib/today/select";
+import { selectTodayItems, type TodayItem, type TodayReward } from "@/lib/today/select";
 import { easternDateString } from "@/lib/dates/eastern";
 import { shouldListLaunchReward } from "@/lib/launch-catalog";
 import { getCurrentCommunityId } from "@/lib/community";
@@ -167,6 +167,11 @@ export interface FanHomeData {
    * no row at all. Selection is pure (lib/today/select.ts).
    */
   today: TodayItem[];
+  /**
+   * Rewards the fan could be pointed at (lib/next-step.ts picks one). Same
+   * list the Today chip reads, before any filter on points.
+   */
+  rewardCandidates: TodayReward[];
 }
 
 /**
@@ -378,28 +383,27 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
         .limit(100)
     : Promise.resolve({ data: [] as Array<{ artist_slug: string; created_at: string }>, error: null });
 
-  // Today row, extra query 2 of 2: rewards the fan can afford, with the
-  // fan's own redemptions embedded (PostgREST filters the embed, not the
-  // parent, so unredeemed rewards come back with an empty array).
-  const fanPoints = Number(fan.total_points ?? 0);
-  const rewardsPromise = fanPoints > 0
-    ? admin
-        .from("rewards_catalog")
-        .select(
-          "id, title, point_cost, community_id, requires_tier, active, stock, drops_at, expires_at, clip_url, in_app_only, reward_redemptions(fan_id)",
-        )
-        .eq("active", true)
-        .gt("point_cost", 0)
-        .lte("point_cost", fanPoints)
-        .or(
-          followedSlugs.length
-            ? `community_id.in.(${followedSlugs.join(",")}),community_id.is.null`
-            : "community_id.is.null",
-        )
-        .eq("reward_redemptions.fan_id", user.id)
-        .order("point_cost", { ascending: false })
-        .limit(25)
-    : Promise.resolve({ data: [] as TodayRewardRow[], error: null });
+  // Today row, extra query 2 of 2: the active rewards of the artists the
+  // fan follows, with the fan's own redemptions embedded (PostgREST filters
+  // the embed, not the parent, so unredeemed rewards come back with an
+  // empty array). Not limited to what the fan can afford: the Today chip
+  // filters by points itself, and "Your next step" (lib/next-step.ts)
+  // needs the rewards still ahead of the fan.
+  const rewardsPromise = admin
+    .from("rewards_catalog")
+    .select(
+      "id, title, point_cost, community_id, requires_tier, active, stock, drops_at, expires_at, clip_url, in_app_only, reward_redemptions(fan_id)",
+    )
+    .eq("active", true)
+    .gt("point_cost", 0)
+    .or(
+      followedSlugs.length
+        ? `community_id.in.(${followedSlugs.join(",")}),community_id.is.null`
+        : "community_id.is.null",
+    )
+    .eq("reward_redemptions.fan_id", user.id)
+    .order("point_cost", { ascending: true })
+    .limit(REWARD_CANDIDATE_LIMIT);
 
   const [
     artistsRes,
@@ -661,15 +665,20 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
   const totalEarnedBadges = earnedSet.size;
   const totalBadgeCount = allBadges.length;
 
+  const now = new Date();
+  const rewardCandidates = shapeRewardCandidates(
+    rewardsRes.error ? [] : ((rewardsRes.data ?? []) as unknown as TodayRewardRow[]),
+    now.getTime(),
+  );
   const today = buildTodayItems({
-    now: new Date(),
+    now,
     fan: fan as FanProfile & { last_active_date?: string | null; current_streak_days?: number | null },
     followedArtists,
     events: visibleUpcoming,
     fanHome,
     checkins: (checkinsRes.data ?? []) as Array<{ artist_slug: string; created_at: string }>,
     recentActivity,
-    rewards: rewardsRes.error ? [] : ((rewardsRes.data ?? []) as unknown as TodayRewardRow[]),
+    rewards: rewardCandidates,
     premiumCommunities,
     founderCommunities,
     primaryCommunity,
@@ -691,6 +700,7 @@ async function _getFanHomeData(): Promise<FanHomeData | null> {
     founderCommunities,
     primaryCommunity,
     today,
+    rewardCandidates,
   };
 }
 
@@ -719,6 +729,30 @@ function utcDateString(at: Date): string {
   return at.toISOString().slice(0, 10);
 }
 
+/** Plenty for every artist a fan follows; the launch catalog is a handful. */
+const REWARD_CANDIDATE_LIMIT = 100;
+
+/**
+ * The rewards a fan can really be pointed at right now: in stock, already
+ * dropped, not ended, and on the launch list of rewards that can be
+ * redeemed. Shared by the Today chip and "Your next step".
+ */
+function shapeRewardCandidates(rows: TodayRewardRow[], nowMs: number): TodayReward[] {
+  return rows
+    .filter((r) => r.stock !== 0)
+    .filter((r) => !r.drops_at || Date.parse(r.drops_at) <= nowMs)
+    .filter((r) => !r.expires_at || Date.parse(r.expires_at) > nowMs)
+    .filter((r) => shouldListLaunchReward(r, { signedIn: true }))
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      point_cost: r.point_cost,
+      community_id: r.community_id,
+      requires_tier: r.requires_tier,
+      redeemed: (r.reward_redemptions?.length ?? 0) > 0,
+    }));
+}
+
 /**
  * Shape the already-loaded Fan Home reads into the pure Today selector's
  * input. No queries here — the two extra reads (checkins, rewards) ran in
@@ -732,7 +766,7 @@ function buildTodayItems(args: {
   fanHome: ReturnType<typeof fanHomeCoords>;
   checkins: Array<{ artist_slug: string; created_at: string }>;
   recentActivity: FanHomeActivityPost[];
-  rewards: TodayRewardRow[];
+  rewards: TodayReward[];
   premiumCommunities: string[];
   founderCommunities: string[];
   primaryCommunity: string;
@@ -781,19 +815,7 @@ function buildTodayItems(args: {
       lastActiveDate: lastActive,
       href: "/activity",
     },
-    rewards: args.rewards
-      .filter((r) => r.stock !== 0)
-      .filter((r) => !r.drops_at || Date.parse(r.drops_at) <= nowMs)
-      .filter((r) => !r.expires_at || Date.parse(r.expires_at) > nowMs)
-      .filter((r) => shouldListLaunchReward(r, { signedIn: true }))
-      .map((r) => ({
-        id: r.id,
-        title: r.title,
-        point_cost: r.point_cost,
-        community_id: r.community_id,
-        requires_tier: r.requires_tier,
-        redeemed: (r.reward_redemptions?.length ?? 0) > 0,
-      })),
+    rewards: args.rewards,
     points: Number(fan.total_points ?? 0),
     premiumCommunities: args.premiumCommunities,
     founderCommunities: args.founderCommunities,
