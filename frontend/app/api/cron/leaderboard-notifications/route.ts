@@ -7,6 +7,7 @@ import {
   notifyMonthEndNudge,
   notifyOvertaken,
 } from "@/lib/notifications/triggers/leaderboard";
+import { emailFanReminder } from "@/lib/fan-reminder-email-run";
 
 /**
  * Cron: GET /api/cron/leaderboard-notifications
@@ -22,6 +23,10 @@ import {
  *      - notifyFirstPlace   → fan newly reached rank 1
  *      - notifyOvertaken    → fan's rank got worse vs yesterday
  *      - notifyMonthEndNudge → fired when ≤ 3 days remain in the month
+ *
+ * Each of these also lands in the fan's inbox. An overtaken fan is also
+ * emailed when FAN_REMINDER_EMAIL_ENABLED is "1" and the rules in
+ * lib/fan-reminder-email.ts allow it (one reminder email per fan in 7 days).
  *
  * Auth: Authorization: Bearer <CRON_SECRET> (same pattern as all other
  * cron routes in this project).
@@ -72,6 +77,7 @@ async function leaderboardNotifications() {
     snapshotsUpserted: number;
     notificationsFirstPlace: number;
     notificationsOvertaken: number;
+    emailsOvertaken: number;
     notificationsNudge: number;
     errors: string[];
   } = {
@@ -79,6 +85,7 @@ async function leaderboardNotifications() {
     snapshotsUpserted: 0,
     notificationsFirstPlace: 0,
     notificationsOvertaken: 0,
+    emailsOvertaken: 0,
     notificationsNudge: 0,
     errors: [],
   };
@@ -162,6 +169,15 @@ async function leaderboardNotifications() {
         else if (prevRank !== undefined && currentRank > prevRank) {
           await notifyOvertaken({ fanId, artistName, artistSlug, newRank: currentRank, now });
           summary.notificationsOvertaken += 1;
+          const email = await emailFanReminder({
+            reminder: "leaderboard_overtaken",
+            fanId,
+            artist: { slug: artistSlug, name: artistName },
+            newRank: currentRank,
+            previousRank: prevRank,
+          });
+          if (email.status === "sent") summary.emailsOvertaken += 1;
+          if (email.status === "failed") summary.errors.push(`${fanId} email: ${email.error}`);
         }
 
         // Month-end nudge (independent of rank change).
