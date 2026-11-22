@@ -4,16 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * Phone-only bottom bar for signed-in fans: Home, Card, Rewards, Artists.
+ * Phone-only bottom bar for signed-in fans: Home, Card, Rewards,
+ * Community, Artists. Community is where fans earn most of their points.
  * Port of Brand Engage Pro #193. On a phone the top menu collapses into a
  * button, which left the logo as the only visible way home and hid the Fan
  * Card. Hidden from md up, where the top menu is visible.
  */
 
+export const COMMUNITY_TAB_PATH = "/community";
+
+/** An artist's community page, such as /artists/raelynn/community. */
+export const ARTIST_COMMUNITY_PATH = /^\/artists\/[^/]+\/community(\/|$)/;
+
 const TABS = [
   { href: "/", label: "Home", icon: "home" },
   { href: "/me/card", label: "Card", icon: "card" },
   { href: "/rewards", label: "Rewards", icon: "rewards" },
+  // /community (app/community/route.ts) sends the fan to their own
+  // artist's community page.
+  { href: COMMUNITY_TAB_PATH, label: "Community", icon: "community" },
   { href: "/artists", label: "Artists", icon: "artists" },
 ] as const;
 
@@ -37,6 +46,11 @@ export function tabBarHiddenOn(pathname: string): boolean {
 
 export function isTabActive(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";
+  // The Community tab lands on an artist's community page, which sits
+  // under /artists.
+  const onArtistCommunity = ARTIST_COMMUNITY_PATH.test(pathname);
+  if (href === COMMUNITY_TAB_PATH && onArtistCommunity) return true;
+  if (href === "/artists" && onArtistCommunity) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -80,6 +94,15 @@ function Icon({ name }: { name: (typeof TABS)[number]["icon"] }) {
       </svg>
     );
   }
+  if (name === "community") {
+    return (
+      <svg {...common}>
+        <path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" />
+        <path d="M8 9.5h8" />
+        <path d="M8 12.5h5" />
+      </svg>
+    );
+  }
   return (
     <svg {...common}>
       <path d="M9 18V6l11-2v12" />
@@ -110,9 +133,11 @@ export default function MobileTabBar() {
               <li key={tab.href} className="flex-1">
                 <Link
                   href={tab.href}
+                  // /community answers with a redirect, so there is nothing to prefetch.
+                  prefetch={tab.href === COMMUNITY_TAB_PATH ? false : undefined}
                   aria-current={active ? "page" : undefined}
                   className={
-                    "flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition " +
+                    "flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 px-1 py-2 text-xs font-medium transition " +
                     (active ? "text-white" : "text-white/60 hover:text-white")
                   }
                 >
