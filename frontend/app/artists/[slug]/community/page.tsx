@@ -4,7 +4,9 @@ import type { Metadata } from "next";
 import { listArtists } from "@/lib/artists";
 import { getArtistFromDb } from "@/lib/data/artists";
 import { getAdminUser } from "@/lib/admin";
+import { communityAdminUser } from "@/lib/admin-guard";
 import { getCurrentFan } from "@/lib/data/fan";
+import { getOfferableSocialPlatforms } from "@/lib/data/social-accounts";
 import { getActiveFanActionsForArtist } from "@/lib/data/campaigns";
 import { getLivePresavesForArtist } from "@/lib/presave/read";
 import { getLockedPostStubs, mergeFounderStubs } from "./founder-gate";
@@ -33,6 +35,11 @@ import TagFilterChips from "./tag-filter-chips";
 import FounderLockedCard from "./founder-locked-card";
 import PickedForYou from "@/components/personal/picked-for-you";
 import PointsToastHost from "@/components/points-toast";
+
+// Server actions on this page share this limit. Publishing an announcement
+// can also send it to social (two calls of up to 8 seconds each, side by
+// side), so allow enough time that a slow call is not cut off part way.
+export const maxDuration = 30;
 
 export async function generateStaticParams() {
   return listArtists().map((a) => ({ slug: a.slug }));
@@ -117,6 +124,12 @@ export default async function ArtistCommunityPage({
 
   const isSignedIn = fan !== null;
   const isAdmin = adminUser !== null;
+  // Platforms this artist's team can also send an announcement to. Empty
+  // (no checkbox) unless the feature is switched on, an account is linked,
+  // and the viewer may publish announcements for this artist. That is the
+  // same rule createAnnouncementAction uses, which checks it again.
+  const canAnnounce = isAdmin && (await communityAdminUser(slug, "editor")) !== null;
+  const socialPlatforms = canAnnounce ? await getOfferableSocialPlatforms(slug) : [];
   const guestSignup = guestSignupHref({
     ref: slug,
     next: `/artists/${slug}/community`,
@@ -181,7 +194,12 @@ export default async function ArtistCommunityPage({
       />
 
       {isSignedIn && canWrite ? (
-        <NewPostForm artistSlug={slug} isAdmin={isAdmin} />
+        <NewPostForm
+          artistSlug={slug}
+          artistName={artist.name}
+          isAdmin={isAdmin}
+          socialPlatforms={socialPlatforms}
+        />
       ) : isSignedIn ? (
         <PremiumLockNote
           communityId={slug}

@@ -9,6 +9,14 @@ import AltTextSuggester from "@/components/community/alt-text-suggester";
 import TagSuggester from "@/components/community/tag-suggester";
 import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import {
+  ALSO_POST_FIELD,
+  ALSO_POST_VALUE,
+  SOCIAL_NO_PHOTO_FORM_NOTE,
+  SUBMIT_KEY_FIELD,
+  alsoPostLabel,
+  type SocialPlatform,
+} from "@/lib/social/social-post";
+import {
   createAnnouncementAction,
   createChallengeAction,
   createPollAction,
@@ -20,10 +28,15 @@ type Visibility = "public" | "premium" | "founder-only";
 
 export default function NewPostForm({
   artistSlug,
+  artistName,
   isAdmin,
+  socialPlatforms = [],
 }: {
   artistSlug: string;
+  artistName: string;
   isAdmin: boolean;
+  /** Linked social platforms this team member may also post an announcement to. */
+  socialPlatforms?: SocialPlatform[];
 }) {
   const [kind, setKind] = useState<Kind>("post");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
@@ -38,6 +51,9 @@ export default function NewPostForm({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [body, setBody] = useState<string>("");
   const [captionUsed, setCaptionUsed] = useState<boolean>(false);
+  const [alsoPostToSocial, setAlsoPostToSocial] = useState(false);
+  // What happened on social after the last announcement, shown under the form.
+  const [socialNotice, setSocialNotice] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const { status, invoke, submitting } = useFormSave();
@@ -50,7 +66,13 @@ export default function NewPostForm({
     setImageUrl(null);
     setBody("");
     setCaptionUsed(false);
+    setAlsoPostToSocial(false);
   }
+
+  // Only a public team announcement can go to social. The server checks
+  // all of this again.
+  const showSocialCheckbox =
+    isAdmin && kind === "announcement" && visibility === "public" && socialPlatforms.length > 0;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -86,13 +108,30 @@ export default function NewPostForm({
     // useFormSave wraps the call with retry-on-503 + visible status. If all
     // retries fail the status will be { kind: "error" } and we leave the
     // form populated so the user can fix and resubmit.
+    // The checkbox is controlled here, so the field is set from state and
+    // only when the box was on screen and ticked.
+    formData.delete(ALSO_POST_FIELD);
+    formData.delete(SUBMIT_KEY_FIELD);
+    if (showSocialCheckbox && alsoPostToSocial) {
+      formData.set(ALSO_POST_FIELD, ALSO_POST_VALUE);
+      // One fresh key per submit. A retry of this submit reuses this same
+      // form data, so the server can tell it has already sent to social.
+      formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
+    }
+
+    setSocialNotice(null);
     const ok = await invoke(async () => {
-      // Fan posts resolve to { pointsAwarded, … } (admin kinds resolve to
-      // undefined); feed the "+5 pts · N to Gold" toast either way.
-      pushPointsToast((await action(formData)) ?? undefined);
-      return { ok: true };
+      const result = (await action(formData)) ?? undefined;
+      // An announcement that was also sent to social resolves to
+      // { socialNotice }. Fan posts resolve to { pointsAwarded, … } and the
+      // other admin kinds to undefined; those feed the "+5 pts · N to Gold"
+      // toast as before.
+      if (result && "socialNotice" in result) return { ok: true, socialNotice: result.socialNotice };
+      pushPointsToast(result);
+      return { ok: true, socialNotice: null };
     });
     if (ok) {
+      setSocialNotice(ok.socialNotice);
       resetForm();
       setKind("post");
     }
@@ -301,6 +340,29 @@ export default function NewPostForm({
 
       {(kind === "post" || kind === "announcement") && (
         <VideoUploader key={uploaderKey} label="Attach video (optional)" />
+      )}
+
+      {showSocialCheckbox && (
+        <div className="space-y-1">
+          <label className="flex items-start gap-2 text-sm text-white/80">
+            <input
+              type="checkbox"
+              checked={alsoPostToSocial}
+              onChange={(e) => setAlsoPostToSocial(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-white/30"
+            />
+            <span>{alsoPostLabel(artistName, socialPlatforms)}</span>
+          </label>
+          {alsoPostToSocial && socialPlatforms.includes("instagram") && !imageUrl && (
+            <p className="pl-6 text-xs text-white/60">{SOCIAL_NO_PHOTO_FORM_NOTE}</p>
+          )}
+        </div>
+      )}
+
+      {socialNotice && (
+        <p role="status" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/80">
+          {socialNotice}
+        </p>
       )}
 
       <div className="flex items-center justify-between gap-3">

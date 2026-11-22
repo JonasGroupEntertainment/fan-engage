@@ -20,6 +20,9 @@ import {
   requirePremiumFeature,
   type PremiumV1Feature,
 } from "@/lib/entitlements";
+import { defaultSocialDeps } from "@/lib/data/social-accounts";
+import { sendAnnouncementToSocial } from "@/lib/social/announce";
+import { ALSO_POST_FIELD, ALSO_POST_VALUE, SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
 type Visibility = "public" | "premium" | "founder-only";
 
 /**
@@ -391,7 +394,12 @@ export async function submitEntryAction(formData: FormData): Promise<PointsActio
 
 // ─── Phase 2a: announcements ──────────────────────────────────────────────
 
-export async function createAnnouncementAction(formData: FormData) {
+/** What the announcement form shows after a send to social was asked for. */
+export type AnnouncementResult = { socialNotice: string };
+
+export async function createAnnouncementAction(
+  formData: FormData,
+): Promise<AnnouncementResult | undefined> {
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
   const adminUser = await communityAdminUser(artistSlug, "editor");
   if (!adminUser) return;
@@ -402,6 +410,10 @@ export async function createAnnouncementAction(formData: FormData) {
   const imageUrlRaw = String(formData.get("image_url") ?? "").trim();
   const videoUrlRaw = String(formData.get("video_url") ?? "").trim();
   const videoPosterUrlRaw = String(formData.get("video_poster_url") ?? "").trim();
+  const wantsSocial = formData.get(ALSO_POST_FIELD) === ALSO_POST_VALUE;
+  // Checked for a uuid shape by the sender. Missing or malformed means
+  // nothing goes to social; the announcement itself still saves.
+  const submitKey = String(formData.get(SUBMIT_KEY_FIELD) ?? "");
   if (!artistSlug || !body) return;
 
   const imageUrl = normalizeUrl(imageUrlRaw);
@@ -431,6 +443,32 @@ export async function createAnnouncementAction(formData: FormData) {
   if (created) tagRowAsync(created.id);
 
   revalidatePath(`/artists/${artistSlug}/community`);
+
+  // The announcement is saved before anything goes to social, so a slow or
+  // failed send cannot block it. The checkbox alone is never trusted: the
+  // sender checks the team grant, the kind, the visibility, the settings,
+  // the submit key (so a retry cannot send twice) and the daily limit again.
+  const postId = (created as { id: string } | null)?.id;
+  if (!wantsSocial || !postId) return;
+  // The same check that let the announcement be published above, for this
+  // artist: an editor or higher on this artist's team, or a super-admin.
+  const isArtistAdmin = adminUser !== null;
+  const notice = await sendAnnouncementToSocial(
+    {
+      kind: "announcement",
+      communityPostId: postId,
+      artistSlug,
+      title,
+      body,
+      visibility,
+      imageUrl,
+      createdBy: adminUser.id,
+      isArtistAdmin,
+      submitKey,
+    },
+    defaultSocialDeps(),
+  );
+  return { socialNotice: notice.message };
 }
 
 export async function togglePinAction(formData: FormData) {
