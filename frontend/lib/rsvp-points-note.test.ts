@@ -42,5 +42,6 @@ describe("where the RSVP note is wired", () => {
     assert.match(button, /formatPointsToast\(result\.progress\)/);
     assert.match(button, /data-rsvp-points-note/);
     assert.match(button, /setPointsNote\(null\)/);
+    assert.match(button, /<span role="status" className="sr-only">/);
   });
 });

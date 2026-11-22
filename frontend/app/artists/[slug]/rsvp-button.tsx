@@ -109,7 +109,7 @@ export default function RsvpButton({
       {justRsvped && (
         <div className="flex flex-col items-end gap-1">
           {pointsNote && (
-            <p role="status" className="text-xs font-semibold text-white/85" data-rsvp-points-note>
+            <p aria-hidden className="text-xs font-semibold text-white/85" data-rsvp-points-note>
               {pointsNote}
             </p>
           )}
@@ -123,6 +123,11 @@ export default function RsvpButton({
           />
         </div>
       )}
+      {/* Always on the page so a screen reader announces the note when it
+          arrives; the visible copy above is hidden from it to avoid a repeat. */}
+      <span role="status" className="sr-only">
+        {pointsNote ?? ""}
+      </span>
       {error && <p className="text-xs text-rose-300">{error}</p>}
     </div>
   );
