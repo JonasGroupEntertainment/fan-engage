@@ -3,6 +3,7 @@ import { type Metadata } from "next";
 import Link from "next/link";
 import { getArtistFromDb } from "@/lib/data/artists";
 import ShareButton from "@/components/share-button";
+import { dropShareCopy, isDropShareItem } from "@/lib/drop-share";
 
 export const dynamic = "force-static";
 export const revalidate = 3600;
@@ -15,11 +16,9 @@ export async function generateMetadata({
   const { slug, drop } = await params;
   const artist = await getArtistFromDb(slug).catch(() => null);
   const artistName = artist?.name ?? "Fan Engage";
-  const dropLabel = decodeURIComponent(drop)
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-  const title = `Exclusive Drop: ${dropLabel} — ${artistName}`;
-  const description = `Premium fans got first access to ${dropLabel} from ${artistName} on Fan Engage.`;
+  // Fixed wording: nothing here is taken from the address (lib/drop-share.ts).
+  if (!artist || !isDropShareItem(drop)) return { title: "Drop", robots: { index: false } };
+  const { title, description } = dropShareCopy(artistName);
   return {
     title,
     description,
@@ -41,17 +40,16 @@ export default async function DropSharePage({
 }) {
   const { slug, drop } = await params;
   const artist = await getArtistFromDb(slug).catch(() => null);
-  if (!artist) notFound();
+  if (!artist || !isDropShareItem(drop)) notFound();
 
-  const dropLabel = decodeURIComponent(drop)
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Fixed wording: nothing here is taken from the address (lib/drop-share.ts).
+  const copy = dropShareCopy(artist.name);
 
   const shareUrl =
     typeof process.env.NEXT_PUBLIC_APP_URL === "string"
       ? `${process.env.NEXT_PUBLIC_APP_URL}/share/drop/${slug}/${drop}`
       : `https://fan-engage-pearl.vercel.app/share/drop/${slug}/${drop}`;
-  const shareTitle = `I got early access to ${dropLabel} from ${artist.name}`;
+  const shareTitle = copy.shareTitle;
   const shareText = `Premium fans on Fan Engage got first access. Don't miss the next one: ${shareUrl}`;
 
   return (
@@ -78,7 +76,7 @@ export default async function DropSharePage({
               WebkitTextFillColor: "transparent",
             }}
           >
-            {dropLabel}
+            {copy.headline}
           </h1>
           <p className="text-white/60 text-sm">from {artist.name}</p>
         </div>

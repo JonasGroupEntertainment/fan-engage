@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getArtistFromDb } from "@/lib/data/artists";
+import { DROP_SHARE_HEADLINE } from "@/lib/drop-share";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
@@ -18,10 +19,8 @@ export default async function DropOpengraphImage({
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
 
-  // drop param is a human-readable slug; decode for display
-  const dropLabel = decodeURIComponent(routeParams.drop)
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Fixed wording: the picture shows nothing taken from the address
+  // (lib/drop-share.ts).
 
   return new ImageResponse(
     (
@@ -118,7 +117,7 @@ export default async function DropOpengraphImage({
               color: "transparent",
             }}
           >
-            {dropLabel}
+            {DROP_SHARE_HEADLINE}
           </div>
           <div style={{ fontSize: 30, fontWeight: 500, color: "rgba(255,255,255,0.7)" }}>
             {`from ${artistName}`}
