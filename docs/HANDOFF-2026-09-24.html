@@ -60,7 +60,7 @@ footer{border-top:1px solid var(--line);padding-top:1.2rem;font-size:.8rem;color
 <ul class="meta">
 <li><b>Date</b> 2026-09-24, updated 2026-11-11 (twentieth update: the Mac checkout is on main and the merged forgot-password branch is deleted. Nineteenth update, same day: PR #161 merged, forgot password and the admin Events tab are live. Eighteenth update, same day: Hermes shortcut and launchers removed, added to Update 14. Seventeenth update, same day: Hermes data archived and removed, Syncnatra kept off, added to Update 14. Sixteenth update, same day: the stage0 branches, Hermes and the Mac checkout, Update 14. Fifteenth update, same day: three draft migrations in PR #166, Update 13. Fourteenth update, same day: artist status, hidden placeholder pages and community tag corrections, Update 12. Thirteenth update, same day: PRs #112 to #148 written up as Update 10b. Twelfth update, same day: launch-readiness review, share image and event time fixes, CI build retry, dependency fixes)</li>
 <li><b>Prepared for</b> Kevin Jonas Sr. and the next agent session</li>
-<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at d9c9842 (PR #181) on 2026-11-22 before this docs change, no open pull requests (checked with gh that day). See "Update 2026-11-22" for the latest. The rest of this line is the 2026-11-11 state and was not rechecked: last code change 2d1a046 (PR #161, forgot password and the admin Events tab), four draft PRs open (#122, #143, #152 and #166, the migration drafts), zero open Dependabot alerts. <span class="status-warn">Six must-fix items before launch, see Update 11.</span></li>
+<li><b>Status</b> <span class="status-good">Live on www.fanengagepro.com</span>, main at 680b0be (PR #184) on 2026-11-22 before this docs change; three pull requests open and ready for Kevin, #185, #186 and #187 (checked with gh that day). See "Update 2026-11-22" and its evening block for the latest. The rest of this line is the 2026-11-11 state and was not rechecked: last code change 2d1a046 (PR #161, forgot password and the admin Events tab), four draft PRs open (#122, #143, #152 and #166, the migration drafts), zero open Dependabot alerts. <span class="status-warn">Six must-fix items before launch, see Update 11.</span></li>
 <li><b>Supersedes</b> the 2026-09-17 handoff for state and open items. The 2026-09-17 workflow recipe and the 2026-09-14 product overview still apply.</li>
 </ul>
 </header>
@@ -604,9 +604,19 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 
 <h3>Notes for the next session</h3>
 <ul>
-<li>The highest numbered migration on main is 0104, not applied. The next free number is 0105.</li>
+<li>The highest numbered migration on main is 0104, not applied. Open pull request #185 carries 0105, so the next free number is 0106.</li>
 <li>This Mac's Node 24 rejects the flag in <code>npm test</code>. Run <code>node --test --experimental-strip-types 'lib/**/*.test.ts'</code> from <code>frontend</code>. CI uses Node 22 and a secret scanner, and both failed on the Brand Engage Pro version of #182 before it was fixed: the scanner flags any random-looking value on a line whose name contains "key", and a test that waits on <code>AbortSignal.timeout</code> ends early on Node 22 unless the stand-in request keeps the process busy. Wait for the GitHub checks before saying a pull request is ready.</li>
 <li>Housekeeping: the #181 and #182 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. No open pull requests on 2026-11-22.</li>
+</ul>
+<h3>2026-11-22, evening: reminder email audience (PR #184) and three open pull requests (#185 to #187)</h3>
+<ul>
+<li><b>#184, merged</b> (680b0be). Event reminder emails go only to fans who RSVPed, sent per member through Mandrill (<code>frontend/lib/event-reminder-email*.ts</code>, <code>reminders.ts</code>). <span class="status-warn">Nothing sends yet:</span> <code>MANDRILL_API_KEY</code> is not set in Vercel for Fan Engage Pro (name only, checked 2026-11-22). Raymond was asked by email that day to add it; no reply when this was recorded.</li>
+<li><b>#185, open, ready.</b> A retried save cannot post the same thing twice. Same design as Brand Engage Pro #290. Carries migration 0105, not applied; it needs Kevin's yes after the merge, one statement at a time. The app works before it is applied.</li>
+<li><b>#186, open, ready.</b> Admin broadcast and campaign messages go only to the fans the admin chose (<code>frontend/lib/audience-email*.ts</code>, <code>admin-audience.ts</code>, <code>send-budget.ts</code>, <code>broadcast-claim.ts</code>). Before this, both admin screens could email everyone.</li>
+<li><b>#187, open, ready.</b> Fan reminders also land in the in-app inbox (<code>frontend/lib/notifications/inbox-mirror.ts</code>, <code>inbox-store.ts</code>). Two of them, the streak reminder and the "you were overtaken" notice, can also go by email, behind <code>FAN_REMINDER_EMAIL_ENABLED</code> set to <code>1</code>. That switch is off. Do not turn it on until Kevin and Brad settle whether fans aged 13 to 17 may get reminder email.</li>
+<li><b>Merging the three.</b> All three passed every check on 2026-11-22, and the three merged together into one scratch branch passed the full test run (1801 pass, 0 fail). The repo requires each pull request to be current with main, so after Kevin merges one, run <code>gh pr update-branch</code> on the next and wait for its checks.</li>
+<li><b>Approved, not started.</b> The "next thing" screens for fans (what to do next after an action), to begin after #187 lands.</li>
+<li>Housekeeping: the #184 branch and its local folder were deleted at Kevin's word after the tip was matched to the pull request. Local folders still in use: <code>~/Developer/fep-once</code> (#185), <code>fep-audience</code> (#186), <code>fep-reach</code> (#187).</li>
 </ul>
 </section>
 
