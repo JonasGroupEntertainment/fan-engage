@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { redeemRewardAction } from "./actions";
 import ShareButton from "@/components/share-button";
+import type { RewardShareMessages } from "@/lib/reward-share";
 
 interface RedeemFormProps {
   rewardId: string;
@@ -13,11 +14,12 @@ interface RedeemFormProps {
   /** Artist display name — used in the share message body. */
   artistName: string;
   /**
-   * Address shared from the success state: the reward's own share page for
-   * a wallpaper, the artist's page for anything else (lib/reward-share.ts).
-   * Worked out by the rewards page.
+   * What the success state shares (lib/reward-share.ts rewardShareMessages).
+   * It names the reward and links to its share page only for a reward that
+   * may be shown publicly; otherwise it says "a fan reward" and links to
+   * the artist's page. Worked out by the rewards page.
    */
-  shareUrl: string;
+  share: Pick<RewardShareMessages, "url" | "redeemedTitle" | "redeemedText">;
   /** Current fan's profile handle — used to link to /fans/<handle>
    *  from the success state so the fan can see their updated profile. */
   fanHandle?: string | null;
@@ -31,7 +33,7 @@ export function RedeemForm({
   pointCost,
   artistSlug,
   artistName,
-  shareUrl,
+  share,
   fanHandle,
   onSuccess,
   onClose,
@@ -67,9 +69,6 @@ export function RedeemForm({
     setLoading(false);
   }
 
-  const shareTitle = `I just redeemed ${rewardTitle} on Fan Engage`;
-  const shareText = `Cashed in ${pointCost.toLocaleString()} points for ${rewardTitle} from ${artistName}'s fan experience. ${shareUrl}`;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="glass-card w-full max-w-md rounded-2xl p-6">
@@ -94,9 +93,9 @@ export function RedeemForm({
 
             <div className="mt-6 flex flex-col items-center gap-3">
               <ShareButton
-                title={shareTitle}
-                text={shareText}
-                url={shareUrl}
+                title={share.redeemedTitle}
+                text={share.redeemedText}
+                url={share.url}
                 label="Share this drop"
                 variant="primary"
               />

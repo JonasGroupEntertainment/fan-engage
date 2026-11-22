@@ -4,6 +4,7 @@ import { useState } from "react";
 import DropCountdown from "@/components/drop-countdown";
 import Image from "next/image";
 import { RedeemForm } from "./redeem-form";
+import type { RewardShareMessages } from "@/lib/reward-share";
 import InlineShareButton from "@/components/inline-share-button";
 import type { RewardRow } from "@/lib/data/rewards";
 import { isInAppOnlyLaunchReward } from "@/lib/launch-catalog";
@@ -17,8 +18,11 @@ interface RewardCardProps {
   artistSlug: string;
   /** Artist display name — used in the share message body. */
   artistName: string;
-  /** What "Share this drop" sends after a redemption (lib/reward-share.ts). */
-  shareUrl: string;
+  /**
+   * What this card's two share buttons send (lib/reward-share.ts). A reward
+   * is named outside the app only when it may be shown publicly.
+   */
+  share: RewardShareMessages;
   /** Current fan's profile handle — used by the redeem success state
    *  to surface a "View your updated profile" link. Optional because
    *  RLS or signup races can briefly leave a fan handle-less. */
@@ -34,7 +38,7 @@ export default function RewardCardWithForm({
   reward,
   artistSlug,
   artistName,
-  shareUrl,
+  share,
   fanHandle,
   fanPoints = 0,
   canRedeem = false,
@@ -111,9 +115,9 @@ export default function RewardCardWithForm({
         {!isInAppOnlyLaunchReward(reward.title) && (
           <div className="mt-2 flex justify-end">
             <InlineShareButton
-              title={reward.title}
-              text={`Check out this drop on Fan Engage: ${reward.title} for ${reward.point_cost.toLocaleString()} pts.`}
-              url={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app"}/artists/${artistSlug}/rewards`}
+              title={share.browseTitle}
+              text={share.browseText}
+              url={share.url}
               label="↗ Share drop"
               className="text-xs text-white/50 hover:text-white/70 transition"
             />
@@ -128,7 +132,7 @@ export default function RewardCardWithForm({
           pointCost={reward.point_cost}
           artistSlug={artistSlug}
           artistName={artistName}
-          shareUrl={shareUrl}
+          share={share}
           fanHandle={fanHandle ?? null}
           onSuccess={() => {
             setShowForm(false);

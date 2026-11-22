@@ -9,6 +9,7 @@ import {
   isRewardShareable,
   pointsLabel,
   rewardShareAddress,
+  rewardShareMessages,
   rewardShareCopy,
   rewardSharePath,
   type ShareableRewardFields,
@@ -134,6 +135,76 @@ describe("rewardShareAddress", () => {
   });
 });
 
+describe("rewardShareMessages: what a fan's share says", () => {
+  const base = { appUrl: APP_URL, artistSlug: ARTIST, artistName: "Some Artist", now: NOW };
+  const everyText = (m: ReturnType<typeof rewardShareMessages>) =>
+    [m.redeemedTitle, m.redeemedText, m.browseTitle, m.browseText, m.url].join(" ");
+
+  it("names a wallpaper and links to its share page", () => {
+    // Arrange
+    const wallpaper = { ...reward(), point_cost: 250 };
+
+    // Act
+    const messages = rewardShareMessages({ ...base, reward: wallpaper });
+
+    // Assert
+    assert.equal(messages.namesReward, true);
+    assert.equal(messages.url, `${APP_URL}/share/reward/${ARTIST}/${REWARD_ID}`);
+    assert.equal(messages.redeemedTitle, "I just redeemed Phone Wallpaper on Fan Engage");
+    assert.equal(
+      messages.redeemedText,
+      `Cashed in 250 points for Phone Wallpaper from Some Artist's fan experience. ${messages.url}`,
+    );
+    assert.equal(messages.browseTitle, "Phone Wallpaper");
+    assert.equal(messages.browseText, "Check out this drop on Fan Engage: Phone Wallpaper for 250 points.");
+  });
+
+  it("never names Fan Spotlight, and links to the artist's page", () => {
+    const spotlight = { ...reward({ title: "Fan Spotlight" }), point_cost: 1000 };
+
+    const messages = rewardShareMessages({ ...base, reward: spotlight });
+
+    assert.equal(messages.namesReward, false);
+    assert.equal(messages.url, `${APP_URL}/artists/${ARTIST}`);
+    assert.doesNotMatch(everyText(messages), /spotlight/i);
+    assert.equal(messages.redeemedTitle, "I just redeemed a fan reward on Fan Engage");
+    assert.match(messages.redeemedText, /^Cashed in my points for a fan reward from Some Artist's fan experience\. /);
+  });
+
+  it("never names any launch reward that is not a wallpaper", () => {
+    const others = LAUNCH_REWARD_TITLES.filter(
+      (title) => !(PUBLIC_SHARE_REWARD_TITLES as readonly string[]).includes(title),
+    );
+    for (const title of others) {
+      const row = { ...reward({ title, clip_url: "https://example.com/clip.mp4" }), point_cost: 500 };
+      const messages = rewardShareMessages({ ...base, reward: row });
+
+      assert.equal(messages.namesReward, false, title);
+      assert.ok(!everyText(messages).includes(title), title);
+    }
+  });
+
+  it("does not name a wallpaper that is switched off or out of stock", () => {
+    for (const overrides of [{ active: false }, { stock: 0 }]) {
+      const row = { ...reward(overrides), point_cost: 250 };
+      const messages = rewardShareMessages({ ...base, reward: row });
+
+      assert.equal(messages.namesReward, false);
+      assert.doesNotMatch(everyText(messages), /wallpaper/i);
+    }
+  });
+
+  it("uses no phrase that is banned from guest-facing copy", () => {
+    const named = rewardShareMessages({ ...base, reward: { ...reward(), point_cost: 250 } });
+    const generic = rewardShareMessages({ ...base, reward: { ...reward({ title: "Fan Spotlight" }), point_cost: 1000 } });
+    const text = `${everyText(named)} ${everyText(generic)}`.toLowerCase();
+
+    for (const phrase of GUEST_FORBIDDEN_PHRASES) {
+      assert.ok(!text.includes(phrase.toLowerCase()), phrase);
+    }
+  });
+});
+
 describe("the reward share page works with the invite link", () => {
   const path = rewardSharePath(ARTIST, REWARD_ID);
 
@@ -207,9 +278,23 @@ describe("where the reward share page is wired", () => {
     assert.match(read("../app/share/reward/[slug]/[reward]/opengraph-image.tsx"), /max-age=600, s-maxage=600/);
   });
 
-  it("the rewards page gives each card its share address, and the redeem box uses it", () => {
-    assert.match(read("../app/artists/[slug]/rewards/page.tsx"), /rewardShareAddress\(/);
-    assert.match(read("../app/artists/[slug]/rewards/redeem-form.tsx"), /url=\{shareUrl\}/);
+  it("the rewards page gives each card its share messages, and both share buttons use them", () => {
+    assert.match(read("../app/artists/[slug]/rewards/page.tsx"), /rewardShareMessages\(/);
+    const form = read("../app/artists/[slug]/rewards/redeem-form.tsx");
+    assert.match(form, /title=\{share\.redeemedTitle\}/);
+    assert.match(form, /text=\{share\.redeemedText\}/);
+    assert.match(form, /url=\{share\.url\}/);
+    const card = read("../app/artists/[slug]/rewards/reward-card.tsx");
+    assert.match(card, /title=\{share\.browseTitle\}/);
+    assert.match(card, /text=\{share\.browseText\}/);
+  });
+
+  it("neither share button builds its own wording from the reward's name", () => {
+    const form = read("../app/artists/[slug]/rewards/redeem-form.tsx");
+    const card = read("../app/artists/[slug]/rewards/reward-card.tsx");
+    assert.doesNotMatch(form, /I just redeemed \$\{/);
+    assert.doesNotMatch(form, /Cashed in/);
+    assert.doesNotMatch(card, /Check out this drop/);
   });
 
   it("the signed-in-only listing rule is untouched", () => {
