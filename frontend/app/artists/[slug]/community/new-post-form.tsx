@@ -117,12 +117,13 @@ export default function NewPostForm({
     // The checkbox is controlled here, so the field is set from state and
     // only when the box was on screen and ticked.
     formData.delete(ALSO_POST_FIELD);
-    formData.delete(SUBMIT_KEY_FIELD);
+    // One fresh key per press of the button, for every kind of post. An
+    // automatic retry of this press reuses this same form data, so the
+    // server can tell it has already saved the post (and already sent it
+    // to social). A later, separate press gets a new key.
+    formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
     if (showSocialCheckbox && alsoPostToSocial) {
       formData.set(ALSO_POST_FIELD, ALSO_POST_VALUE);
-      // One fresh key per submit. A retry of this submit reuses this same
-      // form data, so the server can tell it has already sent to social.
-      formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
     }
 
     setSocialNotice(null);

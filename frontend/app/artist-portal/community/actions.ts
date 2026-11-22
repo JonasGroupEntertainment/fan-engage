@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPortalRole } from "@/lib/artist-portal/access";
 import { buildCommunityPostRow, readPostInput } from "@/lib/community/post-input";
+import { pollHasNoOptions, savePostOnce } from "@/lib/community/save-post-once";
+import { SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
 import { indexRowAsync } from "@/lib/embeddings";
 import { moderateRowAsync } from "@/lib/moderation";
@@ -33,6 +35,27 @@ function revalidateCommunity(slug: string) {
   revalidatePath(`/artists/${slug}`);
 }
 
+/** Same post-insert pipeline as the fan composer: dedupe, embed, moderate, tag. */
+async function runNewPostPipeline(
+  admin: ReturnType<typeof createAdminClient>,
+  postId: string,
+  body: string,
+): Promise<void> {
+  try {
+    const dup = await findNearestPost(body, postId);
+    if (dup) {
+      const updates: Record<string, unknown> = { duplicate_of: dup.postId };
+      if (isHardDuplicate(dup)) updates.moderation_status = "flag_review";
+      await admin.from("community_posts").update(updates).eq("id", postId);
+    }
+  } catch (e) {
+    console.warn("[artist-portal] dedupe check failed", e);
+  }
+  indexRowAsync("community_posts", postId);
+  moderateRowAsync("community_posts", postId);
+  tagRowAsync(postId);
+}
+
 /**
  * Create a post / announcement / poll / challenge from the portal. Same row
  * shape as the fan composer's createPostAction (lib/community/post-input.ts).
@@ -60,42 +83,38 @@ export async function createPortalPostAction(formData: FormData): Promise<Portal
     return { ok: false, error: msg };
   }
 
+  // One id per press of the button. A retry of that press carries the same
+  // id, so the post is saved once and `created` is then the row the first
+  // try saved. Missing or malformed: saved as before.
   const admin = createAdminClient();
-  const { data: created, error: insertErr } = await admin
-    .from("community_posts")
-    .insert(built.row)
-    .select("id")
-    .single();
+  const {
+    row: created,
+    isRepeat,
+    error: insertErr,
+  } = await savePostOnce(admin, built.row, formData.get(SUBMIT_KEY_FIELD));
   if (insertErr || !created) {
     console.error("[artist-portal] post insert failed", insertErr);
     return { ok: false, error: "Your post couldn't be saved. Please try again." };
   }
-  const postId = created.id as string;
+  const postId = created.id;
 
-  if (built.pollOptions.length > 0) {
+  // A repeat adds no second set of poll options. It only fills them in when
+  // the first try stopped before them.
+  const needsOptions =
+    built.pollOptions.length > 0 && (!isRepeat || (await pollHasNoOptions(admin, postId)));
+  if (needsOptions) {
     await admin.from("community_poll_options").insert(
       built.pollOptions.map((label, i) => ({ post_id: postId, label, sort_order: i })),
     );
   }
 
-  // Same post-insert pipeline as the fan composer: dedupe, embed, moderate, tag.
-  try {
-    const dup = await findNearestPost(built.row.body, postId);
-    if (dup) {
-      const updates: Record<string, unknown> = { duplicate_of: dup.postId };
-      if (isHardDuplicate(dup)) updates.moderation_status = "flag_review";
-      await admin.from("community_posts").update(updates).eq("id", postId);
+  // A repeat is not checked, indexed, moderated, tagged or announced again.
+  if (!isRepeat) {
+    await runNewPostPipeline(admin, postId, built.row.body);
+    // Scheduled posts are announced by the cron when due, never here.
+    if (built.notifyAtCreate) {
+      notifyNewPost({ postId, artistSlug, authorId: ctx.user.id }).catch(() => {});
     }
-  } catch (e) {
-    console.warn("[artist-portal] dedupe check failed", e);
-  }
-  indexRowAsync("community_posts", postId);
-  moderateRowAsync("community_posts", postId);
-  tagRowAsync(postId);
-
-  // Scheduled posts are announced by the cron when due — never here.
-  if (built.notifyAtCreate) {
-    notifyNewPost({ postId, artistSlug, authorId: ctx.user.id }).catch(() => {});
   }
 
   // "Use this draft" — close the loop on the AI draft the post came from.

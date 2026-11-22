@@ -15,6 +15,7 @@ import {
   POST_TITLE_MAX,
   type PostKind,
 } from "@/lib/community/post-input";
+import { SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
 import { createPortalPostAction, discardPortalDraftAction } from "./actions";
 
 type Visibility = "public" | "premium" | "founder-only";
@@ -140,6 +141,10 @@ export default function PortalComposer({
         if (v) formData.append("option", v);
       }
     }
+
+    // One fresh key per press of the button. An automatic retry of this
+    // press reuses this same form data, so the server saves the post once.
+    formData.set(SUBMIT_KEY_FIELD, crypto.randomUUID());
 
     setLastResult(null);
     const ok = await invoke(async () => {
