@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { toggleRsvpAction } from "./rsvp-actions";
 import InlineShareButton from "@/components/inline-share-button";
 import type { RsvpWindowView } from "@/lib/rsvp-window";
+import { formatPointsToast } from "@/lib/points/progress";
 
 const OPEN_VIEW: RsvpWindowView = {
   state: "open",
@@ -28,6 +29,8 @@ export default function RsvpButton({
   const router = useRouter();
   const [rsvped, setRsvped] = useState(initialRsvped);
   const [justRsvped, setJustRsvped] = useState(false);
+  // "+10 pts · 1,569 to Gold" after an RSVP that earned points; null when it earned none.
+  const [pointsNote, setPointsNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
@@ -48,7 +51,14 @@ export default function RsvpButton({
         setRsvped(!next);
         setError(result.error);
       } else {
-        if (next) setJustRsvped(true);
+        if (next) {
+          setJustRsvped(true);
+          setPointsNote("progress" in result ? formatPointsToast(result.progress) : null);
+        } else {
+          // Cancelled: the "You're in!" block and its note no longer apply.
+          setJustRsvped(false);
+          setPointsNote(null);
+        }
         router.refresh();
       }
     });
@@ -98,6 +108,11 @@ export default function RsvpButton({
       )}
       {justRsvped && (
         <div className="flex flex-col items-end gap-1">
+          {pointsNote && (
+            <p role="status" className="text-xs font-semibold text-white/85" data-rsvp-points-note>
+              {pointsNote}
+            </p>
+          )}
           <p className="text-xs text-white/50">You&apos;re in! Invite friends to join you.</p>
           <InlineShareButton
             title="Bring a friend!"
