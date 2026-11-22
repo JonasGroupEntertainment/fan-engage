@@ -739,7 +739,8 @@ const REWARD_CANDIDATE_LIMIT = 100;
  */
 function shapeRewardCandidates(rows: TodayRewardRow[], nowMs: number): TodayReward[] {
   return rows
-    .filter((r) => r.stock !== 0)
+    // null means unlimited; the database refuses anything at or below zero.
+    .filter((r) => r.stock === null || r.stock > 0)
     .filter((r) => !r.drops_at || Date.parse(r.drops_at) <= nowMs)
     .filter((r) => !r.expires_at || Date.parse(r.expires_at) > nowMs)
     .filter((r) => shouldListLaunchReward(r, { signedIn: true }))

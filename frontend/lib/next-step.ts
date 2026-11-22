@@ -6,8 +6,10 @@
  * really get:
  *   - a reward has to belong to an artist community (a reward with no
  *     community cannot be redeemed today),
- *   - a reward that needs Premium or Founder is left out unless the fan
- *     holds that in the reward's community,
+ *   - a reward limited to Premium or Founder members is left out for
+ *     everyone. The database checks those against the exact subscription
+ *     value, which is stricter than what this page can see (a comped or
+ *     past-due member would be refused), so the card cannot promise them,
  *   - redeeming any reward is a Premium feature, so a fan without Premium
  *     is told that in the same breath as the reward.
  *
@@ -57,8 +59,6 @@ export type NextStepInput = {
   rewards: readonly NextStepReward[];
   /** Communities where the fan has Premium. */
   premiumCommunities: readonly string[];
-  /** Communities where the fan is a Founder. */
-  founderCommunities: readonly string[];
   /** Where the tier ladder lives. */
   tiersHref: string;
   tiers?: Tier[];
@@ -77,12 +77,12 @@ function clampPercent(value: number): number {
 }
 
 /** A reward this fan could redeem, given the points. */
-function isOpenToFan(reward: NextStepReward, input: NextStepInput): boolean {
+function isOpenToFan(reward: NextStepReward): boolean {
   if (reward.redeemed) return false;
   if (!Number.isFinite(reward.point_cost) || reward.point_cost <= 0) return false;
   if (!reward.community_id) return false;
-  if (reward.requires_tier === "premium") return input.premiumCommunities.includes(reward.community_id);
-  if (reward.requires_tier === "founder-only") return input.founderCommunities.includes(reward.community_id);
+  // Tier-only rewards: see the note at the top of this file.
+  if (reward.requires_tier) return false;
   return true;
 }
 
@@ -139,7 +139,7 @@ export function pickNextStep(input: NextStepInput): NextStep | null {
   const balance = input.spendablePoints;
   if (balance !== null && balance !== undefined && Number.isFinite(balance)) {
     const safeBalance = Math.max(0, balance);
-    const open = input.rewards.filter((reward) => isOpenToFan(reward, input));
+    const open = input.rewards.filter((reward) => isOpenToFan(reward));
     // The best reward already in reach, else the closest one still ahead.
     const ready = open
       .filter((reward) => reward.point_cost <= safeBalance)

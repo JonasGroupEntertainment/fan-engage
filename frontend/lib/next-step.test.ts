@@ -25,7 +25,6 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
     lifetimePoints: 100,
     rewards: [reward()],
     premiumCommunities: ["some-artist"],
-    founderCommunities: [],
     tiersHref: "/rewards",
     ...overrides,
   };
@@ -106,19 +105,17 @@ describe("pickNextStep: rewards it never names", () => {
     assert.equal(step?.kind, "tier_ahead");
   });
 
-  it("skips a Premium reward for a fan without Premium there", () => {
-    const step = pickNextStep(
-      input({ rewards: [reward({ requires_tier: "premium" })], premiumCommunities: [] }),
-    );
+  it("skips a Premium-only reward even for a Premium fan, because the database may still refuse it", () => {
+    const rewards = [reward({ requires_tier: "premium" })];
 
-    assert.equal(step?.kind, "tier_ahead");
+    assert.equal(pickNextStep(input({ rewards, premiumCommunities: ["some-artist"] }))?.kind, "tier_ahead");
+    assert.equal(pickNextStep(input({ rewards, premiumCommunities: [] }))?.kind, "tier_ahead");
   });
 
-  it("skips a Founder reward for a fan who is not a Founder there", () => {
+  it("skips a Founder-only reward for everyone", () => {
     const rewards = [reward({ requires_tier: "founder-only" })];
 
     assert.equal(pickNextStep(input({ rewards }))?.kind, "tier_ahead");
-    assert.equal(pickNextStep(input({ rewards, founderCommunities: ["some-artist"] }))?.kind, "reward_ahead");
   });
 
   it("skips a reward with no cost or a broken cost", () => {

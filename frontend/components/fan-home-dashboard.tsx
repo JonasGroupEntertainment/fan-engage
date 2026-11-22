@@ -63,7 +63,6 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints, lif
         lifetimePoints={lifetimePoints ?? null}
         rewards={data.rewardCandidates ?? []}
         premiumCommunities={premiumCommunities}
-        founderCommunities={data.founderCommunities ?? []}
         tiersHref="/rewards"
       />
 
