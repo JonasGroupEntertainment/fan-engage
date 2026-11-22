@@ -121,13 +121,17 @@ export interface PointBreakdownRow {
   total: number;
 }
 
-// Human-readable label per point source. Matches the enum in 0001_init.sql.
+// Human-readable label per point source. Matches the point_source enum
+// (0001_init.sql plus later additions, the latest being 'badge' in 0106).
+// Badge bonus points have their own source since 0107.
 const SOURCE_LABELS: Record<string, string> = {
   signup_bonus: "Signup bonus",
   referral: "Referrals",
   challenge: "Challenges",
   purchase: "Purchases",
   manual_adjustment: "Adjustments",
+  badge: "Badges",
+  daily_drop: "Daily drops",
   event_rsvp: "Event RSVPs",
   event_attended: "Events attended",
   social_share: "Social shares",
