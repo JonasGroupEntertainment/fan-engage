@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { sharePayload } from "@/lib/share-payload";
+import { inviteShareUrl, shareTextWithoutUrl } from "@/lib/invite-share";
+import { useInviteCode } from "@/components/use-invite-code";
 
 /**
  * Reusable share button.
@@ -10,6 +12,10 @@ import { sharePayload } from "@/lib/share-payload";
  * browsers); falls back to copying the URL to clipboard with a brief
  * "Copied" confirmation. Designed to drop into any unlock moment —
  * artist hub pages, founder share pages, badge celebrations, drop wins.
+ *
+ * A signed-in fan shares their own invite link (lib/invite-share.ts), so a
+ * friend who joins from it is credited to them. A visitor shares the page
+ * address as before.
  *
  * weekly-recap-tile.tsx has its own inline share implementation from
  * Stickiness Phase 3 — leaving that one alone to avoid touching the
@@ -40,9 +46,15 @@ export default function ShareButton({
   onShare,
 }: ShareButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const inviteCode = useInviteCode();
 
   async function handleShare() {
     onShare?.();
+
+    // The fan's invite link when they have one, the page address if not.
+    // Worked out with no waiting, so the tap still opens the share sheet.
+    const link = inviteShareUrl({ origin: window.location.origin, url, inviteCode });
+    const message = link === url ? text : shareTextWithoutUrl(text, url);
 
     // Web Share API path — opens the native share sheet on iOS/Android
     // and recent macOS/Windows browsers. Throws AbortError if the user
@@ -50,7 +62,7 @@ export default function ShareButton({
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
         // Link inside the text: some apps drop a separate url field (BEP #196).
-        await navigator.share(sharePayload({ title, text, url }));
+        await navigator.share(sharePayload({ title, text: message, url: link }));
         return;
       } catch (err) {
         // User cancelled — don't fall through to clipboard. Detected
@@ -62,7 +74,7 @@ export default function ShareButton({
     // Clipboard fallback — copy the share URL and show a brief "Copied"
     // confirmation so the user knows something happened.
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(link);
       setState("copied");
       setTimeout(() => setState("idle"), 2000);
     } catch {
