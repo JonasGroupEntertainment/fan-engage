@@ -37,7 +37,11 @@ export const SOCIAL_POSTING_ENABLED_VALUE = "1";
 export const ALSO_POST_FIELD = "also_post_to_social";
 export const ALSO_POST_VALUE = "1";
 
-/** Hidden form field holding one fresh key per submit, so a retry cannot send twice. */
+/**
+ * Form field holding one fresh key per submit. Every post form sends it:
+ * a retry of the same submit cannot save the post twice
+ * (lib/community/save-once.ts) and cannot send to social twice.
+ */
 export const SUBMIT_KEY_FIELD = "social_submit_key";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
