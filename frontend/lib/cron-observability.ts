@@ -164,8 +164,10 @@ export function optionalEnvWarning(
   }
   if (job === "send-event-reminders") {
     const parts: string[] = [];
-    const mailchimp = missingEnvVars(MAILCHIMP_ENV, env);
-    if (mailchimp.length > 0) parts.push(missingEnvMessage(mailchimp));
+    // Reminder email is per fan through Mandrill only. It never uses a
+    // Mailchimp campaign, which would reach fans who did not RSVP.
+    const mandrill = missingEnvVars(["MANDRILL_API_KEY"], env);
+    if (mandrill.length > 0) parts.push(missingEnvMessage(mandrill));
     const sms = smsProviderEnvWarning(env);
     if (sms) parts.push(sms);
     return parts.length > 0 ? parts.join("; ") : null;

@@ -1,3 +1,4 @@
+import { mapWithConcurrency } from "../concurrency.ts";
 import {
   DIGEST_FROM_NAME,
   DIGEST_REPLY_TO,
@@ -84,6 +85,17 @@ export type TransactionalBatchSpec = {
 
 type Env = Record<string, string | undefined>;
 
+/** A Mandrill request that takes longer than this is a failed send. */
+export const MANDRILL_TIMEOUT_MS = 10_000;
+/** How many Mandrill messages are in flight at once. */
+export const MANDRILL_SEND_CONCURRENCY = 5;
+
+/** Test seams. Production callers leave these unset. */
+export type MandrillSendOptions = {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+};
+
 export const MAILCHIMP_PROVIDER_ENV = [
   "MAILCHIMP_API_KEY",
   "MAILCHIMP_SERVER_PREFIX",
@@ -169,60 +181,82 @@ export async function sendMandrillBatch(
   recipients: readonly TransactionalRecipient[],
   tags: readonly string[],
   env: Env = process.env,
+  options: MandrillSendOptions = {},
 ): Promise<TransactionalBatchResult> {
   if (!mandrillConfigured(env)) {
     return { provider: null, outcomes: [], campaignId: null, error: "MANDRILL_API_KEY is not set" };
   }
   if (recipients.length === 0) return { provider: "mandrill", outcomes: [], campaignId: null, error: null };
-  return sendViaMandrill(recipients, { tags, mailchimp: undefined }, env);
+  return sendViaMandrill(recipients, { tags, mailchimp: undefined }, env, options);
 }
 
 // ── Mandrill ────────────────────────────────────────────────────────────────
 
+function mandrillErrorText(err: unknown, timeoutMs: number): string {
+  if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+    return `Mandrill request timed out after ${timeoutMs} ms`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** One message to one recipient. Never throws: a failure is an outcome. */
+async function sendOneViaMandrill(
+  r: TransactionalRecipient,
+  tags: readonly string[],
+  env: Env,
+  options: MandrillSendOptions,
+): Promise<TransactionalOutcome> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? MANDRILL_TIMEOUT_MS;
+  try {
+    const res = await fetchImpl("https://mandrillapp.com/api/1.0/messages/send.json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        key: env.MANDRILL_API_KEY as string,
+        message: {
+          subject: r.subject,
+          text: r.text,
+          html: r.html,
+          from_email: env.MANDRILL_FROM_EMAIL ?? DIGEST_REPLY_TO,
+          from_name: env.MANDRILL_FROM_NAME ?? DIGEST_FROM_NAME,
+          to: [{ email: r.email, name: r.name || undefined, type: "to" }],
+          track_opens: true,
+          track_clicks: false,
+          tags: [...tags],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { id: r.id, ok: false, error: `Mandrill ${res.status}: ${body.slice(0, 200)}` };
+    }
+    const results = (await res.json()) as Array<{ status?: string; reject_reason?: string | null }>;
+    const first = Array.isArray(results) ? results[0] : undefined;
+    const accepted = first?.status === "sent" || first?.status === "queued" || first?.status === "scheduled";
+    return accepted
+      ? { id: r.id, ok: true }
+      : { id: r.id, ok: false, error: `Mandrill status ${first?.status ?? "unknown"}${first?.reject_reason ? ` (${first.reject_reason})` : ""}` };
+  } catch (err) {
+    return { id: r.id, ok: false, error: mandrillErrorText(err, timeoutMs) };
+  }
+}
+
+/**
+ * A few messages at a time, each with its own time limit, so one slow or
+ * failed recipient never holds up or stops the rest. Outcomes keep the
+ * order of `recipients`.
+ */
 async function sendViaMandrill(
   recipients: readonly TransactionalRecipient[],
   spec: { tags: readonly string[]; mailchimp?: MailchimpBatchSpec },
   env: Env,
+  options: MandrillSendOptions = {},
 ): Promise<TransactionalBatchResult> {
-  const key = env.MANDRILL_API_KEY as string;
-  const outcomes: TransactionalOutcome[] = [];
-  for (const r of recipients) {
-    try {
-      const res = await fetch("https://mandrillapp.com/api/1.0/messages/send.json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key,
-          message: {
-            subject: r.subject,
-            text: r.text,
-            html: r.html,
-            from_email: env.MANDRILL_FROM_EMAIL ?? DIGEST_REPLY_TO,
-            from_name: env.MANDRILL_FROM_NAME ?? DIGEST_FROM_NAME,
-            to: [{ email: r.email, name: r.name || undefined, type: "to" }],
-            track_opens: true,
-            track_clicks: false,
-            tags: [...spec.tags],
-          },
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        outcomes.push({ id: r.id, ok: false, error: `Mandrill ${res.status}: ${body.slice(0, 200)}` });
-        continue;
-      }
-      const results = (await res.json()) as Array<{ status?: string; reject_reason?: string | null }>;
-      const first = Array.isArray(results) ? results[0] : undefined;
-      const accepted = first?.status === "sent" || first?.status === "queued" || first?.status === "scheduled";
-      outcomes.push(
-        accepted
-          ? { id: r.id, ok: true }
-          : { id: r.id, ok: false, error: `Mandrill status ${first?.status ?? "unknown"}${first?.reject_reason ? ` (${first.reject_reason})` : ""}` },
-      );
-    } catch (err) {
-      outcomes.push({ id: r.id, ok: false, error: err instanceof Error ? err.message : String(err) });
-    }
-  }
+  const outcomes = await mapWithConcurrency(recipients, MANDRILL_SEND_CONCURRENCY, (r) =>
+    sendOneViaMandrill(r, spec.tags, env, options),
+  );
   return { provider: "mandrill", outcomes, campaignId: null, error: null };
 }
 

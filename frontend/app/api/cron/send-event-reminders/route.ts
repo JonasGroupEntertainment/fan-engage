@@ -7,6 +7,8 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Reminders are sent a few fans at a time; give a large event room to finish.
+export const maxDuration = 300;
 
 /**
  * GET /api/cron/send-event-reminders
@@ -29,8 +31,10 @@ async function sendEventReminders() {
   const results: Array<{
     kind: string;
     event_id: string;
+    status: string;
     sms: number;
     email: number;
+    email_skipped: number;
     error?: string;
   }> = [];
 
@@ -42,16 +46,20 @@ async function sendEventReminders() {
         results.push({
           kind,
           event_id: event.id,
+          status: r.status,
           sms: r.smsRecipients,
           email: r.emailRecipients,
+          email_skipped: r.emailSkipped,
           error: r.error,
         });
       } catch (e) {
         results.push({
           kind,
           event_id: event.id,
+          status: "threw",
           sms: 0,
           email: 0,
+          email_skipped: 0,
           error: e instanceof Error ? e.message : String(e),
         });
       }
