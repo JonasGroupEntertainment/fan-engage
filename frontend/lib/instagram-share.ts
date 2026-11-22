@@ -12,7 +12,16 @@
  *
  * Pure rules, no browser or server imports, so `node --test` can load this.
  */
-import { inviteShareUrl, invitePreviewImagePath, shareContextFromUrl } from "./invite-share.ts";
+import {
+  CARD_PARAM,
+  inviteShareUrl,
+  invitePreviewImagePath,
+  safeShareCard,
+  shareCardArtist,
+  shareContextFromUrl,
+  type ShareContext,
+} from "./invite-share.ts";
+import { ARTIST_PARAM, parseArtistParam } from "./onboarding/artist-param.ts";
 
 /** Opened in a new tab or, on a phone with the app, in Instagram itself. */
 export const INSTAGRAM_URL = "https://www.instagram.com/";
@@ -29,6 +38,31 @@ export type InstagramSharePlan = {
   pictureFileName: string | null;
 };
 
+const INVITE_PAGE = /^\/invite\//;
+/** Only used to read an address that may have no origin. */
+const PLACEHOLDER_ORIGIN = "https://placeholder.invalid";
+
+/**
+ * Which artist and share page the picture should come from. An address
+ * that is already an invite link (the artist page and the Referrals page
+ * build these for a signed-in fan) carries them as parameters, read under
+ * the same checks the invite page uses: a card only counts when it belongs
+ * to the artist named beside it.
+ */
+function pictureContext(url: string): ShareContext {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, PLACEHOLDER_ORIGIN);
+  } catch {
+    return { artist: null, card: null };
+  }
+  if (!INVITE_PAGE.test(parsed.pathname)) return shareContextFromUrl(url);
+  const artist = parseArtistParam(parsed.searchParams.get(ARTIST_PARAM));
+  if (!artist) return { artist: null, card: null };
+  const card = safeShareCard(parsed.searchParams.get(CARD_PARAM));
+  return { artist, card: card && shareCardArtist(card) === artist ? card : null };
+}
+
 /** What the Instagram button copies and which picture it offers. */
 export function instagramSharePlan(input: {
   /** Where the invite page lives, such as https://www.fanengagepro.com. */
@@ -38,7 +72,7 @@ export function instagramSharePlan(input: {
   inviteCode: string | null | undefined;
 }): InstagramSharePlan {
   const link = inviteShareUrl(input);
-  const context = shareContextFromUrl(input.url);
+  const context = pictureContext(input.url);
   const picturePath = invitePreviewImagePath(context);
   if (!picturePath) return { link, picturePath: null, pictureFileName: null };
   return { link, picturePath, pictureFileName: `${context.artist ?? "share"}-picture.png` };

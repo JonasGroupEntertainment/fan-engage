@@ -56,6 +56,41 @@ describe("instagramSharePlan", () => {
     }
   });
 
+  it("offers the artist's picture for an invite link that names the artist", () => {
+    // The artist page hands a signed-in fan's share button this kind of link.
+    const url = `${ORIGIN}/invite/${CODE}?artist=some-artist`;
+
+    const plan = instagramSharePlan({ origin: ORIGIN, url, inviteCode: CODE });
+
+    assert.equal(plan.link, url);
+    assert.equal(plan.picturePath, "/artists/some-artist/opengraph-image");
+    assert.equal(plan.pictureFileName, "some-artist-picture.png");
+  });
+
+  it("offers the share page's picture for an invite link that carries one", () => {
+    const url = `${ORIGIN}/invite/${CODE}?artist=some-artist&card=%2Fshare%2Ftier%2Fsome-artist`;
+
+    const plan = instagramSharePlan({ origin: ORIGIN, url, inviteCode: CODE });
+
+    assert.equal(plan.picturePath, "/share/tier/some-artist/opengraph-image");
+  });
+
+  it("ignores a card that belongs to another artist, or is not a share page", () => {
+    for (const card of ["%2Fshare%2Ftier%2Fother-artist", "%2F%2Fevil.example%2Fx", "%2Fadmin"]) {
+      const url = `${ORIGIN}/invite/${CODE}?artist=some-artist&card=${card}`;
+
+      const plan = instagramSharePlan({ origin: ORIGIN, url, inviteCode: CODE });
+
+      assert.equal(plan.picturePath, "/artists/some-artist/opengraph-image", card);
+    }
+  });
+
+  it("offers no picture for an invite link with a bad artist value", () => {
+    const url = `${ORIGIN}/invite/${CODE}?artist=..%2Fadmin`;
+
+    assert.equal(instagramSharePlan({ origin: ORIGIN, url, inviteCode: CODE }).picturePath, null);
+  });
+
   it("only ever offers a picture path on our own site", () => {
     const plan = instagramSharePlan({
       origin: ORIGIN,
