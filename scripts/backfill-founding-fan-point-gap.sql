@@ -43,7 +43,8 @@ where m.founding_fan_number is not null
     l.source in (
       'signup_bonus', 'daily_checkin', 'challenge', 'event_rsvp',
       'referral', 'social_share', 'anniversary', 'daily_drop',
-      'prediction_correct', 'presave', 'radio_support', 'purchase'
+      'prediction_correct', 'presave', 'radio_support', 'purchase',
+      'badge'
     )
     or (
       l.source = 'manual_adjustment'
@@ -82,7 +83,8 @@ order by l.created_at;
 --          l.source in (
 --            'signup_bonus', 'daily_checkin', 'challenge', 'event_rsvp',
 --            'referral', 'social_share', 'anniversary', 'daily_drop',
---            'prediction_correct', 'presave', 'radio_support', 'purchase'
+--            'prediction_correct', 'presave', 'radio_support', 'purchase',
+--            'badge'
 --          )
 --          or (
 --            l.source = 'manual_adjustment'
