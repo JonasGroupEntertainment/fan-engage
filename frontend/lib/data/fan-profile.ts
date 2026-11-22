@@ -35,11 +35,15 @@ export interface PublicBadge {
   name: string;
   description: string | null;
   earnedAt: string;
+  /** The artist community the badge is recorded against (fan_badges.community_id). */
+  communityId: string | null;
 }
 
 export interface PublicCommunity {
   slug: string;
   name: string;
+  /** Whether the artist is live. An artist who is not live has no public pages. */
+  active: boolean;
 }
 
 export interface PublicPost {
@@ -106,12 +110,12 @@ export async function getFanProfileBySlug(
       .order("founder_number", { ascending: true }),
     admin
       .from("fan_badges")
-      .select("earned_at, badges!inner ( slug, name, description )")
+      .select("earned_at, community_id, badges!inner ( slug, name, description )")
       .eq("fan_id", fan.id)
       .order("earned_at", { ascending: false }),
     admin
       .from("fan_artist_following")
-      .select("artists!inner ( slug, name )")
+      .select("artists!inner ( slug, name, active )")
       .eq("fan_id", fan.id),
     // Public profile, service-role read: a team member's scheduled post has
     // created_at = scheduled_for and would sort first, leaking its body
@@ -149,9 +153,10 @@ export async function getFanProfileBySlug(
   };
   type BadgeRow = {
     earned_at: string;
+    community_id: string | null;
     badges: { slug: string; name: string; description: string | null };
   };
-  type FollowRow = { artists: { slug: string; name: string } };
+  type FollowRow = { artists: { slug: string; name: string; active: boolean | null } };
   type PostRow = {
     id: string;
     title: string | null;
@@ -191,10 +196,12 @@ export async function getFanProfileBySlug(
       name: b.badges.name,
       description: b.badges.description,
       earnedAt: b.earned_at,
+      communityId: b.community_id ?? null,
     })),
     communities: following.map((f) => ({
       slug: f.artists.slug,
       name: f.artists.name,
+      active: f.artists.active === true,
     })),
     recentPosts: posts
       .filter((p) => p.visibility == null || p.visibility === "public")

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getFanProfileBySlug } from "@/lib/data/fan-profile";
 import ShareButton from "@/components/share-button";
+import { badgeShare, badgeShareArtist } from "@/lib/badge-share";
 import PremiumBadge from "@/components/premium-badge";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,8 @@ export default async function FanProfilePage({
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
   const profileUrl = `${appUrl}/fans/${profile.profileSlug}`;
+  // Badges are shared under a live artist the fan follows (lib/badge-share.ts).
+  const liveArtistSlugs = profile.communities.filter((c) => c.active).map((c) => c.slug);
   const shareTitle = `${displayName}'s fan experience profile on Fan Engage`;
   const founderLine = profile.founderBadges.length
     ? `Founder for ${profile.founderBadges.map((f) => f.communityName).join(", ")}.`
@@ -222,7 +225,15 @@ export default async function FanProfilePage({
             Badges earned
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {profile.badges.map((b) => (
+            {profile.badges.map((b) => {
+              // Each earned badge can be shared: the same Share, Facebook
+              // and Instagram buttons as the profile's own Share button.
+              const share = badgeShare({
+                badge: b,
+                artistSlug: badgeShareArtist(b.communityId, liveArtistSlugs),
+                appUrl,
+              });
+              return (
               <div
                 key={b.slug + b.earnedAt}
                 className="rounded-2xl border border-white/10 bg-black/30 p-4"
@@ -241,8 +252,14 @@ export default async function FanProfilePage({
                     year: "numeric",
                   })}
                 </p>
+                {share && (
+                  <div className="mt-3">
+                    <ShareButton title={share.title} text={share.text} url={share.url} label="Share" />
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
