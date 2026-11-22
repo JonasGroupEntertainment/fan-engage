@@ -14,6 +14,9 @@ import { FOUNDING_FAN_RULE } from "@/lib/founding-fan-rule";
 import { tierBadgeEarned, tierJourneyState } from "@/lib/tier-thresholds";
 import { communityPath } from "@/lib/community-default";
 import { getViewerCommunityId } from "@/lib/viewer-community";
+import { getArtistFromDb } from "@/lib/data/artists";
+import { badgeShare } from "@/lib/badge-share";
+import ShareButton from "@/components/share-button";
 
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   welcome:   "Getting started",
@@ -62,6 +65,11 @@ export default async function RewardsPage() {
     getViewerCommunityId(),
   ]);
   const earnMore = buildEarnMore(communityId);
+  // An unlocked badge gets a Share button. It is shared under the fan's own
+  // artist community, and only when that artist is live, because an artist
+  // who is not live has no public share page (lib/badge-share.ts).
+  const badgeArtist = fan && communityId ? await getArtistFromDb(communityId).catch(() => null) : null;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
 
   // Signed-in users see their real badges (empty until earned).
   // Guests get no fake Bronze/Gold progress chrome or preview numbers.
@@ -240,6 +248,12 @@ export default async function RewardsPage() {
                           const pct = hasThreshold
                             ? Math.min(100, Math.round((progress / (badge.threshold ?? 1)) * 100))
                             : badge.earned ? 100 : 0;
+                          // An unlocked badge can be shared: the same Share,
+                          // Facebook and Instagram buttons as on the profile.
+                          const share =
+                            badge.earned && isSignedIn
+                              ? badgeShare({ badge, artistSlug: badgeArtist?.slug ?? null, appUrl })
+                              : null;
                           return (
                             <div
                               key={badge.slug}
@@ -282,6 +296,11 @@ export default async function RewardsPage() {
                                   <p className="text-xs text-white/50">
                                     {progress} / {badge.threshold}
                                   </p>
+                                </div>
+                              )}
+                              {share && (
+                                <div className="mt-3">
+                                  <ShareButton title={share.title} text={share.text} url={share.url} label="Share" />
                                 </div>
                               )}
                             </div>
