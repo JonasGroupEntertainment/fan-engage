@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "@/lib/notifications/send";
+import { inboxDedupKey } from "@/lib/notifications/inbox-mirror";
 import { awardPoints } from "@/lib/points/award";
 import {
   ANNIVERSARY_MILESTONES,
@@ -102,6 +103,11 @@ export async function celebrateAnniversary(opts: {
         url: `/artists/${opts.artistSlug}`,
         tag: `anniversary:${opts.artistSlug}:${opts.milestone.marker}`,
       },
+      inbox: {
+        kind: "anniversary",
+        dedupKey: inboxDedupKey("anniversary", opts.artistSlug, opts.milestone.marker),
+        communityId: opts.artistSlug,
+      },
       bypassQuietHours: false,
       bypassSmsTierGate: false,
     });
@@ -130,7 +136,7 @@ function buildMessage(artistName: string, m: AnniversaryMilestone): string {
     case 0.083:
       return `One month in. Welcome to the ${artistName} family.`;
     case 0.5:
-      return `Six months in — you've been here for the journey.`;
+      return `Six months in. You've been here for the journey.`;
     case 1:
       return `One year as a ${artistName} fan. Thanks for sticking with us.`;
     case 2:

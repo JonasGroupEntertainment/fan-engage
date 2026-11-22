@@ -60,7 +60,7 @@ describe("moderation queue scoping", () => {
 
 describe("broadcast", () => {
   it("page has no hardcoded artist slug", () => {
-    const src = readRepo("../app/admin/broadcast/page.tsx");
+    const src = readRepo("../app/admin/broadcast/broadcast-form.tsx");
     assert.doesNotMatch(src, /raelynn/i);
     assert.doesNotMatch(src, /name="artist_slug"/);
     assert.match(src, /getBroadcastTarget/);

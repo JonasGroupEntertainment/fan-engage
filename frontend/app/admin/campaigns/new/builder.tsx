@@ -38,6 +38,11 @@ const DEFAULT_CTA_BY_KIND: Record<CTAKind, Partial<CTA>> = {
   custom: { cta_label: "Complete", point_value: 25 },
 };
 
+/** One try only: a retry after a slow response must not publish or send twice. */
+const PUBLISH_ATTEMPTS = 1;
+const NO_ANSWER_MESSAGE =
+  "We could not confirm the campaign was published. Check the campaigns list before trying again.";
+
 export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
   const [artistSlug, setArtistSlug] = useState(artists[0]?.slug ?? "");
   const [title, setTitle] = useState("");
@@ -84,7 +89,9 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
 
   const router = useRouter();
   const [businessError, setBusinessError] = useState<string | null>(null);
-  const { status, submit, submitting } = useFormSave();
+  const [sendLines, setSendLines] = useState<string[] | null>(null);
+  // One try only: a retry after a slow response must not publish or send twice.
+  const { status, submit, submitting } = useFormSave({ maxAttempts: PUBLISH_ATTEMPTS });
 
   function addCTA(kind: CTAKind) {
     const defaults = DEFAULT_CTA_BY_KIND[kind];
@@ -140,10 +147,15 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
     // The event start is typed in the admin's own zone; send an ISO instant.
     const payload = withLocalDateTimesAsIso(formData, ["event_starts_at"]);
     const result = await submit(createAndPublishCampaign, payload);
-    if (result?.success) {
-      router.push("/admin/campaigns");
-    } else if (result && !result.success) {
+    if (!result) {
+      setBusinessError(NO_ANSWER_MESSAGE);
+    } else if (!result.success) {
       setBusinessError(result.error);
+    } else if (result.sendLines.length > 0) {
+      // Stay here so the admin sees what the email and text really did.
+      setSendLines(result.sendLines);
+    } else {
+      router.push("/admin/campaigns");
     }
   }
 
@@ -482,7 +494,9 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
             onChange={(e) => setTargetEventRsvpers(e.target.checked)}
             className="h-4 w-4 accent-aurora"
           />
-          Target SMS blast at event RSVPers (instead of all artist followers)
+          Send the email, text and in-app notice only to fans who RSVPed to this event
+          (instead of all of the artist&apos;s followers). A brand new event has no RSVPs
+          yet, so nobody would be contacted.
         </label>
       </Section>
 
@@ -504,7 +518,9 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
           className="w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm"
         />
         <p className="text-xs text-white/50">
-          Recorded as a campaign item; final send handled via Mailchimp.
+          Goes only to this artist&apos;s followers who have opted in to email (or only to
+          fans who RSVPed, if that box is ticked on the event). Each fan gets their own
+          email with their own unsubscribe link. Plain text only.
         </p>
       </Section>
 
@@ -524,6 +540,18 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
         </p>
       </Section>
 
+      {sendLines && (
+        <div role="status" className="rounded-xl bg-emerald-500/10 p-4 text-sm text-emerald-200">
+          <p className="font-semibold">Campaign published. Here is what went out:</p>
+          {sendLines.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+          <a href="/admin/campaigns" className="mt-2 inline-block underline">
+            Back to campaigns
+          </a>
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-3 py-4">
         <a
           href="/admin/campaigns"
@@ -539,7 +567,7 @@ export default function CampaignBuilder({ artists }: { artists: Artist[] }) {
         )}
         <button
           type="submit"
-          disabled={submitting || !title.trim() || !artistSlug}
+          disabled={submitting || sendLines !== null || !title.trim() || !artistSlug}
           className="rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-2 text-sm font-semibold text-white shadow-glass hover:brightness-110 disabled:opacity-50"
         >
           {submitting ? "Publishing…" : "Publish campaign"}

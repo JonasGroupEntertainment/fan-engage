@@ -16,10 +16,13 @@ import {
   type AtRiskFanRow,
 } from "@/lib/streaks/at-risk";
 import { notifyStreakAtRisk } from "@/lib/notifications/triggers/streak-at-risk";
+import { emailFanReminder } from "@/lib/fan-reminder-email-run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+/** The fans are handled one at a time, each with a few reads and sends. */
+export const maxDuration = 300;
 
 /**
  * GET /api/cron/streak-at-risk
@@ -43,6 +46,10 @@ export const revalidate = 0;
  * quiet hours), which writes the notification_log row that dedups the
  * fan for the rest of the UTC day.
  *
+ * Each fan also gets the reminder in their inbox, and by email when
+ * FAN_REMINDER_EMAIL_ENABLED is "1" and the rules in
+ * lib/fan-reminder-email.ts allow it (one reminder email per fan in 7 days).
+ *
  * ?testEmail=<email>   restrict to that one fan (smoke test; the fan must
  *                      still be at risk and it must be the send hour)
  * ?dryRun=1            counts + up to 10 sample fan ids, nothing sent or
@@ -62,6 +69,7 @@ interface RunSummary {
   atRiskNow: number;
   alreadySentToday: number;
   notified: number;
+  emailed: number;
   timezones: string[];
   sample?: string[];
   errors: string[];
@@ -99,6 +107,7 @@ async function streakAtRisk(url: URL, dryRun: boolean) {
     atRiskNow: 0,
     alreadySentToday: 0,
     notified: 0,
+    emailed: 0,
     timezones: [],
     errors: [],
   };
@@ -210,8 +219,17 @@ async function streakAtRisk(url: URL, dryRun: boolean) {
           fanId: f.id,
           currentStreakDays: f.currentStreakDays,
           endsAtLocal: f.endsAtLocal,
+          now,
         });
         summary.notified += 1;
+        const email = await emailFanReminder({
+          reminder: "streak_at_risk",
+          fanId: f.id,
+          streakDays: f.currentStreakDays,
+          endsAtLocal: f.endsAtLocal,
+        });
+        if (email.status === "sent") summary.emailed += 1;
+        if (email.status === "failed") summary.errors.push(`${f.id} email: ${email.error}`);
       } catch (err) {
         summary.errors.push(`${f.id}: ${err instanceof Error ? err.message : String(err)}`);
       }

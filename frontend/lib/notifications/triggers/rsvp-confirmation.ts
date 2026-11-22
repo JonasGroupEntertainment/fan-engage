@@ -10,6 +10,9 @@ import { sendNotification } from "../send";
  *
  * `bypassSmsTierGate` is also true — RSVP confirmations are valuable to
  * any tier, not just Gold+.
+ *
+ * No `inbox` here on purpose: the event_rsvps trigger in the database
+ * (notify_rsvp_confirmed) already writes the "You're on the list" row.
  */
 export async function notifyRsvpConfirmation(opts: {
   fanId: string;

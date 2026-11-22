@@ -14,6 +14,7 @@ import { notifyCommentOnMyPost } from "@/lib/notifications/triggers/comment-on-m
 import { findNearestPost, isHardDuplicate } from "@/lib/dedup/check";
 import { withPointsProgress } from "@/lib/points/lifetime";
 import { POST_BODY_MAX, buildCommunityPostRow, readPostInput } from "@/lib/community/post-input";
+import { pollHasNoOptions, savePostOnce } from "@/lib/community/save-post-once";
 import type { PointsProgress } from "@/lib/points/progress";
 import {
   premiumPath,
@@ -82,6 +83,9 @@ export async function createPostAction(formData: FormData): Promise<PointsAction
   // This action is the plain-post path: the fan composer routes the other
   // kinds to their own actions below.
   const input = { ...readPostInput(formData), kind: "post" as const };
+  // One id per press of the Post button. A retry of that press carries the
+  // same id, so the post is saved once. Missing or malformed: saved as before.
+  const submitKey = formData.get(SUBMIT_KEY_FIELD);
   if (!artistSlug || !input.body) return;
   if (input.body.length > POST_BODY_MAX) return;
 
@@ -104,19 +108,17 @@ export async function createPostAction(formData: FormData): Promise<PointsAction
   // constraint and silently killed every fan post, so the helper always
   // sends an array.
   const {
-    result: { data: created, error: insertErr },
+    result: { row: saved, isRepeat, error: insertErr },
     progress,
-  } = await withPointsProgress(userId, () =>
-    supabase
-      .from("community_posts")
-      .insert(built.row)
-      .select("id")
-      .single(),
-  );
+  } = await withPointsProgress(userId, () => savePostOnce(supabase, built.row, submitKey));
   if (insertErr) {
     console.error("[community] post insert failed", insertErr);
     throw new Error("Your post couldn't be saved. Please try again.");
   }
+  // A repeat of a press that was already saved wrote nothing (so the points
+  // and badge triggers did not fire, and `progress` shows no new points) and
+  // must not be checked, indexed, moderated, tagged or announced again.
+  const created = isRepeat ? null : saved;
 
   // Fire-and-forget — embedding lands within seconds, backfill cron is the
   // safety net if this path fails.
@@ -277,34 +279,42 @@ export async function createPollAction(formData: FormData) {
     .getAll("option")
     .map((o) => String(o).trim())
     .filter((o) => o.length > 0);
+  const submitKey = formData.get(SUBMIT_KEY_FIELD);
   if (!artistSlug || !body || options.length < 2 || options.length > 6) return;
 
   const admin = createAdminClient();
-  const { data: post } = await admin
-    .from("community_posts")
-    .insert({
+  const { row: post, isRepeat } = await savePostOnce(
+    admin,
+    {
       artist_slug: artistSlug,
       author_id: adminUser.id,
       kind: "poll",
       body,
       visibility,
-    })
-    .select("id")
-    .single();
+    },
+    submitKey,
+  );
   if (!post) return;
 
+  // A repeat of a press that already saved the poll is not indexed,
+  // moderated or tagged again and adds no second set of options. It only
+  // fills the options in when the first try stopped before them.
+  if (!isRepeat) {
+    indexRowAsync("community_posts", post.id);
+    moderateRowAsync("community_posts", post.id);
+    tagRowAsync(post.id);
+  }
 
-  indexRowAsync("community_posts", post.id);
-  moderateRowAsync("community_posts", post.id);
-  tagRowAsync(post.id);
-
-  await admin.from("community_poll_options").insert(
-    options.map((label, i) => ({
-      post_id: post.id,
-      label,
-      sort_order: i,
-    })),
-  );
+  const needsOptions = !isRepeat || (await pollHasNoOptions(admin, post.id));
+  if (needsOptions) {
+    await admin.from("community_poll_options").insert(
+      options.map((label, i) => ({
+        post_id: post.id,
+        label,
+        sort_order: i,
+      })),
+    );
+  }
 
   revalidatePath(`/artists/${artistSlug}/community`);
 }
@@ -346,21 +356,24 @@ export async function createChallengeAction(formData: FormData) {
   const body = String(formData.get("body") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const visibility = normalizeVisibility(formData.get("visibility"));
+  const submitKey = formData.get(SUBMIT_KEY_FIELD);
   if (!artistSlug || !body) return;
 
-  const admin = createAdminClient();
-  const { data: created } = await admin
-    .from("community_posts")
-    .insert({
+  const { row: saved, isRepeat } = await savePostOnce(
+    createAdminClient(),
+    {
       artist_slug: artistSlug,
       author_id: adminUser.id,
       kind: "challenge",
       title: title || null,
       body,
       visibility,
-    })
-    .select("id")
-    .single();
+    },
+    submitKey,
+  );
+  // A repeat of a press that was already saved is not indexed, moderated
+  // or tagged again.
+  const created = isRepeat ? null : saved;
 
   if (created) indexRowAsync("community_posts", created.id);
   if (created) moderateRowAsync("community_posts", created.id);
@@ -411,8 +424,9 @@ export async function createAnnouncementAction(
   const videoUrlRaw = String(formData.get("video_url") ?? "").trim();
   const videoPosterUrlRaw = String(formData.get("video_poster_url") ?? "").trim();
   const wantsSocial = formData.get(ALSO_POST_FIELD) === ALSO_POST_VALUE;
-  // Checked for a uuid shape by the sender. Missing or malformed means
-  // nothing goes to social; the announcement itself still saves.
+  // One id per press of the button, shared by the save and the social send.
+  // Checked for a uuid shape by both. Missing or malformed means nothing
+  // goes to social and the announcement itself still saves, as before.
   const submitKey = String(formData.get(SUBMIT_KEY_FIELD) ?? "");
   if (!artistSlug || !body) return;
 
@@ -420,10 +434,11 @@ export async function createAnnouncementAction(
   const videoUrl = normalizeUrl(videoUrlRaw);
   const videoPosterUrl = normalizeUrl(videoPosterUrlRaw);
 
-  const admin = createAdminClient();
-  const { data: created } = await admin
-    .from("community_posts")
-    .insert({
+  // Saved once per press. On a retry of the same press the database refuses
+  // a second row and `saved` is the announcement that was already saved.
+  const { row: saved, isRepeat } = await savePostOnce(
+    createAdminClient(),
+    {
       artist_slug: artistSlug,
       author_id: adminUser.id,
       kind: "announcement",
@@ -434,9 +449,11 @@ export async function createAnnouncementAction(
       image_url: imageUrl,
       video_url: videoUrl,
       video_poster_url: videoPosterUrl,
-    })
-    .select("id")
-    .single();
+    },
+    submitKey,
+  );
+  // A repeat is not indexed, moderated or tagged again.
+  const created = isRepeat ? null : saved;
 
   if (created) indexRowAsync("community_posts", created.id);
   if (created) moderateRowAsync("community_posts", created.id);
@@ -449,7 +466,11 @@ export async function createAnnouncementAction(
   // sender checks the team grant, the kind, the visibility, the alcohol and
   // tobacco wording rule, the settings, the submit key (so a retry cannot
   // send twice) and the daily limit again.
-  const postId = (created as { id: string } | null)?.id;
+  //
+  // A retry reaches the sender with the same post id and the same submit
+  // key. The sender finds the rows the first try wrote under that key and
+  // reports them without sending again, so the retry gets the same answer.
+  const postId = saved?.id;
   if (!wantsSocial || !postId) return;
   // The same check that let the announcement be published above, for this
   // artist: an editor or higher on this artist's team, or a super-admin.

@@ -1,4 +1,5 @@
 import { sendNotification } from "../send";
+import { inboxDedupKey } from "../inbox-mirror";
 
 /**
  * Notify a fan when their reward redemption is fulfilled by an admin.
@@ -27,6 +28,12 @@ export async function notifyRedemptionFulfilled(opts: {
           ? `/artists/${opts.artistSlug}/rewards`
           : `/inbox`,
         tag: `redemption:${opts.redemptionId}`,
+      },
+      inbox: {
+        kind: "redemption_update",
+        dedupKey: inboxDedupKey("redemption_fulfilled", opts.redemptionId),
+        body: opts.fulfillmentNote || "Your reward has been fulfilled. Open your rewards for details.",
+        communityId: opts.artistSlug ?? null,
       },
       bypassQuietHours: true,
       bypassSmsTierGate: true,
@@ -59,6 +66,11 @@ export async function notifyRedemptionDenied(opts: {
           ? `/artists/${opts.artistSlug}/rewards`
           : `/inbox`,
         tag: `redemption:${opts.redemptionId}`,
+      },
+      inbox: {
+        kind: "redemption_update",
+        dedupKey: inboxDedupKey("redemption_denied", opts.redemptionId),
+        communityId: opts.artistSlug ?? null,
       },
       bypassQuietHours: true,
       bypassSmsTierGate: true,

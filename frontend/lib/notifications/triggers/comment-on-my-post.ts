@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "../send";
+import { inboxDedupKey } from "../inbox-mirror";
 
 /**
  * Someone commented on a post. Notify the post's author (unless they
@@ -53,6 +54,12 @@ export async function notifyCommentOnMyPost(opts: {
         body: excerpt || "Tap to read the comment.",
         url: `/artists/${opts.artistSlug}/community#post-${opts.postId}`,
         tag: `comment_on_my_post:${opts.postId}`,
+      },
+      inbox: {
+        kind: "comment_on_my_post",
+        dedupKey: inboxDedupKey("comment_on_my_post", opts.commentId),
+        body: excerpt || "Open the post to read the comment.",
+        communityId: opts.artistSlug,
       },
     });
   } catch (err) {
