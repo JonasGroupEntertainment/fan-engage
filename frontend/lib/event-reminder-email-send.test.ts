@@ -62,7 +62,7 @@ describe("sendEventReminderEmails", () => {
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].map((r) => r.email), ["a@example.com"]);
     assert.ok(calls[0][0].html.includes("/unsubscribe?token=unsub-a"));
-    assert.deepEqual(result, { recipients: 1, sent: 1, failed: 0, error: null });
+    assert.deepEqual(result, { recipients: 1, sent: 1, failed: 0, skipped: 2, error: null });
   });
 
   it("sends nothing and reads nobody when the per-fan provider is not set up", async () => {
@@ -79,7 +79,7 @@ describe("sendEventReminderEmails", () => {
     });
     assert.equal(loaded, false);
     assert.equal(calls.length, 0);
-    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, error: EVENT_REMINDER_NO_PROVIDER });
+    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, skipped: 0, error: EVENT_REMINDER_NO_PROVIDER });
   });
 
   it("does not call the provider when nobody RSVPed", async () => {
@@ -90,7 +90,7 @@ describe("sendEventReminderEmails", () => {
       send,
     });
     assert.equal(calls.length, 0);
-    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, error: null });
+    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, skipped: 0, error: null });
   });
 
   it("counts a failed fan without stopping the others", async () => {
@@ -121,7 +121,7 @@ describe("sendEventReminderEmails", () => {
       send,
     });
     assert.equal(calls.length, 0);
-    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, error: "event_rsvps: boom" });
+    assert.deepEqual(result, { recipients: 0, sent: 0, failed: 0, skipped: 0, error: "event_rsvps: boom" });
   });
 
   it("returns an error instead of throwing when the provider throws", async () => {
@@ -132,6 +132,6 @@ describe("sendEventReminderEmails", () => {
         throw new Error("network down");
       },
     });
-    assert.deepEqual(result, { recipients: 1, sent: 0, failed: 1, error: "network down" });
+    assert.deepEqual(result, { recipients: 1, sent: 0, failed: 1, skipped: 0, error: "network down" });
   });
 });

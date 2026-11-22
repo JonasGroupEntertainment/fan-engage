@@ -9,10 +9,8 @@ import EditableEventRow from "./editable-event-row";
 import CheckinQr from "@/app/artist-portal/checkin-qr/checkin-qr";
 import { mintCheckinToken } from "@/lib/checkin-token";
 import { APP_URL } from "@/lib/app-url";
-import {
-  deleteEventAction,
-  sendReminderNowAction,
-} from "../actions";
+import { deleteEventAction } from "../actions";
+import SendReminderButton from "./send-reminder-button";
 import { formatRsvpOpensAt } from "@/lib/rsvp-window";
 import ModerationButton from "@/app/admin/community/moderation-button";
 import PresaveManager from "./presave-manager";
@@ -199,12 +197,7 @@ export default async function AdminArtistEditPage({
                     {e.url && <p className="mt-1 text-xs text-white/50 truncate">{e.url}</p>}
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <ModerationButton
-                      action={sendReminderNowAction}
-                      fields={{ event_id: e.id, artist_slug: slug }}
-                      label="📣 Send reminder now"
-                      variant="default"
-                    />
+                    <SendReminderButton eventId={e.id} artistSlug={slug} />
                     <ModerationButton
                       action={deleteEventAction}
                       fields={{ event_id: e.id, artist_slug: slug }}

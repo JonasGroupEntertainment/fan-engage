@@ -15,7 +15,13 @@ import {
   type ReminderRsvpAudience,
 } from "@/lib/event-reminder-email-send";
 
-export type { ReminderKind };
+import {
+  REMINDER_INCOMPLETE_MARKER,
+  manualReminderCutoffIso,
+  type EventReminderResult,
+} from "@/lib/event-reminder-outcome";
+
+export type { EventReminderResult, ReminderKind };
 
 export interface ReminderWindowEvent {
   id: string;
@@ -95,13 +101,15 @@ export async function loadEventsInReminderWindow(kind: "reminder_24h" | "reminde
 const REMINDER_FAN_COLUMNS =
   "id, email, first_name, email_opted_in, suspended, is_internal, unsubscribe_token";
 
-export type EventReminderResult = {
-  smsRecipients: number;
-  emailRecipients: number;
-  error?: string;
-};
-
 type ChannelResult = { sent: number; error: string | null };
+type EmailChannelResult = ChannelResult & { skipped: number; failed: number; configured: boolean };
+
+const NOTHING_SENT = {
+  smsRecipients: 0,
+  emailRecipients: 0,
+  emailSkipped: 0,
+  emailFailed: 0,
+} as const;
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -159,17 +167,35 @@ async function sendReminderSms(event: ReminderWindowEvent, kind: ReminderKind): 
  * broadcastEmail: that creates a Mailchimp campaign for the whole
  * audience, so a "you RSVPed" reminder would reach people who never did.
  */
-async function sendReminderEmail(event: ReminderWindowEvent, kind: ReminderKind): Promise<ChannelResult> {
+async function sendReminderEmail(event: ReminderWindowEvent, kind: ReminderKind): Promise<EmailChannelResult> {
+  const configured = mandrillConfigured();
   const result = await sendEventReminderEmails({
     event,
     kind,
     appUrl: APP_URL,
-    providerReady: mandrillConfigured(),
+    providerReady: configured,
     loadAudience: loadReminderAudience,
     send: (recipients) => sendMandrillBatch(recipients, EVENT_REMINDER_EMAIL_TAGS),
   });
   if (result.error) console.warn("event reminder: email for event", event.id, result.error);
-  return { sent: result.sent, error: result.error };
+  return { sent: result.sent, skipped: result.skipped, failed: result.failed, configured, error: result.error };
+}
+
+/**
+ * True when a manual reminder for this event was recorded in the last few
+ * minutes (a double click, or the admin form retrying). The unique index
+ * only covers the 24 hour and 1 hour kinds, so manual sends need this.
+ */
+async function hasRecentManualReminder(eventId: string): Promise<boolean> {
+  const { data, error } = await createAdminClient()
+    .from("event_reminders")
+    .select("id")
+    .eq("event_id", eventId)
+    .eq("kind", "manual")
+    .gte("sent_at", manualReminderCutoffIso())
+    .limit(1);
+  if (error) throw new Error(`event_reminders: ${error.message}`);
+  return (data ?? []).length > 0;
 }
 
 function joinChannelErrors(sms: ChannelResult, email: ChannelResult): string | null {
@@ -184,11 +210,14 @@ function joinChannelErrors(sms: ChannelResult, email: ChannelResult): string | n
  * Send the SMS and email reminder for one event to the fans who RSVPed
  * and opted in to that channel.
  *
- * The event_reminders row is written first, as a claim. For the 24 hour
- * and 1 hour kinds the unique index on (event_id, kind) lets only one
- * claim through, so a run that is cut short or overlaps another can never
- * send the same reminder twice. If the claim cannot be written, nothing
- * is sent. The row is then updated with the delivery counts.
+ * The event_reminders row is written first, as a claim, with its error
+ * set to the incomplete marker. For the 24 hour and 1 hour kinds the
+ * unique index on (event_id, kind) lets only one claim through, so a run
+ * that is cut short or overlaps another can never send the same reminder
+ * twice. A manual send is ignored when another was recorded moments ago.
+ * If the claim cannot be written, nothing is sent. When the run finishes
+ * the row gets the delivery counts and the real error (or none); a row
+ * still marked incomplete means the run did not finish.
  *
  * Never throws for a failed channel; the error is returned and recorded.
  */
@@ -197,16 +226,27 @@ export async function sendEventReminder(
   kind: ReminderKind,
 ): Promise<EventReminderResult> {
   const admin = createAdminClient();
+  const emailConfigured = mandrillConfigured();
+  const notSent = { ...NOTHING_SENT, emailConfigured };
+
+  if (kind === "manual") {
+    try {
+      if (await hasRecentManualReminder(event.id)) return { ...notSent, status: "recent_manual" };
+    } catch (err) {
+      return { ...notSent, status: "not_recorded", error: `reminder not sent, could not check recent sends: ${errorText(err)}` };
+    }
+  }
+
   const claim = await admin
     .from("event_reminders")
-    .insert({ event_id: event.id, kind })
+    .insert({ event_id: event.id, kind, error: REMINDER_INCOMPLETE_MARKER })
     .select("id")
     .single();
   const outcome = reminderClaimOutcome(claim.error);
-  if (outcome === "already") return { smsRecipients: 0, emailRecipients: 0 };
+  if (outcome === "already") return { ...notSent, status: "already" };
   if (outcome === "failed" || !claim.data) {
     const reason = claim.error?.message ?? "no row returned";
-    return { smsRecipients: 0, emailRecipients: 0, error: `reminder not sent, could not record it: ${reason}` };
+    return { ...notSent, status: "not_recorded", error: `reminder not sent, could not record it: ${reason}` };
   }
 
   const [sms, email] = await Promise.all([
@@ -223,5 +263,13 @@ export async function sendEventReminder(
     console.error("event reminder: could not save counts for event", event.id, updateError.message);
   }
 
-  return { smsRecipients: sms.sent, emailRecipients: email.sent, error: error ?? undefined };
+  return {
+    status: "sent",
+    smsRecipients: sms.sent,
+    emailRecipients: email.sent,
+    emailSkipped: email.skipped,
+    emailFailed: email.failed,
+    emailConfigured: email.configured,
+    error: error ?? undefined,
+  };
 }

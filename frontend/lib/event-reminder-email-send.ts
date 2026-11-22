@@ -38,10 +38,12 @@ export type ReminderEmailResult = {
   recipients: number;
   sent: number;
   failed: number;
+  /** Fans who RSVPed but may not be emailed (not opted in, suspended, internal, no address). */
+  skipped: number;
   error: string | null;
 };
 
-const NOTHING_SENT: ReminderEmailResult = { recipients: 0, sent: 0, failed: 0, error: null };
+const NOTHING_SENT: ReminderEmailResult = { recipients: 0, sent: 0, failed: 0, skipped: 0, error: null };
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -63,11 +65,11 @@ function toRecipient(
   return { id: fan.id, email: (fan.email as string).trim(), name: "", ...message };
 }
 
-function summarize(recipients: number, batch: TransactionalBatchResult): ReminderEmailResult {
+function summarize(recipients: number, skipped: number, batch: TransactionalBatchResult): ReminderEmailResult {
   const sent = batch.outcomes.filter((o) => o.ok).length;
   const failed = recipients - sent;
   const error = batch.error ?? (failed > 0 ? `${failed} of ${recipients} reminder emails failed` : null);
-  return { recipients, sent, failed, error };
+  return { recipients, sent, failed, skipped, error };
 }
 
 export async function sendEventReminderEmails(params: {
@@ -83,19 +85,21 @@ export async function sendEventReminderEmails(params: {
   if (!params.providerReady) return { ...NOTHING_SENT, error: EVENT_REMINDER_NO_PROVIDER };
 
   let recipients: TransactionalRecipient[];
+  let skipped: number;
   try {
     const audience = await params.loadAudience(event.id);
     recipients = selectReminderEmailRecipients(audience.rsvpFanIds, audience.fans).map((fan) =>
       toRecipient(fan, event, kind, appUrl),
     );
+    skipped = new Set(audience.rsvpFanIds).size - recipients.length;
   } catch (err) {
     return { ...NOTHING_SENT, error: errorText(err) };
   }
-  if (recipients.length === 0) return NOTHING_SENT;
+  if (recipients.length === 0) return { ...NOTHING_SENT, skipped };
 
   try {
-    return summarize(recipients.length, await params.send(recipients));
+    return summarize(recipients.length, skipped, await params.send(recipients));
   } catch (err) {
-    return { recipients: recipients.length, sent: 0, failed: recipients.length, error: errorText(err) };
+    return { recipients: recipients.length, sent: 0, failed: recipients.length, skipped, error: errorText(err) };
   }
 }

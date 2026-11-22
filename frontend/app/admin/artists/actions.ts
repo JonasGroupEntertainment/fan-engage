@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authorizeAdmin, assertAdmin } from "@/lib/admin-guard";
 import { sendEventReminder, type ReminderWindowEvent } from "@/lib/reminders";
+import { describeReminderResult } from "@/lib/event-reminder-outcome";
 import { parseSocialLines } from "@/lib/socials/parse";
 import { isMissingRsvpOpensColumn } from "@/lib/rsvp-window";
 
@@ -265,10 +266,16 @@ export async function updateEventAction(formData: FormData) {
   return { success: true as const };
 }
 
-export async function sendReminderNowAction(formData: FormData) {
+export type SendReminderNowResult = { success: true; message: string } | { error: string };
+
+/**
+ * "Send reminder now". Returns plain words for the screen: how many went
+ * out, how many were skipped, or why nothing could be sent.
+ */
+export async function sendReminderNowAction(formData: FormData): Promise<SendReminderNowResult> {
   const eventId = String(formData.get("event_id") ?? "").trim();
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
-  if (!eventId || !artistSlug) return;
+  if (!eventId || !artistSlug) return { error: "This event could not be found." };
   const supa = createAdminClient();
   const [{ data: event }, { data: artist }] = await Promise.all([
     supa
@@ -278,7 +285,7 @@ export async function sendReminderNowAction(formData: FormData) {
       .maybeSingle(),
     supa.from("artists").select("name").eq("slug", artistSlug).maybeSingle(),
   ]);
-  if (!event) return;
+  if (!event) return { error: "This event could not be found." };
   await assertAdmin({ communityId: event.artist_slug as string, minRole: EDIT_ROLE });
   const reminderEvent: ReminderWindowEvent = {
     id: event.id as string,
@@ -291,8 +298,15 @@ export async function sendReminderNowAction(formData: FormData) {
     reminder_sms_template: (event.reminder_sms_template as string | null) ?? null,
     artist_name: (artist?.name as string | null) ?? null,
   };
-  await sendEventReminder(reminderEvent, "manual");
+  let outcome: { ok: boolean; message: string };
+  try {
+    outcome = describeReminderResult(await sendEventReminder(reminderEvent, "manual"));
+  } catch (err) {
+    console.error("sendReminderNowAction: reminder failed for event", eventId, err);
+    return { error: "The reminder could not be sent. Please try again." };
+  }
   revalidatePath(`/admin/artists/${artistSlug}`);
+  return outcome.ok ? { success: true, message: outcome.message } : { error: outcome.message };
 }
 
 export async function deleteEventAction(formData: FormData) {
