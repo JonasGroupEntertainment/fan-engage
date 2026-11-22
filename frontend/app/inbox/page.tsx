@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listNotifications, type Notification } from "@/lib/data/notifications";
 import { relativeTime } from "@/lib/format/relative-time";
+import { inboxReminderLabel } from "@/lib/notifications/inbox-mirror";
 import {
   archiveReadAction,
   markAllReadAction,
@@ -26,7 +27,7 @@ function kindLabel(kind: string): string {
     case "campaign":
       return "News";
     default:
-      return kind.replace(/_/g, " ");
+      return inboxReminderLabel(kind) ?? kind.replace(/_/g, " ");
   }
 }
 

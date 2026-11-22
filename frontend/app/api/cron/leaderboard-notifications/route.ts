@@ -7,6 +7,7 @@ import {
   notifyMonthEndNudge,
   notifyOvertaken,
 } from "@/lib/notifications/triggers/leaderboard";
+import { emailFanReminder } from "@/lib/fan-reminder-email-run";
 
 /**
  * Cron: GET /api/cron/leaderboard-notifications
@@ -23,12 +24,18 @@ import {
  *      - notifyOvertaken    → fan's rank got worse vs yesterday
  *      - notifyMonthEndNudge → fired when ≤ 3 days remain in the month
  *
+ * Each of these also lands in the fan's inbox. An overtaken fan is also
+ * emailed when FAN_REMINDER_EMAIL_ENABLED is "1" and the rules in
+ * lib/fan-reminder-email.ts allow it (one reminder email per fan in 7 days).
+ *
  * Auth: Authorization: Bearer <CRON_SECRET> (same pattern as all other
  * cron routes in this project).
  */
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+/** The fans are handled one at a time, each with a few reads and sends. */
+export const maxDuration = 300;
 
 /** How many days before month-end to send the nudge. */
 const NUDGE_DAYS_THRESHOLD = 3;
@@ -72,6 +79,7 @@ async function leaderboardNotifications() {
     snapshotsUpserted: number;
     notificationsFirstPlace: number;
     notificationsOvertaken: number;
+    emailsOvertaken: number;
     notificationsNudge: number;
     errors: string[];
   } = {
@@ -79,6 +87,7 @@ async function leaderboardNotifications() {
     snapshotsUpserted: 0,
     notificationsFirstPlace: 0,
     notificationsOvertaken: 0,
+    emailsOvertaken: 0,
     notificationsNudge: 0,
     errors: [],
   };
@@ -154,14 +163,23 @@ async function leaderboardNotifications() {
         if (currentRank === 1) {
           // Only notify if they weren't #1 yesterday (avoid daily spam).
           if (prevRank === undefined || prevRank !== 1) {
-            await notifyFirstPlace({ fanId, artistName });
+            await notifyFirstPlace({ fanId, artistName, artistSlug, now });
             summary.notificationsFirstPlace += 1;
           }
         }
         // Overtaken: rank got worse vs yesterday.
         else if (prevRank !== undefined && currentRank > prevRank) {
-          await notifyOvertaken({ fanId, artistName, newRank: currentRank });
+          await notifyOvertaken({ fanId, artistName, artistSlug, newRank: currentRank, now });
           summary.notificationsOvertaken += 1;
+          const email = await emailFanReminder({
+            reminder: "leaderboard_overtaken",
+            fanId,
+            artist: { slug: artistSlug, name: artistName },
+            newRank: currentRank,
+            previousRank: prevRank,
+          });
+          if (email.status === "sent") summary.emailsOvertaken += 1;
+          if (email.status === "failed") summary.errors.push(`${fanId} email: ${email.error}`);
         }
 
         // Month-end nudge (independent of rank change).
@@ -169,6 +187,8 @@ async function leaderboardNotifications() {
           await notifyMonthEndNudge({
             fanId,
             artistName,
+            artistSlug,
+            now,
             rank: currentRank,
             daysLeft,
           });

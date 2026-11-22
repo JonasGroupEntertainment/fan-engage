@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "../send";
+import { inboxDedupKey } from "../inbox-mirror";
+import { dropExpiringCopy, dropLaunchedCopy } from "../reminder-copy";
 
 /**
  * Notify followers of an artist when a limited-time reward drop goes
@@ -36,12 +38,12 @@ export async function notifyDropLaunched(opts: {
     const fanIds = (follows ?? []).map((r) => r.fan_id as string);
     if (fanIds.length === 0) return;
 
-    const desc = opts.rewardDescription
-      ? String(opts.rewardDescription).slice(0, 80)
-      : null;
-    const body = desc
-      ? `${opts.rewardTitle} — ${desc}`
-      : `${opts.rewardTitle} just dropped.`;
+    const copy = dropLaunchedCopy({
+      artistName: artist.name as string,
+      artistSlug: opts.artistSlug,
+      rewardTitle: opts.rewardTitle,
+      rewardDescription: opts.rewardDescription,
+    });
 
     const MAX_CONCURRENT = 200;
     await Promise.all(
@@ -51,10 +53,17 @@ export async function notifyDropLaunched(opts: {
           type: "drops",
           smsMessageType: "drop_launched",
           payload: {
-            title: `${artist.name as string} — new drop`,
-            body,
-            url: `/artists/${opts.artistSlug}/rewards`,
+            title: copy.title,
+            body: copy.body,
+            url: copy.url,
             tag: `drop_launched:${opts.rewardId}`,
+          },
+          inbox: {
+            kind: "drop_launched",
+            dedupKey: inboxDedupKey("drop_launched", opts.rewardId),
+            body: copy.inboxBody,
+            url: copy.url,
+            communityId: opts.artistSlug,
           },
         }),
       ),
@@ -105,10 +114,11 @@ export async function notifyDropExpiring(opts: {
     if (targets.length === 0) return;
 
     const expiresMs = new Date(opts.expiresAt).getTime();
-    const minutesLeft = Math.max(
-      1,
-      Math.round((expiresMs - Date.now()) / 60000),
-    );
+    const copy = dropExpiringCopy({
+      artistSlug: opts.artistSlug,
+      rewardTitle: opts.rewardTitle,
+      minutesLeft: (expiresMs - Date.now()) / 60000,
+    });
 
     const MAX_CONCURRENT = 200;
     await Promise.all(
@@ -118,10 +128,17 @@ export async function notifyDropExpiring(opts: {
           type: "drops",
           smsMessageType: "drop_expiring",
           payload: {
-            title: `${opts.rewardTitle} ends soon`,
-            body: `Last ${minutesLeft} min to redeem this drop.`,
-            url: `/artists/${opts.artistSlug}/rewards`,
+            title: copy.title,
+            body: copy.body,
+            url: copy.url,
             tag: `drop_expiring:${opts.rewardId}`,
+          },
+          inbox: {
+            kind: "drop_expiring",
+            dedupKey: inboxDedupKey("drop_expiring", opts.rewardId),
+            body: copy.inboxBody,
+            url: copy.url,
+            communityId: opts.artistSlug,
           },
         }),
       ),

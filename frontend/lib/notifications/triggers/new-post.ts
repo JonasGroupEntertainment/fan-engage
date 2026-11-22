@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "../send";
+import { inboxDedupKey, type InboxMirror } from "../inbox-mirror";
 
 /**
  * Fan an artist follows just dropped a new post. Notify every follower
@@ -96,6 +97,16 @@ export async function notifyNewPost(opts: {
     const body = excerpt || "Check out the new post.";
     const url = `/artists/${opts.artistSlug}/community`;
 
+    // Inbox copy only for the artist's own posts. A fan's post is a push
+    // nudge at most: mirroring every fan post would bury the inbox.
+    const inbox: InboxMirror | undefined = fromTeam
+      ? {
+          kind: "new_post",
+          dedupKey: inboxDedupKey("new_post", opts.postId),
+          communityId: opts.artistSlug,
+        }
+      : undefined;
+
     // Cap concurrency. 200 is a generous V1 limit — we'll move large
     // followings to a queued cron in V2.
     const MAX_CONCURRENT = 200;
@@ -112,6 +123,7 @@ export async function notifyNewPost(opts: {
             url,
             tag: `new_post:${opts.postId}`,
           },
+          inbox,
         }),
       ),
     );

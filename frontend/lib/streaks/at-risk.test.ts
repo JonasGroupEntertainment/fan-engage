@@ -172,10 +172,19 @@ describe("selectAtRiskFans", () => {
 });
 
 describe("streakAtRiskCopy", () => {
+  it("does not claim a reaction keeps the streak, and the inbox copy names no time", () => {
+    const copy = streakAtRiskCopy(7, "tonight at 6 PM");
+    assert.doesNotMatch(`${copy.body} ${copy.inboxBody}`, /reaction/i);
+    assert.doesNotMatch(copy.inboxBody, /tonight|today|6 PM/i);
+    assert.doesNotMatch(`${copy.title}${copy.body}${copy.inboxBody}`, /\u2014/);
+  });
+
   it("names the streak length and the fan's local rollover time", () => {
     assert.deepEqual(streakAtRiskCopy(12, "tonight at 7 PM"), {
       title: "Your 12-day streak ends tonight at 7 PM",
-      body: "Open Fan Engage and do one thing — a reaction counts.",
+      body: "Open Fan Engage before then to keep it. A visit to your Fan Home or an artist page counts.",
+      inboxBody:
+        "A streak grows with one visit a day. Opening your Fan Home or an artist page is what counts.",
       url: "/",
     });
     assert.equal(streakAtRiskCopy(5, "tonight at 4 PM").title, "Your 5-day streak ends tonight at 4 PM");
