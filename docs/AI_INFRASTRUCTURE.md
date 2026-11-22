@@ -62,6 +62,16 @@ minutes via Vercel Cron (entry added to `frontend/vercel.json`). Calls
 JSON summary. Same `Bearer $CRON_SECRET` auth pattern as the other two
 cron jobs.
 
+**Paused since 2026-11-22.** The entry was taken out of
+`frontend/vercel.json` because the OpenAI account had no credits and the
+job failed on every run (1,321 failures from 2026-10-23). The route is
+unchanged. To switch it back on, add credits, then put the entry back
+(`/api/cron/embeddings-backfill`, `*/15 * * * *`) and remove it from the
+paused list in `frontend/lib/cron-observability.test.ts`. Rows written
+while it was off are picked up by the first run, since the job asks for
+every row that has no embedding. Inline indexing still calls OpenAI and
+still fails quietly until credits are added.
+
 ### Inline indexing
 
 `frontend/app/artists/[slug]/community/actions.ts` is patched at all 5

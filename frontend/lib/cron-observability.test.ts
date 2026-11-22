@@ -226,11 +226,29 @@ describe("scheduled routes log through runCron", () => {
 
   it("covers every cron in frontend/vercel.json", () => {
     const jobs = vercel.crons.map((cron) => cron.path.replace("/api/cron/", ""));
-    // weekly-digest is paused in vercel.json until a test send and typed GO.
+    // Paused in vercel.json. Each keeps its route, env list and job name.
+    //   weekly-digest: until a test send and typed GO.
+    //   embeddings-backfill: since 2026-11-22, because the OpenAI account
+    //     has no credits and the job failed on every run. Put it back once
+    //     credits are added.
+    const paused = new Set<string>(["weekly-digest", "embeddings-backfill"]);
     assert.deepEqual(
       jobs,
-      VERCEL_CRON_JOBS.filter((job) => job !== "weekly-digest"),
+      VERCEL_CRON_JOBS.filter((job) => !paused.has(job)),
     );
+  });
+
+  it("keeps the paused embeddings job ready to switch back on", () => {
+    // Arrange
+    const route = readRepo("../app/api/cron/embeddings-backfill/route.ts");
+
+    // Assert: off the schedule, but the route and its env check remain.
+    assert.equal(
+      vercel.crons.some((cron) => cron.path === "/api/cron/embeddings-backfill"),
+      false,
+    );
+    assert.match(route, /runCron\(/);
+    assert.deepEqual(CRON_REQUIRED_ENV["embeddings-backfill"], ["OPENAI_API_KEY"]);
   });
 
   it("each route calls runCron with its job name", () => {
