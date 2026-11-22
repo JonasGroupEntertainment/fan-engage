@@ -6,6 +6,7 @@ import { getArtistFromDb } from "@/lib/data/artists";
 import { listRewardsForCommunity, listMyRedemptions } from "@/lib/data/rewards";
 import Image from "next/image";
 import RewardCardWithForm from "./reward-card";
+import { rewardShareAddress } from "@/lib/reward-share";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import RecommendedRewardCard from "./recommended-reward-card";
 import { recommendReward } from "@/lib/recs";
@@ -78,6 +79,10 @@ export default async function RewardsPage({
     getViewerEntitlement(slug),
   ]);
   const canRedeem = canUsePremiumFeature("rewards_redeem", entitlement);
+  // Each card's "Share this drop" address: the reward's own share page for
+  // a wallpaper, the artist's page for anything else.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
+  const now = new Date();
 
   if (rewards.length < MIN_INVENTORY) {
     return (
@@ -124,7 +129,7 @@ export default async function RewardsPage({
         {rewards.length > 0 ? (
           <div className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {rewards.map((reward) => (
-              <RewardCardWithForm key={reward.id} reward={reward} artistSlug={slug} artistName={artist.name} fanHandle={fanHandle} fanPoints={fanPoints} canRedeem={canRedeem} />
+              <RewardCardWithForm key={reward.id} reward={reward} artistSlug={slug} artistName={artist.name} shareUrl={rewardShareAddress({ appUrl, artistSlug: slug, reward, now })} fanHandle={fanHandle} fanPoints={fanPoints} canRedeem={canRedeem} />
             ))}
           </div>
         ) : (

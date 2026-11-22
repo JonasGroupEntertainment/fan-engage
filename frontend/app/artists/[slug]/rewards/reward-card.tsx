@@ -17,6 +17,8 @@ interface RewardCardProps {
   artistSlug: string;
   /** Artist display name — used in the share message body. */
   artistName: string;
+  /** What "Share this drop" sends after a redemption (lib/reward-share.ts). */
+  shareUrl: string;
   /** Current fan's profile handle — used by the redeem success state
    *  to surface a "View your updated profile" link. Optional because
    *  RLS or signup races can briefly leave a fan handle-less. */
@@ -32,6 +34,7 @@ export default function RewardCardWithForm({
   reward,
   artistSlug,
   artistName,
+  shareUrl,
   fanHandle,
   fanPoints = 0,
   canRedeem = false,
@@ -125,6 +128,7 @@ export default function RewardCardWithForm({
           pointCost={reward.point_cost}
           artistSlug={artistSlug}
           artistName={artistName}
+          shareUrl={shareUrl}
           fanHandle={fanHandle ?? null}
           onSuccess={() => {
             setShowForm(false);

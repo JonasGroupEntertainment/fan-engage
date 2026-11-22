@@ -23,7 +23,7 @@ const SHARE_ITEM = "[A-Za-z0-9_-]{1,64}";
  * Share pages that have their own preview picture (an opengraph-image file
  * beside the page). A test checks this list against the files on disk.
  */
-export const SHARE_KINDS_WITH_PICTURE = ["badge", "drop", "founder", "rank", "rsvp", "tier"] as const;
+export const SHARE_KINDS_WITH_PICTURE = ["badge", "drop", "founder", "rank", "reward", "rsvp", "tier"] as const;
 /** The tier page is /share/tier/<artist>. Every other kind names one item after the artist. */
 const SHARE_KIND_WITHOUT_ITEM = "tier";
 const SHARE_KINDS_WITH_ITEM = SHARE_KINDS_WITH_PICTURE.filter((kind) => kind !== SHARE_KIND_WITHOUT_ITEM);
