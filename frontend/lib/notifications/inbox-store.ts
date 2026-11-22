@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  INBOX_DEDUP_PREFIX,
   INBOX_REMINDER_PRIORITY,
   UNCAPPED_INBOX_KINDS,
   type InboxFanRow,
@@ -18,6 +19,12 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 const UNIQUE_VIOLATION = "23505";
 const REMINDER_KINDS: string[] = [...INBOX_REMINDER_PRIORITY, ...UNCAPPED_INBOX_KINDS];
+/**
+ * Only rows this module wrote: a reminder kind AND a "reminder:" dedup
+ * key. Both the count and the delete use it, so the cap can never count
+ * or remove a row that something else put in the inbox.
+ */
+const REMINDER_KEY_PATTERN = `${INBOX_DEDUP_PREFIX}:%`;
 
 async function loadFan(admin: Admin, fanId: string): Promise<InboxFanRow | null> {
   const { data, error } = await admin
@@ -39,6 +46,7 @@ async function loadTodaysReminders(
     .select("id, kind, dedup_key, read_at")
     .eq("fan_id", fanId)
     .in("kind", REMINDER_KINDS)
+    .like("dedup_key", REMINDER_KEY_PATTERN)
     .gte("created_at", sinceIso);
   if (error) throw new Error(`notifications: ${error.message}`);
   return (data ?? []) as TodaysReminder[];
@@ -52,7 +60,12 @@ async function insert(admin: Admin, row: InboxRow): Promise<"inserted" | "duplic
 }
 
 async function remove(admin: Admin, id: string): Promise<void> {
-  const { error } = await admin.from("notifications").delete().eq("id", id);
+  const { error } = await admin
+    .from("notifications")
+    .delete()
+    .eq("id", id)
+    .in("kind", REMINDER_KINDS)
+    .like("dedup_key", REMINDER_KEY_PATTERN);
   if (error) throw new Error(`notifications delete: ${error.message}`);
 }
 

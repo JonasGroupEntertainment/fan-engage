@@ -11,6 +11,8 @@ import {
   inboxDedupKey,
   inboxMonth,
   inboxReminderLabel,
+  isInboxReminderKind,
+  isReminderDedupKey,
   mirrorReminderToInbox,
   type InboxMirror,
   type InboxMirrorDeps,
@@ -111,6 +113,34 @@ describe("inbox dedup keys and periods", () => {
     assert.equal(inboxReminderLabel("streak_at_risk"), "Streak");
     assert.equal(inboxReminderLabel("leaderboard_overtaken"), "Leaderboard");
     assert.equal(inboxReminderLabel("badge_earned"), null);
+  });
+});
+
+describe("reminder rows only", () => {
+  it("does not treat an object prototype key as a reminder kind", () => {
+    for (const kind of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+      assert.equal(isInboxReminderKind(kind), false);
+      assert.equal(inboxReminderLabel(kind), null);
+    }
+    assert.equal(isInboxReminderKind("streak_at_risk"), true);
+  });
+
+  it("knows its own dedup keys", () => {
+    assert.equal(isReminderDedupKey(inboxDedupKey("new_post", "p1")), true);
+    assert.equal(isReminderDedupKey("redemption:abc"), false);
+    assert.equal(isReminderDedupKey("reminders:x"), false);
+    assert.equal(isReminderDedupKey(null), false);
+  });
+
+  it("never counts or evicts a row whose key is not a reminder key", () => {
+    const foreign = [
+      { id: "a", kind: "new_post", dedup_key: "campaign:1", read_at: null },
+      { id: "b", kind: "new_post", dedup_key: null, read_at: null },
+      { id: "c", kind: "new_post", dedup_key: "badge:x", read_at: null },
+    ];
+    assert.deepEqual(inboxCapDecision("streak_at_risk", foreign), { action: "write" });
+    const mixed = [...foreign, ...todays("new_post", "anniversary", "drop_launched")];
+    assert.deepEqual(inboxCapDecision("streak_at_risk", mixed), { action: "replace", evictId: "row-0" });
   });
 });
 

@@ -34,6 +34,8 @@ import { emailFanReminder } from "@/lib/fan-reminder-email-run";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+/** The fans are handled one at a time, each with a few reads and sends. */
+export const maxDuration = 300;
 
 /** How many days before month-end to send the nudge. */
 const NUDGE_DAYS_THRESHOLD = 3;

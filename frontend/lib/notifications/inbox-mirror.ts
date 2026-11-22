@@ -52,7 +52,8 @@ export type InboxReminderKind = CappedInboxKind | (typeof UNCAPPED_INBOX_KINDS)[
 /** How many reminder rows one fan can get in one UTC day. */
 export const MAX_INBOX_REMINDERS_PER_FAN_PER_DAY = 3;
 
-const DEDUP_PREFIX = "reminder";
+/** Every dedup key this module writes starts with this, then a colon. */
+export const INBOX_DEDUP_PREFIX = "reminder";
 
 const INBOX_LABELS: Record<InboxReminderKind, string> = {
   streak_at_risk: "Streak",
@@ -143,7 +144,12 @@ export function inboxDedupKey(
   kind: string,
   ...period: ReadonlyArray<string | number>
 ): string {
-  return [DEDUP_PREFIX, kind, ...period.map((part) => String(part).trim())].join(":");
+  return [INBOX_DEDUP_PREFIX, kind, ...period.map((part) => String(part).trim())].join(":");
+}
+
+/** True for a dedup key written by inboxDedupKey. */
+export function isReminderDedupKey(dedupKey: string | null | undefined): boolean {
+  return Boolean(dedupKey?.startsWith(`${INBOX_DEDUP_PREFIX}:`));
 }
 
 /** YYYY-MM-DD on the UTC calendar: the day a daily reminder belongs to. */
@@ -162,7 +168,7 @@ export function inboxDayStartIso(now: Date): string {
 }
 
 export function isInboxReminderKind(kind: string): kind is InboxReminderKind {
-  return kind in INBOX_LABELS;
+  return Object.hasOwn(INBOX_LABELS, kind);
 }
 
 /** Section heading in /inbox, or null for a kind this module does not own. */
@@ -211,7 +217,7 @@ export function inboxCapDecision(
   cap: number = MAX_INBOX_REMINDERS_PER_FAN_PER_DAY,
 ): InboxCapDecision {
   if (!isCapped(kind)) return { action: "write" };
-  const counted = todays.filter((row) => isCapped(row.kind));
+  const counted = todays.filter((row) => isCapped(row.kind) && isReminderDedupKey(row.dedup_key));
   if (counted.length < cap) return { action: "write" };
 
   const weakestUnread = counted

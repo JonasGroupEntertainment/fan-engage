@@ -8,6 +8,7 @@ import {
   REMINDER_EMAIL_LOG_TYPE,
   isFanReminderEmailEnabled,
   type ReminderEmailArtist,
+  type ReminderEmailClaim,
   type ReminderEmailFan,
   type ReminderEmailKind,
 } from "@/lib/fan-reminder-email";
@@ -34,6 +35,8 @@ const FAN_COLUMNS =
   "id, email, first_name, email_opted_in, suspended, is_internal, unsubscribe_token";
 /** Rows in these states count against the 7 day cap. */
 const CAP_STATUSES = ["queued", "sent"];
+/** The earliest claims are enough to tell which one wins. */
+const CLAIM_READ_LIMIT = 10;
 
 const PREFERENCE_TYPE: Record<ReminderEmailKind, NotificationType> = {
   streak_at_risk: "streak_at_risk",
@@ -73,18 +76,24 @@ async function loadArtist(admin: Admin, fanId: string): Promise<ReminderEmailArt
   return slug ? { slug, name: bySlug.get(slug) as string } : null;
 }
 
-async function hasRecentReminderEmail(admin: Admin, fanId: string, sinceIso: string): Promise<boolean> {
+async function recentReminderEmails(
+  admin: Admin,
+  fanId: string,
+  sinceIso: string,
+): Promise<ReminderEmailClaim[]> {
   const { data, error } = await admin
     .from("notification_log")
-    .select("id")
+    .select("id, sent_at")
     .eq("fan_id", fanId)
     .eq("channel", "email")
     .eq("notification_type", REMINDER_EMAIL_LOG_TYPE)
     .in("status", CAP_STATUSES)
     .gte("sent_at", sinceIso)
-    .limit(1);
+    .order("sent_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(CLAIM_READ_LIMIT);
   if (error) throw new Error(`notification_log: ${error.message}`);
-  return (data ?? []).length > 0;
+  return (data ?? []) as ReminderEmailClaim[];
 }
 
 async function claim(admin: Admin, row: ReminderEmailLogRow): Promise<string> {
@@ -110,7 +119,7 @@ function reminderEmailDeps(admin: Admin): ReminderEmailDeps {
     loadFan: (fanId) => loadFan(admin, fanId),
     loadPrefs,
     loadArtist: (fanId) => loadArtist(admin, fanId),
-    hasRecentReminderEmail: (fanId, sinceIso) => hasRecentReminderEmail(admin, fanId, sinceIso),
+    recentReminderEmails: (fanId, sinceIso) => recentReminderEmails(admin, fanId, sinceIso),
     claim: (row) => claim(admin, row),
     finish: (claimId, result) => finish(admin, claimId, result),
     send: (recipients) => sendMandrillBatch(recipients, FAN_REMINDER_EMAIL_TAGS),

@@ -7,6 +7,7 @@ import {
   isFanReminderEmailEnabled,
   reminderEmailBlockReason,
   reminderEmailCapCutoffIso,
+  winningReminderEmailClaim,
   type ReminderEmailFan,
 } from "./fan-reminder-email.ts";
 
@@ -60,6 +61,28 @@ describe("reminderEmailCapCutoffIso", () => {
       reminderEmailCapCutoffIso(new Date("2026-11-22T21:00:00Z")),
       "2026-11-15T21:00:00.000Z",
     );
+  });
+});
+
+describe("winningReminderEmailClaim", () => {
+  it("picks the earliest claim whatever order the rows come in", () => {
+    const early = { id: "b", sent_at: "2026-11-22T16:00:00.100Z" };
+    const late = { id: "a", sent_at: "2026-11-22T16:00:00.200Z" };
+    assert.equal(winningReminderEmailClaim([late, early])?.id, "b");
+    assert.equal(winningReminderEmailClaim([early, late])?.id, "b");
+  });
+
+  it("breaks a tie on time by id", () => {
+    const one = { id: "a", sent_at: "2026-11-22T16:00:00Z" };
+    const two = { id: "b", sent_at: "2026-11-22T16:00:00Z" };
+    assert.equal(winningReminderEmailClaim([two, one])?.id, "a");
+    assert.equal(winningReminderEmailClaim([one, two])?.id, "a");
+  });
+
+  it("puts a row with no readable time last and returns null for none", () => {
+    const dated = { id: "z", sent_at: "2026-11-22T16:00:00Z" };
+    assert.equal(winningReminderEmailClaim([{ id: "a", sent_at: null }, dated])?.id, "z");
+    assert.equal(winningReminderEmailClaim([]), null);
   });
 });
 

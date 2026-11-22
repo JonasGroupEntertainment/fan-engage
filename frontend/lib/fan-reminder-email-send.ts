@@ -1,13 +1,16 @@
 import type { TransactionalBatchResult, TransactionalRecipient } from "./email/transactional.ts";
 import {
+  REMINDER_EMAIL_CLAIM_LOST,
   REMINDER_EMAIL_LOG_TYPE,
   REMINDER_EMAIL_MIN_STREAK,
   buildOvertakenEmail,
   buildStreakReminderEmail,
   reminderEmailBlockReason,
   reminderEmailCapCutoffIso,
+  winningReminderEmailClaim,
   type ReminderEmailArtist,
   type ReminderEmailBlockReason,
+  type ReminderEmailClaim,
   type ReminderEmailFan,
   type ReminderEmailKind,
   type ReminderEmailMessage,
@@ -25,6 +28,11 @@ import {
  * becomes `sent` or `failed`. A `queued` or `sent` row inside the window
  * blocks the next reminder email of any kind. A row left `queued` by a
  * crash still blocks, so the mistake is a missed email, never a second one.
+ *
+ * notification_log has no unique key, and the streak and leaderboard
+ * crons can both run at 16:00 UTC, so two runs can pass the check and
+ * both claim. Each therefore reads the claims back after writing its own,
+ * and only the earliest claim sends; the other is marked failed.
  *
  * Never throws. Every way out is an outcome, so one fan's failure never
  * stops a cron for the others.
@@ -80,8 +88,8 @@ export type ReminderEmailDeps = {
   loadPrefs: (fanId: string, reminder: ReminderEmailKind) => Promise<ReminderEmailPrefs>;
   /** The fan's own artist, for the streak email. Null when there is none. */
   loadArtist: (fanId: string) => Promise<ReminderEmailArtist | null>;
-  /** True when a reminder email was queued or sent to the fan since `sinceIso`. */
-  hasRecentReminderEmail: (fanId: string, sinceIso: string) => Promise<boolean>;
+  /** The fan's queued and sent reminder email rows since `sinceIso`. */
+  recentReminderEmails: (fanId: string, sinceIso: string) => Promise<ReminderEmailClaim[]>;
   /** Writes the `queued` row and returns its id. */
   claim: (row: ReminderEmailLogRow) => Promise<string>;
   finish: (claimId: string, result: { status: "sent" | "failed"; error: string | null }) => Promise<void>;
@@ -142,8 +150,36 @@ async function skipReasonFor(
   if (!prefs.typeAllowed) return "type_opted_out";
   if (request.reminder === "streak_at_risk" && prefs.inQuietHours) return "quiet_hours";
 
-  const recent = await deps.hasRecentReminderEmail(request.fanId, reminderEmailCapCutoffIso(now));
-  return recent ? "weekly_cap" : null;
+  const recent = await deps.recentReminderEmails(request.fanId, reminderEmailCapCutoffIso(now));
+  return recent.length > 0 ? "weekly_cap" : null;
+}
+
+/**
+ * After our own claim is written: true only when it is the earliest claim
+ * in the window. A read that does not show our row at all also loses, so
+ * a doubt costs an email and never sends two.
+ */
+async function claimWon(
+  claimId: string,
+  fanId: string,
+  deps: ReminderEmailDeps,
+  now: Date,
+): Promise<boolean> {
+  const claims = await deps.recentReminderEmails(fanId, reminderEmailCapCutoffIso(now));
+  return winningReminderEmailClaim(claims)?.id === claimId;
+}
+
+async function recordFinish(
+  claimId: string,
+  result: { status: "sent" | "failed"; error: string | null },
+  deps: ReminderEmailDeps,
+): Promise<void> {
+  try {
+    await deps.finish(claimId, result);
+  } catch (err) {
+    // The row stays `queued`, which still counts against the cap.
+    console.warn("fan reminder email: could not update the send record:", errorText(err));
+  }
 }
 
 async function deliver(
@@ -210,18 +246,26 @@ export async function sendFanReminderEmail(params: {
     return { status: "failed", error: errorText(err) };
   }
 
+  let won: boolean;
+  try {
+    won = await claimWon(claimId, fan.id, deps, now);
+  } catch (err) {
+    // Could not confirm the claim is the only one, so do not send.
+    const error = errorText(err);
+    await recordFinish(claimId, { status: "failed", error }, deps);
+    return { status: "failed", error };
+  }
+  if (!won) {
+    await recordFinish(claimId, { status: "failed", error: REMINDER_EMAIL_CLAIM_LOST }, deps);
+    return skipped("weekly_cap");
+  }
+
   let sendError: string | null;
   try {
     sendError = await deliver(fan, message, deps);
   } catch (err) {
     sendError = errorText(err);
   }
-
-  try {
-    await deps.finish(claimId, { status: sendError ? "failed" : "sent", error: sendError });
-  } catch (err) {
-    // The row stays `queued`, which still counts against the cap.
-    console.warn("fan reminder email: could not update the send record:", errorText(err));
-  }
+  await recordFinish(claimId, { status: sendError ? "failed" : "sent", error: sendError }, deps);
   return sendError ? { status: "failed", error: sendError } : { status: "sent" };
 }

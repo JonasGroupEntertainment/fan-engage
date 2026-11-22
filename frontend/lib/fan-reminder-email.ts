@@ -15,7 +15,9 @@
  *   - off unless FAN_REMINDER_EMAIL_ENABLED is exactly "1"
  *   - the fan has not switched that kind of reminder off
  *   - at most one reminder email of any kind per fan in a rolling
- *     REMINDER_EMAIL_CAP_DAYS days, recorded in notification_log
+ *     REMINDER_EMAIL_CAP_DAYS days, recorded in notification_log. Two
+ *     crons can reach the same fan in the same minute, so after a send is
+ *     claimed the claims are read back and only the earliest one sends
  *   - a streak email is not sent inside the fan's quiet hours, and it
  *     gives the end of the streak on the fan's own clock, as the push does
  *
@@ -85,6 +87,34 @@ export function reminderEmailBlockReason(
 /** Reminder emails recorded at or after this instant count against the cap. */
 export function reminderEmailCapCutoffIso(now: Date): string {
   return new Date(now.getTime() - REMINDER_EMAIL_CAP_DAYS * DAY_MS).toISOString();
+}
+
+/** A queued or sent reminder email row in notification_log. */
+export type ReminderEmailClaim = { id: string; sent_at: string | null };
+
+/** Shown on a claim that lost to an earlier one. */
+export const REMINDER_EMAIL_CLAIM_LOST = "another reminder email was already claimed";
+
+function claimTime(claim: ReminderEmailClaim): number {
+  const ms = Date.parse(claim.sent_at ?? "");
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+}
+
+function claimOrder(a: ReminderEmailClaim, b: ReminderEmailClaim): number {
+  const byTime = claimTime(a) - claimTime(b);
+  if (byTime !== 0 && !Number.isNaN(byTime)) return byTime;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * The one claim in the window that may send: the earliest by time, and by
+ * id when two share a time. Both racers read the same rows and reach the
+ * same answer, so exactly one of them sends. Null when there are none.
+ */
+export function winningReminderEmailClaim(
+  claims: readonly ReminderEmailClaim[],
+): ReminderEmailClaim | null {
+  return [...claims].sort(claimOrder)[0] ?? null;
 }
 
 function safeFirstName(firstName: string | null): string | null {
