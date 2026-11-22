@@ -10,6 +10,7 @@ import {
   viewerManagesEventRsvps,
 } from "@/lib/rsvp-access";
 import { evaluateRsvpWindow, rsvpClosedMessage } from "@/lib/rsvp-window";
+import { withPointsProgress } from "@/lib/points/lifetime";
 
 export async function toggleRsvpAction(formData: FormData) {
   const eventId = String(formData.get("event_id") ?? "").trim();
@@ -64,9 +65,15 @@ export async function toggleRsvpAction(formData: FormData) {
   // the trigger enforces the same window.
   const writer =
     decision.state === "open" && decision.reason === "admin" ? createAdminClient() : supabase;
-  const { error } = await writer
-    .from("event_rsvps")
-    .insert({ event_id: eventId, fan_id: user.id });
+  // The RSVP points are awarded by a database trigger, so the action reads
+  // lifetime points before and after the insert to learn what was earned
+  // (lib/points/lifetime.ts). The button shows it as a short note.
+  const {
+    result: { error },
+    progress,
+  } = await withPointsProgress(user.id, () =>
+    writer.from("event_rsvps").insert({ event_id: eventId, fan_id: user.id }),
+  );
   if (error) {
     revalidatePath(`/artists/${artistSlug}`);
     return {
@@ -82,5 +89,5 @@ export async function toggleRsvpAction(formData: FormData) {
   notifyRsvpConfirmation({ fanId: user.id, eventId, artistSlug }).catch(() => {});
   revalidatePath(`/artists/${artistSlug}`);
   revalidatePath("/");
-  return { ok: true as const };
+  return { ok: true as const, progress };
 }
