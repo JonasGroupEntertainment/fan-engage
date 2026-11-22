@@ -12,6 +12,12 @@ interface RedeemFormProps {
   artistSlug: string;
   /** Artist display name — used in the share message body. */
   artistName: string;
+  /**
+   * Address shared from the success state: the reward's own share page for
+   * a wallpaper, the artist's page for anything else (lib/reward-share.ts).
+   * Worked out by the rewards page.
+   */
+  shareUrl: string;
   /** Current fan's profile handle — used to link to /fans/<handle>
    *  from the success state so the fan can see their updated profile. */
   fanHandle?: string | null;
@@ -25,6 +31,7 @@ export function RedeemForm({
   pointCost,
   artistSlug,
   artistName,
+  shareUrl,
   fanHandle,
   onSuccess,
   onClose,
@@ -60,11 +67,8 @@ export function RedeemForm({
     setLoading(false);
   }
 
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://fan-engage-pearl.vercel.app";
-  const artistUrl = `${appUrl}/artists/${artistSlug}`;
   const shareTitle = `I just redeemed ${rewardTitle} on Fan Engage`;
-  const shareText = `Cashed in ${pointCost.toLocaleString()} points for ${rewardTitle} from ${artistName}'s fan experience. ${artistUrl}`;
+  const shareText = `Cashed in ${pointCost.toLocaleString()} points for ${rewardTitle} from ${artistName}'s fan experience. ${shareUrl}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -92,7 +96,7 @@ export function RedeemForm({
               <ShareButton
                 title={shareTitle}
                 text={shareText}
-                url={artistUrl}
+                url={shareUrl}
                 label="Share this drop"
                 variant="primary"
               />
