@@ -61,7 +61,7 @@ export default function BroadcastPage() {
             <span className="text-white/40">Resolving target community…</span>
           ) : target === null ? (
             <span className="text-amber-300">
-              No community selected — pick one in the admin switcher first.
+              No community selected. Pick one in the admin switcher first.
             </span>
           ) : (
             <span className="text-white/80">
@@ -156,6 +156,11 @@ export default function BroadcastPage() {
             {target ? ` of ${target.displayName}` : ""}.
           </span>
         </label>
+        <p className="text-xs text-white/50">
+          Texts and emails go only to fans who follow this community, at the tier you
+          picked, and who have opted in to that channel. Each email is sent on its own
+          with that fan&apos;s unsubscribe link.
+        </p>
 
         <button
           type="submit"
@@ -167,15 +172,14 @@ export default function BroadcastPage() {
 
         {result && (
           <div
+            role="status"
             className={`rounded-xl p-4 text-sm ${result.ok ? "bg-emerald-500/10 text-emerald-200" : "bg-rose-500/10 text-rose-200"}`}
           >
-            {result.ok ? (
-              <>
-                ✓ Sent — {result.smsSent ?? 0} SMS · {result.emailSent ?? 0} email
-              </>
-            ) : (
-              <>✗ {result.error}</>
-            )}
+            {result.error && <p>{result.error}</p>}
+            {!result.error && !result.ok && <p>Nothing was sent.</p>}
+            {(result.lines ?? []).map((line) => (
+              <p key={line}>{line}</p>
+            ))}
           </div>
         )}
       </form>

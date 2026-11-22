@@ -3,7 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertAdmin } from "@/lib/admin-guard";
-import { broadcastEmail, broadcastSms } from "@/lib/broadcast";
+import { broadcastSms } from "@/lib/broadcast";
+import {
+  emailItemMetadata,
+  eventBelongsToArtist,
+  hasRecentCampaign,
+  loadArtistFanIds,
+  loadEventRsvpFanIds,
+  sendAudienceEmail,
+} from "@/lib/admin-audience";
+import { chooseAudienceFanIds } from "@/lib/audience-email";
+import type { AudienceEmailResult } from "@/lib/audience-email-send";
+import {
+  DUPLICATE_CAMPAIGN_MESSAGE,
+  describeAudienceSend,
+  type AudienceSendOutcome,
+  type SmsOutcome,
+} from "@/lib/audience-send-outcome";
 import { createNotification } from "@/lib/data/notifications";
 import { eventOwnerColumns } from "@/lib/events/build-event-row";
 
@@ -13,6 +29,45 @@ import { eventOwnerColumns } from "@/lib/events/build-event-row";
  * campaign_items row per side-effect for reporting.
  */
 const CAMPAIGN_ROLE = "admin" as const;
+
+const CHECK_FAILED_MESSAGE =
+  "The campaign was not published because it could not be checked first. Please try again.";
+const FANS_NOT_READ_EMAIL_RESULT: AudienceEmailResult = {
+  configured: true,
+  chosen: 0,
+  sent: 0,
+  failed: 0,
+  skipped: 0,
+  error: "could not read the chosen fans",
+};
+const EVENT_NOT_ARTISTS_MESSAGE =
+  "That event does not belong to this artist, so the campaign was not published.";
+
+/**
+ * The fans a campaign's email and in-app notice are for: fans who RSVPed
+ * to the attached event when that option is on, otherwise everyone who
+ * follows the artist. Once each. Null when the list could not be read.
+ */
+async function loadCampaignFanIds(artistSlug: string, rsvpEventId: string | null): Promise<string[] | null> {
+  try {
+    const fanIds = rsvpEventId ? await loadEventRsvpFanIds(rsvpEventId) : await loadArtistFanIds(artistSlug);
+    return chooseAudienceFanIds(fanIds, null);
+  } catch (err) {
+    console.error("campaign: could not read the chosen fans for", artistSlug, err);
+    return null;
+  }
+}
+
+/** Text the campaign's fans. broadcastSms scopes by artist or event. Never throws. */
+async function sendCampaignSms(body: string, artistSlug: string, rsvpEventId: string | null): Promise<SmsOutcome> {
+  try {
+    const result = await broadcastSms({ body, messageType: "campaign_sms", artistSlug, eventId: rsvpEventId });
+    return { recipients: result.recipients, sent: result.sent, failed: result.failed, error: result.error ?? null };
+  } catch (err) {
+    console.error("campaign: SMS failed for", artistSlug, err);
+    return { recipients: 0, sent: 0, failed: 0, error: "something went wrong on our side. Please try again." };
+  }
+}
 
 function parseJsonBlock<T>(raw: FormDataEntryValue | null, fallback: T): T {
   if (typeof raw !== "string" || !raw.trim()) return fallback;
@@ -33,6 +88,22 @@ export async function createAndPublishCampaign(formData: FormData) {
   // Campaigns post, email and text on the artist's behalf, so the caller
   // must administer that artist's community.
   const { user: admin } = await assertAdmin({ communityId: artistSlug, minRole: CAMPAIGN_ROLE });
+
+  // Before anything is created: an attached event must be this artist's
+  // own (its RSVPs can become the audience), and a double click or a
+  // retried submit must not publish and send the same campaign twice.
+  const existingEventId = String(formData.get("existing_event_id") ?? "").trim();
+  try {
+    if (existingEventId && !(await eventBelongsToArtist(existingEventId, artistSlug))) {
+      return { success: false as const, error: EVENT_NOT_ARTISTS_MESSAGE };
+    }
+    if (await hasRecentCampaign({ artistSlug, title })) {
+      return { success: false as const, error: DUPLICATE_CAMPAIGN_MESSAGE };
+    }
+  } catch (err) {
+    console.error("campaign: pre-publish checks failed for", artistSlug, err);
+    return { success: false as const, error: CHECK_FAILED_MESSAGE };
+  }
 
   // 1) Create the campaign row
   const { data: campaign } = await supa
@@ -181,11 +252,11 @@ export async function createAndPublishCampaign(formData: FormData) {
   }
 
   // 7) Event (optional) — either create a new one or reference an existing id.
-  //    When an event is attached, the SMS blast below will target its RSVPers
-  //    (instead of all artist followers) if "target_event_rsvpers" is on.
+  //    When an event is attached, the email, SMS and in-app notice below
+  //    go to its RSVPers (instead of all artist followers) if
+  //    "target_event_rsvpers" is on.
   let attachedEventId: string | null = null;
   const eventTitle = String(formData.get("event_title") ?? "").trim();
-  const existingEventId = String(formData.get("existing_event_id") ?? "").trim();
   if (eventTitle) {
     const capacity = parseInt(String(formData.get("event_capacity") ?? ""), 10);
     const startsAt = String(formData.get("event_starts_at") ?? "").trim();
@@ -220,37 +291,47 @@ export async function createAndPublishCampaign(formData: FormData) {
     String(formData.get("target_event_rsvpers") ?? "false") === "true" &&
     attachedEventId !== null;
 
-  // 8) Email blast — create + send a Mailchimp regular campaign
+  const rsvpEventId = targetEventRsvpers ? attachedEventId : null;
+  const [campaignFanIds, artistRow] = await Promise.all([
+    loadCampaignFanIds(artistSlug, rsvpEventId),
+    supa.from("artists").select("name").eq("slug", artistSlug).maybeSingle(),
+  ]);
+  const artistName = (artistRow.data?.name as string | null | undefined) ?? artistSlug;
+
+  // 8) Email blast: one email per chosen fan who may be emailed, each with
+  //    their own unsubscribe link. Never a Mailchimp campaign, which would
+  //    reach the whole audience (every artist, RSVP or not).
   const emailSubject = String(formData.get("email_subject") ?? "").trim();
   const emailBody = String(formData.get("email_body") ?? "").trim();
-  if (emailSubject && emailBody) {
-    const result = await broadcastEmail({ subject: emailSubject, body: emailBody });
+  const emailResult = !(emailSubject && emailBody)
+    ? undefined
+    : campaignFanIds === null
+      ? FANS_NOT_READ_EMAIL_RESULT
+      : await sendAudienceEmail(
+          { subject: emailSubject, body: emailBody, artistName, reason: rsvpEventId ? "rsvp" : "follower" },
+          campaignFanIds,
+        );
+  if (emailResult) {
     await recordItem("email", null, {
       subject: emailSubject,
       body: emailBody,
-      sent: result.sent,
-      recipients: result.recipients,
-      error: result.error ?? null,
+      ...emailItemMetadata(emailResult),
+      targeted_event_id: rsvpEventId,
     });
   }
 
-  // 9) SMS blast — opted-in adults through Mailchimp (throttled). Promotional.
+  // 9) SMS blast: opted-in adults through Mailchimp (throttled). Promotional.
   //    Honors the per-event RSVP filter when attached.
   const smsBody = String(formData.get("sms_body") ?? "").trim();
-  if (smsBody) {
-    const result = await broadcastSms({
-      body: smsBody,
-      messageType: "campaign_sms",
-      artistSlug,
-      eventId: targetEventRsvpers ? attachedEventId : null,
-    });
+  const smsResult = smsBody ? await sendCampaignSms(smsBody, artistSlug, rsvpEventId) : undefined;
+  if (smsResult) {
     await recordItem("sms", null, {
       body: smsBody,
-      sent: result.sent,
-      failed: result.failed,
-      recipients: result.recipients,
-      targeted_event_id: targetEventRsvpers ? attachedEventId : null,
-      error: result.error ?? null,
+      sent: smsResult.sent,
+      failed: smsResult.failed,
+      recipients: smsResult.recipients,
+      targeted_event_id: rsvpEventId,
+      error: smsResult.error ?? null,
     });
   }
 
@@ -259,27 +340,12 @@ export async function createAndPublishCampaign(formData: FormData) {
   //     when targetEventRsvpers is on. Dedup'd by campaign_id so a fan can
   //     never see the same campaign twice in their inbox.
   try {
-    let audienceFanIds: string[] = [];
-    if (targetEventRsvpers && attachedEventId) {
-      const { data: rsvpers } = await supa
-        .from("event_rsvps")
-        .select("fan_id")
-        .eq("event_id", attachedEventId);
-      audienceFanIds = (rsvpers ?? []).map((r) => r.fan_id as string);
-    } else {
-      const { data: followers } = await supa
-        .from("fan_artist_following")
-        .select("fan_id")
-        .eq("artist_slug", artistSlug);
-      audienceFanIds = (followers ?? []).map((r) => r.fan_id as string);
-    }
-
     const body =
       String(formData.get("announcement_body") ?? "").trim().slice(0, 140) ||
       description ||
       "New artist drop";
     await Promise.all(
-      audienceFanIds.map((fanId) =>
+      (campaignFanIds ?? []).map((fanId) =>
         createNotification({
           fanId,
           kind: "campaign",
@@ -299,7 +365,15 @@ export async function createAndPublishCampaign(formData: FormData) {
   revalidatePath("/admin/campaigns");
   revalidatePath(`/artists/${artistSlug}/community`);
   revalidatePath(`/artists/${artistSlug}`);
-  return { success: true as const, campaignId };
+  // What went out, in plain words, when the campaign carried an email or a
+  // text. The builder shows these instead of jumping straight to the list.
+  const outcome: AudienceSendOutcome = {
+    email: emailResult,
+    sms: smsResult,
+    inApp: campaignFanIds?.length,
+  };
+  const sendLines = emailResult || smsResult ? describeAudienceSend(outcome).lines : [];
+  return { success: true as const, campaignId, sendLines };
 }
 
 export async function deactivateCampaignAction(formData: FormData) {
