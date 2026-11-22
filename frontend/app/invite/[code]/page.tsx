@@ -4,10 +4,56 @@ import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getArtistFromDb } from "@/lib/data/artists";
 import SetRefCookie from "./set-ref-cookie";
+import { parseArtistParam } from "@/lib/onboarding/artist-param";
+import {
+  invitePreviewImagePath,
+  safeShareCard,
+  shareCardArtist,
+  type ShareContext,
+} from "@/lib/invite-share";
 
-export const metadata: Metadata = {
-  title: "You're invited",
-};
+type InviteSearchParams = { artist?: string | string[]; card?: string | string[] };
+
+const first = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
+/**
+ * What the invite is about, when the fan shared from an artist page or a
+ * share page (lib/invite-share.ts). Both values are checked before use: the
+ * artist must exist, and the picture must be one of our own share pages for
+ * that same artist.
+ */
+async function inviteContext(sp: InviteSearchParams) {
+  const slug = parseArtistParam(sp.artist);
+  const artist = slug ? await getArtistFromDb(slug).catch(() => null) : null;
+  const card = artist ? safeShareCard(first(sp.card)) : null;
+  return {
+    artist,
+    card: artist && card && shareCardArtist(card) === artist.slug ? card : null,
+  };
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<InviteSearchParams>;
+}): Promise<Metadata> {
+  const { artist, card } = await inviteContext(await searchParams);
+  const preview: ShareContext = { artist: artist?.slug ?? null, card };
+  const image = invitePreviewImagePath(preview);
+  const title = artist ? `You're invited to ${artist.name}'s Fan Experience` : "You're invited";
+  return {
+    title,
+    // Invite links are personal. Keep them out of search results.
+    robots: { index: false, follow: false },
+    ...(image
+      ? {
+          openGraph: { title, images: [image] },
+          twitter: { card: "summary_large_image", title, images: [image] },
+        }
+      : {}),
+  };
+}
 
 async function getInviter(code: string): Promise<{
   firstName: string | null;
@@ -32,13 +78,12 @@ export default async function InvitePage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ artist?: string }>;
+  searchParams: Promise<InviteSearchParams>;
 }) {
   const { code } = await params;
-  const { artist: artistSlug } = await searchParams;
-  const [inviter, artist] = await Promise.all([
+  const [inviter, { artist }] = await Promise.all([
     getInviter(code),
-    artistSlug ? getArtistFromDb(artistSlug) : Promise.resolve(null),
+    searchParams.then(inviteContext),
   ]);
   if (!inviter) notFound();
 
