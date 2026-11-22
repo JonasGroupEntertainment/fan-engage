@@ -4,6 +4,8 @@ import { useState } from "react";
 import { sharePayload } from "@/lib/share-payload";
 import { inviteShareUrl, shareTextWithoutUrl } from "@/lib/invite-share";
 import { useInviteCode } from "@/components/use-invite-code";
+import FacebookShareButton from "@/components/facebook-share-button";
+import InstagramShareButton from "@/components/instagram-share-button";
 
 /**
  * Reusable share button.
@@ -16,6 +18,10 @@ import { useInviteCode } from "@/components/use-invite-code";
  * A signed-in fan shares their own invite link (lib/invite-share.ts), so a
  * friend who joins from it is credited to them. A visitor shares the page
  * address as before.
+ *
+ * Small "Share on Facebook" and "Share to Instagram" buttons sit beside it
+ * everywhere, sending the same link (components/facebook-share-button.tsx,
+ * components/instagram-share-button.tsx).
  *
  * weekly-recap-tile.tsx has its own inline share implementation from
  * Stickiness Phase 3 — leaving that one alone to avoid touching the
@@ -84,28 +90,32 @@ export default function ShareButton({
   }
 
   const baseClass =
-    "inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition disabled:opacity-60";
+    "inline-flex flex-1 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition disabled:opacity-60";
   const styleClass =
     variant === "primary"
       ? "bg-gradient-to-r from-aurora to-ember text-white shadow-glass hover:brightness-110"
       : "border border-white/25 text-white/85 hover:bg-white/10";
 
   return (
-    <button
-      type="button"
-      onClick={handleShare}
-      className={`${baseClass} ${styleClass}`}
-      aria-label={label}
-    >
-      <ShareIcon />
-      <span>
-        {state === "copied"
-          ? "Link copied"
-          : state === "error"
-            ? "Couldn't share"
-            : label}
-      </span>
-    </button>
+    <span className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        onClick={handleShare}
+        className={`${baseClass} ${styleClass}`}
+        aria-label={label}
+      >
+        <ShareIcon />
+        <span>
+          {state === "copied"
+            ? "Link copied"
+            : state === "error"
+              ? "Couldn't share"
+              : label}
+        </span>
+      </button>
+      <FacebookShareButton url={url} />
+      <InstagramShareButton url={url} />
+    </span>
   );
 }
 
