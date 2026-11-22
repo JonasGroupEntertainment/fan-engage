@@ -21,7 +21,7 @@ async function loadCampaigns() {
     .in("campaign_id", ids);
 
   const itemCounts = new Map<string, Record<string, number>>();
-  const broadcastStats = new Map<string, { emailSent?: number; emailFailed?: string | null; smsSent?: number; smsFailed?: string | null }>();
+  const broadcastStats = new Map<string, { emailSent?: number; emailSkipped?: number; emailFailedCount?: number; emailFailed?: string | null; smsSent?: number; smsFailed?: string | null }>();
   for (const it of items ?? []) {
     const map = itemCounts.get(it.campaign_id as string) ?? {};
     const kind = it.item_kind as string;
@@ -29,10 +29,12 @@ async function loadCampaigns() {
     itemCounts.set(it.campaign_id as string, map);
 
     if (kind === "email" || kind === "sms") {
-      const meta = (it.metadata ?? {}) as { sent?: number; error?: string | null };
+      const meta = (it.metadata ?? {}) as { sent?: number; skipped?: number; failed?: number; error?: string | null };
       const stats = broadcastStats.get(it.campaign_id as string) ?? {};
       if (kind === "email") {
         stats.emailSent = meta.sent;
+        stats.emailSkipped = meta.skipped;
+        stats.emailFailedCount = meta.failed;
         stats.emailFailed = meta.error ?? null;
       } else {
         stats.smsSent = meta.sent;
@@ -67,6 +69,12 @@ function itemBadge(kind: string, count: number) {
       {count > 1 && <span className="ml-1">·{count}</span>}
     </span>
   );
+}
+
+/** Email result for one campaign. Older rows carry only a sent count. */
+function emailSummary(stats: { emailSent?: number; emailSkipped?: number; emailFailedCount?: number }): string {
+  if (stats.emailSkipped == null) return `sent · ${stats.emailSent} recipients`;
+  return `${stats.emailSent} sent · ${stats.emailSkipped} skipped · ${stats.emailFailedCount ?? 0} failed`;
 }
 
 export default async function AdminCampaignsPage() {
@@ -143,7 +151,7 @@ export default async function AdminCampaignsPage() {
                       <div className="mt-2 flex flex-wrap gap-3 text-xs">
                         {c.broadcast.emailSent != null && (
                           <span className={c.broadcast.emailFailed ? "text-rose-300" : "text-emerald-300"}>
-                            ✉️ {c.broadcast.emailFailed ? `failed: ${c.broadcast.emailFailed.slice(0, 60)}` : `sent · ${c.broadcast.emailSent} recipients`}
+                            ✉️ {c.broadcast.emailFailed ? `failed: ${c.broadcast.emailFailed.slice(0, 60)}` : emailSummary(c.broadcast)}
                           </span>
                         )}
                         {c.broadcast.smsSent != null && (

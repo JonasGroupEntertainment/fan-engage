@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
 import { smsSendClass, type SmsMessageType } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
+import { pageAll, pageAllIn } from "@/lib/supabase/page-all";
+import { outOfTime } from "@/lib/send-budget";
 
 /**
  * Campaign broadcast helpers — send a single email or SMS blast to every fan
@@ -14,67 +16,101 @@ export type BroadcastResult = {
   sent: number;
   failed: number;
   recipients: number; // how many fans matched before any send
+  /** Fans never tried because the caller's deadline passed. */
+  notSent?: number;
   error?: string;
 };
+
+type RecipientRow = {
+  id: string;
+  first_name: string | null;
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+};
+
+type FanIdRow = { fan_id: string };
+
+async function loadFanIds(
+  table: "event_rsvps" | "fan_artist_following",
+  column: "event_id" | "artist_slug",
+  value: string,
+): Promise<string[]> {
+  const admin = createAdminClient();
+  const rows = await pageAll<FanIdRow>(() =>
+    admin.from(table).select("fan_id").eq(column, value).order("fan_id", { ascending: true }),
+  );
+  if (rows.error) throw new Error(`${table}: ${rows.error.message}`);
+  return rows.data.map((row) => row.fan_id);
+}
+
+/**
+ * Audience precedence (most specific wins):
+ *   fanIds   → exactly these fans (the caller already chose them)
+ *   eventId  → fans who RSVPed to this event (for reminder blasts)
+ *   artist   → fans who follow that artist
+ *   (none)   → every opted-in fan (platform-wide announcement)
+ * Returns null for "no scope". Every read is paged.
+ */
+async function loadScopedFanIds(opts: {
+  artistSlug?: string | null;
+  eventId?: string | null;
+  fanIds?: readonly string[] | null;
+}): Promise<string[] | null> {
+  // An empty list means nobody. It must never fall through to a wider scope.
+  if (opts.fanIds != null) return [...new Set(opts.fanIds)];
+  if (opts.eventId) return [...new Set(await loadFanIds("event_rsvps", "event_id", opts.eventId))];
+  if (opts.artistSlug) {
+    return [...new Set(await loadFanIds("fan_artist_following", "artist_slug", opts.artistSlug))];
+  }
+  return null;
+}
 
 async function loadRecipients(opts: {
   artistSlug?: string | null;
   eventId?: string | null;
+  fanIds?: readonly string[] | null;
   channel: "email" | "sms";
-}) {
+}): Promise<RecipientRow[]> {
   const admin = createAdminClient();
   const optColumn = opts.channel === "email" ? "email_opted_in" : "sms_opted_in";
   const contactColumn = opts.channel === "email" ? "email" : "phone";
 
-  // Audience precedence (most specific wins):
-  //   eventId  → fans who RSVPed to this event (for reminder blasts)
-  //   artist   → fans who follow that artist
-  //   (none)   → every opted-in fan (platform-wide announcement)
-  let scopedIds: string[] | null = null;
+  const scopedIds = await loadScopedFanIds(opts);
+  if (scopedIds !== null && scopedIds.length === 0) return [];
 
-  if (opts.eventId) {
-    const { data } = await admin
-      .from("event_rsvps")
-      .select("fan_id")
-      .eq("event_id", opts.eventId);
-    scopedIds = (data ?? []).map((r) => r.fan_id as string);
-    if (scopedIds.length === 0) return [];
-  } else if (opts.artistSlug) {
-    const { data } = await admin
-      .from("fan_artist_following")
-      .select("fan_id")
-      .eq("artist_slug", opts.artistSlug);
-    scopedIds = (data ?? []).map((f) => f.fan_id as string);
-    if (scopedIds.length === 0) return [];
-  }
+  const fansQuery = () =>
+    admin
+      .from("fans")
+      .select("id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date")
+      .eq(optColumn, true)
+      .eq("suspended", false)
+      .not(contactColumn, "is", null);
 
-  let query = admin
-    .from("fans")
-    .select("id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date")
-    .eq(optColumn, true)
-    .eq("suspended", false)
-    .not(contactColumn, "is", null);
-
-  if (scopedIds) query = query.in("id", scopedIds);
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return (data ?? []) as Array<{
-    id: string;
-    first_name: string | null;
-    email: string | null;
-    phone: string | null;
-    birth_date: string | null;
-  }>;
+  const fans =
+    scopedIds === null
+      ? await pageAll<RecipientRow>(() => fansQuery().order("id", { ascending: true }))
+      : await pageAllIn<RecipientRow, string>(scopedIds, (part) =>
+          fansQuery().in("id", part).order("id", { ascending: true }),
+        );
+  if (fans.error) throw new Error(`fans: ${fans.error.message}`);
+  return fans.data;
 }
 
-/** Send an SMS to every opted-in adult fan through Mailchimp. */
+/**
+ * Send an SMS to every opted-in adult fan in scope through Mailchimp.
+ * Pass `fanIds` when the caller has already chosen the fans (for example
+ * an artist's fans narrowed by tier); only those fans are texted, and an
+ * empty list texts nobody. With `deadlineAt` (epoch ms) no new text is
+ * started after that time and the fans left over come back as `notSent`.
+ */
 export async function broadcastSms(params: {
   body: string;
   messageType: SmsMessageType;
   artistSlug?: string | null;
   eventId?: string | null;
+  fanIds?: readonly string[] | null;
+  deadlineAt?: number | null;
 }): Promise<BroadcastResult> {
   const result: BroadcastResult = { attempted: 0, sent: 0, failed: 0, recipients: 0 };
   const smsClass = smsSendClass(params.messageType);
@@ -87,6 +123,7 @@ export async function broadcastSms(params: {
   const recipients = await loadRecipients({
     artistSlug: params.artistSlug,
     eventId: params.eventId,
+    fanIds: params.fanIds,
     channel: "sms",
   });
   result.recipients = recipients.length;
@@ -94,9 +131,13 @@ export async function broadcastSms(params: {
 
   const admin = createAdminClient();
 
-  for (const fan of recipients) {
+  const textable = recipients.filter((fan) => fan.phone && smsAgeAllowsSend(fan.birth_date));
+  for (const fan of textable) {
     if (!fan.phone) continue;
-    if (!smsAgeAllowsSend(fan.birth_date)) continue;
+    if (outOfTime(params.deadlineAt)) {
+      result.notSent = textable.length - result.attempted;
+      break;
+    }
     result.attempted += 1;
     try {
       const sent = await deliverSms({ to: fan.phone, body: params.body, ...smsClass });
@@ -153,6 +194,11 @@ async function deleteMailchimpCampaign(
 }
 
 /**
+ * WHOLE AUDIENCE. Nothing calls this any more: the Broadcast screen and
+ * the campaign builder now email only the chosen fans, one message each
+ * (lib/admin-audience.ts). Do not use it for anything aimed at one
+ * artist, one tier or one event; it cannot narrow who gets the email.
+ *
  * Send an email blast via Mailchimp Campaigns API — creates a one-off
  * regular campaign against the configured audience, sets plain-text + html
  * content, and fires it immediately.
