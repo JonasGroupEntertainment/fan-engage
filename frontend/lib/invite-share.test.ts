@@ -121,11 +121,12 @@ describe("inviteShareUrl", () => {
     assert.equal(link, buildInviteLink({ origin: ORIGIN, code: CODE, artistSlug: "raelynn" }));
   });
 
-  it("is a plain invite link when the page has no artist", () => {
-    assert.equal(
-      inviteShareUrl({ origin: ORIGIN, url: `${ORIGIN}/me/card`, inviteCode: CODE }),
-      `${ORIGIN}/invite/${CODE}`,
-    );
+  it("leaves an address alone when the invite page cannot stand in for it", () => {
+    // A fan profile, the fan card and anything else with no artist are
+    // shared as they are, even by a signed-in fan with a good code.
+    for (const url of [`${ORIGIN}/fans/some-fan`, `${ORIGIN}/me/card`, `${ORIGIN}/rewards`, "https://example.com/x"]) {
+      assert.equal(inviteShareUrl({ origin: ORIGIN, url, inviteCode: CODE }), url);
+    }
   });
 
   it("leaves the address alone for a visitor with no invite code", () => {

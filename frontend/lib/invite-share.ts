@@ -78,9 +78,10 @@ export function shareContextFromUrl(url: string): ShareContext {
 }
 
 /**
- * The fan's invite link for whatever they are sharing. Returns the original
- * address unchanged when there is no usable invite code, or when the address
- * is already an invite link.
+ * The fan's invite link, when they share a share page or an artist page.
+ * Returns the original address unchanged when there is no usable invite
+ * code, when the address is already an invite link, or when it is any other
+ * page (the invite page can only stand in for an artist or a share page).
  */
 export function inviteShareUrl(input: {
   /** Where the invite page lives, such as https://www.fanengagepro.com. */
@@ -93,12 +94,14 @@ export function inviteShareUrl(input: {
   const path = pathOf(input.url);
   if (path !== null && INVITE_PAGE.test(path)) return input.url;
   const { artist, card } = shareContextFromUrl(input.url);
+  // Only a share page or an artist page becomes an invite link. A fan
+  // profile, the fan card or any other address is shared as it is.
+  if (!artist) return input.url;
   const params = new URLSearchParams();
-  if (artist) params.set(ARTIST_PARAM, artist);
+  params.set(ARTIST_PARAM, artist);
   if (card) params.set(CARD_PARAM, card);
-  const query = params.toString();
   const origin = input.origin.replace(/\/+$/, "");
-  return `${origin}/invite/${input.inviteCode}${query ? `?${query}` : ""}`;
+  return `${origin}/invite/${input.inviteCode}?${params.toString()}`;
 }
 
 /** A dash that joined the text to the address and now ends the message. */
