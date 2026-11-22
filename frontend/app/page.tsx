@@ -212,7 +212,7 @@ export default async function Home({
           {/* Personalized Fan Home dashboard — only for fans past
               onboarding. Still signed-in, so the marketing landing never
               appears here. */}
-          {showsDashboard && fanHome && <FanHomeDashboard data={fanHome} streak={streak} recap={recap} totalPoints={kpis?.total_points ?? null} />}
+          {showsDashboard && fanHome && <FanHomeDashboard data={fanHome} streak={streak} recap={recap} totalPoints={kpis?.total_points ?? null} lifetimePoints={kpis?.lifetime_points ?? null} />}
           <section className="glass-card p-6">
             <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-white/60">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
