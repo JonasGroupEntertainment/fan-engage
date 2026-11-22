@@ -446,8 +446,9 @@ export async function createAnnouncementAction(
 
   // The announcement is saved before anything goes to social, so a slow or
   // failed send cannot block it. The checkbox alone is never trusted: the
-  // sender checks the team grant, the kind, the visibility, the settings,
-  // the submit key (so a retry cannot send twice) and the daily limit again.
+  // sender checks the team grant, the kind, the visibility, the alcohol and
+  // tobacco wording rule, the settings, the submit key (so a retry cannot
+  // send twice) and the daily limit again.
   const postId = (created as { id: string } | null)?.id;
   if (!wantsSocial || !postId) return;
   // The same check that let the announcement be published above, for this

@@ -5,6 +5,7 @@ import {
   SOCIAL_DAILY_LIMIT_MESSAGE,
   SOCIAL_NOT_ALLOWED_MESSAGE,
   SOCIAL_NOT_SET_UP_MESSAGE,
+  SOCIAL_AGE_21_FORM_NOTE,
   SOCIAL_REFUSAL_MESSAGES,
   alsoPostLabel,
   MAX_SOCIAL_ANNOUNCEMENTS_PER_ARTIST_PER_DAY,
@@ -13,6 +14,7 @@ import {
   buildSocialText,
   decideSocialEligibility,
   describePlatforms,
+  isAge21Content,
   isOverDailyLimit,
   isSocialPostingConfigured,
   isValidSubmitKey,
@@ -128,6 +130,38 @@ describe("decideSocialEligibility", () => {
       const d = decideSocialEligibility({ ...ok, visibility });
       assert.equal(!d.ok && d.reason, "premium_or_founders");
     }
+  });
+  it("refuses alcohol or tobacco wording in the title or body", () => {
+    const inBody = decideSocialEligibility({ ...ok, body: "Half price margaritas tonight" });
+    assert.equal(!inBody.ok && inBody.reason, "age_21");
+    assert.equal(
+      !inBody.ok && inBody.message,
+      "This announcement mentions alcohol or tobacco, so it was not sent to Facebook or Instagram. It is still posted in the community.",
+    );
+    const inTitle = decideSocialEligibility({ ...ok, title: "Happy hour" });
+    assert.equal(!inTitle.ok && inTitle.reason, "age_21");
+    assert.equal(decideSocialEligibility({ ...ok, body: "Root beer floats" }).ok, true);
+    assert.equal(
+      SOCIAL_AGE_21_FORM_NOTE,
+      "This announcement mentions alcohol or tobacco, so it cannot go to Facebook or Instagram.",
+    );
+  });
+  it("catches alcohol wording hidden in markup or entities", () => {
+    const dodges = [
+      "Half price w<b></b>ine tonight",
+      "Half price w&#105;ne tonight",
+      "Half price &#x77;ine tonight",
+      "Half price **w**ine tonight",
+      "Half price be&shy;er tonight",
+      "Half price be\u200ber tonight",
+    ];
+    for (const body of dodges) {
+      assert.equal(isAge21Content("", body), true, body);
+      assert.equal(isAge21Content(body, "Plain body"), true, body);
+      const d = decideSocialEligibility({ ...ok, body });
+      assert.equal(!d.ok && d.reason, "age_21", body);
+    }
+    assert.equal(isAge21Content("New single", "<b>Out</b> &amp; about Friday"), false);
   });
   it("gives a plain message with no em dash", () => {
     const d = decideSocialEligibility({ ...ok, visibility: "premium" });

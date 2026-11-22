@@ -5,10 +5,8 @@
 // Only team announcements may ever go out. Fan posts, comments, polls
 // and challenge entries are refused here and have no sender of their own.
 //
-// Ported from Brand Engage Pro. One rule did not come across: Brand Engage
-// Pro also refuses announcements that mention alcohol or tobacco, using
-// its own word list. Fan Engage Pro has no such list, so there is no
-// wording check here. See the note in migration 0104 before switching on.
+// Ported from Brand Engage Pro, with the same guard rails.
+import { mentionsAlcohol } from "./alcohol-terms.ts";
 
 export const SOCIAL_PLATFORMS = ["facebook", "instagram"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
@@ -207,7 +205,7 @@ export function buildSocialText(input: {
   return `${truncateAtWord(head, room)}${ELLIPSIS}${tail}`;
 }
 
-export type SocialRefusalReason = "not_announcement" | "premium_or_founders";
+export type SocialRefusalReason = "not_announcement" | "premium_or_founders" | "age_21";
 
 export type SocialEligibility =
   | { ok: true }
@@ -217,16 +215,31 @@ export const SOCIAL_REFUSAL_MESSAGES: Record<SocialRefusalReason, string> = {
   not_announcement: "Only team announcements can go to Facebook and Instagram.",
   premium_or_founders:
     "Premium and Founders announcements stay inside the community, so this was not sent to Facebook or Instagram.",
+  age_21:
+    "This announcement mentions alcohol or tobacco, so it was not sent to Facebook or Instagram. It is still posted in the community.",
 };
+
+/** Shown on the form in place of the checkbox when the wording mentions alcohol or tobacco. */
+export const SOCIAL_AGE_21_FORM_NOTE =
+  "This announcement mentions alcohol or tobacco, so it cannot go to Facebook or Instagram.";
 
 /** Shown on the form when Instagram is linked but no photo is attached yet. */
 export const SOCIAL_NO_PHOTO_FORM_NOTE =
   "Instagram needs a photo. Without one, this will not go to Instagram.";
 
+/** True when the wording, as typed or as sent, mentions alcohol or tobacco. */
+export function isAge21Content(title: string, body: string): boolean {
+  // Checked on the words as typed and on the plain text that would really
+  // be sent, so markup or entities cannot hide a word from the check.
+  const asTyped = `${title} ${body}`;
+  const asSent = `${toPlainText(title)} ${toPlainText(body)}`;
+  return mentionsAlcohol(asTyped) || mentionsAlcohol(asSent);
+}
+
 /**
- * May this go to social at all? Only a public team announcement. Anything
- * that is not exactly "public" (Premium, Founders, or a value this code
- * does not know) is refused.
+ * May this go to social at all? Only a public team announcement with no
+ * alcohol or tobacco wording. Anything that is not exactly "public"
+ * (Premium, Founders, or a value this code does not know) is refused.
  */
 export function decideSocialEligibility(input: {
   kind: string;
@@ -241,6 +254,7 @@ export function decideSocialEligibility(input: {
   });
   if (input.kind !== ANNOUNCEMENT_KIND) return refuse("not_announcement");
   if (input.visibility !== PUBLIC_VISIBILITY) return refuse("premium_or_founders");
+  if (isAge21Content(input.title, input.body)) return refuse("age_21");
   return { ok: true };
 }
 

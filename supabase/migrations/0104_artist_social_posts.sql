@@ -32,13 +32,9 @@
 --
 -- Only team announcements are ever sent. Fan posts, comments, polls and
 -- challenge entries have no sender. Premium and Founders announcements
--- are refused. See frontend/lib/social/ and
+-- are refused, and so are announcements that mention alcohol or tobacco
+-- (fans can be 13 to 17). See frontend/lib/social/ and
 -- frontend/lib/data/social-accounts.ts.
---
--- Open question before switching on: Brand Engage Pro also refuses
--- announcements that mention alcohol or tobacco. Fan Engage Pro has no
--- such word list, so that check is not part of this port. Fans can be 13
--- to 17, so decide whether one is needed here first.
 --
 -- Platform and status are text with a check, not enums, so a new value
 -- never has to be added and used in the same migration.

@@ -150,6 +150,16 @@ describe("sendAnnouncementToSocial", () => {
     assert.equal(sent.length, 0);
   });
 
+  it("refuses alcohol wording with a plain message, even when hidden in markup", async () => {
+    for (const body of ["Bourbon tasting Friday", "Bour<i></i>bon tasting", "w&#105;ne night"]) {
+      const { deps, sent, reserved } = makeDeps();
+      const notice = await sendAnnouncementToSocial({ ...announcement, body }, deps);
+      assert.equal(sent.length, 0, body);
+      assert.equal(reserved.length, 0, body);
+      assert.match(notice.message, /alcohol or tobacco/);
+    }
+  });
+
   it("refuses Premium and Founders announcements", async () => {
     for (const visibility of ["premium", "founder-only", "private", ""]) {
       const { deps, sent, reserved } = makeDeps();
@@ -351,6 +361,21 @@ describe("only the announcement action can send", () => {
     assert.match(actions, /formData\.get\(SUBMIT_KEY_FIELD\)/);
     const page = readFileSync(join(frontendRoot, "app/artists/[slug]/community/page.tsx"), "utf8");
     assert.match(page, /export const maxDuration = \d+/);
+  });
+
+  it("the form does not offer the box when the wording mentions alcohol or tobacco", () => {
+    const formSrc = readFileSync(join(frontendRoot, "app/artists/[slug]/community/new-post-form.tsx"), "utf8");
+    assert.match(formSrc, /isAge21Content\(title, body\)/);
+    assert.match(formSrc, /canOfferSocial && !isAge21/);
+    assert.match(formSrc, /SOCIAL_AGE_21_FORM_NOTE/);
+  });
+
+  it("the alcohol and tobacco word list is used only by this feature", () => {
+    const users = files
+      .filter((f) => /from "[^"]*alcohol-terms/.test(readFileSync(f, "utf8")))
+      .map(relative)
+      .sort();
+    assert.deepEqual(users, ["lib/social/social-post.ts"]);
   });
 
   it("the database side is server only", () => {

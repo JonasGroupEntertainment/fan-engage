@@ -11,9 +11,11 @@ import { useFormSave, SaveStatusIndicator } from "@/lib/use-form-save";
 import {
   ALSO_POST_FIELD,
   ALSO_POST_VALUE,
+  SOCIAL_AGE_21_FORM_NOTE,
   SOCIAL_NO_PHOTO_FORM_NOTE,
   SUBMIT_KEY_FIELD,
   alsoPostLabel,
+  isAge21Content,
   type SocialPlatform,
 } from "@/lib/social/social-post";
 import {
@@ -51,6 +53,7 @@ export default function NewPostForm({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [body, setBody] = useState<string>("");
   const [captionUsed, setCaptionUsed] = useState<boolean>(false);
+  const [title, setTitle] = useState<string>("");
   const [alsoPostToSocial, setAlsoPostToSocial] = useState(false);
   // What happened on social after the last announcement, shown under the form.
   const [socialNotice, setSocialNotice] = useState<string | null>(null);
@@ -66,13 +69,16 @@ export default function NewPostForm({
     setImageUrl(null);
     setBody("");
     setCaptionUsed(false);
+    setTitle("");
     setAlsoPostToSocial(false);
   }
 
-  // Only a public team announcement can go to social. The server checks
-  // all of this again.
-  const showSocialCheckbox =
+  // Only a public team announcement can go to social, and never one that
+  // mentions alcohol or tobacco. The server checks all of this again.
+  const canOfferSocial =
     isAdmin && kind === "announcement" && visibility === "public" && socialPlatforms.length > 0;
+  const isAge21 = canOfferSocial && isAge21Content(title, body);
+  const showSocialCheckbox = canOfferSocial && !isAge21;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -220,6 +226,8 @@ export default function NewPostForm({
         <input
           type="text"
           name="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           maxLength={160}
           placeholder={
             kind === "announcement"
@@ -358,6 +366,8 @@ export default function NewPostForm({
           )}
         </div>
       )}
+
+      {isAge21 && <p className="text-xs text-white/60">{SOCIAL_AGE_21_FORM_NOTE}</p>}
 
       {socialNotice && (
         <p role="status" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/80">
