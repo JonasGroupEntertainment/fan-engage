@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import {
-  FACEBOOK_WINDOW_FEATURES,
-  facebookShareUrl,
-} from "./facebook-share.ts";
+import { FACEBOOK_WINDOW_FEATURES, facebookShareMode, facebookShareUrl } from "./facebook-share.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (relative: string) => readFileSync(join(here, relative), "utf8");
@@ -64,6 +61,42 @@ describe("facebookShareUrl", () => {
 
   it("opens the window with no way back into our page", () => {
     assert.equal(FACEBOOK_WINDOW_FEATURES, "noopener,noreferrer");
+  });
+});
+
+describe("facebookShareMode", () => {
+  it("uses the share sheet on a phone or tablet, where the Facebook app would only open its feed", () => {
+    assert.equal(facebookShareMode({ hasShareSheet: true, isTouchDevice: true }), "share_sheet");
+  });
+
+  it("opens Facebook's share window on a computer, even one whose browser has a share sheet", () => {
+    assert.equal(facebookShareMode({ hasShareSheet: true, isTouchDevice: false }), "facebook_window");
+  });
+
+  it("opens Facebook's share window when the device has no share sheet", () => {
+    assert.equal(facebookShareMode({ hasShareSheet: false, isTouchDevice: true }), "facebook_window");
+    assert.equal(facebookShareMode({ hasShareSheet: false, isTouchDevice: false }), "facebook_window");
+  });
+});
+
+describe("how the Facebook button behaves on a phone", () => {
+  const button = read("../components/facebook-share-button.tsx");
+
+  it("decides with the shared rule, from the share sheet and a finger as the pointer", () => {
+    assert.match(button, /facebookShareMode\(\{/);
+    assert.match(button, /typeof navigator\.share === "function"/);
+    assert.match(button, /"\(pointer: coarse\)"/);
+  });
+
+  it("hands the share sheet the link alone, as a link", () => {
+    assert.match(button, /await navigator\.share\(\{ url: link \}\);/);
+  });
+
+  it("treats closing the share sheet as a choice, and falls back to Facebook's window on a real failure", () => {
+    assert.match(button, /err\.name === "AbortError"\) return;/);
+    const sheet = button.indexOf("await navigator.share(");
+    const fallback = button.indexOf('window.open(facebookUrl, "_blank", FACEBOOK_WINDOW_FEATURES)');
+    assert.ok(sheet > 0 && fallback > sheet);
   });
 });
 

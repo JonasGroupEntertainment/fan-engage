@@ -32,3 +32,30 @@ export function facebookShareUrl(
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
   return `${FACEBOOK_SHARE_PAGE}?u=${encodeURIComponent(parsed.toString())}`;
 }
+
+/**
+ * How the Facebook button should share on this device.
+ *
+ * On a phone or tablet, a link to facebook.com is handed to the Facebook
+ * app, and the app ignores the share page: it just opens the feed, with no
+ * post started and no link (reported by a fan on an iPhone, 2026-11-22).
+ * We know of no way for a web page to start a post inside the app without
+ * a Facebook app id. What does work is the
+ * device's own share sheet: the fan picks Facebook there and the app opens
+ * its post composer with the link attached. Facebook's own tools do the
+ * same when the app is installed.
+ *
+ * On a computer there is no app in the way, so Facebook's share window is
+ * opened as before.
+ */
+export type FacebookShareMode = "share_sheet" | "facebook_window";
+
+export function facebookShareMode(device: {
+  /** The browser can open the device's share sheet (navigator.share). */
+  hasShareSheet: boolean;
+  /** The main way of pointing is a finger: a phone or a tablet. */
+  isTouchDevice: boolean;
+}): FacebookShareMode {
+  return device.hasShareSheet && device.isTouchDevice ? "share_sheet" : "facebook_window";
+}
+

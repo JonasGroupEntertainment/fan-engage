@@ -1,16 +1,15 @@
 "use client";
 
-import {
-  FACEBOOK_WINDOW_FEATURES,
-  facebookShareUrl,
-} from "@/lib/facebook-share";
+import { FACEBOOK_WINDOW_FEATURES, facebookShareMode, facebookShareUrl } from "@/lib/facebook-share";
 import { inviteShareUrl } from "@/lib/invite-share";
 import { useInviteCode } from "@/components/use-invite-code";
 
 /**
  * "Share on Facebook" button.
  *
- * Opens Facebook's own share window for the link. A signed-in fan sends
+ * On a computer it opens Facebook's own share window for the link. On a
+ * phone or tablet it opens the device's share sheet, because the Facebook
+ * app ignores a share link and only shows the feed (lib/facebook-share.ts). A signed-in fan sends
  * their invite link under the same rule as the Share button
  * (lib/invite-share.ts), so a friend who joins from the post is credited to
  * them. Facebook builds the post's picture and title from the page behind
@@ -26,6 +25,8 @@ export interface FacebookShareButtonProps {
 }
 
 const ACCESSIBLE_NAME = "Share on Facebook";
+/** True on a phone or tablet, where the main way of pointing is a finger. */
+const TOUCH_DEVICE_QUERY = "(pointer: coarse)";
 
 export default function FacebookShareButton({
   url,
@@ -34,8 +35,9 @@ export default function FacebookShareButton({
 }: FacebookShareButtonProps) {
   const inviteCode = useInviteCode();
 
-  function handleClick() {
+  async function handleClick() {
     // The fan's invite link when they have one; the page address if not.
+    // Worked out with no waiting, so the tap still opens the share sheet.
     const link = inviteShareUrl({
       origin: window.location.origin,
       url,
@@ -43,6 +45,23 @@ export default function FacebookShareButton({
     });
     const facebookUrl = facebookShareUrl(link);
     if (!facebookUrl) return;
+
+    const mode = facebookShareMode({
+      hasShareSheet: typeof navigator !== "undefined" && typeof navigator.share === "function",
+      isTouchDevice: typeof window.matchMedia === "function" && window.matchMedia(TOUCH_DEVICE_QUERY).matches,
+    });
+    if (mode === "share_sheet") {
+      try {
+        // Only the link is sent, as a link: Facebook's share option shows
+        // for links and takes no pre-written text.
+        await navigator.share({ url: link });
+        return;
+      } catch (err) {
+        // Closing the share sheet is a choice, not a failure.
+        if (err instanceof Error && err.name === "AbortError") return;
+        console.warn("FacebookShareButton: the share sheet failed, opening Facebook instead", err);
+      }
+    }
     window.open(facebookUrl, "_blank", FACEBOOK_WINDOW_FEATURES);
   }
 
