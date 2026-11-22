@@ -49,8 +49,10 @@ export function useInviteCode(): string | null {
     let isCurrent = true;
     const load = () => {
       cached ??= readInviteCode();
-      void cached.then((value) => {
-        if (isCurrent) setCode(value);
+      const thisRead = cached;
+      void thisRead.then((value) => {
+        // A slower, older read must not overwrite a newer one.
+        if (isCurrent && cached === thisRead) setCode(value);
       });
     };
     load();
@@ -62,6 +64,8 @@ export function useInviteCode(): string | null {
       const { data } = createClient().auth.onAuthStateChange((event) => {
         if (!FAN_CHANGED_EVENTS.includes(event)) return;
         cached = null;
+        // Drop the old code at once, before the new one is read.
+        setCode(null);
         // Read after this callback returns: the auth client must not be
         // called from inside its own change handler.
         setTimeout(load, 0);

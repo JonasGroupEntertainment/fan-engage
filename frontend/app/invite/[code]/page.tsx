@@ -33,6 +33,9 @@ async function inviteContext(sp: InviteSearchParams) {
   };
 }
 
+const INVITE_SITE_NAME = "Fan Engage";
+const INVITE_PREVIEW_DESCRIPTION = "Join free to earn points and unlock real drops.";
+
 export async function generateMetadata({
   searchParams,
 }: {
@@ -46,10 +49,23 @@ export async function generateMetadata({
     title,
     // Invite links are personal. Keep them out of search results.
     robots: { index: false, follow: false },
+    // These replace the site-wide preview settings whole, so the site name
+    // and a description are repeated here.
     ...(image
       ? {
-          openGraph: { title, images: [image] },
-          twitter: { card: "summary_large_image", title, images: [image] },
+          openGraph: {
+            type: "website",
+            siteName: INVITE_SITE_NAME,
+            title,
+            description: INVITE_PREVIEW_DESCRIPTION,
+            images: [image],
+          },
+          twitter: {
+            card: "summary_large_image",
+            title,
+            description: INVITE_PREVIEW_DESCRIPTION,
+            images: [image],
+          },
         }
       : {}),
   };
