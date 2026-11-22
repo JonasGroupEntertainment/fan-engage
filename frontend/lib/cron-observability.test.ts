@@ -99,12 +99,21 @@ describe("missing env", () => {
       }) ?? "",
       /MAILCHIMP_TRANSACTIONAL_API_KEY or MANDRILL_API_KEY/,
     );
+    // The reminder email is one message per RSVPed fan through Mandrill.
+    // The Mailchimp campaign vars do not make it sendable.
     assert.equal(
       optionalEnvWarning("send-event-reminders", {
         MAILCHIMP_API_KEY: "k",
         MAILCHIMP_SERVER_PREFIX: "us1",
         MAILCHIMP_AUDIENCE_ID: "aud",
         MAILCHIMP_TRANSACTIONAL_API_KEY: "tx",
+        MAILCHIMP_SMS_FROM: "+16155550199",
+      }),
+      "Missing env: MANDRILL_API_KEY",
+    );
+    assert.equal(
+      optionalEnvWarning("send-event-reminders", {
+        MANDRILL_API_KEY: "m",
         MAILCHIMP_SMS_FROM: "+16155550199",
       }),
       null,
