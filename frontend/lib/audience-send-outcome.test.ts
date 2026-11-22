@@ -57,6 +57,29 @@ describe("describeEmailOutcome", () => {
   });
 });
 
+describe("stopped early", () => {
+  it("says the email send ran out of time and how many were not emailed", () => {
+    assert.equal(
+      describeEmailOutcome(email({ chosen: 900, sent: 240, skipped: 10, failed: 0, notSent: 650 })),
+      "Email: 240 sent, 10 skipped because they have not opted in or cannot be emailed, 0 failed. The send stopped early because it ran out of time. 650 of the chosen fans were not emailed.",
+    );
+  });
+
+  it("says the text send ran out of time and how many were not texted", () => {
+    assert.equal(
+      describeSmsOutcome(sms({ recipients: 500, sent: 200, failed: 1, notSent: 299 })),
+      "Texts: 200 sent, 1 failed. The send stopped early because it ran out of time. 299 of the chosen fans were not texted.",
+    );
+  });
+
+  it("still says so when time ran out before any text went", () => {
+    assert.equal(
+      describeSmsOutcome(sms({ recipients: 5, notSent: 5 })),
+      "Texts: 0 sent, 0 failed. The send stopped early because it ran out of time. 5 of the chosen fans were not texted.",
+    );
+  });
+});
+
 describe("describeSmsOutcome", () => {
   it("says how many texts were sent and failed", () => {
     assert.equal(describeSmsOutcome(sms({ recipients: 6, sent: 5, failed: 1 })), "Texts: 5 sent, 1 failed.");
@@ -118,6 +141,12 @@ describe("duplicate messages", () => {
   it("are plain and carry no em dashes", () => {
     for (const message of [DUPLICATE_BROADCAST_MESSAGE, DUPLICATE_CAMPAIGN_MESSAGE]) {
       assert.ok(message.includes("5 minutes"));
+    }
+    assert.equal(
+      DUPLICATE_BROADCAST_MESSAGE,
+      "This same message went to these fans in the last 5 minutes, or is still going out, so it was not sent again. Wait a few minutes if you mean to send it again.",
+    );
+    for (const message of [DUPLICATE_BROADCAST_MESSAGE, DUPLICATE_CAMPAIGN_MESSAGE]) {
       assert.ok(!message.includes(EM_DASH));
     }
   });

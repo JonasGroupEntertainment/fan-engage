@@ -5,6 +5,7 @@ import type { AudienceMessage } from "./audience-email.ts";
 import type { ReminderFanRow } from "./event-reminder-email.ts";
 import {
   AUDIENCE_EMAIL_NOT_READ,
+  EMAIL_SEND_CHUNK,
   sendAudienceEmails,
   type ChosenAudience,
 } from "./audience-email-send.ts";
@@ -68,7 +69,7 @@ describe("sendAudienceEmails", () => {
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].map((r) => r.email), ["a@example.com"]);
     assert.ok(calls[0][0].html.includes("/unsubscribe?token=unsub-a"));
-    assert.deepEqual(result, { configured: true, chosen: 5, sent: 1, failed: 0, skipped: 4, error: null });
+    assert.deepEqual(result, { configured: true, chosen: 5, sent: 1, failed: 0, skipped: 4, notSent: 0, error: null });
   });
 
   it("counts a chosen fan with no fans row as skipped", async () => {
@@ -78,7 +79,7 @@ describe("sendAudienceEmails", () => {
       loadAudience: audience({ chosenFanIds: ["a", "gone", "a"], fans: [fan("a")] }),
       send,
     });
-    assert.deepEqual(result, { configured: true, chosen: 2, sent: 1, failed: 0, skipped: 1, error: null });
+    assert.deepEqual(result, { configured: true, chosen: 2, sent: 1, failed: 0, skipped: 1, notSent: 0, error: null });
   });
 
   it("sends nothing and reads nobody when the per-fan provider is not set up", async () => {
@@ -95,7 +96,7 @@ describe("sendAudienceEmails", () => {
     });
     assert.equal(loaded, false);
     assert.equal(calls.length, 0);
-    assert.deepEqual(result, { configured: false, chosen: 0, sent: 0, failed: 0, skipped: 0, error: null });
+    assert.deepEqual(result, { configured: false, chosen: 0, sent: 0, failed: 0, skipped: 0, notSent: 0, error: null });
   });
 
   it("does not call the provider when nobody was chosen", async () => {
@@ -106,7 +107,7 @@ describe("sendAudienceEmails", () => {
       send,
     });
     assert.equal(calls.length, 0);
-    assert.deepEqual(result, { configured: true, chosen: 0, sent: 0, failed: 0, skipped: 0, error: null });
+    assert.deepEqual(result, { configured: true, chosen: 0, sent: 0, failed: 0, skipped: 0, notSent: 0, error: null });
   });
 
   it("counts a failed fan without stopping the others", async () => {
@@ -121,7 +122,7 @@ describe("sendAudienceEmails", () => {
       loadAudience: audience({ chosenFanIds: ["a", "b", "c"], fans: [fan("a"), fan("b"), fan("c")] }),
       send,
     });
-    assert.deepEqual(result, { configured: true, chosen: 3, sent: 2, failed: 1, skipped: 0, error: null });
+    assert.deepEqual(result, { configured: true, chosen: 3, sent: 2, failed: 1, skipped: 0, notSent: 0, error: null });
   });
 
   it("returns an error and sends nothing when the fans cannot be read", async () => {
@@ -140,6 +141,7 @@ describe("sendAudienceEmails", () => {
       sent: 0,
       failed: 0,
       skipped: 0,
+      notSent: 0,
       error: `${AUDIENCE_EMAIL_NOT_READ}: fans: timeout`,
     });
   });
@@ -152,7 +154,7 @@ describe("sendAudienceEmails", () => {
         throw new Error("network down");
       },
     });
-    assert.deepEqual(result, { configured: true, chosen: 2, sent: 0, failed: 1, skipped: 1, error: "network down" });
+    assert.deepEqual(result, { configured: true, chosen: 2, sent: 0, failed: 1, skipped: 1, notSent: 0, error: "network down" });
   });
 
   it("passes on an error that stopped every send", async () => {
@@ -162,6 +164,60 @@ describe("sendAudienceEmails", () => {
       loadAudience: audience({ chosenFanIds: ["a"], fans: [fan("a")] }),
       send,
     });
-    assert.deepEqual(result, { configured: true, chosen: 1, sent: 0, failed: 1, skipped: 0, error: "MANDRILL_API_KEY is not set" });
+    assert.deepEqual(result, { configured: true, chosen: 1, sent: 0, failed: 1, skipped: 0, notSent: 0, error: "MANDRILL_API_KEY is not set" });
+  });
+
+  it("sends a chunk at a time and stops starting new chunks when time runs out", async () => {
+    const ids = Array.from({ length: EMAIL_SEND_CHUNK * 3 }, (_, i) => `fan-${i}`);
+    const { calls, send } = recorder();
+    // The clock is read before each chunk: in time, in time, then past the deadline.
+    const clock = [0, 50, 100];
+    const result = await sendAudienceEmails({
+      ...base,
+      deadlineAt: 100,
+      now: () => clock.shift() ?? 100,
+      loadAudience: audience({ chosenFanIds: ids, fans: ids.map((id) => fan(id)) }),
+      send,
+    });
+    assert.deepEqual(calls.map((c) => c.length), [EMAIL_SEND_CHUNK, EMAIL_SEND_CHUNK]);
+    assert.deepEqual(result, {
+      configured: true,
+      chosen: EMAIL_SEND_CHUNK * 3,
+      sent: EMAIL_SEND_CHUNK * 2,
+      failed: 0,
+      skipped: 0,
+      notSent: EMAIL_SEND_CHUNK,
+      error: null,
+    });
+  });
+
+  it("sends everything when no deadline is given", async () => {
+    const ids = Array.from({ length: EMAIL_SEND_CHUNK + 1 }, (_, i) => `fan-${i}`);
+    const { calls, send } = recorder();
+    const result = await sendAudienceEmails({
+      ...base,
+      loadAudience: audience({ chosenFanIds: ids, fans: ids.map((id) => fan(id)) }),
+      send,
+    });
+    assert.equal(calls.length, 2);
+    assert.equal(result.sent, EMAIL_SEND_CHUNK + 1);
+    assert.equal(result.notSent, 0);
+  });
+
+  it("carries on with the next chunk when one chunk throws", async () => {
+    const ids = Array.from({ length: EMAIL_SEND_CHUNK * 2 }, (_, i) => `fan-${i}`);
+    let call = 0;
+    const result = await sendAudienceEmails({
+      ...base,
+      loadAudience: audience({ chosenFanIds: ids, fans: ids.map((id) => fan(id)) }),
+      send: async (recipients) => {
+        call += 1;
+        if (call === 1) throw new Error("network down");
+        return { provider: "mandrill", outcomes: recipients.map((r) => ({ id: r.id, ok: true })), campaignId: null, error: null };
+      },
+    });
+    assert.equal(result.sent, EMAIL_SEND_CHUNK);
+    assert.equal(result.failed, EMAIL_SEND_CHUNK);
+    assert.equal(result.error, "network down");
   });
 });

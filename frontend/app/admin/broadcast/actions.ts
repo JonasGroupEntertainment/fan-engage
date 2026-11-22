@@ -12,10 +12,12 @@ import {
   sendAudienceEmail,
 } from "@/lib/admin-audience";
 import { chooseAudienceFanIds, parseTierFilter, tiersAtOrAbove, type TierFilter } from "@/lib/audience-email";
+import type { AudienceEmailResult } from "@/lib/audience-email-send";
+import { broadcastClaimDescription, releasedClaimDescription } from "@/lib/broadcast-claim";
+import { sendDeadline } from "@/lib/send-budget";
 import {
   DUPLICATE_BROADCAST_MESSAGE,
   describeAudienceSend,
-  type EmailOutcome,
   type SmsOutcome,
 } from "@/lib/audience-send-outcome";
 
@@ -77,10 +79,21 @@ async function loadChosenFanIds(artistSlug: string, tier: TierFilter): Promise<s
 }
 
 /** Text the chosen fans. Never throws. */
-async function sendBroadcastSms(body: string, artistSlug: string, fanIds: readonly string[]): Promise<SmsOutcome> {
+async function sendBroadcastSms(
+  body: string,
+  artistSlug: string,
+  fanIds: readonly string[],
+  deadlineAt: number,
+): Promise<SmsOutcome> {
   try {
-    const result = await broadcastSms({ body, messageType: "admin_owner_blast", artistSlug, fanIds });
-    return { recipients: result.recipients, sent: result.sent, failed: result.failed, error: result.error ?? null };
+    const result = await broadcastSms({ body, messageType: "admin_owner_blast", artistSlug, fanIds, deadlineAt });
+    return {
+      recipients: result.recipients,
+      sent: result.sent,
+      failed: result.failed,
+      notSent: result.notSent ?? 0,
+      error: result.error ?? null,
+    };
   } catch (err) {
     console.error("sendBroadcast: SMS failed for", artistSlug, err);
     return { recipients: 0, sent: 0, failed: 0, error: "something went wrong on our side. Please try again." };
@@ -90,7 +103,7 @@ async function sendBroadcastSms(body: string, artistSlug: string, fanIds: readon
 async function recordBroadcastItems(
   campaignId: string,
   tier: TierFilter,
-  outcome: { sms?: SmsOutcome; email?: EmailOutcome },
+  outcome: { sms?: SmsOutcome; email?: AudienceEmailResult },
 ): Promise<void> {
   const rows = [
     ...(outcome.sms
@@ -104,9 +117,22 @@ async function recordBroadcastItems(
   if (error) console.error("sendBroadcast: could not save results for campaign", campaignId, error.message);
 }
 
+/**
+ * Nothing went out, so the claim must not block a retry: its description
+ * is changed so the duplicate check no longer matches it.
+ */
+async function releaseClaim(campaignId: string, description: string): Promise<void> {
+  const { error } = await createAdminClient()
+    .from("campaigns")
+    .update({ description: releasedClaimDescription(description) })
+    .eq("id", campaignId);
+  if (error) console.error("sendBroadcast: could not release claim", campaignId, error.message);
+}
+
 export async function sendBroadcast(
   formData: FormData,
 ): Promise<BroadcastFormResult> {
+  const deadlineAt = sendDeadline();
   const ctx = await getAdminContext();
   if (!ctx) return { ok: false, error: "Unauthorized" };
 
@@ -139,7 +165,9 @@ export async function sendBroadcast(
 
   const admin = createAdminClient();
   const title = broadcastTitle(message);
-  const description = `Tier: ${tier} · Channel: ${channel}`;
+  // The description carries a fingerprint of the whole message, so only a
+  // truly identical send is treated as a duplicate.
+  const description = broadcastClaimDescription(tier, channel, message);
 
   let chosenFanIds: string[];
   try {
@@ -179,7 +207,7 @@ export async function sendBroadcast(
   const wantsSms = channel === "sms" || channel === "both";
   const wantsEmail = channel === "email" || channel === "both";
   const [sms, email] = await Promise.all([
-    wantsSms ? sendBroadcastSms(body, artistSlug, chosenFanIds) : undefined,
+    wantsSms ? sendBroadcastSms(body, artistSlug, chosenFanIds, deadlineAt) : undefined,
     wantsEmail
       ? sendAudienceEmail(
           {
@@ -189,10 +217,13 @@ export async function sendBroadcast(
             reason: "follower",
           },
           chosenFanIds,
+          deadlineAt,
         )
       : undefined,
   ]);
 
   await recordBroadcastItems(campaign.id as string, tier, { sms, email });
-  return describeAudienceSend({ sms, email });
+  const described = describeAudienceSend({ sms, email });
+  if (!described.ok) await releaseClaim(campaign.id as string, description);
+  return described;
 }

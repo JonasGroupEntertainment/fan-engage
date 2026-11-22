@@ -3,6 +3,7 @@ import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
 import { smsSendClass, type SmsMessageType } from "@/lib/sms/kinds";
 import { smsAgeAllowsSend } from "@/lib/sms/policy";
 import { pageAll, pageAllIn } from "@/lib/supabase/page-all";
+import { outOfTime } from "@/lib/send-budget";
 
 /**
  * Campaign broadcast helpers — send a single email or SMS blast to every fan
@@ -15,6 +16,8 @@ export type BroadcastResult = {
   sent: number;
   failed: number;
   recipients: number; // how many fans matched before any send
+  /** Fans never tried because the caller's deadline passed. */
+  notSent?: number;
   error?: string;
 };
 
@@ -54,7 +57,8 @@ async function loadScopedFanIds(opts: {
   eventId?: string | null;
   fanIds?: readonly string[] | null;
 }): Promise<string[] | null> {
-  if (opts.fanIds) return [...new Set(opts.fanIds)];
+  // An empty list means nobody. It must never fall through to a wider scope.
+  if (opts.fanIds != null) return [...new Set(opts.fanIds)];
   if (opts.eventId) return [...new Set(await loadFanIds("event_rsvps", "event_id", opts.eventId))];
   if (opts.artistSlug) {
     return [...new Set(await loadFanIds("fan_artist_following", "artist_slug", opts.artistSlug))];
@@ -96,7 +100,9 @@ async function loadRecipients(opts: {
 /**
  * Send an SMS to every opted-in adult fan in scope through Mailchimp.
  * Pass `fanIds` when the caller has already chosen the fans (for example
- * an artist's fans narrowed by tier); only those fans are texted.
+ * an artist's fans narrowed by tier); only those fans are texted, and an
+ * empty list texts nobody. With `deadlineAt` (epoch ms) no new text is
+ * started after that time and the fans left over come back as `notSent`.
  */
 export async function broadcastSms(params: {
   body: string;
@@ -104,6 +110,7 @@ export async function broadcastSms(params: {
   artistSlug?: string | null;
   eventId?: string | null;
   fanIds?: readonly string[] | null;
+  deadlineAt?: number | null;
 }): Promise<BroadcastResult> {
   const result: BroadcastResult = { attempted: 0, sent: 0, failed: 0, recipients: 0 };
   const smsClass = smsSendClass(params.messageType);
@@ -124,9 +131,13 @@ export async function broadcastSms(params: {
 
   const admin = createAdminClient();
 
-  for (const fan of recipients) {
+  const textable = recipients.filter((fan) => fan.phone && smsAgeAllowsSend(fan.birth_date));
+  for (const fan of textable) {
     if (!fan.phone) continue;
-    if (!smsAgeAllowsSend(fan.birth_date)) continue;
+    if (outOfTime(params.deadlineAt)) {
+      result.notSent = textable.length - result.attempted;
+      break;
+    }
     result.attempted += 1;
     try {
       const sent = await deliverSms({ to: fan.phone, body: params.body, ...smsClass });

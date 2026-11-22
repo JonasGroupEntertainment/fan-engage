@@ -43,4 +43,35 @@ describe("admin audience email wiring", () => {
     const src = readRepo("./broadcast.ts");
     assert.match(src, /pageAllIn<RecipientRow, string>/);
   });
+
+  it("tier lists count only active memberships", () => {
+    const src = readRepo("./admin-audience.ts");
+    assert.match(src, /\.in\("current_tier", \[\.\.\.tiers\]\)\s*\.eq\("status", ACTIVE_MEMBERSHIP\)/);
+  });
+
+  it("campaign texts use the same fan list as campaign email", () => {
+    const src = readRepo("../app/admin/campaigns/actions.ts");
+    assert.match(src, /broadcastSms\(\{[^}]*fanIds/);
+    assert.doesNotMatch(src, /broadcastSms\(\{[^}]*eventId/);
+  });
+
+  it("an empty chosen list means nobody is texted, never everybody", () => {
+    const src = readRepo("./broadcast.ts");
+    assert.match(src, /if \(opts\.fanIds != null\) return \[\.\.\.new Set\(opts\.fanIds\)\]/);
+    assert.match(src, /scopedIds !== null && scopedIds\.length === 0\) return \[\]/);
+  });
+
+  it("both screens give their sends five minutes and a deadline", () => {
+    for (const page of ["../app/admin/broadcast/page.tsx", "../app/admin/campaigns/new/page.tsx"]) {
+      const src = readRepo(page);
+      assert.doesNotMatch(src, /"use client"/);
+      assert.match(src, /export const maxDuration = 300;/);
+    }
+    for (const screen of SCREENS) assert.match(readRepo(screen), /sendDeadline\(/);
+  });
+
+  it("a broadcast that reached nobody releases its claim", () => {
+    const src = readRepo("../app/admin/broadcast/actions.ts");
+    assert.match(src, /releasedClaimDescription\(/);
+  });
 });

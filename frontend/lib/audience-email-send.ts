@@ -1,6 +1,7 @@
 import type { TransactionalBatchResult, TransactionalRecipient } from "./email/transactional.ts";
 import { buildAudienceEmail, type AudienceMessage } from "./audience-email.ts";
 import { selectReminderEmailRecipients, type ReminderFanRow } from "./event-reminder-email.ts";
+import { outOfTime } from "./send-budget.ts";
 
 /**
  * Sends an admin's email to the fans they chose: one message per fan who
@@ -13,10 +14,20 @@ import { selectReminderEmailRecipients, type ReminderFanRow } from "./event-remi
  *
  * Never throws. One fan's failed send is counted and the rest carry on.
  *
+ * Recipients go to the provider a chunk at a time. When a deadline is
+ * given and it has passed, no new chunk is started; the fans left over
+ * are counted in `notSent` so the admin is told the send stopped early.
+ *
  * Relative imports and injected reads / sends, so it runs under node --test.
  */
 
 export const AUDIENCE_EMAIL_NOT_READ = "could not read the chosen fans";
+
+/**
+ * Recipients handed to the provider between deadline checks. With 5 in
+ * flight and a 10 second limit each, one chunk takes at most 20 seconds.
+ */
+export const EMAIL_SEND_CHUNK = 10;
 
 export type ChosenAudience = {
   /** Every fan the admin chose (the artist's fans, narrowed). */
@@ -34,7 +45,9 @@ export type AudienceEmailResult = {
   failed: number;
   /** Chosen fans who may not be emailed. */
   skipped: number;
-  /** A failure that stopped the read or every send. */
+  /** Fans who may be emailed but were never tried: the send ran out of time. */
+  notSent: number;
+  /** A failure that stopped the read or a whole chunk of sends. */
   error: string | null;
 };
 
@@ -44,8 +57,29 @@ const NOTHING_SENT: AudienceEmailResult = {
   sent: 0,
   failed: 0,
   skipped: 0,
+  notSent: 0,
   error: null,
 };
+
+type ChunkTally = { sent: number; failed: number; error: string | null };
+
+function chunksOf<T>(items: readonly T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
+}
+
+/** One chunk. A throw fails that chunk only. */
+async function sendChunk(
+  chunk: readonly TransactionalRecipient[],
+  send: (recipients: readonly TransactionalRecipient[]) => Promise<TransactionalBatchResult>,
+): Promise<ChunkTally> {
+  try {
+    const batch = await send(chunk);
+    const sent = batch.outcomes.filter((outcome) => outcome.ok).length;
+    return { sent, failed: chunk.length - sent, error: batch.error };
+  } catch (err) {
+    return { sent: 0, failed: chunk.length, error: errorText(err) };
+  }
+}
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -67,6 +101,10 @@ export async function sendAudienceEmails(params: {
   providerReady: boolean;
   loadAudience: () => Promise<ChosenAudience>;
   send: (recipients: readonly TransactionalRecipient[]) => Promise<TransactionalBatchResult>;
+  /** Epoch ms after which no new chunk is started. Omit for no limit. */
+  deadlineAt?: number | null;
+  /** Test seam for the clock. */
+  now?: () => number;
 }): Promise<AudienceEmailResult> {
   if (!params.providerReady) return { ...NOTHING_SENT, configured: false };
 
@@ -84,11 +122,12 @@ export async function sendAudienceEmails(params: {
   const counts = { ...NOTHING_SENT, chosen, skipped: chosen - recipients.length };
   if (recipients.length === 0) return counts;
 
-  try {
-    const batch = await params.send(recipients);
-    const sent = batch.outcomes.filter((outcome) => outcome.ok).length;
-    return { ...counts, sent, failed: recipients.length - sent, error: batch.error };
-  } catch (err) {
-    return { ...counts, failed: recipients.length, error: errorText(err) };
+  const now = params.now ?? Date.now;
+  let tally: ChunkTally = { sent: 0, failed: 0, error: null };
+  for (const chunk of chunksOf(recipients, EMAIL_SEND_CHUNK)) {
+    if (outOfTime(params.deadlineAt, now())) break;
+    const done = await sendChunk(chunk, params.send);
+    tally = { sent: tally.sent + done.sent, failed: tally.failed + done.failed, error: tally.error ?? done.error };
   }
+  return { ...counts, ...tally, notSent: recipients.length - tally.sent - tally.failed };
 }

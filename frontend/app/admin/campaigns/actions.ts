@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin-audience";
 import { chooseAudienceFanIds } from "@/lib/audience-email";
 import type { AudienceEmailResult } from "@/lib/audience-email-send";
+import { sendDeadline } from "@/lib/send-budget";
 import {
   DUPLICATE_CAMPAIGN_MESSAGE,
   describeAudienceSend,
@@ -38,6 +39,7 @@ const FANS_NOT_READ_EMAIL_RESULT: AudienceEmailResult = {
   sent: 0,
   failed: 0,
   skipped: 0,
+  notSent: 0,
   error: "could not read the chosen fans",
 };
 const EVENT_NOT_ARTISTS_MESSAGE =
@@ -58,11 +60,32 @@ async function loadCampaignFanIds(artistSlug: string, rsvpEventId: string | null
   }
 }
 
-/** Text the campaign's fans. broadcastSms scopes by artist or event. Never throws. */
-async function sendCampaignSms(body: string, artistSlug: string, rsvpEventId: string | null): Promise<SmsOutcome> {
+const FANS_NOT_READ_SMS_RESULT: SmsOutcome = {
+  recipients: 0,
+  sent: 0,
+  failed: 0,
+  error: "the list of fans could not be read. Please try again.",
+};
+
+/**
+ * Text the campaign's fans: the same list the email uses, so the two can
+ * never drift apart. An empty list texts nobody. Never throws.
+ */
+async function sendCampaignSms(
+  body: string,
+  artistSlug: string,
+  fanIds: readonly string[],
+  deadlineAt: number,
+): Promise<SmsOutcome> {
   try {
-    const result = await broadcastSms({ body, messageType: "campaign_sms", artistSlug, eventId: rsvpEventId });
-    return { recipients: result.recipients, sent: result.sent, failed: result.failed, error: result.error ?? null };
+    const result = await broadcastSms({ body, messageType: "campaign_sms", artistSlug, fanIds, deadlineAt });
+    return {
+      recipients: result.recipients,
+      sent: result.sent,
+      failed: result.failed,
+      notSent: result.notSent ?? 0,
+      error: result.error ?? null,
+    };
   } catch (err) {
     console.error("campaign: SMS failed for", artistSlug, err);
     return { recipients: 0, sent: 0, failed: 0, error: "something went wrong on our side. Please try again." };
@@ -79,6 +102,7 @@ function parseJsonBlock<T>(raw: FormDataEntryValue | null, fallback: T): T {
 }
 
 export async function createAndPublishCampaign(formData: FormData) {
+  const deadlineAt = sendDeadline();
   const supa = createAdminClient();
 
   const artistSlug = String(formData.get("artist_slug") ?? "").trim();
@@ -298,47 +322,11 @@ export async function createAndPublishCampaign(formData: FormData) {
   ]);
   const artistName = (artistRow.data?.name as string | null | undefined) ?? artistSlug;
 
-  // 8) Email blast: one email per chosen fan who may be emailed, each with
-  //    their own unsubscribe link. Never a Mailchimp campaign, which would
-  //    reach the whole audience (every artist, RSVP or not).
-  const emailSubject = String(formData.get("email_subject") ?? "").trim();
-  const emailBody = String(formData.get("email_body") ?? "").trim();
-  const emailResult = !(emailSubject && emailBody)
-    ? undefined
-    : campaignFanIds === null
-      ? FANS_NOT_READ_EMAIL_RESULT
-      : await sendAudienceEmail(
-          { subject: emailSubject, body: emailBody, artistName, reason: rsvpEventId ? "rsvp" : "follower" },
-          campaignFanIds,
-        );
-  if (emailResult) {
-    await recordItem("email", null, {
-      subject: emailSubject,
-      body: emailBody,
-      ...emailItemMetadata(emailResult),
-      targeted_event_id: rsvpEventId,
-    });
-  }
-
-  // 9) SMS blast: opted-in adults through Mailchimp (throttled). Promotional.
-  //    Honors the per-event RSVP filter when attached.
-  const smsBody = String(formData.get("sms_body") ?? "").trim();
-  const smsResult = smsBody ? await sendCampaignSms(smsBody, artistSlug, rsvpEventId) : undefined;
-  if (smsResult) {
-    await recordItem("sms", null, {
-      body: smsBody,
-      sent: smsResult.sent,
-      failed: smsResult.failed,
-      recipients: smsResult.recipients,
-      targeted_event_id: rsvpEventId,
-      error: smsResult.error ?? null,
-    });
-  }
-
-  // 10) In-app inbox notification for every fan this campaign targets.
-  //     Audience: artist followers when no event is attached; event RSVPers
-  //     when targetEventRsvpers is on. Dedup'd by campaign_id so a fan can
-  //     never see the same campaign twice in their inbox.
+  // 8) In-app inbox notification for every fan this campaign targets.
+  //    Sent before the email and text so a long send can never cut it off.
+  //    Audience: artist followers when no event is attached; event RSVPers
+  //    when targetEventRsvpers is on. Dedup'd by campaign_id so a fan can
+  //    never see the same campaign twice in their inbox.
   try {
     const body =
       String(formData.get("announcement_body") ?? "").trim().slice(0, 140) ||
@@ -360,6 +348,52 @@ export async function createAndPublishCampaign(formData: FormData) {
     );
   } catch (err) {
     console.warn("campaign fan-out (notifications) failed:", err);
+  }
+
+  // 9) Email blast: one email per chosen fan who may be emailed, each with
+  //    their own unsubscribe link. Never a Mailchimp campaign, which would
+  //    reach the whole audience (every artist, RSVP or not).
+  // 10) SMS blast: opted-in adults through Mailchimp (throttled). Promotional.
+  //    Email and text use the same fan list and run side by side, so they
+  //    share the time budget fairly.
+  const emailSubject = String(formData.get("email_subject") ?? "").trim();
+  const emailBody = String(formData.get("email_body") ?? "").trim();
+  const smsBody = String(formData.get("sms_body") ?? "").trim();
+  const wantsEmail = Boolean(emailSubject && emailBody);
+  const [emailResult, smsResult] = await Promise.all([
+    !wantsEmail
+      ? undefined
+      : campaignFanIds === null
+        ? FANS_NOT_READ_EMAIL_RESULT
+        : sendAudienceEmail(
+            { subject: emailSubject, body: emailBody, artistName, reason: rsvpEventId ? "rsvp" : "follower" },
+            campaignFanIds,
+            deadlineAt,
+          ),
+    !smsBody
+      ? undefined
+      : campaignFanIds === null
+        ? FANS_NOT_READ_SMS_RESULT
+        : sendCampaignSms(smsBody, artistSlug, campaignFanIds, deadlineAt),
+  ]);
+  if (emailResult) {
+    await recordItem("email", null, {
+      subject: emailSubject,
+      body: emailBody,
+      ...emailItemMetadata(emailResult),
+      targeted_event_id: rsvpEventId,
+    });
+  }
+  if (smsResult) {
+    await recordItem("sms", null, {
+      body: smsBody,
+      sent: smsResult.sent,
+      failed: smsResult.failed,
+      not_sent: smsResult.notSent ?? 0,
+      recipients: smsResult.recipients,
+      targeted_event_id: rsvpEventId,
+      error: smsResult.error ?? null,
+    });
   }
 
   revalidatePath("/admin/campaigns");

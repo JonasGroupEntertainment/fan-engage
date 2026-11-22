@@ -12,7 +12,7 @@ const DUPLICATE_SEND_WINDOW_MINUTES = 5;
 /** An identical send inside this window is refused (double click, retry). */
 export const DUPLICATE_SEND_WINDOW_MS = DUPLICATE_SEND_WINDOW_MINUTES * MINUTE_MS;
 
-export const DUPLICATE_BROADCAST_MESSAGE = `This same message was already sent to these fans in the last ${DUPLICATE_SEND_WINDOW_MINUTES} minutes, so it was not sent again. Wait a few minutes if you mean to send it again.`;
+export const DUPLICATE_BROADCAST_MESSAGE = `This same message went to these fans in the last ${DUPLICATE_SEND_WINDOW_MINUTES} minutes, or is still going out, so it was not sent again. Wait a few minutes if you mean to send it again.`;
 
 export const DUPLICATE_CAMPAIGN_MESSAGE = `A campaign with this title was already published for this artist in the last ${DUPLICATE_SEND_WINDOW_MINUTES} minutes, so this one was not published again. Check the campaigns list before trying again.`;
 
@@ -29,6 +29,8 @@ export type EmailOutcome = {
   failed: number;
   /** Chosen fans who may not be emailed. */
   skipped: number;
+  /** Fans never tried because the send ran out of time. */
+  notSent?: number;
   error: string | null;
 };
 
@@ -37,6 +39,8 @@ export type SmsOutcome = {
   recipients: number;
   sent: number;
   failed: number;
+  /** Fans never tried because the send ran out of time. */
+  notSent?: number;
   error?: string | null;
 };
 
@@ -47,6 +51,11 @@ export type AudienceSendOutcome = {
   inApp?: number;
 };
 
+function stoppedEarly(notSent: number | undefined, verb: string): string {
+  if (!notSent) return "";
+  return ` The send stopped early because it ran out of time. ${notSent} of the chosen fans were not ${verb}.`;
+}
+
 export function describeEmailOutcome(email: EmailOutcome): string {
   if (!email.configured) {
     return "Email is not set up yet (the mail key is missing), so no emails were sent.";
@@ -56,15 +65,15 @@ export function describeEmailOutcome(email: EmailOutcome): string {
       ? "No emails were sent because the list of fans could not be read. Please try again."
       : "Email: no fans matched your choice, so no emails were sent.";
   }
-  return `Email: ${email.sent} sent, ${email.skipped} skipped because they have not opted in or cannot be emailed, ${email.failed} failed.`;
+  return `Email: ${email.sent} sent, ${email.skipped} skipped because they have not opted in or cannot be emailed, ${email.failed} failed.${stoppedEarly(email.notSent, "emailed")}`;
 }
 
 export function describeSmsOutcome(sms: SmsOutcome): string {
   if (sms.error && sms.sent === 0) return `No texts were sent: ${sms.error}`;
-  if (sms.recipients === 0) {
+  if (sms.recipients === 0 && !sms.notSent) {
     return "Texts: none of the chosen fans have opted in to texts, so none were sent.";
   }
-  return `Texts: ${sms.sent} sent, ${sms.failed} failed.`;
+  return `Texts: ${sms.sent} sent, ${sms.failed} failed.${stoppedEarly(sms.notSent, "texted")}`;
 }
 
 export function describeInAppOutcome(fans: number): string {

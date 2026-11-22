@@ -19,6 +19,9 @@ export const AUDIENCE_EMAIL_TAGS = ["admin-audience-email"] as const;
 const AUDIENCE_FAN_COLUMNS =
   "id, email, first_name, email_opted_in, suspended, is_internal, unsubscribe_token";
 
+/** Only an active membership counts for a tier (not suspended, not pending). */
+const ACTIVE_MEMBERSHIP = "active";
+
 type FanIdRow = { fan_id: string };
 
 function fanIdsOrThrow(
@@ -42,7 +45,7 @@ export async function loadArtistFanIds(artistSlug: string): Promise<string[]> {
   return fanIdsOrThrow("fan_artist_following", rows);
 }
 
-/** Members of the artist's community in any of `tiers`. Throws on a failed read. */
+/** Active members of the artist's community in any of `tiers`. Throws on a failed read. */
 export async function loadTierFanIds(artistSlug: string, tiers: readonly string[]): Promise<string[]> {
   const admin = createAdminClient();
   const rows = await pageAll<FanIdRow>(() =>
@@ -51,6 +54,7 @@ export async function loadTierFanIds(artistSlug: string, tiers: readonly string[
       .select("fan_id")
       .eq("community_id", artistSlug)
       .in("current_tier", [...tiers])
+      .eq("status", ACTIVE_MEMBERSHIP)
       .order("fan_id", { ascending: true }),
   );
   return fanIdsOrThrow("fan_community_memberships", rows);
@@ -109,6 +113,7 @@ async function loadEmailFans(fanIds: readonly string[]): Promise<ReminderFanRow[
 export async function sendAudienceEmail(
   message: AudienceMessage,
   chosenFanIds: readonly string[],
+  deadlineAt: number,
 ): Promise<AudienceEmailResult> {
   const result = await sendAudienceEmails({
     message,
@@ -116,6 +121,7 @@ export async function sendAudienceEmail(
     providerReady: mandrillConfigured(),
     loadAudience: async () => ({ chosenFanIds, fans: await loadEmailFans(chosenFanIds) }),
     send: (recipients) => sendMandrillBatch(recipients, AUDIENCE_EMAIL_TAGS),
+    deadlineAt,
   });
   if (result.error) console.warn("admin audience email:", result.error);
   return result;
@@ -127,6 +133,7 @@ export function emailItemMetadata(result: AudienceEmailResult): Record<string, u
     sent: result.sent,
     skipped: result.skipped,
     failed: result.failed,
+    not_sent: result.notSent,
     recipients: result.chosen,
     error: result.configured ? result.error : "email is not set up (the mail key is missing)",
   };
