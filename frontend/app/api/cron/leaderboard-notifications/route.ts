@@ -154,13 +154,13 @@ async function leaderboardNotifications() {
         if (currentRank === 1) {
           // Only notify if they weren't #1 yesterday (avoid daily spam).
           if (prevRank === undefined || prevRank !== 1) {
-            await notifyFirstPlace({ fanId, artistName });
+            await notifyFirstPlace({ fanId, artistName, artistSlug, now });
             summary.notificationsFirstPlace += 1;
           }
         }
         // Overtaken: rank got worse vs yesterday.
         else if (prevRank !== undefined && currentRank > prevRank) {
-          await notifyOvertaken({ fanId, artistName, newRank: currentRank });
+          await notifyOvertaken({ fanId, artistName, artistSlug, newRank: currentRank, now });
           summary.notificationsOvertaken += 1;
         }
 
@@ -169,6 +169,8 @@ async function leaderboardNotifications() {
           await notifyMonthEndNudge({
             fanId,
             artistName,
+            artistSlug,
+            now,
             rank: currentRank,
             daysLeft,
           });

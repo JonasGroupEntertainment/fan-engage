@@ -186,15 +186,22 @@ export function selectAtRiskFans(rows: readonly AtRiskFanRow[], now: Date): AtRi
   return out;
 }
 
-/** Push copy. */
+/**
+ * Push and inbox copy. Only a visit keeps a streak: lib/streaks/touch.ts
+ * runs when Fan Home or an artist page loads, and nowhere else. A
+ * reaction, comment or post does not count, so the copy must not say so.
+ * `inboxBody` is read later, so it names no time of day.
+ */
 export function streakAtRiskCopy(
   currentStreakDays: number,
   endsAtLocal: string,
-): { title: string; body: string; url: string } {
+): { title: string; body: string; inboxBody: string; url: string } {
   const n = Math.max(0, Math.floor(currentStreakDays));
   return {
     title: `Your ${n}-day streak ends ${endsAtLocal}`,
-    body: "Open Fan Engage and do one thing — a reaction counts.",
+    body: "Open Fan Engage before then to keep it. A visit to your Fan Home or an artist page counts.",
+    inboxBody:
+      "A streak grows with one visit a day. Opening your Fan Home or an artist page is what counts.",
     url: "/",
   };
 }

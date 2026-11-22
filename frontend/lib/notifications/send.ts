@@ -3,13 +3,67 @@ import { sendPush } from "./push";
 import { smsSendClassForNotification, type SmsMessageType } from "@/lib/sms/kinds";
 import { sendSmsToFan } from "./sms";
 import { getPreferences, isOptedIn, isInQuietHours } from "./preferences";
-import type { NotificationType, PushPayload, Channel } from "./types";
+import { mirrorReminderToInbox, type InboxMirror, type InboxMirrorResult } from "./inbox-mirror";
+import { inboxMirrorDeps } from "./inbox-store";
+import type { NotificationPreferences, NotificationType, PushPayload, Channel } from "./types";
+
+type SendOptions = {
+  fanId: string;
+  type: NotificationType;
+  payload: PushPayload;
+  inbox?: InboxMirror;
+};
+
+function inboxLogRow(opts: SendOptions, result: InboxMirrorResult): Record<string, unknown> {
+  const written = result.status === "written" || result.status === "duplicate";
+  return {
+    fan_id: opts.fanId,
+    channel: "in_app",
+    notification_type: opts.type,
+    title: opts.payload.title,
+    body: opts.inbox?.body ?? opts.payload.body,
+    url: opts.inbox?.url ?? opts.payload.url,
+    status: written ? "sent" : result.status === "failed" ? "failed" : "suppressed",
+    suppression_reason: result.status === "suppressed" ? result.reason : null,
+    error: result.status === "failed" ? result.error : null,
+    metadata: { inbox_kind: opts.inbox?.kind, dedup_key: opts.inbox?.dedupKey, outcome: result.status },
+  };
+}
+
+/**
+ * The inbox copy of a reminder (rules in ./inbox-mirror.ts). Written
+ * whether or not push is on, so a fan without push still sees it. Never
+ * throws; returns the notification_log row that records what happened.
+ */
+async function mirrorToInbox(
+  admin: ReturnType<typeof createAdminClient>,
+  opts: SendOptions & { inbox: InboxMirror },
+  prefs: NotificationPreferences,
+): Promise<Record<string, unknown>> {
+  const result = await mirrorReminderToInbox(inboxMirrorDeps(admin), {
+    fanId: opts.fanId,
+    type: opts.type,
+    prefs,
+    mirror: opts.inbox,
+    title: opts.payload.title,
+    pushBody: opts.payload.body,
+    pushUrl: opts.payload.url,
+    now: new Date(),
+  });
+  if (result.status === "failed") {
+    console.warn("sendNotification: inbox copy failed:", result.error);
+  }
+  return inboxLogRow(opts, result);
+}
 
 /**
  * High-level dispatcher. Given a fan + a notification type + a payload,
  * decides which channels to fire on, respects opt-ins and quiet hours,
  * and writes one row to `notification_log` per channel attempt (sent OR
  * suppressed).
+ *
+ * When the caller passes `inbox`, the reminder is also written to the
+ * fan's in-app inbox first, whatever the push and SMS settings are.
  *
  * **Critical contract**: this function NEVER throws. Every notification
  * trigger lives at the tail of an existing user-facing action; if push
@@ -34,6 +88,11 @@ export async function sendNotification(opts: {
    * Anniversary and prediction reuse `drops` and pass their own type.
    */
   smsMessageType?: SmsMessageType;
+  /**
+   * Also write this reminder to the fan's inbox (see ./inbox-mirror.ts).
+   * Leave it out only when something else already writes the inbox row.
+   */
+  inbox?: InboxMirror;
 }): Promise<void> {
   try {
     const channels = opts.channels ?? ["push", "sms"];
@@ -42,6 +101,10 @@ export async function sendNotification(opts: {
     const admin = createAdminClient();
 
     const logRows: Array<Record<string, unknown>> = [];
+
+    if (opts.inbox) {
+      logRows.push(await mirrorToInbox(admin, { ...opts, inbox: opts.inbox }, prefs));
+    }
 
     // ── Push ────────────────────────────────────────────────────────
     if (channels.includes("push")) {

@@ -210,6 +210,7 @@ async function streakAtRisk(url: URL, dryRun: boolean) {
           fanId: f.id,
           currentStreakDays: f.currentStreakDays,
           endsAtLocal: f.endsAtLocal,
+          now,
         });
         summary.notified += 1;
       } catch (err) {

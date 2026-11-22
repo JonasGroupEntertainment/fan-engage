@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "../send";
+import { inboxDedupKey, type InboxMirror } from "../inbox-mirror";
 
 /**
  * Fire a push notification to every voter on a prediction when it's
@@ -70,6 +71,13 @@ export async function notifyPredictionResolved(opts: {
       : `The answer was: ${correctLabel}`;
     const url = `/artists/${opts.artistSlug}/community#post-${opts.postId}`;
 
+    // One inbox row per voter per prediction; the push wording reads fine later.
+    const inbox: InboxMirror = {
+      kind: "prediction_resolved",
+      dedupKey: inboxDedupKey("prediction_resolved", opts.postId),
+      communityId: opts.artistSlug,
+    };
+
     const MAX_CONCURRENT = 200;
     await Promise.all([
       // Correct voters get the celebration
@@ -87,6 +95,7 @@ export async function notifyPredictionResolved(opts: {
             url,
             tag: `prediction:${opts.postId}`,
           },
+          inbox,
         }),
       ),
       // Incorrect voters get the reveal
@@ -101,6 +110,7 @@ export async function notifyPredictionResolved(opts: {
             url,
             tag: `prediction:${opts.postId}`,
           },
+          inbox,
         }),
       ),
     ]);
