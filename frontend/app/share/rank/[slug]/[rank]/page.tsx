@@ -3,6 +3,7 @@ import { type Metadata } from "next";
 import Link from "next/link";
 import { getArtistFromDb } from "@/lib/data/artists";
 import ShareButton from "@/components/share-button";
+import { shareNumber } from "@/lib/share-number";
 
 export const dynamic = "force-static";
 export const revalidate = 3600;
@@ -21,9 +22,10 @@ export async function generateMetadata({
   const { slug, rank } = await params;
   const artist = await getArtistFromDb(slug).catch(() => null);
   const artistName = artist?.name ?? "Fan Engage";
-  const rankNum = parseInt(rank, 10);
-  const rankDisplay =
-    Number.isFinite(rankNum) && rankNum > 0 ? ordinal(rankNum) : rank;
+  // Read strictly (lib/share-number.ts): typed words never reach the title.
+  const rankNum = shareNumber(rank);
+  if (!artist || rankNum === null) return { title: "Leaderboard", robots: { index: false } };
+  const rankDisplay = ordinal(rankNum);
   const title = `${rankDisplay} on the ${artistName} leaderboard`;
   const description = `Ranked ${rankDisplay} in the ${artistName} fan community on Fan Engage. Earn points and climb the chart.`;
   return {
@@ -33,7 +35,7 @@ export async function generateMetadata({
       type: "website",
       title,
       description,
-      url: `/share/rank/${slug}/${rank}`,
+      url: `/share/rank/${slug}/${rankNum}`,
       siteName: "Fan Engage",
     },
     twitter: { card: "summary_large_image", title, description },
@@ -49,14 +51,14 @@ export default async function RankSharePage({
   const artist = await getArtistFromDb(slug).catch(() => null);
   if (!artist) notFound();
 
-  const rankNum = parseInt(rank, 10);
-  if (!Number.isFinite(rankNum) || rankNum < 1) notFound();
+  const rankNum = shareNumber(rank);
+  if (rankNum === null) notFound();
   const rankDisplay = ordinal(rankNum);
 
   const shareUrl =
     typeof process.env.NEXT_PUBLIC_APP_URL === "string"
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/share/rank/${slug}/${rank}`
-      : `https://fan-engage-pearl.vercel.app/share/rank/${slug}/${rank}`;
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/share/rank/${slug}/${rankNum}`
+      : `https://fan-engage-pearl.vercel.app/share/rank/${slug}/${rankNum}`;
   const shareTitle = `I'm ranked ${rankDisplay} in the ${artist.name} fan community`;
   const shareText = `Climbing the leaderboard on Fan Engage — currently ${rankDisplay}. Can you beat me? ${shareUrl}`;
 

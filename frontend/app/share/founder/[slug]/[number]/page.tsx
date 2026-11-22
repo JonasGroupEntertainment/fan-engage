@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getArtistFromDb } from "@/lib/data/artists";
 import ShareButton from "@/components/share-button";
+import { shareNumber } from "@/lib/share-number";
 
 // ─── Public founder share page ──────────────────────────────────────────
 // Anyone with the URL can see the badge — founder counts are public,
@@ -21,7 +22,10 @@ export async function generateMetadata({
   const { slug, number } = await params;
   const artist = await getArtistFromDb(slug).catch(() => null);
   const artistName = artist?.name ?? "Fan Engage";
-  const title = `Founder #${number} for ${artistName}`;
+  // Read strictly (lib/share-number.ts): typed words never reach the title.
+  const founderNumber = shareNumber(number);
+  if (!artist || founderNumber === null) return { title: "Founder", robots: { index: false } };
+  const title = `Founder #${founderNumber} for ${artistName}`;
   const description = `One of the first 100 fans who joined ${artistName} on Fan Engage. Free Founding Fan badge with 1.5× points. Not a paid plan.`;
   return {
     title,
@@ -30,7 +34,7 @@ export async function generateMetadata({
       type: "website",
       title,
       description,
-      url: `/share/founder/${slug}/${number}`,
+      url: `/share/founder/${slug}/${founderNumber}`,
       siteName: "Fan Engage",
     },
     twitter: {
@@ -50,8 +54,8 @@ export default async function FounderSharePage({
   const artist = await getArtistFromDb(slug).catch(() => null);
   if (!artist) notFound();
 
-  const founderNumber = parseInt(number, 10);
-  if (!Number.isFinite(founderNumber) || founderNumber < 1) notFound();
+  const founderNumber = shareNumber(number);
+  if (founderNumber === null) notFound();
 
   const accentStyle = {
     backgroundImage: `linear-gradient(135deg, ${artist.accentFrom}, ${artist.accentTo})`,

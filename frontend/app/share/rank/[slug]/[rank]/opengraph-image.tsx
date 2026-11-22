@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getArtistFromDb } from "@/lib/data/artists";
+import { shareNumber } from "@/lib/share-number";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
@@ -23,8 +24,10 @@ export default async function RankOpengraphImage({
   const artistName = artist?.name ?? "Fan Engage";
   const accentFrom = artist?.accentFrom ?? "#7c3aed";
   const accentTo = artist?.accentTo ?? "#fb923c";
-  const rankNum = parseInt(routeParams.rank, 10);
-  const rankDisplay = Number.isFinite(rankNum) && rankNum > 0 ? ordinal(rankNum) : routeParams.rank;
+  // Read strictly (lib/share-number.ts). Anything that is not a plain
+  // number gets fixed wording, never the words from the address.
+  const rankNum = shareNumber(routeParams.rank);
+  const rankDisplay = rankNum !== null ? ordinal(rankNum) : "Top";
 
   return new ImageResponse(
     (
