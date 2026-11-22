@@ -10,6 +10,8 @@ import { listArtistsFromDb } from "@/lib/data/artists";
 import InviteQRCode from "@/components/invite-qr";
 import CopyLinkButton from "./copy-link-button";
 import NativeShareButton from "./native-share-button";
+import FacebookShareButton from "@/components/facebook-share-button";
+import InstagramShareButton from "@/components/instagram-share-button";
 import PreviewSignupBanner from "@/components/preview-signup-banner";
 import {
   FIRST_72H_BODY,
@@ -121,6 +123,8 @@ export default async function ReferralsPage() {
                     title="Join me on Fan Engage"
                     text={`Join me on Fan Engage. You get 100 points when you sign up, and I get 150 when you finish joining.`}
                   />
+                  <FacebookShareButton url={inviteUrl} label="Facebook" />
+                  <InstagramShareButton url={inviteUrl} label="Instagram" />
                 </div>
 
                 {myCount === 0 ? (
