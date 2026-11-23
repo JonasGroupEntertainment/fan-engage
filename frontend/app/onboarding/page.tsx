@@ -80,12 +80,13 @@ export default async function OnboardingPage({
   let initialSmsConsent = false;
   let needsSmsGuardian = false;
   if (user) {
-    let { data: fan, error } = await supabase
+    const firstFan = await supabase
       .from("fans")
       .select("phone, sms_opted_in, birth_date, sms_parent_consent_at")
       .eq("id", user.id)
       .maybeSingle();
-    if (error && isMissingSmsParentConsentColumn(error)) {
+    let fan = firstFan.data;
+    if (firstFan.error && isMissingSmsParentConsentColumn(firstFan.error)) {
       const plain = await supabase
         .from("fans")
         .select("phone, sms_opted_in, birth_date")
