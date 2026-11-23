@@ -737,6 +737,23 @@ export function SignupForm({
             )}
           </label>
 
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+            <input
+              type="checkbox"
+              name="parent-consent"
+              checked={parentConsentChecked}
+              onChange={(e) => {
+                setParentConsentChecked(e.target.checked);
+                if (status === "error") {
+                  setStatus("idle");
+                  setMessage("");
+                }
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+            />
+            <span>{PARENT_CONSENT_LABEL}</span>
+          </label>
+
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wide text-white/60">
               Mobile phone <span className="normal-case tracking-normal text-white/40">(optional)</span>
@@ -829,25 +846,6 @@ export function SignupForm({
                 </p>
               )}
             </div>
-          )}
-
-          {parentConsentRequired && (
-            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
-              <input
-                type="checkbox"
-                name="parent-consent"
-                checked={parentConsentChecked}
-                onChange={(e) => {
-                  setParentConsentChecked(e.target.checked);
-                  if (status === "error") {
-                    setStatus("idle");
-                    setMessage("");
-                  }
-                }}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
-              />
-              <span>{PARENT_CONSENT_LABEL}</span>
-            </label>
           )}
 
           {hasConsentDocs ? (

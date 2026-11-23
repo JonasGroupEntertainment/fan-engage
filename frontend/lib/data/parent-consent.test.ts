@@ -26,5 +26,8 @@ describe("0098 parent consent", () => {
     assert.match(form, /needsParentConsent\(birthDate\) && !parentConsentChecked/);
     assert.match(form, /name="parent-consent"/);
     assert.match(form, /PARENT_CONSENT_LABEL/);
+    const gate = readRepo("../age-gate.ts");
+    assert.match(gate, /I am 13 to 17 and a parent or guardian says I can join\./);
+    assert.match(gate, /Ages 13 to 17 need a parent or guardian's permission to join\./);
   });
 });

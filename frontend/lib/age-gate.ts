@@ -91,11 +91,13 @@ export function needsParentConsent(dob: Date | null | undefined, now: Date = new
   return dob != null && ageBand(dob, now) === "teen";
 }
 
+/** Same sentence as Brand Engage Pro's join checkbox. */
 export const PARENT_CONSENT_LABEL =
-  "A parent or guardian says I can create this account.";
+  "I am 13 to 17 and a parent or guardian says I can join.";
 
+/** Same sentence as Brand Engage Pro's GUARDIAN_CONSENT_MESSAGE. */
 export const PARENT_CONSENT_MESSAGE =
-  "A parent or guardian must say you can join before we can create this account.";
+  "Ages 13 to 17 need a parent or guardian's permission to join.";
 
 /** False when the date is unknown, so adult-only features stay closed. */
 export function isAdult(dob: Date | null | undefined, now: Date = new Date()): boolean {

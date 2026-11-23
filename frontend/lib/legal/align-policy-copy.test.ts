@@ -62,23 +62,27 @@ describe("terms and privacy age", () => {
     ].join("\n\n");
     const next = applyTermsMinimumAge(published);
     assert.match(next, /UNDER AGE 13/);
-    assert.match(next, /13 and older/);
-    assert.match(next, /parent or guardian must say you can join/);
+    assert.match(next, /13, 14, 15, 16, or 17/);
+    assert.match(next, /parent or guardian's permission/);
     assert.equal(next.includes("UNDER AGE 18"), false);
     assert.match(next, /Fan Engage Pro LLC/);
     assert.equal(next.includes("FEP, Inc."), false);
     assert.match(
       applyTermsMinimumAge("## 2. Eligibility\nYou must be 13 years or older to use Fan Engage.\n"),
-      /parent or guardian's OK/,
+      /parent or guardian's permission/,
+    );
+    assert.match(
+      applyTermsMinimumAge("- You are 18 years old or older.\n"),
+      /a parent or guardian has said you may join/,
     );
   });
 
-  it("states 13+ with parent OK on privacy and still blocks under 13", () => {
+  it("states 13+ with parent permission on privacy and still blocks under 13", () => {
     const stored = `${PRIVACY_UNDER_13_HEADING}\r\n\r\n${PRIVACY_UNDER_13_BODY}\r\n\r\nADDITIONAL INFORMATION`;
     const next = applyPrivacyAgeRequirement(stored);
     assert.equal(next.includes(PRIVACY_AGE_18_HEADING), true);
     assert.match(next, /Fans must be 13 or older/);
-    assert.match(next, /parent or guardian's OK/);
+    assert.match(next, /parent or guardian's permission/);
     assert.match(next, /No one under 13/);
     assert.equal(next.includes(PRIVACY_AGE_18_BODY), false);
     assert.equal(next.includes("CHILDREN UNDER"), false);
@@ -90,7 +94,7 @@ describe("terms and privacy age", () => {
     assert.equal(from18.includes("FEP, Inc."), false);
     assert.match(from18, /Fan Engage Pro LLC/);
     const viaScrub = applyPrivacyCounselScrub(stored);
-    assert.match(viaScrub, /parent or guardian's OK/);
+    assert.match(viaScrub, /parent or guardian's permission/);
   });
 });
 
