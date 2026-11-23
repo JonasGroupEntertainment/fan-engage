@@ -53,7 +53,7 @@ export async function savePreferencesAction(
       .select("current_tier, phone, birth_date")
       .eq("id", user.id)
       .maybeSingle();
-    fan = plain.data;
+    fan = plain.data as typeof fan;
   } else if (fanRes.error) {
     return { error: "Could not save your preferences. Please try again." };
   }

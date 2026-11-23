@@ -92,7 +92,7 @@ export default async function OnboardingPage({
         .select("phone, sms_opted_in, birth_date")
         .eq("id", user.id)
         .maybeSingle();
-      fan = plain.data;
+      fan = plain.data as typeof fan;
     }
     initialPhone = typeof fan?.phone === "string" ? fan.phone : "";
     initialSmsConsent = fan?.sms_opted_in === true;

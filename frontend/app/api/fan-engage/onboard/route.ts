@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         .select("socials, sms_opted_in, email_opted_in, birth_date")
         .eq("id", user.id)
         .maybeSingle();
-      existingFan = plain.data;
+      existingFan = plain.data as typeof existingFan;
       existingErr = plain.error;
     }
     if (existingErr) {

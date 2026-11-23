@@ -23,7 +23,7 @@ export function supabaseSmsFanDirectory(): SmsFanDirectory {
         .select("id, phone, birth_date, sms_parent_consent_at");
       if (error && isMissingSmsParentConsentColumn(error)) {
         const plain = await admin.from("fans").select("id, phone, birth_date");
-        data = plain.data;
+        data = plain.data as typeof data;
         error = plain.error;
       }
       if (error) throw new Error(error.message);

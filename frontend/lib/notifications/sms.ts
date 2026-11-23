@@ -62,7 +62,7 @@ export async function sendSmsToFan(opts: {
       .select("id, phone, sms_opted_in, current_tier, birth_date")
       .eq("id", opts.fanId)
       .maybeSingle();
-    fan = plain.data;
+    fan = plain.data as typeof fan;
     fanErr = plain.error;
   }
   if (fanErr || !fan) return { sent: false, suppressionReason: "no_phone" };

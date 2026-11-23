@@ -89,7 +89,7 @@ export default async function NotificationPreferencesPage() {
       .select("phone, current_tier, total_points, birth_date")
       .eq("id", user.id)
       .maybeSingle();
-    fan = plain.data;
+    fan = plain.data as typeof fan;
   }
 
   const hasPush = !!(pushSubs && pushSubs.length > 0);

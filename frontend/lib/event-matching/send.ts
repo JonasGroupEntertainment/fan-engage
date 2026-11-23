@@ -86,7 +86,7 @@ export async function sendEventMatchNotifications(
       .eq("event_id", eventId)
       .eq("is_candidate", true)
       .is("sent_at", null);
-    rows = plain.data;
+    rows = plain.data as typeof rows;
     listErr = plain.error;
   }
   if (listErr) {

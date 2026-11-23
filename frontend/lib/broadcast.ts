@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
 import { smsSendClass, type SmsMessageType } from "@/lib/sms/kinds";
 import { isMissingSmsParentConsentColumn, smsAgeAllowsSend } from "@/lib/sms/policy";
-import { pageAll, pageAllIn } from "@/lib/supabase/page-all";
+import { pageAll, pageAllIn, type PageQuery } from "@/lib/supabase/page-all";
 import { outOfTime } from "@/lib/send-budget";
 
 /**
@@ -94,9 +94,11 @@ async function loadRecipients(opts: {
 
   const load = (cols: string) =>
     scopedIds === null
-      ? pageAll<RecipientRow>(() => fansQuery(cols).order("id", { ascending: true }))
+      ? pageAll<RecipientRow>(
+          () => fansQuery(cols).order("id", { ascending: true }) as PageQuery<RecipientRow>,
+        )
       : pageAllIn<RecipientRow, string>(scopedIds, (part) =>
-          fansQuery(cols).in("id", part).order("id", { ascending: true }),
+          fansQuery(cols).in("id", part).order("id", { ascending: true }) as PageQuery<RecipientRow>,
         );
   let fans = await load(columns);
   if (fans.error && isMissingSmsParentConsentColumn(fans.error)) {

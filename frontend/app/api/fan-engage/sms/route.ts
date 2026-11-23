@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         .select("phone, sms_opted_in, birth_date")
         .eq("id", user.id)
         .maybeSingle();
-      fan = plain.data;
+      fan = plain.data as typeof fan;
       fanErr = plain.error;
     }
     if (fanErr) {
