@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleMarketingAudienceSms } from "@/lib/sms/audience-forward";
+import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 import { supabaseSmsFanDirectory } from "@/lib/sms/fan-directory";
 import { optOutPhones } from "@/lib/sms/inbound";
-import { marketingSmsOptOutPhone, readFormParams, safeEqual } from "@/lib/sms/mandrill";
-import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
+import { readFormParams, safeEqual } from "@/lib/sms/mandrill";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,10 @@ export const dynamic = "force-dynamic";
  * https://mailchimp.com/developer/marketing/guides/sync-audience-data-webhooks/
  *
  * An email unsubscribe is ignored. Email consent is not SMS consent.
+ *
+ * An SMS unsubscribe also forwards a signed STOP to Brand Engage on
+ * the shared number. That forward is best-effort. A failure is logged
+ * and does not change this route's response or Fan Engage's opt-out.
  */
 
 export function GET() {
@@ -41,16 +46,13 @@ export async function POST(request: Request) {
     return new NextResponse("ok", { status: 200 });
   }
 
-  const phone = marketingSmsOptOutPhone(params);
-  if (!phone) return new NextResponse("ok", { status: 200 });
-
-  try {
-    await optOutPhones([phone], supabaseSmsFanDirectory());
-    await syncSmsOptInWithProvider(phone, false);
-  } catch (err) {
-    console.error("Mailchimp audience SMS opt-out failed", err);
-    return new NextResponse("error", { status: 500 });
-  }
-
+  const outcome = await handleMarketingAudienceSms({
+    params,
+    optOutLocally: async (phone) => {
+      await optOutPhones([phone], supabaseSmsFanDirectory());
+      await syncSmsOptInWithProvider(phone, false);
+    },
+  });
+  if (outcome === "error") return new NextResponse("error", { status: 500 });
   return new NextResponse("ok", { status: 200 });
 }

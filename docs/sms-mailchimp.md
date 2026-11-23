@@ -34,6 +34,8 @@ Brand Engage rejects the POST when the signature does not match the raw body, or
 
 Forwarding is best-effort, with a 4 second timeout. A failure is logged. It does not change Fan Engage's reply to Mailchimp. If `BEP_SMS_FORWARD_URL` or `SMS_FORWARD_SECRET` is unset, the forward is skipped.
 
+A Marketing audience SMS unsubscribe uses that same forward. `POST /api/mailchimp/sms/audience` with `type` `sms_unsubscribe` opts the phone out in Fan Engage, then POSTs a signed body whose `text` is `STOP` and whose `from` is that phone in E.164. Subscribe, profile, and email unsubscribe events are not forwarded. A forward failure is logged and does not change Fan Engage's opt-out or the webhook response. Missing `BEP_SMS_FORWARD_URL` or `SMS_FORWARD_SECRET` skips the forward.
+
 STOP (and the other stop words in `frontend/lib/sms/keywords.ts`) opts that number out in Fan Engage when it belongs to a Fan Engage fan, including when the event is also forwarded. A number Fan Engage does not know is not written to the shared Transactional denylist, so Brand Engage can still apply its own START. A START from a number Fan Engage does not know is a no-op in Fan Engage. A known under-18 fan who texts START is not opted in, is not texted, and is put on the shared Transactional denylist. That denylist is the Mailchimp account both apps use, so Brand Engage will not text that number either until it is removed.
 
 Mailchimp auto-answers HELP and STOP on 10DLC. Fan Engage does not send those replies. HELP and START replies from Fan Engage stay off unless `MAILCHIMP_SMS_SEND_KEYWORD_REPLIES=true`.
