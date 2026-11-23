@@ -1,8 +1,9 @@
 /**
  * Age check for COPPA and adult-only features. Pure module, no imports.
  *
- * Under 13: no account, nothing stored. 13 to 17: free account only.
- * 18 and up: paid tiers and texts. Dates are calendar dates in UTC.
+ * Under 13: no account and no texts. 13 to 17: an account only with a
+ * parent or guardian's OK, and texts only with a separate tick.
+ * Paid memberships stay 18 and older. Dates are calendar dates in UTC.
  */
 
 export type AgeBand = "under13" | "teen" | "adult";
@@ -99,9 +100,52 @@ export const PARENT_CONSENT_LABEL =
 export const PARENT_CONSENT_MESSAGE =
   "Ages 13 to 17 need a parent or guardian's permission to join.";
 
+/** Same sentences as Brand Engage Pro's text opt-in. The join tick is not this tick. */
+export const SMS_GUARDIAN_MESSAGE =
+  "Ages 13 to 17 need a parent or guardian's permission before text messages can be turned on.";
+
+export const SMS_GUARDIAN_CHECKBOX =
+  "A parent or guardian says I can get text messages.";
+
 /** False when the date is unknown, so adult-only features stay closed. */
 export function isAdult(dob: Date | null | undefined, now: Date = new Date()): boolean {
   return dob != null && ageBand(dob, now) === "adult";
+}
+
+export function isTeenBirthDate(birthDate: string | null | undefined, now: Date = new Date()): boolean {
+  const dob = parseBirthDateIso(birthDate, now);
+  return dob != null && ageBand(dob, now) === "teen";
+}
+
+export type SmsTextOptIn = {
+  /** Whether sms_opted_in may be set true. */
+  accept: boolean;
+  /** Stamp fans.sms_parent_consent_at because this opt-in is a 13-to-17 tick. */
+  stampConsent: boolean;
+  /** The fan asked for texts and the age rule refused. */
+  rejected: boolean;
+};
+
+/**
+ * Text opt-in, same decision as Brand Engage Pro.
+ * 18 and older opt in as before. No birth date is not blocked.
+ * Ages 13 to 17 need a separate parent or guardian tick, not the join tick.
+ * Under 13 is refused. Turning texts off is always allowed.
+ */
+export function smsTextOptIn(input: {
+  birthDate: string | null | undefined;
+  requested: boolean;
+  smsParentConsent: boolean;
+  now?: Date;
+}): SmsTextOptIn {
+  if (!input.requested) return { accept: false, stampConsent: false, rejected: false };
+  const dob = parseBirthDateIso(input.birthDate, input.now);
+  if (!dob) return { accept: true, stampConsent: false, rejected: false };
+  const band = ageBand(dob, input.now);
+  if (band === "under13") return { accept: false, stampConsent: false, rejected: true };
+  if (band === "adult") return { accept: true, stampConsent: false, rejected: false };
+  if (!input.smsParentConsent) return { accept: false, stampConsent: false, rejected: true };
+  return { accept: true, stampConsent: true, rejected: false };
 }
 
 export type AdultGate = "ok" | "required" | "adult_only";
@@ -126,17 +170,21 @@ export function birthDateReturnPath(raw: unknown): string {
 }
 
 /**
- * SMS opt-in after the 18+ rule. A new opt-in needs a known adult birth
- * date. A fan already opted in with no birth date keeps it (grandfathered).
- * A known under-18 birth date always turns it off.
+ * SMS opt-in flag to store. A 13-to-17 opt-in is accepted only when
+ * `smsParentConsent` is true. No birth date is not blocked. Under 13 is off.
  */
 export function adultSmsOptIn(
   requested: boolean,
   storedIso: string | null | undefined,
   alreadyOptedIn: boolean,
   now: Date = new Date(),
+  smsParentConsent = false,
 ): boolean {
-  if (!requested) return false;
-  const gate = adultGate(storedIso ?? null, now);
-  return gate === "ok" || (gate === "required" && alreadyOptedIn);
+  void alreadyOptedIn;
+  return smsTextOptIn({
+    birthDate: storedIso,
+    requested,
+    smsParentConsent,
+    now,
+  }).accept;
 }

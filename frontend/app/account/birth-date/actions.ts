@@ -49,8 +49,8 @@ export async function saveBirthDateAction(
     return { ok: false, error: "We couldn't save that. Please try again." };
   }
 
-  // Under 18: the database turns fans.sms_opted_in off. Turn the settings
-  // switch off too so the page and the senders agree.
+  // A newly stored 13-to-17 date has no text permission yet. Turn texts
+  // off until that separate parent tick. Paid checkout stays 18 and older.
   if (!isAdult(dob)) {
     const { error: prefsError } = await admin
       .from("notification_preferences")

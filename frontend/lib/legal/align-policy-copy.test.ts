@@ -75,6 +75,10 @@ describe("terms and privacy age", () => {
       applyTermsMinimumAge("- You are 18 years old or older.\n"),
       /a parent or guardian has said you may join/,
     );
+    assert.match(
+      applyTermsMinimumAge("You may not enroll if you are under 18 years old."),
+      /separate parent or guardian tick for texts/,
+    );
   });
 
   it("states 13+ with parent permission on privacy and still blocks under 13", () => {
@@ -83,6 +87,7 @@ describe("terms and privacy age", () => {
     assert.equal(next.includes(PRIVACY_AGE_18_HEADING), true);
     assert.match(next, /Fans must be 13 or older/);
     assert.match(next, /parent or guardian's permission/);
+    assert.match(next, /Text messages for a fan who is 13 to 17/);
     assert.match(next, /No one under 13/);
     assert.equal(next.includes(PRIVACY_AGE_18_BODY), false);
     assert.equal(next.includes("CHILDREN UNDER"), false);

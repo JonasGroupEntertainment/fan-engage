@@ -12,7 +12,8 @@
  * Age: stored /terms and /privacy still say 18+. This rewrites the
  * public pages to Brand Engage Pro's join rule: 13 or older, a parent
  * or guardian's permission for ages 13 to 17, and no one under 13.
- * Paid memberships and text alerts stay 18 and older in product code.
+ * Paid memberships stay 18 and older. Text alerts follow Brand Engage
+ * Pro: 13 to 17 need a separate parent tick, and no one under 13.
  * These helpers do not write policy_pages.
  */
 import {
@@ -60,7 +61,7 @@ export const PRIVACY_AGE_18_BODY =
 
 /**
  * Brand Engage Pro's approved join paragraph, in Fan Engage words.
- * Paid memberships and text alerts stay 18 and older elsewhere.
+ * Paid memberships stay 18 and older. Text alerts are a separate sentence.
  */
 export const ACCOUNT_AGE_RULE =
   "Fans must be 13 or older. A fan who is 13, 14, 15, 16, or 17 may join only with a parent or guardian's permission. No one under 13 may use Fan Engage Pro or give us information.";
@@ -69,12 +70,16 @@ export const ACCOUNT_AGE_RULE =
 export const TERMS_AGE_REPRESENTATION =
   "You meet the age rule in AGE REQUIREMENT. If you are 13 to 17, a parent or guardian has said you may join.";
 
+/** Brand Engage Pro's text-enrollment paragraph, with fans in place of members. */
+export const TERMS_SMS_AGE_RULE =
+  "Text messages need their own permission. No one under 13 may opt in. A fan who is 13 to 17 may opt in only after a separate parent or guardian tick for texts. Fans 18 or older opt in as before. A fan with no date of birth on file is not asked again.";
+
 /**
- * Brand Engage Pro's privacy age section, without the brand-account
- * sentence and without a teen text opt-in. Fan Engage texts stay 18+.
+ * Brand Engage Pro's privacy age section, without the brand-account sentence.
+ * Text permission is separate from joining. Paid memberships stay 18+.
  */
 export const PRIVACY_AGE_RULE_BODY =
-  "Fans must be 13 or older. A fan who is 13 to 17 may join only with a parent or guardian's permission. No one under 13 may use this Website or give us information. Our Website is not intended for children under 13 years of age. No one under age 13 may provide any information to or on the Website. We do not knowingly collect Personal Information from children under 13. If you are under 13, do not use or provide any information on this Website or on or through any of its features, register on the Website, make any purchases through the Website, or provide any information about yourself to us, including your name, address, telephone number, e-mail address, or any screen name or user name you may use. If we learn we have collected or received Personal Information from a child under 13, we will delete that information. If you believe we might have any information from or about a child under 13, please contact us (please see the ''Contact Us'' section below).";
+  "Fans must be 13 or older. A fan who is 13 to 17 may join only with a parent or guardian's permission. No one under 13 may use this Website or give us information. Text messages for a fan who is 13 to 17 also need a separate parent or guardian's permission. Fans 18 or older opt in to texts as before. Our Website is not intended for children under 13 years of age. No one under age 13 may provide any information to or on the Website. We do not knowingly collect Personal Information from children under 13. If you are under 13, do not use or provide any information on this Website or on or through any of its features, register on the Website, make any purchases through the Website, or provide any information about yourself to us, including your name, address, telephone number, e-mail address, or any screen name or user name you may use. If we learn we have collected or received Personal Information from a child under 13, we will delete that information. If you believe we might have any information from or about a child under 13, please contact us (please see the ''Contact Us'' section below).";
 
 const TERMS_AGE_SENTENCES: ReadonlyArray<readonly [string, string]> = [
   ["You must be 18 years or older to use Fan Engage.", ACCOUNT_AGE_RULE],
@@ -89,6 +94,7 @@ const TERMS_AGE_SENTENCES: ReadonlyArray<readonly [string, string]> = [
     "We will terminate with or without notice any User who we believe is under the age of 13.",
   ],
   ["You are 18 years old or older.", TERMS_AGE_REPRESENTATION],
+  ["You may not enroll if you are under 18 years old.", TERMS_SMS_AGE_RULE],
 ];
 
 function escapeRegExp(value: string): string {

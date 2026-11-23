@@ -37,8 +37,9 @@ export default function HelpPage() {
             artists you care about, earn points for showing up, RSVP to events,
             and unlock in-app rewards. Fans must be 13 or older. If you are 13
             to 17, a parent or guardian has to say you can join. No one under
-            13 can join. Paid memberships and text alerts are for fans 18 and
-            older.
+            13 can join. Texts for ages 13 to 17 need a separate parent or
+            guardian tick. Fans 18 or older turn texts on as before. Paid
+            memberships are for fans 18 and older.
           </p>
         </article>
 

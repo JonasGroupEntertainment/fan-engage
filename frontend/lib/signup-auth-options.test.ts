@@ -103,4 +103,17 @@ describe("buildSignupAuthOptions", () => {
     });
     assert.deepEqual(skipped.data, { birth_date: "2012-04-02" });
   });
+
+  it("records the separate text tick only when that box was ticked", () => {
+    const ticked = buildSignupAuthOptions({
+      emailRedirectTo: "https://www.fanengagepro.com/auth/callback",
+      turnstileConfigured: false,
+      turnstileToken: null,
+      birthDate: "2012-04-02",
+      smsOptedIn: true,
+      smsParentConsent: true,
+    });
+    assert.equal(ticked.data?.sms_parent_consent, "true");
+    assert.equal(ticked.data?.sms_opted_in, "true");
+  });
 });

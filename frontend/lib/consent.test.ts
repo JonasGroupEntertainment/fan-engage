@@ -98,7 +98,7 @@ describe("onboard route and wizard consent wiring", () => {
   it("route uses onboardConsentUpdates and never invents a consent time", () => {
     const route = readRepo("../app/api/fan-engage/onboard/route.ts");
     assert.match(route, /onboardConsentUpdates\(/);
-    assert.match(route, /adultSmsOptIn\(\s*consent\.smsOptedIn/);
+    assert.match(route, /smsTextOptIn\(/);
     assert.match(route, /sms_opted_in: smsOptedIn,/);
     assert.match(route, /smsEnabledFromOnboarding\(smsOptedIn/);
     assert.doesNotMatch(route, /consent_accepted_at:\s*new Date\(\)/);

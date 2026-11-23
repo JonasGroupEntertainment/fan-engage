@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SmsFanDirectory } from "./inbound.ts";
+import { isMissingSmsParentConsentColumn } from "./policy.ts";
 
 function digits(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
@@ -17,13 +18,26 @@ export function supabaseSmsFanDirectory(): SmsFanDirectory {
       const wanted = digits(from);
       if (!wanted) return null;
       const admin = createAdminClient();
-      const { data, error } = await admin.from("fans").select("id, phone, birth_date");
+      let { data, error } = await admin
+        .from("fans")
+        .select("id, phone, birth_date, sms_parent_consent_at");
+      if (error && isMissingSmsParentConsentColumn(error)) {
+        const plain = await admin.from("fans").select("id, phone, birth_date");
+        data = plain.data;
+        error = plain.error;
+      }
       if (error) throw new Error(error.message);
       const target = (data ?? []).find((fan) => digits(fan.phone as string | null) === wanted);
       if (!target) return null;
+      const row = target as {
+        id: string;
+        birth_date?: string | null;
+        sms_parent_consent_at?: string | null;
+      };
       return {
-        id: String(target.id),
-        birthDate: (target.birth_date as string | null) ?? null,
+        id: String(row.id),
+        birthDate: row.birth_date ?? null,
+        smsParentConsentAt: row.sms_parent_consent_at ?? null,
       };
     },
     async setOptIn(id: string, optedIn: boolean) {

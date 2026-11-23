@@ -10,7 +10,9 @@ Fans must be 13 or older. A fan who is 13, 14, 15, 16, or 17 may join only with 
 
 You meet the age rule in AGE REQUIREMENT. If you are 13 to 17, a parent or guardian has said you may join.
 
-Paid memberships and text alerts stay 18 and older. That is existing product code. Brand Engage Pro lets ages 13 to 17 opt into texts with a second parent tick. Fan Engage does not.
+Text messages need their own permission. No one under 13 may opt in. A fan who is 13 to 17 may opt in only after a separate parent or guardian tick for texts. Fans 18 or older opt in as before.
+
+Paid memberships stay for fans 18 and older. Brand Engage Pro does not check age before Premium checkout, so a 13-to-17 member there can pay. This pull request does not change Fan Engage paid checkout.
 
 ## How parent permission is captured
 
@@ -22,4 +24,4 @@ The tick is required only when the date of birth is 13 to 17. It is sent as sign
 
 Brand Engage Pro also says brand accounts are 18 or older and requires that attestation on the brand application. Fan Engage's artist application does not ask for age. That sentence is not copied into the fan terms.
 
-Text enrollment in the stored terms still says a person under 18 may not enroll. The rewrite does not change that sentence.
+The text tick is stored as `fans.sms_parent_consent_at` by migration `0108_sms_parent_consent.sql`. That file is not applied from the pull request. Until it is applied by hand, the existing database trigger still turns texts off for anyone under 18.

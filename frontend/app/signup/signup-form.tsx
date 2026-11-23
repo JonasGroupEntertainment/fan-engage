@@ -51,6 +51,8 @@ import {
   AGE_BLOCK_STORAGE_KEY,
   PARENT_CONSENT_LABEL,
   PARENT_CONSENT_MESSAGE,
+  SMS_GUARDIAN_CHECKBOX,
+  SMS_GUARDIAN_MESSAGE,
   ageBand,
   needsParentConsent,
   parseBirthDate,
@@ -170,6 +172,7 @@ export function SignupForm({
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
   const [parentConsentChecked, setParentConsentChecked] = useState(false);
+  const [smsParentChecked, setSmsParentChecked] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -184,7 +187,8 @@ export function SignupForm({
     ? parseBirthDate(typedBirthDate.year, typedBirthDate.month, typedBirthDate.day)
     : null;
   // Texts are 18+. Until a full adult date is entered, the box stays off.
-  const smsAllowed = birthDate != null && ageBand(birthDate) === "adult";
+  const smsAllowed = birthDate != null && ageBand(birthDate) !== "under13";
+  const smsParentRequired = needsParentConsent(birthDate);
   const parentConsentRequired = needsParentConsent(birthDate);
   const hasConsentDocs = !!consentDocs && consentDocs.length > 0;
   const handleTurnstileSuccess = useCallback((token: string) => {
@@ -324,6 +328,12 @@ export function SignupForm({
       return;
     }
 
+    if (sms.smsOptedIn && smsParentRequired && !smsParentChecked) {
+      setStatus("error");
+      setMessage(SMS_GUARDIAN_MESSAGE);
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     const ok = await ensureCaptcha();
@@ -333,6 +343,7 @@ export function SignupForm({
       sms,
       toIsoDate(birthDate),
       needsParentConsent(birthDate),
+      sms.smsOptedIn && smsParentRequired && smsParentChecked,
     );
   }
 
@@ -346,6 +357,7 @@ export function SignupForm({
     setPassword("");
     setPhone("");
     setSmsConsent(false);
+    setSmsParentChecked(false);
     setParentConsentChecked(false);
     setBirthDateText("");
     setAgeBlocked(true);
@@ -358,6 +370,7 @@ export function SignupForm({
     sms: PublicSmsOptIn,
     birthDateIso: string,
     parentConsent: boolean,
+    smsParentConsent: boolean,
   ) {
     setStatus("loading");
     setMessage("");
@@ -380,6 +393,7 @@ export function SignupForm({
           smsOptedIn: sms.smsOptedIn,
           birthDate: birthDateIso,
           parentConsent,
+          smsParentConsent,
         }),
       });
       resetChallenge();
@@ -799,9 +813,21 @@ export function SignupForm({
             />
             <SmsConsentCopy linkClassName="text-white/85 underline underline-offset-4 hover:text-white" />
           </label>
-          {!smsAllowed && (
+          {smsParentRequired && (
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                name="sms-parent-consent"
+                checked={smsParentChecked}
+                onChange={(e) => setSmsParentChecked(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-aurora"
+              />
+              <span>{SMS_GUARDIAN_CHECKBOX}</span>
+            </label>
+          )}
+          {!birthDate && (
             <p className="text-xs text-white/45">
-              Text alerts are for fans 18 and older.
+              Add your date of birth to turn on text alerts.
             </p>
           )}
           {smsAllowed && smsConsent && !phone.trim() && (

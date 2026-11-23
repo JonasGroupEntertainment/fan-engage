@@ -7,7 +7,8 @@ import {
   smsOptInFromSettings,
   smsTierAllowed,
 } from "@/lib/sms-send-gate";
-import { adultGate } from "@/lib/age-gate";
+import { SMS_GUARDIAN_MESSAGE, smsTextOptIn } from "@/lib/age-gate";
+import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
 import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 import { TOGGLE_KEYS, isMissingPendingColumn, type Prefs } from "./prefs";
 
@@ -25,6 +26,7 @@ function cleanTime(value: unknown): string | null {
  */
 export async function savePreferencesAction(
   prefs: Prefs,
+  smsParentConsent = false,
 ): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
   const {
@@ -32,10 +34,10 @@ export async function savePreferencesAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
 
-  const [{ data: fan }, { data: current }] = await Promise.all([
+  const [fanRes, { data: current }] = await Promise.all([
     supabase
       .from("fans")
-      .select("current_tier, phone, birth_date")
+      .select("current_tier, phone, birth_date, sms_parent_consent_at")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -44,12 +46,31 @@ export async function savePreferencesAction(
       .eq("fan_id", user.id)
       .maybeSingle(),
   ]);
+  let fan = fanRes.data;
+  if (fanRes.error && isMissingSmsParentConsentColumn(fanRes.error)) {
+    const plain = await supabase
+      .from("fans")
+      .select("current_tier, phone, birth_date")
+      .eq("id", user.id)
+      .maybeSingle();
+    fan = plain.data;
+  } else if (fanRes.error) {
+    return { error: "Could not save your preferences. Please try again." };
+  }
 
-  // A new SMS turn-on needs Gold tier and a known adult birth date (COPPA).
-  // Fans already on SMS keep it until they turn it off (grandfathered).
-  const tierAllowsSms =
-    smsTierAllowed(fan?.current_tier as string | null) &&
-    adultGate((fan?.birth_date as string | null) ?? null) === "ok";
+  // A new SMS turn-on needs Gold tier. Ages 13 to 17 also need the
+  // separate parent tick. No birth date is not blocked. Under 13 is refused.
+  const tierAllowsSms = smsTierAllowed(fan?.current_tier as string | null);
+  const alreadyTextConsent = Boolean(
+    (fan as { sms_parent_consent_at?: string | null } | null)?.sms_parent_consent_at,
+  );
+  const turningSmsOn = !!prefs.sms_enabled && !current?.sms_enabled;
+  const smsAge = smsTextOptIn({
+    birthDate: (fan?.birth_date as string | null) ?? null,
+    requested: turningSmsOn,
+    smsParentConsent: smsParentConsent || alreadyTextConsent,
+  });
+  if (smsAge.rejected) return { error: SMS_GUARDIAN_MESSAGE };
   const sms = resolveSmsSwitch(
     !!prefs.sms_enabled,
     !!current?.sms_enabled,
@@ -100,10 +121,20 @@ export async function savePreferencesAction(
       )
     : null;
   if (smsOptIn !== null) {
-    const { error: optInError } = await supabase
-      .from("fans")
-      .update({ sms_opted_in: smsOptIn })
-      .eq("id", user.id);
+    const fanUpdate: { sms_opted_in: boolean; sms_parent_consent_at?: string } = {
+      sms_opted_in: smsOptIn,
+    };
+    if (smsOptIn && smsAge.stampConsent) {
+      fanUpdate.sms_parent_consent_at = new Date().toISOString();
+    }
+    let { error: optInError } = await supabase.from("fans").update(fanUpdate).eq("id", user.id);
+    if (optInError && isMissingSmsParentConsentColumn(optInError)) {
+      if (smsAge.stampConsent) return { error: SMS_GUARDIAN_MESSAGE };
+      ({ error: optInError } = await supabase
+        .from("fans")
+        .update({ sms_opted_in: smsOptIn })
+        .eq("id", user.id));
+    }
     if (optInError) {
       console.error("notifications: failed to sync sms_opted_in", optInError);
       return { error: "Could not save your SMS setting. Please try again." };

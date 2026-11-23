@@ -15,6 +15,11 @@ export type SignupAuthOptionsInput = {
    * The database refuses that age without it. Nothing is verified.
    */
   parentConsent?: boolean;
+  /**
+   * True only when a 13–17 fan ticked the separate text box.
+   * The join box does not count. Nothing is verified.
+   */
+  smsParentConsent?: boolean;
 };
 
 export type SignupAuthOptions = {
@@ -42,6 +47,7 @@ export function buildSignupAuthOptions(input: SignupAuthOptionsInput): SignupAut
   if (input.smsOptedIn === true) data.sms_opted_in = "true";
   if (input.birthDate) data.birth_date = input.birthDate;
   if (input.parentConsent === true) data.parent_consent = "true";
+  if (input.smsParentConsent === true) data.sms_parent_consent = "true";
   if (Object.keys(data).length > 0) options.data = data;
 
   return options;
