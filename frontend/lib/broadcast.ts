@@ -1,8 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
 import { smsSendClass, type SmsMessageType } from "@/lib/sms/kinds";
-import { smsAgeAllowsSend } from "@/lib/sms/policy";
-import { pageAll, pageAllIn } from "@/lib/supabase/page-all";
+import { isMissingSmsParentConsentColumn, smsAgeAllowsSend } from "@/lib/sms/policy";
+import { pageAll, pageAllIn, type PageQuery } from "@/lib/supabase/page-all";
 import { outOfTime } from "@/lib/send-budget";
 
 /**
@@ -27,6 +27,7 @@ type RecipientRow = {
   email: string | null;
   phone: string | null;
   birth_date: string | null;
+  sms_parent_consent_at?: string | null;
 };
 
 type FanIdRow = { fan_id: string };
@@ -79,26 +80,36 @@ async function loadRecipients(opts: {
   const scopedIds = await loadScopedFanIds(opts);
   if (scopedIds !== null && scopedIds.length === 0) return [];
 
-  const fansQuery = () =>
+  const fansQuery = (columns: string) =>
     admin
       .from("fans")
-      .select("id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date")
+      .select(columns)
       .eq(optColumn, true)
       .eq("suspended", false)
       .not(contactColumn, "is", null);
+  const columns =
+    "id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date, sms_parent_consent_at";
+  const plainColumns =
+    "id, first_name, email, phone, sms_opted_in, email_opted_in, suspended, birth_date";
 
-  const fans =
+  const load = (cols: string) =>
     scopedIds === null
-      ? await pageAll<RecipientRow>(() => fansQuery().order("id", { ascending: true }))
-      : await pageAllIn<RecipientRow, string>(scopedIds, (part) =>
-          fansQuery().in("id", part).order("id", { ascending: true }),
+      ? pageAll<RecipientRow>(
+          () => fansQuery(cols).order("id", { ascending: true }) as PageQuery<RecipientRow>,
+        )
+      : pageAllIn<RecipientRow, string>(scopedIds, (part) =>
+          fansQuery(cols).in("id", part).order("id", { ascending: true }) as PageQuery<RecipientRow>,
         );
+  let fans = await load(columns);
+  if (fans.error && isMissingSmsParentConsentColumn(fans.error)) {
+    fans = await load(plainColumns);
+  }
   if (fans.error) throw new Error(`fans: ${fans.error.message}`);
   return fans.data;
 }
 
 /**
- * Send an SMS to every opted-in adult fan in scope through Mailchimp.
+ * Send an SMS to every opted-in fan the age rule allows, through Mailchimp.
  * Pass `fanIds` when the caller has already chosen the fans (for example
  * an artist's fans narrowed by tier); only those fans are texted, and an
  * empty list texts nobody. With `deadlineAt` (epoch ms) no new text is
@@ -131,7 +142,9 @@ export async function broadcastSms(params: {
 
   const admin = createAdminClient();
 
-  const textable = recipients.filter((fan) => fan.phone && smsAgeAllowsSend(fan.birth_date));
+  const textable = recipients.filter(
+    (fan) => fan.phone && smsAgeAllowsSend(fan.birth_date, new Date(), fan.sms_parent_consent_at),
+  );
   for (const fan of textable) {
     if (!fan.phone) continue;
     if (outOfTime(params.deadlineAt)) {

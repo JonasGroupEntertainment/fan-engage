@@ -9,12 +9,13 @@ import { normalizePhoneE164 } from "@/lib/phone";
 import { setPreferences } from "@/lib/notifications/preferences";
 import { smsEnabledFromOnboarding } from "@/lib/sms-send-gate";
 import { onboardConsentUpdates } from "@/lib/consent";
-import { adultSmsOptIn } from "@/lib/age-gate";
+import { SMS_GUARDIAN_MESSAGE, smsTextOptIn } from "@/lib/age-gate";
 import {
   channelOptInTimestampPatch,
   isMissingOptInTimestampColumn,
   omitOptInTimestamps,
 } from "@/lib/channel-opt-in";
+import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,8 @@ type OnboardPayload = {
   smsOptedIn?: boolean;
   /** True only when the fan ticked the SMS consent box. */
   smsConsent?: boolean;
+  /** Separate parent tick for a fan aged 13 to 17. Not the join tick. */
+  smsParentConsent?: boolean;
   emailOptedIn?: boolean;
   /** When the fan ticked the Terms box (client clock, validated here). */
   consentAcceptedAt?: string;
@@ -106,19 +109,40 @@ export async function POST(request: NextRequest) {
     // — instead we merge it into the socials jsonb column so social
     // identifiers stay in their own field. The URL slug column,
     // fans.profile_slug, is owned by the BEFORE INSERT trigger.
-    const { data: existingFan } = await supabase
+    let { data: existingFan, error: existingErr } = await supabase
       .from("fans")
-      .select("socials, sms_opted_in, email_opted_in, birth_date")
+      .select("socials, sms_opted_in, email_opted_in, birth_date, sms_parent_consent_at")
       .eq("id", user.id)
       .maybeSingle();
+    const consentColumnReady = !isMissingSmsParentConsentColumn(existingErr);
+    if (existingErr && !consentColumnReady) {
+      const plain = await supabase
+        .from("fans")
+        .select("socials, sms_opted_in, email_opted_in, birth_date")
+        .eq("id", user.id)
+        .maybeSingle();
+      existingFan = plain.data as typeof existingFan;
+      existingErr = plain.error;
+    }
+    if (existingErr) {
+      console.error("onboard: failed to read fan", existingErr);
+      return NextResponse.json({ error: "Unable to save profile." }, { status: 500 });
+    }
 
-    // Texts are 18+ (COPPA, 0070). A new SMS opt-in needs a known adult
-    // birth date; a fan already opted in with no birth date keeps it.
-    const smsOptedIn = adultSmsOptIn(
-      consent.smsOptedIn,
-      existingFan?.birth_date as string | null,
-      existingFan?.sms_opted_in === true,
+    // Texts: 18+ as before, no birth date is not blocked, 13 to 17 need a
+    // separate parent tick, under 13 never. The column is migration 0108.
+    const alreadyTextConsent = Boolean(
+      (existingFan as { sms_parent_consent_at?: string | null } | null)?.sms_parent_consent_at,
     );
+    const smsAge = smsTextOptIn({
+      birthDate: existingFan?.birth_date as string | null,
+      requested: consent.smsOptedIn,
+      smsParentConsent: payload.smsParentConsent === true || alreadyTextConsent,
+    });
+    if (smsAge.rejected || (smsAge.stampConsent && !consentColumnReady)) {
+      return NextResponse.json({ error: SMS_GUARDIAN_MESSAGE, field: "sms" }, { status: 400 });
+    }
+    const smsOptedIn = smsAge.accept;
 
     let socialsMerge: Record<string, unknown> | undefined = undefined;
     if (typeof payload.handle === "string" && payload.handle.trim()) {
@@ -150,6 +174,7 @@ export async function POST(request: NextRequest) {
       // Only written when the fan ticked the Terms box this time, so a
       // re-submit never blanks or back-dates an earlier consent.
       ...(consent.consent ?? {}),
+      ...(smsAge.stampConsent ? { sms_parent_consent_at: new Date().toISOString() } : {}),
     };
     if (socialsMerge !== undefined) updates.socials = socialsMerge;
 

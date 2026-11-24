@@ -29,7 +29,9 @@ describe("help, pricing perk, and header copy", () => {
     assert.match(help, /What is Fan Engage Pro\?/);
     assert.match(help, /Fans must be 13 or older/);
     assert.match(help, /parent or guardian/);
-    assert.match(help, /No one under\s+13/);
+    assert.match(help, /No one under\s+13 can join/);
+    assert.match(help, /separate parent or\s+guardian tick/);
+    assert.match(help, /Paid\s+memberships are for fans 18 and older/);
     assert.match(help, /Founding Fan perks/);
     assert.match(help, /Premium billing/);
     assert.match(help, /Colorado limited liability company/);

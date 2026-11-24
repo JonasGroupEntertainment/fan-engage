@@ -73,9 +73,11 @@ describe("promotional SMS flag", () => {
   });
 });
 
-describe("18+ send gate", () => {
-  it("blocks a known under-18 date and allows 18 and unknown", () => {
+describe("text age gate", () => {
+  it("blocks under 13 and a teen without the parent tick, and allows the rest", () => {
     assert.equal(smsAgeAllowsSend(UNDER_18, NOW), false);
+    assert.equal(smsAgeAllowsSend(UNDER_18, NOW, "2026-11-01T00:00:00.000Z"), true);
+    assert.equal(smsAgeAllowsSend("2014-11-19", NOW, "2026-11-01T00:00:00.000Z"), false);
     assert.equal(smsAgeAllowsSend("2008-11-19", NOW), false);
     assert.equal(smsAgeAllowsSend("2008-11-18", NOW), true);
     assert.equal(smsAgeAllowsSend(ADULT, NOW), true);

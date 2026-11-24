@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverSms } from "@/lib/sms/deliver";
 import { type SmsMessageType, smsSendClass } from "@/lib/sms/kinds";
-import { smsAgeAllowsSend } from "@/lib/sms/policy";
+import { isMissingSmsParentConsentColumn, smsAgeAllowsSend } from "@/lib/sms/policy";
 
 /**
  * Send a single SMS to a fan. Tier-gated by default — only Gold/Platinum
@@ -12,8 +12,8 @@ import { smsAgeAllowsSend } from "@/lib/sms/policy";
  * table, quiet hours). This module only enforces:
  *   1. Mailchimp SMS is configured
  *   2. Fan has a phone + sms_opted_in
- *   3. Fan is 18+ when a birth date is on file (unknown dates stay
- *      grandfathered, matching the fans age trigger)
+ *   3. Age rule: 18+ and unknown birth dates may be texted. Ages 13 to 17
+ *      only when sms_parent_consent_at is set. Under 13 is refused.
  *   4. Fan tier ≥ Gold (unless `bypassTierGate` is true)
  *   5. Promotional types stay blocked until the promotional flag is set
  *
@@ -37,7 +37,7 @@ export interface SendSmsResult {
     | "promotional_disabled"
     | "no_phone"
     | "not_opted_in"
-    | "under_18"
+    | "age_rule"
     | "tier_gate"
     | "send_failed";
   error?: string;
@@ -51,17 +51,26 @@ export async function sendSmsToFan(opts: {
   bypassTierGate?: boolean;
 }): Promise<SendSmsResult> {
   const admin = createAdminClient();
-  const { data: fan } = await admin
+  let { data: fan, error: fanErr } = await admin
     .from("fans")
-    .select("id, phone, sms_opted_in, current_tier, birth_date")
+    .select("id, phone, sms_opted_in, current_tier, birth_date, sms_parent_consent_at")
     .eq("id", opts.fanId)
     .maybeSingle();
-
-  if (!fan) return { sent: false, suppressionReason: "no_phone" };
+  if (fanErr && isMissingSmsParentConsentColumn(fanErr)) {
+    const plain = await admin
+      .from("fans")
+      .select("id, phone, sms_opted_in, current_tier, birth_date")
+      .eq("id", opts.fanId)
+      .maybeSingle();
+    fan = plain.data as typeof fan;
+    fanErr = plain.error;
+  }
+  if (fanErr || !fan) return { sent: false, suppressionReason: "no_phone" };
   if (!fan.phone) return { sent: false, suppressionReason: "no_phone" };
   if (!fan.sms_opted_in) return { sent: false, suppressionReason: "not_opted_in" };
-  if (!smsAgeAllowsSend(fan.birth_date as string | null)) {
-    return { sent: false, suppressionReason: "under_18" };
+  const consentAt = (fan as { sms_parent_consent_at?: string | null }).sms_parent_consent_at;
+  if (!smsAgeAllowsSend(fan.birth_date as string | null, new Date(), consentAt)) {
+    return { sent: false, suppressionReason: "age_rule" };
   }
 
   if (!opts.bypassTierGate) {

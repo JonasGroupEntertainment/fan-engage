@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SMS_GUARDIAN_CHECKBOX } from "@/lib/age-gate";
 import { savePreferencesAction } from "./actions";
 import type { PendingColumn, Prefs, ToggleKey } from "./prefs";
 
@@ -105,18 +106,22 @@ export function PreferencesForm({
   hadRow,
   smsAllowed,
   smsCopy,
+  needsSmsGuardian = false,
   unavailable = [],
 }: {
   initial: Prefs;
   hadRow: boolean;
   smsAllowed: boolean; // false below Gold: SMS can be turned off, not on
   smsCopy?: string; // shown on the SMS row when smsAllowed is false
+  /** 13 to 17, and the separate text tick is not stored yet. */
+  needsSmsGuardian?: boolean;
   unavailable?: readonly PendingColumn[]; // columns prod does not have yet
 }) {
   const [prefs, setPrefs] = useState<Prefs>(initial);
   const [pending, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [smsParentConsent, setSmsParentConsent] = useState(false);
 
   const allRows = [...CHANNEL_ROWS, ...TYPE_ROWS];
   const dirty =
@@ -143,7 +148,7 @@ export function PreferencesForm({
     setError(null);
     startTransition(async () => {
       try {
-        const res = await savePreferencesAction(prefs);
+        const res = await savePreferencesAction(prefs, smsParentConsent);
         if ("error" in res) {
           setError(res.error);
         } else {
@@ -176,6 +181,18 @@ export function PreferencesForm({
             onToggle={() => toggle(row.key)}
           />
         ))}
+        {needsSmsGuardian && prefs.sms_enabled && (
+          <label className="flex items-start gap-2 px-1 text-sm text-white/70">
+            <input
+              type="checkbox"
+              name="sms-parent-consent"
+              checked={smsParentConsent}
+              onChange={(e) => setSmsParentConsent(e.target.checked)}
+              className="mt-1 h-4 w-4 accent-aurora"
+            />
+            <span>{SMS_GUARDIAN_CHECKBOX}</span>
+          </label>
+        )}
       </Section>
 
       <Section title="What to notify me about">

@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isTeenBirthDate } from "@/lib/age-gate";
+import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guestSignupHref } from "@/lib/guest-signup";
@@ -76,20 +78,35 @@ export default async function OnboardingPage({
   const email = user?.email ?? "";
   let initialPhone = "";
   let initialSmsConsent = false;
+  let needsSmsGuardian = false;
   if (user) {
-    const { data: fan } = await supabase
+    const firstFan = await supabase
       .from("fans")
-      .select("phone, sms_opted_in")
+      .select("phone, sms_opted_in, birth_date, sms_parent_consent_at")
       .eq("id", user.id)
       .maybeSingle();
+    let fan = firstFan.data;
+    if (firstFan.error && isMissingSmsParentConsentColumn(firstFan.error)) {
+      const plain = await supabase
+        .from("fans")
+        .select("phone, sms_opted_in, birth_date")
+        .eq("id", user.id)
+        .maybeSingle();
+      fan = plain.data as typeof fan;
+    }
     initialPhone = typeof fan?.phone === "string" ? fan.phone : "";
     initialSmsConsent = fan?.sms_opted_in === true;
+    const birthDate = (fan?.birth_date as string | null) ?? null;
+    const textConsent = (fan as { sms_parent_consent_at?: string | null } | null)
+      ?.sms_parent_consent_at;
+    needsSmsGuardian = isTeenBirthDate(birthDate) && !textConsent;
   }
   return (
     <OnboardingWizard
       initialEmail={email}
       initialPhone={initialPhone}
       initialSmsConsent={initialSmsConsent}
+      needsSmsGuardian={needsSmsGuardian}
       sessionConfirmed={!bounce}
       lockedArtist={lockedArtist}
     />

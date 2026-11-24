@@ -9,6 +9,8 @@ import { smsAgeAllowsSend } from "./policy.ts";
 export type SmsFanRecord = {
   id: string;
   birthDate: string | null;
+  /** Set when a 13–17 fan ticked the separate text permission. */
+  smsParentConsentAt?: string | null;
 };
 
 export type SmsFanDirectory = {
@@ -32,7 +34,7 @@ export type InboundOutcome = {
    * Unknown numbers stay null so a Brand Engage fan is not trapped.
    */
   providerOptIn: boolean | null;
-  /** Known fan under 18. Not opted in and not texted. */
+  /** Known fan the age rule refuses. Not opted in and not texted. */
   underAge: boolean;
 };
 
@@ -41,8 +43,9 @@ export type InboundOutcome = {
  *
  * STOP opts that fan out even though the event is also forwarded to
  * Brand Engage. A number with no Fan Engage fan is left unchanged.
- * START from an unknown number is a no-op. A known under-18 fan is
- * never opted back in and is kept on the denylist.
+ * START from an unknown number is a no-op. A known under-13 fan, and a
+ * 13-to-17 fan without the separate parent text tick, is never opted
+ * back in and is kept on the denylist.
  * HELP and START replies are returned only when the caller sets
  * sendKeywordReplies. STOP never gets a reply from us.
  */
@@ -67,7 +70,9 @@ export async function handleInboundSms(input: {
   }
   const fan = await input.directory.findByPhone(input.from);
   const repliesOn = input.sendKeywordReplies === true;
-  const underAge = Boolean(fan && !smsAgeAllowsSend(fan.birthDate, input.now));
+  const underAge = Boolean(
+    fan && !smsAgeAllowsSend(fan.birthDate, input.now, fan.smsParentConsentAt),
+  );
 
   if (action === "stop") {
     if (fan) await input.directory.setOptIn(fan.id, false);

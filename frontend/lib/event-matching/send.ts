@@ -6,7 +6,7 @@
  *
  *   1. Write a row to public.notifications (in-app inbox) with a
  *      stable dedup_key so re-running can't double-fire.
- *   2. If the fan has sms_opted_in = true, a phone number, and is 18+
+ *   2. If the fan has sms_opted_in = true, a phone number, and passes the age rule
  *      (or has no birth date on file), send one SMS through Mailchimp.
  *      Event matches are promotional, so they stay blocked until
  *      MAILCHIMP_SMS_PROMOTIONAL_ENABLED is set. In-app rows still write.
@@ -20,7 +20,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deliverSms, smsBlockReason } from "@/lib/sms/deliver";
 import { smsSendClass } from "@/lib/sms/kinds";
-import { smsAgeAllowsSend } from "@/lib/sms/policy";
+import { isMissingSmsParentConsentColumn, smsAgeAllowsSend } from "@/lib/sms/policy";
 
 export interface SendEventMatchResult {
   event_id: string;
@@ -71,14 +71,24 @@ export async function sendEventMatchNotifications(
     (artist?.display_name as string) ?? (event.artist_slug as string);
 
   // Load unsent candidates with the fan fields we need.
-  const { data: rows, error: listErr } = await admin
+  const matchSelect =
+    "fan_id, channels_sent, fans!inner(first_name, phone, sms_opted_in, birth_date, sms_parent_consent_at)";
+  let { data: rows, error: listErr } = await admin
     .from("event_match_log")
-    .select(
-      "fan_id, channels_sent, fans!inner(first_name, phone, sms_opted_in, birth_date)",
-    )
+    .select(matchSelect)
     .eq("event_id", eventId)
     .eq("is_candidate", true)
     .is("sent_at", null);
+  if (listErr && isMissingSmsParentConsentColumn(listErr)) {
+    const plain = await admin
+      .from("event_match_log")
+      .select("fan_id, channels_sent, fans!inner(first_name, phone, sms_opted_in, birth_date)")
+      .eq("event_id", eventId)
+      .eq("is_candidate", true)
+      .is("sent_at", null);
+    rows = plain.data as typeof rows;
+    listErr = plain.error;
+  }
   if (listErr) {
     throw new Error(`event_match_log read failed: ${listErr.message}`);
   }
@@ -91,6 +101,7 @@ export async function sendEventMatchNotifications(
       phone: string | null;
       sms_opted_in: boolean;
       birth_date: string | null;
+      sms_parent_consent_at?: string | null;
     };
   }>);
 
@@ -141,13 +152,13 @@ export async function sendEventMatchNotifications(
       channels.push("in_app");
     }
 
-    // 2) SMS — provider configured, fan opted in, has a phone, and is 18+.
+    // 2) SMS — provider configured, fan opted in, has a phone, and passes the age rule.
     if (
       smsReady &&
       c.fans.sms_opted_in === true &&
       c.fans.phone &&
       c.fans.phone.trim().length > 0 &&
-      smsAgeAllowsSend(c.fans.birth_date)
+      smsAgeAllowsSend(c.fans.birth_date, new Date(), c.fans.sms_parent_consent_at)
     ) {
       const smsBody = formatSms({
         firstName: c.fans.first_name,

@@ -8,6 +8,7 @@ import {
   ageBand,
   needsParentConsent,
   adultSmsOptIn,
+  smsTextOptIn,
   birthDateReturnPath,
   ageOn,
   isAdult,
@@ -122,26 +123,44 @@ describe("birthDateReturnPath", () => {
   });
 });
 
-describe("adultSmsOptIn", () => {
+describe("sms text opt-in", () => {
   const now = new Date("2026-10-11T12:00:00Z");
 
-  it("allows a new opt-in for a known adult", () => {
+  it("lets an adult opt in without a parent tick", () => {
     assert.equal(adultSmsOptIn(true, "2000-01-01", false, now), true);
+    assert.deepEqual(
+      smsTextOptIn({ birthDate: "2000-01-01", requested: true, smsParentConsent: false, now }),
+      { accept: true, stampConsent: false, rejected: false },
+    );
   });
 
-  it("blocks a new opt-in with no birth date", () => {
-    assert.equal(adultSmsOptIn(true, null, false, now), false);
-  });
-
-  it("keeps an existing opt-in with no birth date (grandfathered)", () => {
+  it("does not block a fan with no birth date", () => {
+    assert.equal(adultSmsOptIn(true, null, false, now), true);
     assert.equal(adultSmsOptIn(true, null, true, now), true);
   });
 
-  it("always turns it off for a known under-18", () => {
+  it("refuses ages 13 to 17 until the separate parent tick", () => {
     assert.equal(adultSmsOptIn(true, "2010-05-05", true, now), false);
+    assert.equal(adultSmsOptIn(true, "2010-05-05", false, now, true), true);
+    assert.deepEqual(
+      smsTextOptIn({ birthDate: "2010-05-05", requested: true, smsParentConsent: false, now }),
+      { accept: false, stampConsent: false, rejected: true },
+    );
+    assert.deepEqual(
+      smsTextOptIn({ birthDate: "2010-05-05", requested: true, smsParentConsent: true, now }),
+      { accept: true, stampConsent: true, rejected: false },
+    );
+  });
+
+  it("refuses under 13 even with the tick", () => {
+    assert.deepEqual(
+      smsTextOptIn({ birthDate: "2015-01-01", requested: true, smsParentConsent: true, now }),
+      { accept: false, stampConsent: false, rejected: true },
+    );
   });
 
   it("never turns it on when not requested", () => {
     assert.equal(adultSmsOptIn(false, "2000-01-01", true, now), false);
+    assert.equal(adultSmsOptIn(false, "2010-05-05", true, now, true), false);
   });
 });

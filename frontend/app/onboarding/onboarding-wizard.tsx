@@ -17,6 +17,7 @@ import {
   smsSendBlockedReason,
 } from "@/lib/sms-send-gate";
 import { SmsConsentCopy } from "@/components/sms-consent-copy";
+import { SMS_GUARDIAN_CHECKBOX, SMS_GUARDIAN_MESSAGE } from "@/lib/age-gate";
 
 type Field = {
   label: string;
@@ -125,6 +126,7 @@ export default function OnboardingWizard({
   initialEmail = "",
   initialPhone = "",
   initialSmsConsent = false,
+  needsSmsGuardian = false,
   sessionConfirmed = false,
   lockedArtist = null,
 }: {
@@ -132,6 +134,8 @@ export default function OnboardingWizard({
   initialPhone?: string;
   /** True when this fan already opted in (for example on the public signup form). */
   initialSmsConsent?: boolean;
+  /** Ages 13 to 17 who have not ticked the separate text permission yet. */
+  needsSmsGuardian?: boolean;
   sessionConfirmed?: boolean;
   /**
    * Artist the fan is joining, from a validated `?artist=<slug>`. When set it
@@ -170,6 +174,7 @@ export default function OnboardingWizard({
   // the server never has to invent one.
   const [tosConsentAt, setTosConsentAt] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(initialSmsConsent);
+  const [smsParentChecked, setSmsParentChecked] = useState(false);
   // Tracks whether the email field was successfully auto-prefilled from
   // auth.users. When true, the field stays readOnly (no risk of typo
   // changing what's already on the account). When false, the field is
@@ -308,7 +313,10 @@ export default function OnboardingWizard({
       refFromUrl,
       defaultSlug: LAUNCH_COMMUNITY_ID,
     });
-    const textsConsented = hasSendablePhone(formState.phone) && smsConsent;
+    const textsConsented =
+      hasSendablePhone(formState.phone) &&
+      smsConsent &&
+      (!needsSmsGuardian || smsParentChecked);
     return JSON.stringify({
       firstName: formState.firstName,
       city: formState.city,
@@ -320,6 +328,7 @@ export default function OnboardingWizard({
       communitySlug,
       smsOptedIn: textsConsented,
       smsConsent: textsConsented,
+      smsParentConsent: needsSmsGuardian && smsParentChecked,
       emailOptedIn: Boolean(formState.email),
       consentAcceptedAt: tosConsent && tosConsentAt ? tosConsentAt : undefined,
     });
@@ -339,6 +348,11 @@ export default function OnboardingWizard({
     if (!smsConsent) {
       setSmsStatus("error");
       setSmsMessage("Tick the SMS consent box before we text you.");
+      return;
+    }
+    if (needsSmsGuardian && !smsParentChecked) {
+      setSmsStatus("error");
+      setSmsMessage(SMS_GUARDIAN_MESSAGE);
       return;
     }
 
@@ -394,6 +408,11 @@ export default function OnboardingWizard({
    * optional field.
    */
   const handleFinish = async () => {
+    if (needsSmsGuardian && smsConsent && !smsParentChecked) {
+      setFinishStatus("error");
+      setFinishMessage(SMS_GUARDIAN_MESSAGE);
+      return;
+    }
     try {
       setFinishStatus("saving");
 
@@ -668,6 +687,20 @@ export default function OnboardingWizard({
                     .
                   </span>
                 </label>
+                {formState.phone && needsSmsGuardian && (
+                  <label className="flex items-start gap-3 py-1">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        name="sms-parent-consent"
+                        checked={smsParentChecked}
+                        onChange={(e) => setSmsParentChecked(e.target.checked)}
+                        className="h-5 w-5 accent-aurora"
+                      />
+                    </span>
+                    <span className="text-sm text-white/70">{SMS_GUARDIAN_CHECKBOX}</span>
+                  </label>
+                )}
                 {formState.phone && (
                   <label className="flex items-start gap-3 py-1">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center">
