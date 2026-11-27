@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { reportClientError } from "@/lib/report-client-error";
 
 // Route-level error boundary. Renders inside the root layout (nav + footer
 // stay up), so only the page body is replaced.
@@ -14,6 +15,7 @@ export default function ErrorPage({
 }) {
   useEffect(() => {
     console.error(error);
+    reportClientError(error);
   }, [error]);
 
   return (

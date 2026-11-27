@@ -1,5 +1,6 @@
 import { runCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   gatherAdminBriefMetrics,
   summarizeAdminBrief,
@@ -33,6 +34,22 @@ export async function GET(request: Request) {
 
 async function dailyAdminBrief() {
   const started = Date.now();
+
+  // Keep app_errors to 90 days (migration 0114). Never blocks the brief.
+  try {
+    const { data: purged, error: purgeErr } = await createAdminClient().rpc(
+      "purge_old_app_errors",
+      { p_keep_days: 90 },
+    );
+    if (purgeErr) console.warn("[daily-admin-brief] app_errors purge failed:", purgeErr.message);
+    else if (purged) console.info("[daily-admin-brief] app_errors purged:", purged);
+  } catch (err) {
+    console.warn(
+      "[daily-admin-brief] app_errors purge failed:",
+      err instanceof Error ? err.message : "error",
+    );
+  }
+
   try {
     const metrics = await gatherAdminBriefMetrics(new Date());
     const summary = await summarizeAdminBrief(metrics);

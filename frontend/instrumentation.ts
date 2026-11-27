@@ -17,8 +17,23 @@ export async function register() {
   }
 }
 
-export const onRequestError: Instrumentation.onRequestError = (error, request, context) => {
-  if (!hasSentryDsn()) return;
-  if (isNextControlFlowError(error)) return;
-  Sentry.captureRequestError(error, request, context);
+/**
+ * Server errors are kept in the app's own database (app_errors, migration
+ * 0114) for 90 days and read on /admin/errors. Sentry, when it is set up,
+ * still gets them too.
+ */
+export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
+  if (hasSentryDsn() && !isNextControlFlowError(error)) {
+    Sentry.captureRequestError(error, request, context);
+  }
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  try {
+    const { serverErrorRow } = await import("./lib/app-error-row");
+    const row = serverErrorRow(error, request, context);
+    if (!row) return;
+    const { recordAppError } = await import("./lib/app-errors");
+    await recordAppError(row);
+  } catch {
+    // Recording must never cause another error.
+  }
 };
