@@ -789,6 +789,22 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 <li><b>Next migration number is 0115.</b> 0104 is still on main and not applied.</li>
 <li>Housekeeping: #221 (the docs update for #219 and #220) merged as 8faec1c. The #221, #222 and #223 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request.</li>
 </ul>
+
+<h3>2026-11-27: batch 3, smaller fan-facing fixes from Brand Engage Pro (PR #225, no migration)</h3>
+<ul>
+<li><b>What this is.</b> Batch 3 of the catch-up with Brand Engage Pro (its #248, #264, #269, #297, #312 and #320), adapted to this app. One pull request, merged by Kevin as 4109fc7 and live.</li>
+<li><span class="status-good">Names.</span> The leaderboard, the fan card and its share title show the preferred (first) name only, through <code>fanPublicName</code> in <code>lib/format/fan-name.ts</code>. Team views keep <code>fanDisplayName</code> and the full name. No fan has a last name stored today, so nothing looks different yet.</li>
+<li><span class="status-good">Post links.</span> Each post card has the <code>post-&lt;id&gt;</code> anchor (<code>lib/community/post-anchor.ts</code>), so "You might have missed" cards, search results, digest links and notifications land on the post.</li>
+<li><span class="status-good">Large text.</span> The base size in <code>app/globals.css</code> is <code>112.5%</code>, not a fixed <code>18px</code>: the same at the default, and it follows the visitor's own text-size setting. <code>components/header-fit.tsx</code> shortens "Fan Engage Pro" with an ellipsis, at phone width only (below 768), and only when the name would overlap the header buttons. Long links in posts and comments wrap.</li>
+<li><span class="status-good">Check-in.</span> Once the answer is final (recorded, already recorded today, or code expired) the code is removed from the address (<code>lib/checkin-code-address.ts</code>), and the page posts once even if its effect runs twice. Reloading after a check-in now shows "Scan the QR at the venue". The signed-out screen explains the second sign-in to a fan who scanned the code.</li>
+<li><span class="status-good">Reset password.</span> "Passwords do not match." and "Password must be at least 8 characters." show as the fan types, above the button. The form has <code>noValidate</code>.</li>
+<li><b>Looked at and left alone.</b> Welcome points wording stays at 100 (Brand Engage Pro #249 moved its wording to 125). Here the signup bonus is 100, and what else a new fan gets varies, so there is no single higher number to promise.</li>
+<li><span class="status-good">Checked.</span> Unit tests 2,131 passing; an independent review found nothing serious. On the preview, signed out: at 768 wide the header matched production exactly; at about 600 wide it was unchanged at normal and 1.5 times text and shortened to "Fan…" at 2 times with no sideways scroll. The first version of the header change acted at tablet width at normal size; that was caught on the preview and fixed before merge. On production after the merge: tests, secret scan and deploy passed; the pages load; the live stylesheet has the new base size; posts on the RaeLynn community page carry the anchor.</li>
+<li><span class="status-warn">Not checked.</span> Nothing signed in, and no real phone (the narrowest width measured was about 600). Added to the phone pass: tap a "You might have missed" card, the names on the leaderboard and fan card, scan a check-in code twice, the reset form messages, and the header with larger text.</li>
+<li><span class="status-warn">Found, not fixed.</span> For a signed-in admin the header runs off the right edge between about 768 and 1,240 wide, because the full menu, badges and buttons do not fit. It was like this before #225. It needs its own small fix.</li>
+<li><b>Still to port.</b> Batch 4 (team only). The item list is in the private online copy of this handoff.</li>
+<li>Housekeeping: #224 (the docs update for batch 2c) merged as 56ded48. The #224 and #225 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. Next migration number is still 0115.</li>
+</ul>
 </section>
 
 <section>
