@@ -42,7 +42,8 @@ export const INBOX_REMINDER_PRIORITY = [
 
 /**
  * Never counted and never dropped: news about a reward the fan spent
- * points on.
+ * points on, and the notice that they now have enough points for one
+ * (at most one per reward per day).
  */
 export const UNCAPPED_INBOX_KINDS = ["redemption_update"] as const;
 
