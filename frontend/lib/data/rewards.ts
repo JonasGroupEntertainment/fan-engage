@@ -7,6 +7,9 @@ import {
   requirePremiumAnywhere,
   requirePremiumFeature,
 } from "@/lib/entitlements";
+import { ALREADY_WAITING_MESSAGE, redeemErrorMessage } from "@/lib/reward-redeem-error";
+
+export { ALREADY_WAITING_MESSAGE };
 
 export interface RewardRow {
   id: string;
@@ -158,9 +161,6 @@ export async function countPendingRedemptions(communityId: string): Promise<numb
  * Callers cannot supply another fan id (A-P0-2).
  * Returns { ok, redemptionId?, error? }
  */
-/** Shown when the fan already has this reward waiting to be fulfilled. */
-export const ALREADY_WAITING_MESSAGE =
-  "You already redeemed this and it is waiting to be fulfilled. No more points were spent.";
 
 export async function redeemReward({
   rewardId,
@@ -230,7 +230,9 @@ export async function redeemReward({
     });
 
     if (error) {
-      return { ok: false, error: error.message };
+      // Two presses at the same moment: the database refuses the second
+      // (migration 0112) and nothing is spent. Say so in the same words.
+      return { ok: false, error: redeemErrorMessage(error) };
     }
 
     return { ok: true, redemptionId: data as string };
