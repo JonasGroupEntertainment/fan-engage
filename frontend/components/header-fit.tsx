@@ -16,16 +16,23 @@ import { useEffect } from "react";
  * synchronous step, so there is no flicker and the result does not depend on
  * the previous state.
  */
+/** Below the width where the full menu appears in the header (Tailwind md). */
+const PHONE_WIDTH_QUERY = "(max-width: 767.98px)";
+
 export function HeaderFit() {
   useEffect(() => {
     const row = document.querySelector<HTMLElement>("[data-header-row]");
     const name = row?.querySelector<HTMLElement>("[data-wordmark]");
     if (!row || !name) return;
 
+    const phone = window.matchMedia(PHONE_WIDTH_QUERY);
     let frame = 0;
     const check = () => {
       frame = 0;
       row.removeAttribute("data-crowded");
+      // Phones only. From tablet width up the full menu is in the row and
+      // the layout there is not this component's to change.
+      if (!phone.matches) return;
       if (isCrowded(row, name)) row.setAttribute("data-crowded", "");
     };
     const schedule = () => {

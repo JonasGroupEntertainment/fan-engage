@@ -56,6 +56,9 @@ describe("large text", () => {
     assert.match(layout, /data-header-row/);
     assert.match(layout, /data-wordmark-link/);
     assert.match(layout, /<HeaderFit \/>/);
+    const fit = read("../components/header-fit.tsx");
+    assert.match(fit, /if \(!phone\.matches\) return;/);
+    assert.ok(fit.indexOf("if (!phone.matches) return;") < fit.indexOf('row.setAttribute("data-crowded"'));
     assert.match(read("../app/globals.css"), /\[data-header-row\]\[data-crowded\] \[data-wordmark\]/);
   });
 

@@ -30,7 +30,8 @@ html {
   min-width: 0;
 }
 [data-header-row][data-crowded] [data-wordmark] {
-  min-width: 0;
+  /* Never squeezed away entirely: at least a few letters stay. */
+  min-width: 4ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
