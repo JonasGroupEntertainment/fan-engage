@@ -9,6 +9,9 @@ import { isAuthEmailOtpType } from "@/lib/auth-callback";
 import { resetPageState, type ResetPageState } from "@/lib/reset-session";
 import { createClient } from "@/lib/supabase/client";
 
+const PASSWORD_TOO_SHORT = "Password must be at least 8 characters.";
+const PASSWORDS_DO_NOT_MATCH = "Passwords do not match.";
+
 export default function ResetPasswordForm({
   forgotPasswordEnabled,
 }: {
@@ -95,12 +98,12 @@ export default function ResetPasswordForm({
     e.preventDefault();
     if (password.length < 8) {
       setStatus("error");
-      setMessage("Password must be at least 8 characters.");
+      setMessage(PASSWORD_TOO_SHORT);
       return;
     }
     if (password !== confirmPassword) {
       setStatus("error");
-      setMessage("Passwords do not match.");
+      setMessage(PASSWORDS_DO_NOT_MATCH);
       return;
     }
     setStatus("loading");
@@ -149,6 +152,13 @@ export default function ResetPasswordForm({
       setMessage(err instanceof Error ? err.message : "Unable to update password.");
     }
   }
+
+  // Live checks. "Do not match" waits until the second field has something
+  // in it, so it does not nag while the first one is being typed.
+  const tooShort = password.length > 0 && password.length < 8;
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const repeatsLiveHint =
+    (mismatch && message === PASSWORDS_DO_NOT_MATCH) || (tooShort && message === PASSWORD_TOO_SHORT);
 
   if (sessionState === "checking") {
     return (
@@ -230,7 +240,9 @@ export default function ResetPasswordForm({
           <p className="text-sm text-white/70">Choose a new password for your account.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* noValidate: the browser's own checks block the button without
+            saying why on a phone. The messages below say why instead. */}
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="space-y-1">
             <label htmlFor="new-password" className="block text-xs uppercase tracking-wide text-white/60">New password</label>
             <PasswordInput
@@ -256,6 +268,19 @@ export default function ResetPasswordForm({
             />
           </div>
 
+          {/* Shown as the fan types, right under the fields and above the
+              button, so the keyboard never hides them. */}
+          {tooShort && (
+            <p className="text-sm text-red-300" role="status" data-password-too-short>
+              {PASSWORD_TOO_SHORT}
+            </p>
+          )}
+          {mismatch && (
+            <p className="text-sm text-red-300" role="status" data-password-mismatch>
+              {PASSWORDS_DO_NOT_MATCH}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={status === "loading" || status === "done"}
@@ -265,7 +290,7 @@ export default function ResetPasswordForm({
           </button>
         </form>
 
-        {message && (
+        {message && !repeatsLiveHint && (
           <p
             role={status === "error" ? "alert" : "status"}
             className={`text-sm ${
