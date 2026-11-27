@@ -21,7 +21,14 @@ export function isAlreadyWaitingError(error: RedeemErrorLike): boolean {
   return error.code === "23505" && (error.message ?? "").includes(ONE_PENDING_INDEX);
 }
 
+/** Shown when the database refuses the text as too long (migration 0113). */
+export const DETAILS_TOO_LONG_MESSAGE =
+  "Delivery details can be up to 500 characters. Please shorten them and try again.";
+
 export function redeemErrorMessage(error: RedeemErrorLike): string {
   if (isAlreadyWaitingError(error)) return ALREADY_WAITING_MESSAGE;
+  if (error?.code === "23514" && (error.message ?? "").includes("delivery_details_length")) {
+    return DETAILS_TOO_LONG_MESSAGE;
+  }
   return error?.message?.trim() || "We could not redeem that reward. Please try again.";
 }

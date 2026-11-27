@@ -23,6 +23,7 @@ import {
   smsConsentStamp,
   type EmailConsentFields,
 } from "@/lib/marketing-consent";
+import { overLimitField } from "@/lib/fan-field-limits";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,20 @@ export async function POST(request: NextRequest) {
         { error: phoneResult.error, field: "phone" },
         { status: 400 },
       );
+    }
+
+    // The database holds the same limits (migration 0113). Checking here
+    // lets the form say which field is too long.
+    const over = overLimitField({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      city: payload.city,
+      interest: payload.interest,
+      musicOutlet: payload.musicOutlet,
+      instagramOrTiktok: payload.handle,
+    });
+    if (over) {
+      return NextResponse.json({ error: over.message, field: over.field }, { status: 400 });
     }
 
     const consent = onboardConsentUpdates(payload, phoneResult.phone);

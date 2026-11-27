@@ -12,7 +12,7 @@ How to run (any local Postgres 15 or later):
 
 1. Create an empty database and run `hardening_base.sql` in it.
 2. Run migrations 0110, 0111, 0112 and 0113 from `supabase/migrations/`.
-3. Run `hardening_behaviour.sql`. The last line reads `TOTAL 40 pass 40 fail 0`.
+3. Run `hardening_behaviour.sql`. The last line reads `TOTAL 48 pass 48 fail 0`.
 
 The stand-in is deliberately small. It is not a copy of production, so a
 pass here shows the rules behave as written, not that production matches.

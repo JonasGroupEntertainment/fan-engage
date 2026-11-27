@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ALREADY_WAITING_MESSAGE,
+  DETAILS_TOO_LONG_MESSAGE,
   ONE_PENDING_INDEX,
   isAlreadyWaitingError,
   redeemErrorMessage,
@@ -36,5 +37,18 @@ describe("any other redeem failure", () => {
   it("has a plain line when there is no message", () => {
     assert.equal(redeemErrorMessage({ code: "XX000", message: "  " }), "We could not redeem that reward. Please try again.");
     assert.equal(redeemErrorMessage(undefined), "We could not redeem that reward. Please try again.");
+  });
+});
+
+describe("delivery details the database refused as too long", () => {
+  it("reads as a plain line, not a database message", () => {
+    // Arrange
+    const error = {
+      code: "23514",
+      message: 'new row for relation "reward_redemptions" violates check constraint "reward_redemptions_delivery_details_length"',
+    };
+
+    // Assert
+    assert.equal(redeemErrorMessage(error), DETAILS_TOO_LONG_MESSAGE);
   });
 });

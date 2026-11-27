@@ -4,6 +4,7 @@ import { useState } from "react";
 import { redeemRewardAction } from "./actions";
 import ShareButton from "@/components/share-button";
 import type { RewardShareMessages } from "@/lib/reward-share";
+import { FAN_FIELD_LIMITS } from "@/lib/fan-field-limits";
 
 interface RedeemFormProps {
   rewardId: string;
@@ -140,6 +141,7 @@ export function RedeemForm({
                   aria-describedby={error ? "redeem-form-error" : "delivery-details-hint"}
                   className="mt-2 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none"
                   rows={3}
+                  maxLength={FAN_FIELD_LIMITS.deliveryDetails}
                 />
                 <p id="delivery-details-hint" className="sr-only">
                   Optional details the artist needs to fulfill this reward, such as size or shipping address.

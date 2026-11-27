@@ -16,7 +16,9 @@ create table community_posts (id uuid primary key default gen_random_uuid(), art
 create table community_comments (id uuid primary key default gen_random_uuid(), post_id uuid references community_posts(id) on delete cascade, author_id uuid references fans(id) on delete cascade, body text, created_at timestamptz default now(), moderation_status text default 'pending', moderation_severity smallint, moderation_categories text[], moderation_reason text, moderation_self_harm boolean default false, moderation_classified_at timestamptz, moderation_model text, moderation_prompt_version text, draft_used boolean default false);
 create table community_reactions (post_id uuid references community_posts(id) on delete cascade, fan_id uuid, emoji text, created_at timestamptz default now(), primary key (post_id, fan_id, emoji));
 create table reward_redemptions (id uuid primary key default gen_random_uuid(), fan_id uuid, reward_id uuid, community_id text, point_cost int, delivery_details text, status text default 'pending');
-create table community_challenge_entries (id uuid primary key default gen_random_uuid(), post_id uuid, fan_id uuid, body text);
+create table community_challenge_entries (id uuid primary key default gen_random_uuid(), post_id uuid references community_posts(id) on delete cascade, fan_id uuid, body text, image_url text, created_at timestamptz default now());
+create table community_poll_options (id uuid primary key default gen_random_uuid(), post_id uuid references community_posts(id) on delete cascade, label text);
+create table community_poll_votes (post_id uuid references community_posts(id) on delete cascade, fan_id uuid, option_id uuid references community_poll_options(id) on delete cascade, created_at timestamptz default now(), primary key (post_id, fan_id));
 grant select, insert, update, delete on all tables in schema public to authenticated, anon, service_role;
 create function is_admin_of(p_community_id text) returns boolean language sql stable security definer set search_path to 'public' as $$ select exists (select 1 from admin_users where user_id = auth.uid() and (community_id = p_community_id or community_id = '*')) $$;
 create function is_premium(p_fan_id uuid, p_community_id text) returns boolean language sql stable security definer set search_path to 'public' as $$ select exists (select 1 from fan_community_memberships where fan_id = p_fan_id and community_id = p_community_id and subscription_tier in ('premium','comped','past_due')) $$;
@@ -50,6 +52,11 @@ create function set_community_id_from_parent() returns trigger language plpgsql 
 create trigger community_posts_set_community_id before insert on community_posts for each row execute function set_community_id_from_parent('artist_slug');
 create trigger community_posts_award_points after insert on community_posts for each row execute function award_community_post_points();
 create trigger community_comments_award_points after insert on community_comments for each row execute function award_community_comment_points();
+alter table community_poll_votes enable row level security; alter table community_challenge_entries enable row level security;
+create policy community_poll_votes_select on community_poll_votes for select using (true);
+create policy community_poll_votes_insert on community_poll_votes for insert with check (auth.uid() = fan_id);
+create policy community_challenge_entries_select on community_challenge_entries for select using (true);
+create policy community_challenge_entries_insert on community_challenge_entries for insert with check (auth.uid() = fan_id);
 alter table community_posts enable row level security; alter table community_comments enable row level security; alter table community_reactions enable row level security;
 create policy community_posts_public_read on community_posts for select using (true);
 create policy community_posts_insert on community_posts for insert with check (auth.uid() = author_id);

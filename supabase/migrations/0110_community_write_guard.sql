@@ -32,9 +32,12 @@
 -- 3. A BEFORE INSERT trigger on community_comments for the same sessions:
 --    1 to 1,000 characters, and the moderation columns are reset.
 --
--- 4. Comments and reactions can only be added to a post the fan can see
---    (community_post_visible_to_viewer, the function the read policies
---    already use). Reactions are limited to the five the buttons offer.
+-- 4. Comments, reactions, poll votes and challenge entries can only be
+--    added to a post the fan can see (community_post_visible_to_viewer,
+--    the function the read policies already use). Reactions are limited
+--    to the five the buttons offer. A vote must be for one of that poll's
+--    own options, and an entry must be on a challenge. For a session, the
+--    time on a post, comment, vote or entry is the server's.
 --
 -- 5. Check constraints as a backstop for every writer: post body up to
 --    10,000 characters, title up to 200, image alt text up to 500, and
@@ -62,6 +65,10 @@
 
 begin;
 
+-- Do not wait long behind a write in flight. If this times out, nothing
+-- has changed: run the file again.
+set local lock_timeout = '5s';
+
 -- 1. No fan updates on posts ------------------------------------------------
 drop policy if exists community_posts_update on public.community_posts;
 
@@ -73,7 +80,7 @@ create or replace function public.community_posts_fan_insert_guard()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_team boolean;
@@ -114,6 +121,10 @@ begin
 
   -- A post belongs to the community of the artist it is posted to.
   new.community_id := new.artist_slug;
+
+  -- The post's time is the server's. Only a scheduled team post carries
+  -- another time, and that is its scheduled time.
+  new.created_at := case when v_team then coalesce(new.scheduled_for, now()) else now() end;
 
   -- Moderation, AI and prediction columns are the server's to set. Only
   -- the columns this table really has are reset, so the function still
@@ -165,7 +176,7 @@ create or replace function public.community_comments_fan_insert_guard()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 begin
   if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
@@ -179,6 +190,8 @@ begin
     raise exception 'Comment is longer than 1000 characters' using errcode = '23514';
   end if;
 
+  -- The comment's time is the server's.
+  new.created_at                := now();
   new.moderation_status         := 'pending';
   new.moderation_severity       := null;
   new.moderation_categories     := null;
@@ -215,6 +228,74 @@ alter table public.community_reactions
   add constraint community_reactions_emoji_allowed
   check (emoji in (E'\u2764\uFE0F', E'\U0001F525', E'\U0001F44F', E'\U0001F4AF', E'\U0001F602'));
 
+-- 4b. Poll votes and challenge entries --------------------------------------
+-- A vote must be on a poll the fan can see, for one of that poll's own
+-- options. An entry must be on a challenge the fan can see.
+drop policy if exists community_poll_votes_insert on public.community_poll_votes;
+create policy community_poll_votes_insert on public.community_poll_votes
+  for insert
+  with check (auth.uid() = fan_id and public.community_post_visible_to_viewer(post_id));
+
+drop policy if exists community_challenge_entries_insert on public.community_challenge_entries;
+create policy community_challenge_entries_insert on public.community_challenge_entries
+  for insert
+  with check (auth.uid() = fan_id and public.community_post_visible_to_viewer(post_id));
+
+create or replace function public.community_poll_votes_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from community_posts p where p.id = new.post_id and p.kind = 'poll'::community_post_kind
+  ) then
+    raise exception 'That post is not a poll' using errcode = '23514';
+  end if;
+  if not exists (
+    select 1 from community_poll_options o where o.id = new.option_id and o.post_id = new.post_id
+  ) then
+    raise exception 'That option does not belong to this poll' using errcode = '23514';
+  end if;
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+    new.created_at := now();
+  end if;
+  return new;
+end $$;
+
+revoke all on function public.community_poll_votes_guard() from public, anon, authenticated;
+
+drop trigger if exists aa_community_poll_votes_guard on public.community_poll_votes;
+create trigger aa_community_poll_votes_guard
+  before insert on public.community_poll_votes
+  for each row execute function public.community_poll_votes_guard();
+
+create or replace function public.community_challenge_entries_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from community_posts p where p.id = new.post_id and p.kind = 'challenge'::community_post_kind
+  ) then
+    raise exception 'That post is not a challenge' using errcode = '23514';
+  end if;
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+    new.created_at := now();
+  end if;
+  return new;
+end $$;
+
+revoke all on function public.community_challenge_entries_guard() from public, anon, authenticated;
+
+drop trigger if exists aa_community_challenge_entries_guard on public.community_challenge_entries;
+create trigger aa_community_challenge_entries_guard
+  before insert on public.community_challenge_entries
+  for each row execute function public.community_challenge_entries_guard();
+
 -- 5. Length backstops for every writer --------------------------------------
 alter table public.community_posts drop constraint if exists community_posts_body_length;
 alter table public.community_posts
@@ -234,7 +315,7 @@ create or replace function public.award_community_post_points()
 returns trigger
 language plpgsql
 security definer
-set search_path to 'public'
+set search_path to 'public', 'pg_temp'
 as $function$
 declare
   v_ref   text := 'community_post:' || new.id::text;
@@ -244,7 +325,9 @@ begin
     return new;
   end if;
 
-  -- At most 5 paid posts per fan per activity day.
+  -- At most 5 paid posts per fan per activity day. Lock the fan first so
+  -- two posts saved at the same moment are counted one after the other.
+  perform 1 from fans where id = new.author_id for update;
   select count(*) into v_today
     from points_ledger
    where fan_id = new.author_id
@@ -269,7 +352,7 @@ create or replace function public.take_back_community_points(
 returns void
 language plpgsql
 security definer
-set search_path to 'public'
+set search_path to 'public', 'pg_temp'
 as $function$
 declare
   v_earned    int;
@@ -308,7 +391,7 @@ create or replace function public.community_posts_take_back_points()
 returns trigger
 language plpgsql
 security definer
-set search_path to 'public'
+set search_path to 'public', 'pg_temp'
 as $function$
 begin
   perform public.take_back_community_points(
@@ -331,7 +414,7 @@ create or replace function public.community_comments_take_back_points()
 returns trigger
 language plpgsql
 security definer
-set search_path to 'public'
+set search_path to 'public', 'pg_temp'
 as $function$
 begin
   -- Only when the comment's own author removes it. auth.uid() is the

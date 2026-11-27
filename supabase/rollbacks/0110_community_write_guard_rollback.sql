@@ -13,6 +13,10 @@ begin;
 
 drop trigger if exists aa_community_posts_fan_insert_guard on public.community_posts;
 drop trigger if exists aa_community_comments_fan_insert_guard on public.community_comments;
+drop trigger if exists aa_community_poll_votes_guard on public.community_poll_votes;
+drop trigger if exists aa_community_challenge_entries_guard on public.community_challenge_entries;
+drop function if exists public.community_poll_votes_guard();
+drop function if exists public.community_challenge_entries_guard();
 drop trigger if exists community_posts_take_back_points on public.community_posts;
 drop trigger if exists community_comments_take_back_points on public.community_comments;
 drop function if exists public.community_posts_fan_insert_guard();
@@ -37,6 +41,14 @@ create policy community_comments_insert on public.community_comments
 
 drop policy if exists community_reactions_insert on public.community_reactions;
 create policy community_reactions_insert on public.community_reactions
+  for insert with check (auth.uid() = fan_id);
+
+drop policy if exists community_poll_votes_insert on public.community_poll_votes;
+create policy community_poll_votes_insert on public.community_poll_votes
+  for insert with check (auth.uid() = fan_id);
+
+drop policy if exists community_challenge_entries_insert on public.community_challenge_entries;
+create policy community_challenge_entries_insert on public.community_challenge_entries
   for insert with check (auth.uid() = fan_id);
 
 create or replace function public.award_community_post_points()

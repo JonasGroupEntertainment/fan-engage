@@ -119,6 +119,38 @@ describe("0110: what a signed-in session may write to the community", () => {
     assert.ok(sql.includes(`check (emoji in (${escaped.join(", ")}))`));
   });
 
+  it("the time on a post or comment is the server's", () => {
+    assert.match(posts, /new\.created_at := case when v_team then coalesce\(new\.scheduled_for, now\(\)\) else now\(\) end;/);
+    assert.match(functionBody(sql, "community_comments_fan_insert_guard"), /new\.created_at\s+:= now\(\);/);
+  });
+
+  it("a vote must be on a visible poll, for one of its own options", () => {
+    // Arrange
+    const votes = functionBody(sql, "community_poll_votes_guard");
+
+    // Assert
+    assert.match(sql, /create policy community_poll_votes_insert[\s\S]*?auth\.uid\(\) = fan_id and public\.community_post_visible_to_viewer\(post_id\)/);
+    assert.match(votes, /p\.kind = 'poll'::community_post_kind/);
+    assert.match(votes, /o\.id = new\.option_id and o\.post_id = new\.post_id/);
+  });
+
+  it("an entry must be on a visible challenge", () => {
+    assert.match(sql, /create policy community_challenge_entries_insert[\s\S]*?public\.community_post_visible_to_viewer\(post_id\)/);
+    assert.match(functionBody(sql, "community_challenge_entries_guard"), /p\.kind = 'challenge'::community_post_kind/);
+  });
+
+  it("two posts saved together are counted one after the other", () => {
+    // Arrange
+    const award = functionBody(sql, "award_community_post_points");
+
+    // Assert
+    assert.ok(award.indexOf("from fans where id = new.author_id for update") < award.indexOf("select count(*) into v_today"));
+  });
+
+  it("does not wait long behind another write", () => {
+    assert.match(sql, /set local lock_timeout = '5s';/);
+  });
+
   it("post points stop at five paid posts a day", () => {
     // Arrange
     const award = functionBody(sql, "award_community_post_points");

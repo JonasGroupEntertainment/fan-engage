@@ -26,8 +26,10 @@ select pg_temp.expect_fail('premium fan cannot schedule', $q$insert into communi
 select pg_temp.expect_fail('empty post refused', $q$insert into community_posts (artist_slug, author_id, body) values ('raelynn', auth.uid(), '   ')$q$, '%empty%');
 select pg_temp.expect_fail('over-long post refused', $q$insert into community_posts (artist_slug, author_id, body) values ('raelynn', auth.uid(), repeat('a', 2001))$q$, '%2000%');
 select pg_temp.expect_fail('cannot post as someone else', $q$insert into community_posts (artist_slug, author_id, body) values ('raelynn', '00000000-0000-0000-0000-00000000000b', 'x')$q$, '%row-level security%');
+select pg_temp.expect_ok('a post dated in the far future is saved', $q$insert into community_posts (artist_slug, author_id, body, created_at) values ('raelynn', auth.uid(), 'time traveller', '2100-01-01')$q$);
 select pg_temp.expect_ok('pre-approved post is saved', $q$insert into community_posts (artist_slug, author_id, body, moderation_status, moderation_severity, duplicate_of, announced_at, community_id) values ('raelynn', auth.uid(), 'sneaky', 'safe', 0, null, now(), 'other-artist')$q$);
 commit;
+insert into results(name, ok) select 'the far-future date was replaced by the server time', created_at < now() + interval '1 minute' from community_posts where body = 'time traveller';
 insert into results(name, ok) select 'pre-approved post was reset to pending, own community, not announced', (moderation_status = 'pending' and moderation_severity is null and announced_at is null and community_id = 'raelynn') from community_posts where body = 'sneaky';
 begin;
 select pg_temp.as_fan(:'A');
@@ -51,6 +53,22 @@ select pg_temp.as_fan(:'B');
 select pg_temp.expect_fail('free fan cannot comment on a post they cannot see', $q$insert into community_comments (post_id, author_id, body) select id, auth.uid(), 'hi' from community_posts where body = 'team only'$q$, '%row-level security%');
 select pg_temp.expect_fail('free fan cannot react to a post they cannot see', $q$insert into community_reactions (post_id, fan_id, emoji) select id, auth.uid(), E'\U0001F525' from community_posts where body = 'team only'$q$, '%row-level security%');
 commit;
+-- polls and challenges
+begin;
+select set_config('request.jwt.claim.role', 'service_role', true); set local role service_role;
+insert into community_posts (id, artist_slug, author_id, body, kind) values ('00000000-0000-0000-0000-0000000000d1', 'raelynn', '00000000-0000-0000-0000-00000000000c', 'poll one', 'poll'), ('00000000-0000-0000-0000-0000000000d2', 'raelynn', '00000000-0000-0000-0000-00000000000c', 'poll two', 'poll'), ('00000000-0000-0000-0000-0000000000d3', 'raelynn', '00000000-0000-0000-0000-00000000000c', 'challenge one', 'challenge');
+insert into community_posts (id, artist_slug, author_id, body, kind, visibility) values ('00000000-0000-0000-0000-0000000000d4', 'raelynn', '00000000-0000-0000-0000-00000000000c', 'premium poll', 'poll', 'premium');
+insert into community_poll_options (id, post_id, label) values ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1', 'yes'), ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000d2', 'other poll'), ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000d4', 'premium option');
+commit;
+begin;
+select pg_temp.as_fan(:'B');
+select pg_temp.expect_fail('a vote for another poll''s option is refused', $q$insert into community_poll_votes (post_id, fan_id, option_id) values ('00000000-0000-0000-0000-0000000000d1', auth.uid(), '00000000-0000-0000-0000-0000000000e2')$q$, '%does not belong%');
+select pg_temp.expect_ok('a vote for the poll''s own option is saved', $q$insert into community_poll_votes (post_id, fan_id, option_id) values ('00000000-0000-0000-0000-0000000000d1', auth.uid(), '00000000-0000-0000-0000-0000000000e1')$q$);
+select pg_temp.expect_fail('a challenge entry on a post that is not a challenge is refused', $q$insert into community_challenge_entries (post_id, fan_id, body) values ('00000000-0000-0000-0000-0000000000d1', auth.uid(), 'x')$q$, '%not a challenge%');
+select pg_temp.expect_ok('a challenge entry on a challenge is saved', $q$insert into community_challenge_entries (post_id, fan_id, body, created_at) values ('00000000-0000-0000-0000-0000000000d3', auth.uid(), 'my entry', '2100-01-01')$q$);
+select pg_temp.expect_fail('a vote on a post the fan cannot see is refused', $q$insert into community_poll_votes (post_id, fan_id, option_id) values ('00000000-0000-0000-0000-0000000000d4', auth.uid(), '00000000-0000-0000-0000-0000000000e4')$q$, '%row-level security%');
+commit;
+insert into results(name, ok) select 'the entry''s date is the server time', created_at < now() + interval '1 minute' from community_challenge_entries where body = 'my entry';
 -- service role: full control
 begin;
 select set_config('request.jwt.claim.role', 'service_role', true); set local role service_role;
@@ -59,13 +77,13 @@ select pg_temp.expect_ok('service role can update a post', $q$update community_p
 commit;
 insert into results(name, ok) select 'announcement kept its approved status', moderation_status = 'safe' from community_posts where body = 'news';
 -- points: cap and take-back
-insert into results(name, ok) select 'two posts by the premium fan earned 10 points', (select total_points from fans where id = :'A') = 10;
+insert into results(name, ok) select 'three posts by the premium fan earned 15 points', (select total_points from fans where id = :'A') = 15;
 begin;
 select pg_temp.as_fan(:'A');
 insert into community_posts (artist_slug, author_id, body) select 'raelynn', auth.uid(), 'p' || g from generate_series(1, 6) g;
 commit;
 insert into results(name, ok) select 'post points stop at 5 paid posts a day (25 points)', (select total_points from fans where id = :'A') = 25;
-insert into results(name, ok) select 'all 8 posts were saved', (select count(*) from community_posts where author_id = :'A') = 8;
+insert into results(name, ok) select 'all 9 posts were saved', (select count(*) from community_posts where author_id = :'A') = 9;
 begin;
 select pg_temp.as_fan(:'A');
 delete from community_posts where body = 'hello';
