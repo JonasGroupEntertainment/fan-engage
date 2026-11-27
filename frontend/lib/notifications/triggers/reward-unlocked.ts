@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { shouldListLaunchReward } from "@/lib/launch-catalog";
 import {
   isQuietAwardSource,
@@ -72,5 +73,22 @@ export async function notifyRewardUnlocked(
     });
   } catch (err) {
     console.warn("notifyRewardUnlocked failed (non-blocking):", err);
+  }
+}
+
+/**
+ * Runs the notice after the response has been sent, so it never slows a
+ * page, a check-in or a payment acknowledgement. Outside a request (where
+ * there is no response to wait for) it runs straight away. Never throws.
+ */
+export function scheduleRewardUnlockedNotice(
+  admin: SupabaseClient,
+  opts: { fanId: string; communityId: string; written: number; source: string },
+): void {
+  const run = () => notifyRewardUnlocked(admin, opts);
+  try {
+    after(run);
+  } catch {
+    void run();
   }
 }

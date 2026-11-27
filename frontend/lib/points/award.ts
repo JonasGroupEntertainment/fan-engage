@@ -72,11 +72,14 @@ export async function awardPoints(
   const written = typeof data === "number" ? data : 0;
 
   // "You have enough points for {reward}" when this award crossed a reward's
-  // price. Loaded on demand and fully guarded: it can never fail the award.
+  // price. Loaded on demand, sent after the response, and fully guarded: it
+  // can never fail or slow the award.
   if (written > 0) {
     try {
-      const { notifyRewardUnlocked } = await import("../notifications/triggers/reward-unlocked");
-      await notifyRewardUnlocked(admin, { fanId, communityId, written, source });
+      const { scheduleRewardUnlockedNotice } = await import(
+        "../notifications/triggers/reward-unlocked"
+      );
+      scheduleRewardUnlockedNotice(admin, { fanId, communityId, written, source });
     } catch (err) {
       console.warn("awardPoints: reward notice skipped:", err instanceof Error ? err.message : err);
     }

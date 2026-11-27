@@ -78,6 +78,13 @@ describe("wiring", () => {
     const hook = award.slice(award.indexOf("const written ="));
     assert.match(hook, /try \{[\s\S]*reward-unlocked[\s\S]*\} catch/);
     assert.match(hook, /return written;/);
+    assert.match(hook, /scheduleRewardUnlockedNotice\(admin, \{ fanId, communityId, written, source \}\)/);
+    assert.doesNotMatch(hook, /await notifyRewardUnlocked/);
+  });
+
+  it("is sent after the response, not while the fan waits", () => {
+    assert.match(trigger, /import \{ after \} from "next\/server";/);
+    assert.match(trigger, /after\(run\);/);
   });
 
   it("goes to the inbox and push only, never a text", () => {
