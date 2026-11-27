@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { getPickedForYou, type PickedPost } from "@/lib/personal-feed/compute";
+import { postCommunityHref } from "@/lib/community/post-anchor";
 
 interface Props {
   fanId: string;
@@ -40,18 +41,18 @@ export default async function PickedForYou({
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {posts.map((p) => (
-          <PickedCard key={p.id} post={p} />
+          <PickedCard key={p.id} post={p} artistSlug={artistSlug} />
         ))}
       </div>
     </section>
   );
 }
 
-function PickedCard({ post }: { post: PickedPost }) {
+function PickedCard({ post, artistSlug }: { post: PickedPost; artistSlug: string }) {
   const preview = previewText(post);
   return (
     <Link
-      href={`#post-${post.id}`}
+      href={postCommunityHref(artistSlug, post.id)}
       className="block rounded-xl border border-white/10 bg-black/40 p-3 transition hover:border-white/30 hover:bg-black/60"
     >
       {post.image_url && (

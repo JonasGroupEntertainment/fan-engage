@@ -19,6 +19,7 @@ import ChallengeBlock from "./challenge-block";
 import { relativeTime } from "@/lib/format/relative-time";
 import { withPointsToast } from "@/components/points-toast";
 import { REACTION_SET } from "@/lib/community/reactions";
+import { postAnchorId } from "@/lib/community/post-anchor";
 
 
 function KindBadge({ kind }: { kind: CommunityPost["kind"] }) {
@@ -133,7 +134,10 @@ export default function PostCard({
         : "";
 
   return (
-    <article className={`glass-card space-y-3 p-5 ${accentRing}`}>
+    <article
+      id={postAnchorId(post.id)}
+      className={`glass-card scroll-mt-24 space-y-3 p-5 ${accentRing}`}
+    >
 
       {post.moderation_status === "auto_hide" && (
         <ModerationChip message={post.moderation_user_message ?? null} />
@@ -183,7 +187,7 @@ export default function PostCard({
         </h2>
       )}
 
-      <p className="whitespace-pre-wrap text-sm text-white/90">{post.body}</p>
+      <p className="whitespace-pre-wrap text-sm text-white/90 [overflow-wrap:anywhere]">{post.body}</p>
 
       {post.video_url ? (
         <video
@@ -307,7 +311,7 @@ export default function PostCard({
                   {relativeTime(c.created_at)}
                 </p>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-white/80">
+              <p className="mt-1 whitespace-pre-wrap text-sm text-white/80 [overflow-wrap:anywhere]">
                 {c.body}
               </p>
             </div>

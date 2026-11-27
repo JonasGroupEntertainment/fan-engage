@@ -22,6 +22,7 @@ import { getEntitlement, fanIsPremiumAnywhere, merchAccess } from "@/lib/entitle
 import { getAdminContext } from "@/lib/admin";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import { APP_URL } from "@/lib/app-url";
+import { HeaderFit } from "@/components/header-fit";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 const spaceGrotesk = Space_Grotesk({
@@ -175,13 +176,19 @@ export default async function RootLayout({
     >
       <body className="min-h-full bg-midnight text-white">
         <header className="sticky top-0 z-40 border-b border-white/10 bg-midnight/80 backdrop-blur">
-          <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2">
+          <div
+            data-header-row
+            className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              {/* data-wordmark-*: HeaderFit shortens the name only when it would
+                  overlap the buttons, for example with larger phone text. */}
+              <Link href="/" data-wordmark-link className="flex items-center gap-2">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-aurora to-ember text-sm font-bold">
                   FE
                 </span>
                 <span
+                  data-wordmark
                   className="text-lg font-semibold"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
@@ -242,6 +249,7 @@ export default async function RootLayout({
               </div>
             )}
           </div>
+          <HeaderFit />
         </header>
         {children}
         <Footer />
