@@ -8,6 +8,23 @@
 
 export type ImageMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
+/** The file extension to store for each image type. */
+export const IMAGE_EXTENSION: Record<ImageMime, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+
+/**
+ * A stored file name whose extension matches the image's real type, so the
+ * name a browser sent never decides how the file is labelled.
+ */
+export function imageFileName(safeName: string, type: ImageMime): string {
+  const stem = safeName.replace(/\.[^.]*$/, "").replace(/\./g, "-") || "file";
+  return `${stem}.${IMAGE_EXTENSION[type]}`;
+}
+
 /** How many leading bytes sniffImageType needs. */
 export const IMAGE_SIGNATURE_BYTES = 12;
 

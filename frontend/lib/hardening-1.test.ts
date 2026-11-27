@@ -114,6 +114,14 @@ describe("an uploaded picture is judged by its contents", () => {
     assert.match(route, /if \(!realType\) \{/);
   });
 
+  it("checks before anything is stored", () => {
+    assert.ok(route.indexOf("sniffImageType(head)") < route.indexOf(".upload(path, file"));
+  });
+
+  it("names the stored file from the type it found", () => {
+    assert.match(route, /imageFileName\(safeFilename\(file\.name\), realType\)/);
+  });
+
   it("stores the type it found, not the type the browser stated", () => {
     assert.match(route, /contentType: realType,/);
     assert.doesNotMatch(route, /contentType: file\.type,/);

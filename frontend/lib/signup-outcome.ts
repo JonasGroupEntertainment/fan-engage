@@ -8,8 +8,8 @@ export const SIGNUP_CREATE_FAILED_MESSAGE =
   "We couldn’t create your account. Try again in a moment.";
 
 /**
- * Neutral on purpose: it must not tell a stranger whether an email already
- * has an account.
+ * Worded as an "if", so the page does not state outright that an email has
+ * an account. It is still only shown for that case.
  */
 export const SIGNUP_EMAIL_IN_USE_MESSAGE =
   "If you already have an account with this email, sign in instead, or reset your password.";

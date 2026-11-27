@@ -124,7 +124,8 @@ export function authCallbackErrorCode(message: string, next: string): AuthCallba
 
 /** The line to show for ?error=<code>. Anything that is not a known code shows nothing. */
 export function authCallbackErrorMessage(code: string | null | undefined): string | null {
-  if (!code || !Object.hasOwn(AUTH_CALLBACK_ERROR_MESSAGES, code)) return null;
+  // hasOwnProperty, not Object.hasOwn: older phones lack the newer one.
+  if (!code || !Object.prototype.hasOwnProperty.call(AUTH_CALLBACK_ERROR_MESSAGES, code)) return null;
   return AUTH_CALLBACK_ERROR_MESSAGES[code as AuthCallbackErrorCode];
 }
 
