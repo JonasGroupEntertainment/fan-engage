@@ -23,3 +23,15 @@ export function fanDisplayName(
   const last = (fan?.last_name ?? "").trim();
   return [first, last].filter(Boolean).join(" ") || fallback;
 }
+
+/**
+ * The name other fans may see: the preferred (first) name only. The last
+ * name is never shown on public pages such as the leaderboard, the fan card
+ * or a share title. Team views keep using fanDisplayName.
+ */
+export function fanPublicName(
+  fan: Pick<FanNameParts, "first_name"> | null | undefined,
+  fallback = "A fan",
+): string {
+  return (fan?.first_name ?? "").trim() || fallback;
+}

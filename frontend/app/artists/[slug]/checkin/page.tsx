@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { formatPointsToast, type NextTier } from "@/lib/points/progress";
+import { addressWithoutCheckinCode, isFinalCheckinAnswer } from "@/lib/checkin-code-address";
 
 type State =
   | "loading"
@@ -26,23 +27,36 @@ function CheckinFlow() {
   /** "+25 pts · N to Gold" from the API's progress payload (lib/points/progress.ts). */
   const [progressLine, setProgressLine] = useState<string | null>(null);
 
+  // The code is read once. After a final answer it is taken out of the
+  // address, so a reopened tab, bookmark or history entry cannot check the
+  // fan in again without a new scan (BEP #297).
+  const answered = useRef(false);
+
   useEffect(() => {
+    if (answered.current) return;
+    function finish(next: State) {
+      setState(next);
+      if (!isFinalCheckinAnswer(next)) return;
+      answered.current = true;
+      const cleaned = addressWithoutCheckinCode(window.location.href, TOKEN_PARAM);
+      if (cleaned) window.history.replaceState(null, "", cleaned);
+    }
     async function doCheckin() {
       const res = await fetch("/api/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ artist_slug: slug, token: token || undefined }),
       });
-      if (res.status === 401) { setState("unauthenticated"); return; }
+      if (res.status === 401) { finish("unauthenticated"); return; }
       if (res.status === 403) {
         const data = await res.json().catch(() => ({}));
-        setState(data?.error === "expired_code" ? "token_expired" : "token_required");
+        finish(data?.error === "expired_code" ? "token_expired" : "token_required");
         return;
       }
-      if (!res.ok) { setState("error"); return; }
+      if (!res.ok) { finish("error"); return; }
       const data = await res.json();
       if (data.alreadyCheckedIn) {
-        setState("already");
+        finish("already");
       } else {
         setPoints(data.pointsAwarded);
         setProgressLine(
@@ -52,7 +66,7 @@ function CheckinFlow() {
             nextTier: (data.nextTier as NextTier | null) ?? null,
           }),
         );
-        setState("success");
+        finish("success");
       }
     }
     doCheckin();
@@ -106,6 +120,10 @@ function CheckinFlow() {
         <div className="space-y-4">
           <p className="text-5xl">🔒</p>
           <h1 className="text-2xl font-semibold">Sign in to check in</h1>
+          <p className="mx-auto max-w-sm text-white/60">
+            Already a fan here? Your camera opened this page in a browser where you
+            are not signed in yet. Sign in once and your check-in will go through.
+          </p>
           <button
             onClick={() => router.push(`/login?next=${encodeURIComponent(nextPath)}`)}
             className="mt-4 rounded-full bg-gradient-to-r from-aurora to-ember px-6 py-3 text-sm font-semibold"

@@ -7,6 +7,7 @@ import ShareButton from "@/components/share-button";
 import { getFanProfileSlug } from "@/lib/data/fan-profile";
 import { CANONICAL_PRODUCTION_APP_URL } from "@/lib/app-url";
 import type { Metadata } from "next";
+import { fanPublicName } from "@/lib/format/fan-name";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,10 +34,9 @@ export default async function FanCardPage() {
   const nextTierData = kpis?.next_tier ?? null;
   const totalPoints = kpis?.total_points ?? fan.total_points ?? 0;
 
-  const displayName =
-    fan.first_name && fan.last_name
-      ? `${fan.first_name} ${fan.last_name}`
-      : fan.first_name ?? "Fan";
+  // Preferred name only. The last name is not shown on the card or in the
+  // share title (BEP #320).
+  const displayName = fanPublicName(fan, "Fan");
 
   // The public profile lives at /fans/<handle>. The card's share link used
   // the fan id, which that page did not recognise, so every shared link

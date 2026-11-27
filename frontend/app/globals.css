@@ -14,7 +14,26 @@
  * spots feel too big now, override locally with text-[NNpx].
  */
 html {
-  font-size: 18px;
+  /* 112.5% = 18px at the browser default, but it follows the visitor's own
+   * text-size setting. A fixed 18px ignored "Large" text in browser
+   * settings, which hurt exactly the fans who need it. */
+  font-size: 112.5%;
+}
+
+/*
+ * Header with large text (see components/header-fit.tsx). data-crowded is
+ * only set when the site name would overlap the buttons, so at normal text
+ * size these rules never apply.
+ */
+[data-header-row][data-crowded] [data-wordmark-link] {
+  flex-shrink: 1;
+  min-width: 0;
+}
+[data-header-row][data-crowded] [data-wordmark] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @theme inline {

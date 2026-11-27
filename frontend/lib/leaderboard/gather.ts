@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fanDisplayName } from "@/lib/format/fan-name";
+import { fanPublicName } from "@/lib/format/fan-name";
 import type {
   ArtistMonthlyLeaderboard,
   LeaderboardEntry,
@@ -215,7 +215,7 @@ export async function gatherArtistLeaderboard(opts: {
     const candidateIds = sorted.map(([fanId]) => fanId);
     const { data: fanRows } = await admin
       .from("fans")
-      .select("id, first_name, last_name, avatar_url, current_tier, profile_slug, public_profile_enabled, is_internal")
+      .select("id, first_name, avatar_url, current_tier, profile_slug, public_profile_enabled, is_internal")
       .in("id", candidateIds)
       .eq("is_internal", false)
       .eq("suspended", false);
@@ -235,9 +235,7 @@ export async function gatherArtistLeaderboard(opts: {
       }
     >();
     for (const f of fanRows ?? []) {
-      const display = fanDisplayName(
-        f as { first_name: string | null; last_name: string | null },
-      );
+      const display = fanPublicName(f as { first_name: string | null });
       const publicProfileEnabled = (f.public_profile_enabled as boolean | null) ?? false;
       fanInfoById.set(f.id as string, {
         display_name: display,
