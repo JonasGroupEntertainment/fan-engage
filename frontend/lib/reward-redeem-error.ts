@@ -25,8 +25,20 @@ export function isAlreadyWaitingError(error: RedeemErrorLike): boolean {
 export const DETAILS_TOO_LONG_MESSAGE =
   "Delivery details can be up to 500 characters. Please shorten them and try again.";
 
+/** Raised by redeem_reward for a suspended fan (migration 0116). */
+export const SUSPENDED_ERROR_MARKER = "Account suspended";
+
+/** Shown when a suspended fan tries to redeem. Nothing was spent. */
+export const SUSPENDED_MESSAGE =
+  "Your account is suspended, so rewards cannot be redeemed right now. No points were spent. Contact support if you think this is a mistake.";
+
+export function isSuspendedError(error: RedeemErrorLike): boolean {
+  return Boolean(error) && (error?.message ?? "").includes(SUSPENDED_ERROR_MARKER);
+}
+
 export function redeemErrorMessage(error: RedeemErrorLike): string {
   if (isAlreadyWaitingError(error)) return ALREADY_WAITING_MESSAGE;
+  if (isSuspendedError(error)) return SUSPENDED_MESSAGE;
   if (error?.code === "23514" && (error.message ?? "").includes("delivery_details_length")) {
     return DETAILS_TOO_LONG_MESSAGE;
   }

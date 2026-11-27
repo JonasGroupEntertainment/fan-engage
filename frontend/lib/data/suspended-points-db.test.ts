@@ -44,6 +44,29 @@ describe("migration 0115: suspended fans earn no points", () => {
   });
 
   it("the suspend button says so", () => {
-    assert.match(read("../../app/admin/fans/[id]/page.tsx"), /post, comment or earn points until unsuspended/);
+    assert.match(read("../../app/admin/fans/[id]/page.tsx"), /post, comment, or earn or spend points until unsuspended/);
+  });
+});
+
+describe("migration 0116: suspended fans cannot redeem", () => {
+  const sql = read("../../../supabase/migrations/0116_suspended_fans_cannot_redeem.sql");
+
+  it("refuses before the reward is read or anything is written", () => {
+    const guard = sql.indexOf("if v_suspended then");
+    assert.ok(guard > 0);
+    assert.ok(guard < sql.indexOf("select * into v_reward"));
+    assert.ok(guard < sql.indexOf("insert into public.reward_redemptions"));
+    assert.match(sql, /raise exception 'Account suspended: rewards cannot be redeemed';/);
+  });
+
+  it("raises the wording the app looks for", () => {
+    const app = read("../reward-redeem-error.ts");
+    assert.match(app, /SUSPENDED_ERROR_MARKER = "Account suspended"/);
+  });
+
+  it("keeps visitors out and has a rollback without the rule", () => {
+    assert.match(sql, /revoke execute on function public\.redeem_reward\([^)]*\) from public, anon;/);
+    const rollback = read("../../../supabase/rollbacks/0116_suspended_fans_cannot_redeem_rollback.sql");
+    assert.doesNotMatch(rollback, /v_suspended/);
   });
 });

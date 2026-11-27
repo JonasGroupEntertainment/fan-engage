@@ -52,3 +52,17 @@ describe("delivery details the database refused as too long", () => {
     assert.equal(redeemErrorMessage(error), DETAILS_TOO_LONG_MESSAGE);
   });
 });
+
+describe("suspended fan (migration 0116)", () => {
+  it("gets a plain message that says nothing was spent", async () => {
+    const { SUSPENDED_MESSAGE, isSuspendedError, redeemErrorMessage: message } = await import(
+      "./reward-redeem-error.ts"
+    );
+    const error = { code: "P0001", message: "Account suspended: rewards cannot be redeemed" };
+    assert.equal(isSuspendedError(error), true);
+    assert.equal(message(error), SUSPENDED_MESSAGE);
+    assert.match(SUSPENDED_MESSAGE, /No points were spent/);
+    assert.equal(isSuspendedError({ message: "Insufficient points" }), false);
+    assert.equal(isSuspendedError(null), false);
+  });
+});
