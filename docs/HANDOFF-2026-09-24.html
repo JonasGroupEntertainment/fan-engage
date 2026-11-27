@@ -843,6 +843,17 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 <li><b>One more item.</b> A recommendation Kevin asked for about an account setting is recorded in the private online copy of this handoff.</li>
 <li>Housekeeping: #231 (the docs update for the header fix) merged as 1747ed2. The #231, #232 and #233 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. Next migration number is 0116; 0104 is still on main and not applied.</li>
 </ul>
+
+<h3>2026-11-27: suspended fans cannot redeem rewards (PR #235, migration 0116)</h3>
+<ul>
+<li><b>What Kevin decided.</b> After #233 he was asked whether a suspended fan should also stop spending points. His answer on 2026-11-27: "Suspended fans should also stop spending points".</li>
+<li><span class="status-good">#235 (e06b1da), live.</span> <code>redeem_reward()</code> refuses a suspended fan and writes nothing: no redemption, no ledger row, no stock change (migration 0116). The app checks for the suspension first (<code>lib/data/rewards.ts</code>) and shows "Your account is suspended, so rewards cannot be redeemed right now. No points were spent. Contact support if you think this is a mistake." (<code>lib/reward-redeem-error.ts</code>). A reward redeemed before the suspension can still be fulfilled or refunded by the team. Lifting the suspension lets the fan redeem again. The Suspend button now says "post, comment, or earn or spend points". Rollback in <code>supabase/rollbacks/</code>.</li>
+<li><span class="status-good">0116 applied to production on 2026-11-27 with Kevin's yes (ledger version 20261127202700).</span> Before that: applied twice on a local Postgres, 9 of 9 behaviour checks (<code>supabase/tests/local/suspended_redeem_*.sql</code>), rollback run, the rollback file matched production by fingerprint, and an independent database review found nothing serious. After applying: tried with real accounts and a real reward inside a transaction that was rolled back. A suspended fan was refused and nothing was written; an active fan redeemed; after lifting the suspension the same fan redeemed. The ledger (2,123 rows) and the redemptions (3) were unchanged afterwards.</li>
+<li><span class="status-good">Checked on production.</span> Merge verified with gh; tests, secret scan and deploy passed on main; the rewards page loads.</li>
+<li><span class="status-warn">Not checked.</span> The message was not seen on screen as a suspended fan. The Redeem button still shows for a suspended fan; the message appears when they press it.</li>
+<li><b>Where suspension stands now.</b> A suspended fan cannot post, comment, earn points (0115) or redeem rewards (0116). The team can still refund, adjust or take back their points. Redeeming a reward is the only way to spend points in this app.</li>
+<li>Housekeeping: #234 (the docs update for #232 and #233) merged as d36b0ff. The #234 and #235 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. Next migration number is 0117; 0104 is still on main and not applied.</li>
+</ul>
 </section>
 
 <section>
