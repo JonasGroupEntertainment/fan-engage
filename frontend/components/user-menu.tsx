@@ -231,23 +231,25 @@ export default function UserMenu({ fan, isAdmin, unreadCount = 0, isPremium = fa
             {/* Divider before Sign out */}
             <div className="my-1 border-t border-white/10" />
 
-            {/* Sign out: clear the browser session, then hit /logout so
-                server cookies are expired too. A POST-only /auth/signout
-                left testers on GET /logout + /signout 404s, and middleware
-                session refresh could restore cookies on the same response. */}
+            {/* Sign out: clear the browser session, then POST the form to
+                /logout so server cookies are expired too. Opening /logout
+                as a plain link only shows a confirm page; it never signs
+                anyone out. */}
             <form
               action="/logout"
               method="post"
               onSubmit={async (event) => {
                 event.preventDefault();
+                const form = event.currentTarget;
                 setIsOpen(false);
                 try {
                   const supabase = createClient();
                   await supabase.auth.signOut();
                 } catch {
-                  /* still navigate so the server route expires cookies */
+                  /* still post so the server route expires cookies */
                 }
-                window.location.assign("/logout");
+                // submit() does not fire onSubmit again, so this posts once.
+                form.submit();
               }}
             >
               <button

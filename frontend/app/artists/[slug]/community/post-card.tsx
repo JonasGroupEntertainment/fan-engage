@@ -18,8 +18,8 @@ import PollBlock from "./poll-block";
 import ChallengeBlock from "./challenge-block";
 import { relativeTime } from "@/lib/format/relative-time";
 import { withPointsToast } from "@/components/points-toast";
+import { REACTION_SET } from "@/lib/community/reactions";
 
-const REACTION_SET = ["❤️", "🔥", "👏", "💯", "😂"] as const;
 
 function KindBadge({ kind }: { kind: CommunityPost["kind"] }) {
   if (kind === "announcement") {

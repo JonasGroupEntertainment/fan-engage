@@ -94,6 +94,41 @@ export function authCallbackIncompleteMessage(next: string): string {
   return "This sign-in link is incomplete. Please sign in again.";
 }
 
+/**
+ * Short codes carried in the address when a sign-in or reset link fails.
+ * The page turns a code back into its line with authCallbackErrorMessage,
+ * so the login and forgot-password pages only ever show our own wording,
+ * never text taken from the address.
+ */
+export type AuthCallbackErrorCode =
+  | "link_failed"
+  | "link_incomplete"
+  | "reset_failed"
+  | "reset_incomplete";
+
+const AUTH_CALLBACK_ERROR_MESSAGES: Record<AuthCallbackErrorCode, string> = {
+  link_failed: authCallbackUserMessage("/"),
+  link_incomplete: authCallbackIncompleteMessage("/"),
+  reset_failed: authCallbackUserMessage("/reset-password"),
+  reset_incomplete: authCallbackIncompleteMessage("/reset-password"),
+};
+
+/** The code for a failure message produced by this module. */
+export function authCallbackErrorCode(message: string, next: string): AuthCallbackErrorCode {
+  const incomplete =
+    message === AUTH_CALLBACK_ERROR_MESSAGES.link_incomplete ||
+    message === AUTH_CALLBACK_ERROR_MESSAGES.reset_incomplete;
+  if (isRecoveryNext(next)) return incomplete ? "reset_incomplete" : "reset_failed";
+  return incomplete ? "link_incomplete" : "link_failed";
+}
+
+/** The line to show for ?error=<code>. Anything that is not a known code shows nothing. */
+export function authCallbackErrorMessage(code: string | null | undefined): string | null {
+  // hasOwnProperty, not Object.hasOwn: older phones lack the newer one.
+  if (!code || !Object.prototype.hasOwnProperty.call(AUTH_CALLBACK_ERROR_MESSAGES, code)) return null;
+  return AUTH_CALLBACK_ERROR_MESSAGES[code as AuthCallbackErrorCode];
+}
+
 /** Relative error path only — never an external URL. */
 export function authCallbackErrorPath(input: {
   next: string;
@@ -101,7 +136,7 @@ export function authCallbackErrorPath(input: {
   forgotPasswordEnabled: boolean;
 }): string {
   const params = new URLSearchParams();
-  params.set("error", input.message);
+  params.set("error", authCallbackErrorCode(input.message, input.next));
   if (isRecoveryNext(input.next) && input.forgotPasswordEnabled) {
     return `/forgot-password?${params.toString()}`;
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { authCallbackErrorMessage } from "@/lib/auth-callback";
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -14,7 +15,9 @@ import { scrollToTurnstileChallenge, shouldShowParentChallengeError } from "@/li
 
 export default function ForgotPasswordForm() {
   const searchParams = useSearchParams();
-  const callbackError = searchParams.get("error");
+  // Only a known short code is turned into a line. Other text in the
+  // address is ignored.
+  const callbackError = authCallbackErrorMessage(searchParams.get("error"));
   const turnstileConfigured = isTurnstileConfigured();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "sent">(
