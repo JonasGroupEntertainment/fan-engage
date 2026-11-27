@@ -18,7 +18,15 @@ describe("migration 0115: suspended fans earn no points", () => {
   });
 
   it("still lets a refund and a team adjustment through", () => {
-    assert.match(sql, /v_source not in \('reward_redemption', 'manual_adjustment'\)/);
+    assert.match(sql, /coalesce\(p_source, ''\) = 'reward_redemption'/);
+    assert.match(sql, /coalesce\(p_source, ''\) = 'manual_adjustment'/);
+  });
+
+  it("does not let a streak milestone or an unknown source through", () => {
+    assert.match(sql, /coalesce\(p_source_ref, ''\) not like 'streak-milestone:%'/);
+    assert.doesNotMatch(sql, /v_source not in/);
+    // The app must keep using the reference the rule looks for.
+    assert.match(read("../streaks/touch.ts"), /sourceRef: `streak-milestone:\$\{fanId\}:\$\{milestoneHit\}`/);
   });
 
   it("reads the flag under the same row lock the function already took", () => {

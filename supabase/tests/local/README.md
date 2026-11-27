@@ -26,4 +26,4 @@ take-backs still work.
 1. Create an empty database and run `suspended_points_base.sql` in it.
 2. Run migration 0115 from `supabase/migrations/`.
 3. Run `suspended_points_behaviour.sql`. The last result line reads
-   `TOTAL 13 pass 13 fail 0`, followed by one PASS notice.
+   `TOTAL 18 pass 18 fail 0`, followed by one PASS notice.

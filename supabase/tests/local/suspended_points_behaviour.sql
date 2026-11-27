@@ -19,7 +19,11 @@ begin
   r := apply_points_award(b, 10, 'challenge', null, null, null);
   insert into results values ('suspended fan: no community, no ref, still nothing', r = 0);
   r := apply_points_award(b, 10, 'not_a_real_source', 'b:3', 'raelynn', null);
-  insert into results values ('suspended fan: an unknown source counts as a team adjustment', r = 10);
+  insert into results values ('suspended fan: an unknown source pays nothing', r = 0);
+  r := apply_points_award(b, 200, 'manual_adjustment', 'streak-milestone:' || b || ':30', 'raelynn', null);
+  insert into results values ('suspended fan: a streak milestone pays nothing', r = 0);
+  r := apply_points_award(b, 25, 'daily_checkin', 'a:1', 'raelynn', null);
+  insert into results values ('suspended fan: a repeat reference pays nothing', r = 0);
 
   r := apply_points_award(b, 100, 'reward_redemption', 'b:refund', 'raelynn', 'Refund');
   insert into results values ('suspended fan: a refund still goes through', r = 100);
@@ -28,7 +32,7 @@ begin
   r := apply_points_award(b, -30, 'manual_adjustment', 'b:take', 'raelynn', 'Take back');
   insert into results values ('suspended fan: points can still be taken away', r = -30);
   insert into results values ('suspended fan: total follows the ledger',
-    (select total_points from fans where id = b) = 120);
+    (select total_points from fans where id = b) = 110);
 
   update fans set suspended = false where id = b;
   r := apply_points_award(b, 25, 'daily_checkin', 'b:1', 'raelynn', null);
@@ -36,6 +40,16 @@ begin
 
   r := apply_points_award(a, 25, 'daily_checkin', 'a:1', 'raelynn', null);
   insert into results values ('a repeat award is still refused', r = 0);
+  r := apply_points_award(a, 10, 'not_a_real_source', 'a:u', 'raelynn', null);
+  insert into results values ('active fan: an unknown source is still filed as an adjustment', r = 10);
+  r := apply_points_award(a, 200, 'manual_adjustment', 'streak-milestone:' || a || ':30', 'raelynn', null);
+  insert into results values ('active fan: a streak milestone still pays', r = 200);
+  begin
+    r := apply_points_award('00000000-0000-0000-0000-0000000000ff', 5, 'badge', 'none', null, null);
+    insert into results values ('a fan who does not exist is an error', false);
+  exception when others then
+    insert into results values ('a fan who does not exist is an error', true);
+  end;
   r := apply_points_award(a, 0, 'daily_checkin', 'a:0', 'raelynn', null);
   insert into results values ('a zero award is still nothing', r = 0);
 end $$;

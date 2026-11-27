@@ -10,7 +10,9 @@
 -- returns 0, the same answer a duplicate award gets, so no caller needs
 -- to change. Still allowed for a suspended fan:
 --   - a refund of points they spent (source reward_redemption)
---   - an adjustment the team makes by hand (source manual_adjustment)
+--   - an adjustment the team makes by hand (source manual_adjustment),
+--     but not a streak milestone bonus, which the app files under the
+--     same source
 --   - points being taken away (a negative amount)
 -- Lifting the suspension lets the fan earn again from that moment. Points
 -- missed while suspended are not paid back.
@@ -56,11 +58,18 @@ begin
 
   -- A suspended fan earns no new points. Two things still go through: a
   -- refund of points they spent (reward_redemption) and an adjustment the
-  -- team makes by hand (manual_adjustment). Points being taken away
-  -- (a negative amount) are never blocked.
+  -- team makes by hand (manual_adjustment). The source must be named
+  -- exactly: an unknown source is not treated as a team adjustment here.
+  -- Streak milestone bonuses are filed as manual_adjustment by the app
+  -- (lib/streaks/touch.ts) but are earned, so they are refused too.
+  -- Points being taken away (a negative amount) are never blocked.
   if v_suspended
      and p_base_delta > 0
-     and v_source not in ('reward_redemption', 'manual_adjustment') then
+     and not (
+       coalesce(p_source, '') = 'reward_redemption'
+       or (coalesce(p_source, '') = 'manual_adjustment'
+           and coalesce(p_source_ref, '') not like 'streak-milestone:%')
+     ) then
     return 0;
   end if;
 
