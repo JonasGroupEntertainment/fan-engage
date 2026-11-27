@@ -31,9 +31,12 @@ function CheckinFlow() {
   // address, so a reopened tab, bookmark or history entry cannot check the
   // fan in again without a new scan (BEP #297).
   const answered = useRef(false);
+  // One request at a time, so a double run of the effect cannot post twice.
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    if (answered.current) return;
+    if (answered.current || inFlight.current) return;
+    inFlight.current = true;
     function finish(next: State) {
       setState(next);
       if (!isFinalCheckinAnswer(next)) return;
@@ -69,7 +72,11 @@ function CheckinFlow() {
         finish("success");
       }
     }
-    doCheckin();
+    doCheckin()
+      .catch(() => setState("error"))
+      .finally(() => {
+        inFlight.current = false;
+      });
   }, [slug, token]);
 
   const nextPath = `/artists/${slug}/checkin${token ? `?${TOKEN_PARAM}=${encodeURIComponent(token)}` : ""}`;

@@ -42,7 +42,7 @@ describe("check-in page", () => {
   );
 
   it("does not check in a second time after the address changes", () => {
-    assert.match(page, /if \(answered\.current\) return;/);
+    assert.match(page, /if \(answered\.current \|\| inFlight\.current\) return;/);
     assert.match(page, /addressWithoutCheckinCode\(window\.location\.href, TOKEN_PARAM\)/);
   });
 
