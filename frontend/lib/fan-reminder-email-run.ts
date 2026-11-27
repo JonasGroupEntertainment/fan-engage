@@ -32,7 +32,7 @@ import {
 type Admin = ReturnType<typeof createAdminClient>;
 
 const FAN_COLUMNS =
-  "id, email, first_name, email_opted_in, suspended, is_internal, unsubscribe_token";
+  "id, email, first_name, email_opted_in, email_consent_at, suspended, is_internal, unsubscribe_token";
 /** Rows in these states count against the 7 day cap. */
 const CAP_STATUSES = ["queued", "sent"];
 /** The earliest claims are enough to tell which one wins. */

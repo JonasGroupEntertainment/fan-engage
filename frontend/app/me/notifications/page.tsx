@@ -7,6 +7,9 @@ import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
 import { BirthDateForm } from "@/components/birth-date-form";
 import { pointsToGold } from "@/lib/tier-thresholds";
 import { PreferencesForm } from "./preferences-form";
+import EmailMarketingSwitch from "./email-marketing-switch";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { hasRecordedEmailConsent } from "@/lib/marketing-consent";
 import {
   DEFAULT_PREFS,
   TOGGLE_KEYS,
@@ -92,6 +95,16 @@ export default async function NotificationPreferencesPage() {
     fan = plain.data as typeof fan;
   }
 
+  // Marketing email is on only with a recorded consent. If the consent
+  // columns do not exist yet (migration 0109), the read fails and the
+  // switch shows Off.
+  const { data: emailRow } = await createAdminClient()
+    .from("fans")
+    .select("email_opted_in, email_consent_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  const marketingEmailOn = hasRecordedEmailConsent(emailRow);
+
   const hasPush = !!(pushSubs && pushSubs.length > 0);
   const hasEmail = !!user.email;
   const hasSms = !!fan?.phone;
@@ -144,6 +157,8 @@ export default async function NotificationPreferencesPage() {
           <BirthDateForm next="/me/notifications" />
         </div>
       )}
+
+      <EmailMarketingSwitch initialOn={marketingEmailOn} hasEmail={hasEmail} />
 
       <PreferencesForm
         initial={prefs}

@@ -21,6 +21,7 @@ const FAN: ReminderEmailFan = {
   email: "mia@example.com",
   first_name: "Mia",
   email_opted_in: true,
+  email_consent_at: "2026-11-27T15:00:00.000Z",
   suspended: false,
   is_internal: false,
   unsubscribe_token: "unsub-1",
@@ -46,6 +47,9 @@ describe("reminderEmailBlockReason", () => {
     assert.equal(reminderEmailBlockReason(null), "fan_not_found");
     assert.equal(reminderEmailBlockReason({ ...FAN, email_opted_in: false }), "not_opted_in");
     assert.equal(reminderEmailBlockReason({ ...FAN, email_opted_in: null }), "not_opted_in");
+    // The old join form turned the flag on without a tick. That is not consent.
+    assert.equal(reminderEmailBlockReason({ ...FAN, email_consent_at: null }), "no_recorded_consent");
+    assert.equal(reminderEmailBlockReason({ ...FAN, email_consent_at: undefined }), "no_recorded_consent");
     assert.equal(reminderEmailBlockReason({ ...FAN, suspended: true }), "suspended");
     assert.equal(reminderEmailBlockReason({ ...FAN, suspended: null }), "suspended");
     assert.equal(reminderEmailBlockReason({ ...FAN, is_internal: true }), "internal");

@@ -16,6 +16,13 @@ import {
   omitOptInTimestamps,
 } from "@/lib/channel-opt-in";
 import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
+import {
+  emailJoinUpdates,
+  isMissingMarketingConsentColumn,
+  omitMarketingConsent,
+  smsConsentStamp,
+  type EmailConsentFields,
+} from "@/lib/marketing-consent";
 
 export const runtime = "nodejs";
 
@@ -36,7 +43,10 @@ type OnboardPayload = {
   smsConsent?: boolean;
   /** Separate parent tick for a fan aged 13 to 17. Not the join tick. */
   smsParentConsent?: boolean;
+  /** Ignored. The old form sent true for every fan who gave an email. */
   emailOptedIn?: boolean;
+  /** True only when the fan ticked the marketing email box. */
+  emailConsent?: boolean;
   /** When the fan ticked the Terms box (client clock, validated here). */
   consentAcceptedAt?: string;
 };
@@ -152,7 +162,28 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    const nextEmailOptedIn = Boolean(payload.emailOptedIn);
+    // Marketing email: only a ticked box opts a fan in, and the tick is
+    // recorded with its time and wording version (migration 0109). The
+    // consent record is read on its own so a database without 0109 still
+    // lets the fan finish joining.
+    const emailRecord = await supabase
+      .from("fans")
+      .select("email_opted_in, email_consent_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    const existingEmail: EmailConsentFields = emailRecord.error
+      ? { email_opted_in: existingFan?.email_opted_in === true, email_consent_at: null }
+      : ((emailRecord.data as EmailConsentFields | null) ?? {});
+    const now = new Date();
+    const emailUpdates = emailJoinUpdates(
+      payload.emailConsent === true && Boolean(user.email),
+      existingEmail,
+      now,
+    );
+    const nextEmailOptedIn =
+      typeof emailUpdates.email_opted_in === "boolean"
+        ? emailUpdates.email_opted_in
+        : existingEmail.email_opted_in === true;
     const updates: Record<string, unknown> = {
       first_name: payload.firstName ?? null,
       last_name: payload.lastName ?? null,
@@ -162,6 +193,9 @@ export async function POST(request: NextRequest) {
       interest: payload.interest ?? null,
       sms_opted_in: smsOptedIn,
       email_opted_in: nextEmailOptedIn,
+      ...emailUpdates,
+      // Texts are only accepted here when the fan ticked the box this time.
+      ...(smsOptedIn ? smsConsentStamp(now) : {}),
       // Stamp the channel time only on a false → true flip. Opt-out leaves
       // the previous timestamp in place (see lib/channel-opt-in.ts).
       ...channelOptInTimestampPatch(
@@ -191,6 +225,20 @@ export async function POST(request: NextRequest) {
       const retry = await supabase
         .from("fans")
         .update(omitOptInTimestamps(updates))
+        .eq("id", user.id)
+        .select("id, first_name, current_tier, total_points, profile_slug")
+        .single();
+      fan = retry.data;
+      updateErr = retry.error;
+    }
+
+    // 0109 is not applied yet: the consent record columns are unknown. Save
+    // the rest so joining still completes. No marketing email goes to a fan
+    // without a consent record, so nothing is sent on the strength of this.
+    if (updateErr && isMissingMarketingConsentColumn(updateErr)) {
+      const retry = await supabase
+        .from("fans")
+        .update(omitMarketingConsent(omitOptInTimestamps(updates)))
         .eq("id", user.id)
         .select("id, first_name, current_tier, total_points, profile_slug")
         .single();

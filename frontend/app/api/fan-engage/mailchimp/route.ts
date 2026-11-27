@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { fanDataRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { hasRecordedEmailConsent } from "@/lib/marketing-consent";
 
 export const runtime = "nodejs";
 
@@ -8,14 +10,20 @@ const ALLOWED_TAGS = ["fan", "early-access", "vip", "newsletter"] as const;
 type AllowedTag = (typeof ALLOWED_TAGS)[number];
 
 type SubscribePayload = {
-  email: string;
+  /** Ignored. The address is the signed-in fan's own account email. */
+  email?: string;
   firstName?: string;
   lastName?: string;
   tags?: string[];
 };
 
 /**
- * Subscribes a fan to the configured Mailchimp audience.
+ * Subscribes the signed-in fan to the configured Mailchimp audience.
+ *
+ * The audience is for marketing email, so only a fan with a recorded
+ * email consent is added (lib/marketing-consent.ts). The consent and the
+ * address are read on the server: the address is the account email, and a
+ * posted email is not trusted, so nobody can subscribe someone else.
  *
  * Uses PUT /lists/{id}/members/{subscriber_hash} which is an upsert —
  * calling it twice with the same email is safe.
@@ -66,11 +74,28 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, firstName, lastName, tags } =
+    const { firstName, lastName, tags } =
       (await request.json()) as SubscribePayload;
 
+    const email = user.email?.trim();
     if (!email) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
+    }
+
+    // Read with the service role, scoped to this fan. If the consent
+    // columns do not exist yet (migration 0109), the read fails and the fan
+    // is not added: no record, no mailing list.
+    const { data: consentRow, error: consentErr } = await createAdminClient()
+      .from("fans")
+      .select("email_opted_in, email_consent_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (consentErr) {
+      console.error("mailchimp subscribe: consent read failed", { code: consentErr.code });
+      return NextResponse.json({ skipped: "no-email-consent" }, { status: 200 });
+    }
+    if (!hasRecordedEmailConsent(consentRow)) {
+      return NextResponse.json({ skipped: "no-email-consent" }, { status: 200 });
     }
 
     const subscriberHash = await md5Lowercase(email);

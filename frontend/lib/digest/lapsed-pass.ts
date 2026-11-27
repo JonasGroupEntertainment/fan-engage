@@ -16,6 +16,7 @@ import {
   type LapsedFanRow,
 } from "./lapsed.ts";
 import { buildLapsedEmail } from "./lapsed-email.ts";
+import { MARKETING_EMAIL_CONSENT_COLUMN } from "../marketing-consent.ts";
 import {
   lapsedProvider,
   sendLapsedBatch,
@@ -103,6 +104,8 @@ export async function runLapsedPass(params: {
           .from("fans")
           .select("id, email, first_name, last_active_date, created_at, is_internal")
           .eq("email_opted_in", true)
+          // Marketing email needs a recorded consent, not only the flag.
+          .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null)
           .eq("suspended", false)
           .not("email", "is", null)
           .order("created_at", { ascending: true }),

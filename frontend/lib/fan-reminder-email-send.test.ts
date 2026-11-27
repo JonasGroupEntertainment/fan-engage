@@ -19,6 +19,7 @@ const FAN: ReminderEmailFan = {
   email: " mia@example.com ",
   first_name: "Mia",
   email_opted_in: true,
+  email_consent_at: "2026-11-27T15:00:00.000Z",
   suspended: false,
   is_internal: false,
   unsubscribe_token: "unsub-1",
@@ -146,6 +147,7 @@ describe("sendFanReminderEmail gates", () => {
     const cases: Array<[Partial<ReminderEmailFan> | null, string]> = [
       [null, "fan_not_found"],
       [{ email_opted_in: false }, "not_opted_in"],
+      [{ email_consent_at: null }, "no_recorded_consent"],
       [{ suspended: true }, "suspended"],
       [{ is_internal: true }, "internal"],
       [{ email: null }, "no_address"],

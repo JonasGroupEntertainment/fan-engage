@@ -9,6 +9,7 @@ import {
 import { unsentCampaignError } from "@/lib/digest/outcomes";
 import { runLapsedPass, type LapsedClient, type LapsedPassResult } from "@/lib/digest/lapsed-pass";
 import { cronAuthProblem } from "@/lib/cron-observability";
+import { MARKETING_EMAIL_CONSENT_COLUMN } from "@/lib/marketing-consent";
 import { getAdminContext } from "@/lib/admin";
 
 export const runtime = "nodejs";
@@ -157,6 +158,31 @@ async function weeklyDigest(request: Request) {
       total_points: number;
       current_tier: string;
     }>;
+
+    // The weekly digest is marketing email. The database function only
+    // checks the email_opted_in flag, so keep the fans who also have a
+    // recorded consent (lib/marketing-consent.ts). If the consent column
+    // does not exist yet (migration 0109) this read fails and nobody is
+    // sent a digest.
+    if (recipients.length > 0) {
+      const { data: consented, error: consentErr } = await admin
+        .from("fans")
+        .select("id")
+        .in(
+          "id",
+          recipients.map((r) => r.fan_id),
+        )
+        .eq("email_opted_in", true)
+        .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null);
+      if (consentErr) {
+        return NextResponse.json(
+          { error: `email consent check failed: ${consentErr.message}` },
+          { status: 500 },
+        );
+      }
+      const allowed = new Set((consented ?? []).map((row) => row.id as string));
+      recipients = recipients.filter((r) => allowed.has(r.fan_id));
+    }
 
     // Test-mode: filter to a single email so manual smoke tests don't
     // blast the whole audience. Pass ?testEmail=you@example.com along

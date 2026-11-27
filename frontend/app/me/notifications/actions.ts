@@ -11,6 +11,11 @@ import { SMS_GUARDIAN_MESSAGE, smsTextOptIn } from "@/lib/age-gate";
 import { isMissingSmsParentConsentColumn } from "@/lib/sms/policy";
 import { syncSmsOptInWithProvider } from "@/lib/sms/deliver";
 import { TOGGLE_KEYS, isMissingPendingColumn, type Prefs } from "./prefs";
+import {
+  isMissingMarketingConsentColumn,
+  omitMarketingConsent,
+  smsConsentStamp,
+} from "@/lib/marketing-consent";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
@@ -121,13 +126,24 @@ export async function savePreferencesAction(
       )
     : null;
   if (smsOptIn !== null) {
-    const fanUpdate: { sms_opted_in: boolean; sms_parent_consent_at?: string } = {
+    const now = new Date();
+    const fanUpdate: Record<string, string | boolean> = {
       sms_opted_in: smsOptIn,
+      // Turning texts on here is a fresh consent; record when and to what
+      // wording (shown next to the switch). Columns are migration 0109.
+      ...(smsOptIn ? smsConsentStamp(now) : {}),
     };
     if (smsOptIn && smsAge.stampConsent) {
-      fanUpdate.sms_parent_consent_at = new Date().toISOString();
+      fanUpdate.sms_parent_consent_at = now.toISOString();
     }
     let { error: optInError } = await supabase.from("fans").update(fanUpdate).eq("id", user.id);
+    if (optInError && isMissingMarketingConsentColumn(optInError)) {
+      // 0109 is not applied yet: save the switch without the record.
+      ({ error: optInError } = await supabase
+        .from("fans")
+        .update(omitMarketingConsent(fanUpdate))
+        .eq("id", user.id));
+    }
     if (optInError && isMissingSmsParentConsentColumn(optInError)) {
       if (smsAge.stampConsent) return { error: SMS_GUARDIAN_MESSAGE };
       ({ error: optInError } = await supabase

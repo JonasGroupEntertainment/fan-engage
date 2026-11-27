@@ -6,6 +6,7 @@ import type { AudienceMessage } from "@/lib/audience-email";
 import { sendAudienceEmails, type AudienceEmailResult } from "@/lib/audience-email-send";
 import { duplicateSendCutoffIso } from "@/lib/audience-send-outcome";
 import type { ReminderFanRow } from "@/lib/event-reminder-email";
+import { MARKETING_EMAIL_CONSENT_COLUMN } from "@/lib/marketing-consent";
 
 /**
  * Reads and sends behind the two admin screens that write to one artist's
@@ -88,6 +89,11 @@ export async function eventBelongsToArtist(eventId: string, artistSlug: string):
 /**
  * The fans rows for the chosen ids. The email gates are applied here and
  * again in selectReminderEmailRecipients.
+ *
+ * Admin broadcast and campaign email is marketing, so it also needs a
+ * recorded email consent (lib/marketing-consent.ts): a fan the old join
+ * form opted in without a tick is not emailed. If the consent column does
+ * not exist yet (migration 0109) this read fails and nothing is sent.
  */
 async function loadEmailFans(fanIds: readonly string[]): Promise<ReminderFanRow[]> {
   const admin = createAdminClient();
@@ -97,6 +103,7 @@ async function loadEmailFans(fanIds: readonly string[]): Promise<ReminderFanRow[
       .select(AUDIENCE_FAN_COLUMNS)
       .in("id", part)
       .eq("email_opted_in", true)
+      .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null)
       .eq("suspended", false)
       .eq("is_internal", false)
       .order("id", { ascending: true }),

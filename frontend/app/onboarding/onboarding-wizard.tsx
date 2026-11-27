@@ -18,6 +18,7 @@ import {
 } from "@/lib/sms-send-gate";
 import { SmsConsentCopy } from "@/components/sms-consent-copy";
 import { SMS_GUARDIAN_CHECKBOX, SMS_GUARDIAN_MESSAGE } from "@/lib/age-gate";
+import { EMAIL_CONSENT_TEXT } from "@/lib/marketing-consent";
 
 type Field = {
   label: string;
@@ -174,6 +175,8 @@ export default function OnboardingWizard({
   // the server never has to invent one.
   const [tosConsentAt, setTosConsentAt] = useState<string | null>(null);
   const [smsConsent, setSmsConsent] = useState(initialSmsConsent);
+  // Marketing email is its own box and always starts unticked.
+  const [emailConsent, setEmailConsent] = useState(false);
   const [smsParentChecked, setSmsParentChecked] = useState(false);
   // Tracks whether the email field was successfully auto-prefilled from
   // auth.users. When true, the field stays readOnly (no risk of typo
@@ -329,7 +332,7 @@ export default function OnboardingWizard({
       smsOptedIn: textsConsented,
       smsConsent: textsConsented,
       smsParentConsent: needsSmsGuardian && smsParentChecked,
-      emailOptedIn: Boolean(formState.email),
+      emailConsent: Boolean(formState.email) && emailConsent,
       consentAcceptedAt: tosConsent && tosConsentAt ? tosConsentAt : undefined,
     });
   };
@@ -379,9 +382,10 @@ export default function OnboardingWizard({
       setSmsStatus("success");
       setSmsMessage("Confirmation text delivered. Fan is live in the journey.");
 
-      // Fire-and-forget Mailchimp subscribe — don't block the SMS success path
-      // if Mailchimp isn't configured yet or the audience ID is missing.
-      if (formState.email) {
+      // Fire-and-forget Mailchimp subscribe, and only after the email box
+      // was ticked (the server checks the saved consent record too). It must
+      // not block the SMS success path if Mailchimp is not configured.
+      if (formState.email && emailConsent) {
         fetch("/api/fan-engage/mailchimp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -436,7 +440,9 @@ export default function OnboardingWizard({
         document.cookie = "fanengage_ref=; path=/; max-age=0";
       }
 
-      if (formState.email) {
+      // Only a fan who ticked the email box joins the mailing list. The
+      // server checks the saved consent record too.
+      if (formState.email && emailConsent) {
         const tags = ["welcome"];
         if (formState.interest) tags.push(formState.interest);
         fetch("/api/fan-engage/mailchimp", {
@@ -687,6 +693,18 @@ export default function OnboardingWizard({
                     .
                   </span>
                 </label>
+                {formState.email && (
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      name="email-consent"
+                      checked={emailConsent}
+                      onChange={(e) => setEmailConsent(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-aurora"
+                    />
+                    <span>{EMAIL_CONSENT_TEXT}</span>
+                  </label>
+                )}
                 {formState.phone && needsSmsGuardian && (
                   <label className="flex items-start gap-3 py-1">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center">
