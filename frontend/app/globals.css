@@ -27,11 +27,11 @@ html {
  */
 [data-header-row][data-crowded] [data-wordmark-link] {
   flex-shrink: 1;
-  min-width: 0;
+  /* The badge plus a few letters always stay. */
+  min-width: 4.5rem;
 }
 [data-header-row][data-crowded] [data-wordmark] {
-  /* Never squeezed away entirely: at least a few letters stay. */
-  min-width: 4ch;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
