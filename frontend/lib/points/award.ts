@@ -69,5 +69,20 @@ export async function awardPoints(
 
   // The RPC returns the delta it wrote, or 0 when source_ref was already
   // in the ledger (a duplicate award).
-  return typeof data === "number" ? data : 0;
+  const written = typeof data === "number" ? data : 0;
+
+  // "You have enough points for {reward}" when this award crossed a reward's
+  // price. Loaded on demand, sent after the response, and fully guarded: it
+  // can never fail or slow the award.
+  if (written > 0) {
+    try {
+      const { scheduleRewardUnlockedNotice } = await import(
+        "../notifications/triggers/reward-unlocked"
+      );
+      scheduleRewardUnlockedNotice(admin, { fanId, communityId, written, source });
+    } catch (err) {
+      console.warn("awardPoints: reward notice skipped:", err instanceof Error ? err.message : err);
+    }
+  }
+  return written;
 }

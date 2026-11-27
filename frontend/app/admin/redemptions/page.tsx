@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import RedemptionAction from "./redemption-action";
 import { listPendingRedemptions } from "@/lib/data/rewards";
+import { needsActionHeading } from "@/lib/rewards/redemption-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function AdminRedemptionsPage() {
   const fanIds = pending.map((p) => p.fan_id);
   const { data: fans } = await supabase
     .from("fans")
-    .select("id, first_name, last_name, avatar_url")
+    .select("id, first_name, avatar_url")
     .in("id", fanIds);
 
   const fanMap = new Map(fans?.map((f) => [f.id, f]) ?? []);
@@ -27,13 +28,24 @@ export default async function AdminRedemptionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Redemption Queue</h1>
-        <div className="rounded-full bg-yellow-500/20 px-3 py-1 text-xs font-semibold text-yellow-300">
-          {pending.length} pending
-        </div>
+        {pending.length > 0 ? (
+          <a
+            href="#needs-action"
+            className="rounded-full bg-yellow-500/20 px-3 py-1 text-xs font-semibold text-yellow-300 hover:bg-yellow-500/30"
+          >
+            {pending.length} pending · view ↓
+          </a>
+        ) : (
+          <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/60">
+            0 pending
+          </div>
+        )}
       </div>
 
       {pending.length > 0 ? (
-        <div className="glass-card divide-y divide-white/5 rounded-2xl overflow-hidden">
+        <section id="needs-action" className="scroll-mt-24 space-y-3">
+          <h2 className="text-sm font-semibold text-yellow-200">{needsActionHeading(pending.length)}</h2>
+          <div className="glass-card divide-y divide-white/5 rounded-2xl overflow-hidden">
           {pending.map((redemption) => {
             const fan = fanMap.get(redemption.fan_id);
             return (
@@ -60,6 +72,7 @@ export default async function AdminRedemptionsPage() {
                       <p className="mt-1 text-xs text-white/60">{redemption.delivery_details}</p>
                     )}
                     <p className="mt-1 text-xs text-white/50">
+                      {redemption.point_cost.toLocaleString("en-US")} points ·{" "}
                       {new Date(redemption.created_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -71,7 +84,8 @@ export default async function AdminRedemptionsPage() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </section>
       ) : (
         <div className="glass-card rounded-2xl p-8 text-center">
           <p className="text-white/60">No pending redemptions. You&apos;re all caught up!</p>
