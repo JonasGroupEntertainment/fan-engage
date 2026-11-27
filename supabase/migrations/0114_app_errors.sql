@@ -3,7 +3,7 @@
 -- An error log kept in the app's own database for 90 days. Until now
 -- errors were only short-lived Vercel log lines.
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127182021).
 --
 -- Written only by the server with the service role:
 --   source 'client': the error page in a fan's browser
