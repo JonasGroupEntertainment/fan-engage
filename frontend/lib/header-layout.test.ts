@@ -19,7 +19,13 @@ describe("header fits at tablet width", () => {
   });
 
   it("lets the search box shrink instead of pushing the row wider", () => {
-    assert.match(layout, /<div className="hidden min-w-0 max-w-xs flex-1 md:block">/);
+    assert.match(layout, /hidden min-w-0 max-w-xs flex-1 md:block/);
+  });
+
+  it("gives an admin a search button beside the full menu, where a box has no room", () => {
+    assert.match(layout, /md:block\$\{isAdmin \? " xl:hidden" : ""\}/);
+    assert.match(layout, /\{isAdmin && \(\s*<Link\s+href="\/search"\s+aria-label="Search"/);
+    assert.match(layout, /hover:bg-white\/10 xl:inline-flex"/);
   });
 
   it("does not show the Premium badge beside the Admin button", () => {
