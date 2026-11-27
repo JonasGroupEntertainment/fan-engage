@@ -820,6 +820,16 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 <li><b>What the numbers say.</b> For RaeLynn the last 8 weeks are almost empty: no new real fans, and one real fan active in one week. Worth knowing before launch planning.</li>
 <li>Housekeeping: #226 (the docs update for batch 3) merged as fd3d114. The #226, #227 and #228 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. Next migration number is still 0115; 0104 is still on main and not applied. The header overflow at tablet width for a signed-in admin is still open.</li>
 </ul>
+
+<h3>2026-11-27: header fits at tablet width (PR #230, no migration)</h3>
+<ul>
+<li><b>What was wrong.</b> The full menu has seven links. With the buttons on the right a signed-in admin needs about 1,250px, but the menu was shown from 768px, so between about 768 and 1,240 wide the header ran off the right edge and the page scrolled sideways. Found on 2026-11-27 while checking #225.</li>
+<li><span class="status-good">#230 (0632e98), live.</span> The full menu (<code>components/desktop-nav.tsx</code>) shows from 1280px (<code>xl</code>). Below that the menu button (<code>components/mobile-nav.tsx</code>) is used, on tablets as well as phones. The search box shows from 768px and can shrink (<code>min-w-0</code>) instead of pushing the row wider. The Premium badge is not shown beside the Admin button; the profile page still shows it. Test: <code>lib/header-layout.test.ts</code>.</li>
+<li><span class="status-good">Checked.</span> Merge verified with gh; tests, secret scan and deploy passed on main. Preview, signed out: at 1,024 wide the menu button shows, the search box is 360px and nothing runs past the edge; at 1,619 wide the full menu shows with the search box. Production, signed in as an owner at 1,464 wide: full menu, no sideways scroll, no Founder badge in the header.</li>
+<li><span class="status-warn">Not checked.</span> Tablet width signed in, which is the case that was broken. The browser window could not be resized for the check. By the measured sizes it should fit (the header needs about 570px plus the search box in menu-button mode). Kevin can confirm by narrowing a browser window on the live site or opening it on an iPad.</li>
+<li><span class="status-warn">Left as is.</span> For an admin between 1,280 and about 1,500 wide the search box is only 59 to 75px. It fits but is cramped. A search icon at those widths would fix it; not built, waiting on Kevin.</li>
+<li>Housekeeping: #229 (the docs update for batch 4) merged as d44a75f. The #229 and #230 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request.</li>
+</ul>
 </section>
 
 <section>
