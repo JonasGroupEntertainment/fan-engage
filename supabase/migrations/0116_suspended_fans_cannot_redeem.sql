@@ -3,7 +3,7 @@
 -- Kevin, 2026-11-27: a suspended fan should also stop spending points.
 -- Migration 0115 stopped them earning; this stops redeem_reward().
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127202700).
 --
 -- For a suspended fan redeem_reward() raises
 -- 'Account suspended: rewards cannot be redeemed' and writes nothing: no
