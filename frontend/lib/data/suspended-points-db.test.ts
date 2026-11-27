@@ -64,6 +64,14 @@ describe("migration 0116: suspended fans cannot redeem", () => {
     assert.match(app, /SUSPENDED_ERROR_MARKER = "Account suspended"/);
   });
 
+  it("the app says so before it offers an upgrade", () => {
+    const app = read("./rewards.ts");
+    const check = app.indexOf("self?.suspended === true");
+    assert.ok(check > 0);
+    assert.ok(check < app.indexOf("requirePremiumFeature(user.id"));
+    assert.ok(check < app.indexOf('.rpc("redeem_reward"'));
+  });
+
   it("keeps visitors out and has a rollback without the rule", () => {
     assert.match(sql, /revoke execute on function public\.redeem_reward\([^)]*\) from public, anon;/);
     const rollback = read("../../../supabase/rollbacks/0116_suspended_fans_cannot_redeem_rollback.sql");
