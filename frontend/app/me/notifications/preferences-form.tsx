@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { SMS_GUARDIAN_CHECKBOX } from "@/lib/age-gate";
+import { SMS_CONSENT_TEXT } from "@/lib/marketing-consent";
 import { savePreferencesAction } from "./actions";
 import type { PendingColumn, Prefs, ToggleKey } from "./prefs";
 
@@ -181,6 +182,9 @@ export function PreferencesForm({
             onToggle={() => toggle(row.key)}
           />
         ))}
+        {smsAllowed && (
+          <p className="px-1 text-xs text-white/50">Turning on SMS means: {SMS_CONSENT_TEXT}</p>
+        )}
         {needsSmsGuardian && prefs.sms_enabled && (
           <label className="flex items-start gap-2 px-1 text-sm text-white/70">
             <input

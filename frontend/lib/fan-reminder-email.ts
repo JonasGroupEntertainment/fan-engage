@@ -24,6 +24,8 @@
  * Pure: no env reads beyond the injected flag, no Supabase, no imports.
  */
 
+import { hasRecordedEmailConsent } from "./marketing-consent.ts";
+
 export type FanReminderEmailEnv = { FAN_REMINDER_EMAIL_ENABLED?: string };
 
 /** At most one reminder email per fan in this many days. */
@@ -46,6 +48,8 @@ export type ReminderEmailFan = {
   email: string | null;
   first_name: string | null;
   email_opted_in: boolean | null;
+  /** When the fan ticked the marketing email box. Null = no recorded consent. */
+  email_consent_at?: string | null;
   suspended: boolean | null;
   is_internal: boolean | null;
   unsubscribe_token: string | null;
@@ -56,6 +60,7 @@ export type ReminderEmailArtist = { slug: string; name: string };
 export type ReminderEmailBlockReason =
   | "fan_not_found"
   | "not_opted_in"
+  | "no_recorded_consent"
   | "suspended"
   | "internal"
   | "no_address"
@@ -77,6 +82,8 @@ export function reminderEmailBlockReason(
 ): ReminderEmailBlockReason | null {
   if (!fan) return "fan_not_found";
   if (fan.email_opted_in !== true) return "not_opted_in";
+  // These reminders are marketing email: the flag alone is not consent.
+  if (!hasRecordedEmailConsent(fan)) return "no_recorded_consent";
   if (fan.suspended !== false) return "suspended";
   if (fan.is_internal !== false) return "internal";
   if (!fan.email?.trim()) return "no_address";

@@ -2,6 +2,7 @@ import Link from "next/link";
 import WeeklyRecapTile from "@/components/weekly-recap-tile";
 import type { WeeklyRecap } from "@/lib/personal-recap/types";
 import PushOptInBanner from "@/components/push-opt-in-banner";
+import EmailReaskBanner from "@/components/email-reask-banner";
 import StreakTile from "@/components/streak-tile";
 import TodayRow from "@/components/today-row";
 import NextStepCard from "@/components/next-step-card";
@@ -67,6 +68,7 @@ export default function FanHomeDashboard({ data, streak, recap, totalPoints, lif
       />
 
       {/* Followed artists strip */}
+      <EmailReaskBanner />
       <PushOptInBanner />
       {streak && <StreakTile
         currentStreakDays={streak.currentStreakDays}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runCron } from "@/lib/cron-run";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_URL } from "@/lib/app-url";
+import { MARKETING_EMAIL_CONSENT_COLUMN } from "@/lib/marketing-consent";
 import {
   dueReengagementStep,
   isReengagementEmailEnabled,
@@ -68,6 +69,8 @@ async function reengagementEmail(request: Request) {
       "id, email, first_name, created_at, unsubscribe_token, email_opted_in, suspended, is_internal",
     )
     .eq("email_opted_in", true)
+    // Marketing email needs a recorded consent, not only the flag.
+    .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null)
     .eq("suspended", false)
     .eq("is_internal", false)
     .gt("created_at", new Date(now.getTime() - 9 * DAY_MS).toISOString())
