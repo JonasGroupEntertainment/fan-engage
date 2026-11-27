@@ -198,20 +198,24 @@ export default async function RootLayout({
               <MobileNav navItems={navItems} isSignedIn={Boolean(user)} joinHref={joinHref} />
             </div>
             <DesktopNav navItems={navItems} />
-            <div className="hidden flex-1 max-w-xs lg:block">
+            <div className="hidden min-w-0 max-w-xs flex-1 md:block">
               <SearchInput compact placeholder="Search Fan Engage…" />
             </div>
             {user ? (
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 {/* Hidden on phones, where it crowded the logo and menu
                     button (BEP #196). The profile page still shows it. */}
-                <span className="hidden sm:inline-flex">
-                  <PremiumBadge
-                    isPremium={isPremium}
-                    isFounder={isFounder}
-                    founderNumber={founderNumber}
-                  />
-                </span>
+                {/* Not beside the Admin button: the two together left no room
+                    for the search box. The profile page still shows it. */}
+                {!isAdmin && (
+                  <span className="hidden sm:inline-flex">
+                    <PremiumBadge
+                      isPremium={isPremium}
+                      isFounder={isFounder}
+                      founderNumber={founderNumber}
+                    />
+                  </span>
+                )}
                 <AdminPill show={isAdmin} />
                 <Link
                   href="/inbox"

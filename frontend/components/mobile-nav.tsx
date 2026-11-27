@@ -6,7 +6,9 @@
  * and on overlay click. Positioned absolute below the sticky header so
  * it sits naturally beneath the topbar.
  *
- * Used in app/layout.tsx — desktop nav stays a separate `md:flex` block.
+ * Used in app/layout.tsx — desktop nav stays a separate `xl:flex` block. The
+ * full menu needs about 1,250px beside the header buttons, so this menu
+ * button is used below that, on tablets as well as phones.
  */
 
 import Link from "next/link";
@@ -61,7 +63,7 @@ export function MobileNav({
         aria-expanded={open}
         aria-controls="mobile-nav-panel"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/80 hover:bg-white/10 md:hidden"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/80 hover:bg-white/10 xl:hidden"
       >
         <span aria-hidden className="text-base leading-none">
           {open ? "✕" : "☰"}
@@ -72,12 +74,12 @@ export function MobileNav({
           <div
             aria-hidden
             onClick={() => setOpen(false)}
-            className="fixed inset-0 top-[var(--mobile-nav-top,64px)] z-30 bg-black/60 backdrop-blur md:hidden"
+            className="fixed inset-0 top-[var(--mobile-nav-top,64px)] z-30 bg-black/60 backdrop-blur xl:hidden"
           />
           <nav
             id="mobile-nav-panel"
             aria-label="Mobile menu"
-            className="absolute inset-x-0 top-full z-40 border-b border-white/10 bg-midnight/95 shadow-2xl md:hidden"
+            className="absolute inset-x-0 top-full z-40 border-b border-white/10 bg-midnight/95 shadow-2xl xl:hidden"
           >
             <ul className="mx-auto flex max-w-6xl flex-col px-4 py-2">
               {navItems.map((item) => {
