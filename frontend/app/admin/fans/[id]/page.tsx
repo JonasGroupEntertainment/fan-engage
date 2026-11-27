@@ -122,7 +122,7 @@ export default async function AdminFanDetailPage({
           confirmMessage={
             fan.suspended
               ? "Lift the suspension on this fan?"
-              : "Suspend this fan? They won't be able to post, comment or earn points until unsuspended."
+              : "Suspend this fan? They won't be able to post, comment, or earn or spend points until unsuspended."
           }
           className={`rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-50 ${
             fan.suspended

@@ -7,7 +7,7 @@ import {
   requirePremiumAnywhere,
   requirePremiumFeature,
 } from "@/lib/entitlements";
-import { ALREADY_WAITING_MESSAGE, redeemErrorMessage } from "@/lib/reward-redeem-error";
+import { ALREADY_WAITING_MESSAGE, redeemErrorMessage, SUSPENDED_MESSAGE } from "@/lib/reward-redeem-error";
 
 export { ALREADY_WAITING_MESSAGE };
 
@@ -183,6 +183,18 @@ export async function redeemReward({
     } = await supabase.auth.getUser();
     if (!user) {
       return { ok: false, error: "Not signed in" };
+    }
+
+    // A suspended fan cannot spend points (migration 0116). Said first, so
+    // they are not shown an upgrade prompt instead. The database refuses
+    // the redemption as well; this only gives the right message sooner.
+    const { data: self } = await supabase
+      .from("fans")
+      .select("suspended")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (self?.suspended === true) {
+      return { ok: false, error: SUSPENDED_MESSAGE };
     }
 
     const { data: rewardRow } = await supabase
