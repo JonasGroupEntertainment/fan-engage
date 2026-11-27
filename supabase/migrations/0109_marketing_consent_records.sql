@@ -1,6 +1,8 @@
 -- 0109_marketing_consent_records.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127165851),
+-- after PR #217 was live. Checked after: the four columns exist, all
+-- nullable with no default, and no fan row changed.
 --
 -- Keep a record of each fan's marketing email and text consent. Port of
 -- Brand Engage Pro 0123.
