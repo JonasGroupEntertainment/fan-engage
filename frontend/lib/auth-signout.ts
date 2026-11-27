@@ -49,3 +49,6 @@ export function signOutCookieNames(existing: CookieToClear[]): string[] {
 }
 
 export const SIGNOUT_REDIRECT_PATH = "/";
+
+/** Page with a "Sign out" button, shown when someone opens a sign-out address. */
+export const SIGNOUT_CONFIRM_PATH = "/logout/confirm";

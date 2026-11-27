@@ -24,6 +24,7 @@ import {
 import { defaultSocialDeps } from "@/lib/data/social-accounts";
 import { sendAnnouncementToSocial } from "@/lib/social/announce";
 import { ALSO_POST_FIELD, ALSO_POST_VALUE, SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
+import { isAllowedReaction } from "@/lib/community/reactions";
 type Visibility = "public" | "premium" | "founder-only";
 
 /**
@@ -156,6 +157,8 @@ export async function toggleReactionAction(formData: FormData): Promise<PointsAc
   const emoji = String(formData.get("emoji") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
   if (!postId || !emoji || !artistSlug) return;
+  // Only the reactions the buttons offer. Anything else is ignored.
+  if (!isAllowedReaction(emoji)) return;
 
   const { supabase, userId } = await requireUser();
 

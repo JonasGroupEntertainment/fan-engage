@@ -7,8 +7,12 @@ export const SIGNUP_EXISTING_ACCOUNT_MESSAGE =
 export const SIGNUP_CREATE_FAILED_MESSAGE =
   "We couldn’t create your account. Try again in a moment.";
 
+/**
+ * Neutral on purpose: it must not tell a stranger whether an email already
+ * has an account.
+ */
 export const SIGNUP_EMAIL_IN_USE_MESSAGE =
-  "That email is already in use. Sign in, or try a different email.";
+  "If you already have an account with this email, sign in instead, or reset your password.";
 
 export const SIGNUP_WEAK_PASSWORD_MESSAGE =
   "That password is too common or has appeared in a data breach, so it can’t be used. Please choose a different password.";

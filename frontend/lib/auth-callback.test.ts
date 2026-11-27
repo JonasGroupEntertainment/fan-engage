@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   authCallbackCompletePath,
+  authCallbackErrorCode,
+  authCallbackErrorMessage,
   authCallbackErrorPath,
   authCallbackIncompleteMessage,
   authCallbackUserMessage,
@@ -71,7 +73,7 @@ describe("PKCE miss and safe redirects", () => {
         message: "expired",
         forgotPasswordEnabled: true,
       }),
-      "/forgot-password?error=expired",
+      "/forgot-password?error=reset_failed",
     );
     assert.equal(
       authCallbackErrorPath({
@@ -79,7 +81,7 @@ describe("PKCE miss and safe redirects", () => {
         message: "expired",
         forgotPasswordEnabled: false,
       }),
-      "/login?error=expired&next=%2Freset-password",
+      "/login?error=reset_failed&next=%2Freset-password",
     );
     assert.equal(
       authCallbackErrorPath({
@@ -87,8 +89,45 @@ describe("PKCE miss and safe redirects", () => {
         message: "expired",
         forgotPasswordEnabled: true,
       }),
-      "/login?error=expired&next=%2Fonboarding",
+      "/login?error=link_failed&next=%2Fonboarding",
     );
+  });
+
+  it("puts a short code in the address, never the message itself", () => {
+    // Arrange
+    const typed = "Call 555-0100 to restore your account";
+
+    // Act
+    const path = authCallbackErrorPath({ next: "/", message: typed, forgotPasswordEnabled: true });
+
+    // Assert
+    assert.equal(path, "/login?error=link_failed&next=%2F");
+  });
+
+  it("keeps the incomplete link wording apart from the expired one", () => {
+    assert.equal(authCallbackErrorCode(authCallbackIncompleteMessage("/"), "/"), "link_incomplete");
+    assert.equal(
+      authCallbackErrorCode(authCallbackIncompleteMessage("/reset-password"), "/reset-password"),
+      "reset_incomplete",
+    );
+    assert.equal(authCallbackErrorCode(authCallbackUserMessage("/"), "/"), "link_failed");
+  });
+
+  it("shows our own line for a known code and nothing for any other text", () => {
+    assert.equal(authCallbackErrorMessage("link_failed"), authCallbackUserMessage("/"));
+    assert.equal(authCallbackErrorMessage("reset_incomplete"), authCallbackIncompleteMessage("/reset-password"));
+    assert.equal(authCallbackErrorMessage("Call 555-0100 to restore your account"), null);
+    assert.equal(authCallbackErrorMessage("toString"), null);
+    assert.equal(authCallbackErrorMessage(""), null);
+    assert.equal(authCallbackErrorMessage(null), null);
+  });
+
+  it("the login and forgot-password pages only show a known code's line", () => {
+    for (const file of ["../app/login/login-form.tsx", "../app/forgot-password/forgot-password-form.tsx"]) {
+      const src = readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+      assert.match(src, /const callbackError = authCallbackErrorMessage\(searchParams\.get\("error"\)\);/, file);
+      assert.doesNotMatch(src, /const callbackError = searchParams\.get\("error"\);/, file);
+    }
   });
 
   it("keeps the browser complete path internal", () => {
