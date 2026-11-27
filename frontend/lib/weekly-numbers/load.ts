@@ -26,11 +26,67 @@ export type WeeklyNumbersResult = WeeklyNumbers & {
 
 type Read<Row> = { rows: Row[] | null; failed: boolean };
 
-async function readAll<Row>(make: () => PageQuery<Row>): Promise<Read<Row>> {
+/** Logs why a list could not be read. The message never holds row data. */
+function logUnread(what: string, message: string): void {
+  console.warn(`[weekly-numbers] could not read ${what}:`, message.slice(0, 200));
+}
+
+async function readAll<Row>(what: string, make: () => PageQuery<Row>): Promise<Read<Row>> {
   try {
     const res = await pageAll(make);
-    return res.error ? { rows: null, failed: true } : { rows: res.data, failed: false };
-  } catch {
+    if (res.error) {
+      logUnread(what, res.error.message);
+      return { rows: null, failed: true };
+    }
+    return { rows: res.data, failed: false };
+  } catch (err) {
+    logUnread(what, err instanceof Error ? err.message : "error");
+    return { rows: null, failed: true };
+  }
+}
+
+const asQuery = <Row>(builder: unknown) => builder as PageQuery<Row>;
+
+/**
+ * Comments carry no community of their own, so the community's posts are
+ * read first and the comments are read by post, a chunk of posts at a time.
+ */
+async function readComments(
+  admin: SupabaseClient,
+  communityId: string,
+  since: string,
+): Promise<Read<AuthoredRow>> {
+  const posts = await readAll<{ id: string }>("posts for comments", () =>
+    asQuery(
+      admin
+        .from("community_posts")
+        .select("id")
+        .eq("community_id", communityId)
+        .order("id", { ascending: true }),
+    ),
+  );
+  if (!posts.rows) return { rows: null, failed: true };
+  if (posts.rows.length === 0) return { rows: [], failed: false };
+  try {
+    const res = await pageAllIn<AuthoredRow, string>(
+      posts.rows.map((post) => post.id),
+      (part) =>
+        asQuery(
+          admin
+            .from("community_comments")
+            .select("author_id, created_at")
+            .in("post_id", part)
+            .gte("created_at", since)
+            .order("id", { ascending: true }),
+        ),
+    );
+    if (res.error) {
+      logUnread("comments", res.error.message);
+      return { rows: null, failed: true };
+    }
+    return { rows: res.data, failed: false };
+  } catch (err) {
+    logUnread("comments", err instanceof Error ? err.message : "error");
     return { rows: null, failed: true };
   }
 }
@@ -48,10 +104,10 @@ export async function loadWeeklyNumbers(
 ): Promise<WeeklyNumbersResult> {
   const weeks = recentWeeks(now);
   const since = weeks[weeks.length - 1].startIso;
-  const q = <Row>(builder: unknown) => builder as PageQuery<Row>;
+  const q = asQuery;
 
   const [memberships, activity, posts, comments, rewardsClaimed, friends] = await Promise.all([
-    readAll<MembershipRow>(() =>
+    readAll<MembershipRow>("fans", () =>
       q(
         admin
           .from("fan_community_memberships")
@@ -61,7 +117,7 @@ export async function loadWeeklyNumbers(
           .order("fan_id", { ascending: true }),
       ),
     ),
-    readAll<ActivityRow>(() =>
+    readAll<ActivityRow>("points activity", () =>
       q(
         admin
           .from("points_ledger")
@@ -72,7 +128,7 @@ export async function loadWeeklyNumbers(
           .order("id", { ascending: true }),
       ),
     ),
-    readAll<AuthoredRow>(() =>
+    readAll<AuthoredRow>("posts", () =>
       q(
         admin
           .from("community_posts")
@@ -82,17 +138,8 @@ export async function loadWeeklyNumbers(
           .order("id", { ascending: true }),
       ),
     ),
-    readAll<AuthoredRow>(() =>
-      q(
-        admin
-          .from("community_comments")
-          .select("author_id, created_at, post:community_posts!inner(community_id)")
-          .eq("post.community_id", communityId)
-          .gte("created_at", since)
-          .order("id", { ascending: true }),
-      ),
-    ),
-    readAll<RewardClaimedRow>(() =>
+    readComments(admin, communityId, since),
+    readAll<RewardClaimedRow>("rewards", () =>
       q(
         admin
           .from("reward_redemptions")
@@ -103,7 +150,7 @@ export async function loadWeeklyNumbers(
           .order("id", { ascending: true }),
       ),
     ),
-    readAll<FriendRow>(() =>
+    readAll<FriendRow>("friends who joined", () =>
       q(
         admin
           .from("referrals")
@@ -136,8 +183,10 @@ export async function loadWeeklyNumbers(
             .order("id", { ascending: true }),
         ),
       );
+      if (res.error) logUnread("account checks", res.error.message);
       fans = res.error ? null : res.data;
-    } catch {
+    } catch (err) {
+      logUnread("account checks", err instanceof Error ? err.message : "error");
       fans = null;
     }
   }

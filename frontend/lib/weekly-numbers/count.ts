@@ -16,6 +16,20 @@ import { weekIndexOf, type WeekWindow } from "./weeks.ts";
 /** Test addresses that are not on the internal list. */
 const TEST_EMAIL_DOMAINS: readonly string[] = ["example.com", "example.org", "test.com"];
 
+/**
+ * Points a fan is given without doing anything that week: bonuses, badges,
+ * anniversaries, a friend's join, a team adjustment or a refund. They do
+ * not make a fan "active". Every other source is something the fan did.
+ */
+export const PASSIVE_SOURCES: readonly string[] = [
+  "signup_bonus",
+  "referral",
+  "manual_adjustment",
+  "reward_redemption",
+  "anniversary",
+  "badge",
+];
+
 export const CHECKIN_SOURCE = "daily_checkin";
 export const DROP_SOURCE = "daily_drop";
 
@@ -144,12 +158,13 @@ export function countWeeklyNumbers(input: WeeklyNumbersInput): WeeklyNumbers {
   const claimed = countByWeek(input.rewardsClaimed, real, (r) => r.fan_id, (r) => r.created_at);
   const friends = countByWeek(input.friends, real, (r) => r.referred_id, (r) => r.verified_at);
 
-  // Who earned points in each week.
+  // Who did something that earned points in each week.
   const activeByWeek = new Map<number, Set<string>>();
   if (input.activity && real) {
     for (const row of input.activity) {
       const week = weekOf(row.created_at);
       if (week === null || !real.has(row.fan_id)) continue;
+      if (PASSIVE_SOURCES.includes(row.source)) continue;
       const set = activeByWeek.get(week) ?? new Set<string>();
       set.add(row.fan_id);
       activeByWeek.set(week, set);

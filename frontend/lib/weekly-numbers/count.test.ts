@@ -80,9 +80,10 @@ describe("countWeeklyNumbers", () => {
   });
 
   it("counts active and returning fans", () => {
-    assert.equal(current.activeFans, 3);
-    // a and b were fans before this week began; c joined this week.
-    assert.deepEqual(current.returning, { count: 2, share: 2 / 3 });
+    // b only received a badge this week, which is not activity.
+    assert.equal(current.activeFans, 2);
+    // a was a fan before this week began; c joined this week.
+    assert.deepEqual(current.returning, { count: 1, share: 0.5 });
     assert.equal(last.activeFans, 2);
     // b joined last week, so only a is returning.
     assert.deepEqual(last.returning, { count: 1, share: 0.5 });
@@ -107,6 +108,22 @@ describe("countWeeklyNumbers", () => {
       label: "Active fans",
       comparison: { current: 2, previous: 0, change: 2, direction: "up" },
     });
+  });
+
+  it("does not call a fan active for points they were simply given", () => {
+    const given = countWeeklyNumbers({
+      ...base,
+      activity: [
+        { fan_id: "a", source: "badge", created_at: "2026-11-25T15:00:00Z" },
+        { fan_id: "a", source: "anniversary", created_at: "2026-11-25T15:00:00Z" },
+        { fan_id: "b", source: "manual_adjustment", created_at: "2026-11-25T15:00:00Z" },
+        { fan_id: "c", source: "signup_bonus", created_at: "2026-11-25T15:00:00Z" },
+        { fan_id: "c", source: "referral", created_at: "2026-11-25T15:00:00Z" },
+        { fan_id: "b", source: "challenge", created_at: "2026-11-25T15:00:00Z" },
+      ],
+    });
+    assert.equal(given.rows[0].activeFans, 1);
+    assert.deepEqual(given.rows[0].returning, { count: 1, share: 1 });
   });
 
   it("shows a failed read as unknown, never as zero", () => {

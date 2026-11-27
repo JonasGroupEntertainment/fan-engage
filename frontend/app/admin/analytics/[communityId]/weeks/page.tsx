@@ -83,7 +83,7 @@ export default async function WeeklyNumbersPage({
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs uppercase tracking-wide text-white/50">Fans today</p>
+          <p className="text-xs uppercase tracking-wide text-white/50">Real fans today</p>
           <p className="mt-1 text-2xl font-semibold">{show(numbers.totalFans)}</p>
         </div>
         {numbers.summary?.lines.map((line) => (
@@ -141,7 +141,8 @@ export default async function WeeklyNumbersPage({
       </div>
 
       <p className="text-xs text-white/50">
-        Active fans earned points in this community that week. Returning fans were active and had
+        Active fans did something that earned points in this community that week (a bonus, badge or
+        anniversary they were given does not count). Returning fans were active and had
         already joined before the week began. Check-ins are daily check-ins. Posts and comments
         are from fans, not the team.
       </p>
