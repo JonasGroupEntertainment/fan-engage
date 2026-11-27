@@ -3,7 +3,7 @@
 -- Kevin, 2026-11-27: a suspended fan should stop earning points. Until
 -- now "suspended" only stopped posting and commenting.
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127195350).
 --
 -- Every award in the app goes through apply_points_award(), so the rule
 -- lives there. For a suspended fan a positive award writes nothing and
