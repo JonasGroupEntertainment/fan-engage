@@ -830,6 +830,19 @@ openclaw gateway start            # brings OpenClaw back</code></pre>
 <li><span class="status-warn">Left as is.</span> For an admin between 1,280 and about 1,500 wide the search box is only 59 to 75px. It fits but is cramped. A search icon at those widths would fix it; not built, waiting on Kevin.</li>
 <li>Housekeeping: #229 (the docs update for batch 4) merged as d44a75f. The #229 and #230 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request.</li>
 </ul>
+
+<h3>2026-11-27: Kevin's decisions after the catch-up (PRs #232 and #233, migration 0115)</h3>
+<ul>
+<li><b>What Kevin decided on 2026-11-27.</b> Search icon: "your best judgement". Suspended fans: "they should stop earning points". The tablet check and the fan-side phone pass: his team will do them.</li>
+<li><span class="status-good">#232 (4168e5d), live. Search button for admins.</span> Beside the full menu an admin's search box was only 59 to 75px wide. From 1280px an admin now gets a round search button that opens <code>/search</code>. Below 1280px, and for every fan who is not an admin, the search box is unchanged. In <code>app/layout.tsx</code>; test in <code>lib/header-layout.test.ts</code>.</li>
+<li><span class="status-good">#233 (d6b1b2a), live. Suspended fans earn no points.</span> Every award goes through <code>apply_points_award()</code>, so the rule lives there (migration 0115). For a suspended fan a positive award writes nothing and returns 0, the same answer a repeat award gets, so no caller changed. Still allowed: a refund of points they spent, an adjustment the team makes by hand, and points being taken away. Streak milestone bonuses are treated as earned and are refused too. Lifting the suspension lets the fan earn again; missed points are not paid back. The Suspend button now says "post, comment or earn points". Rollback in <code>supabase/rollbacks/</code>.</li>
+<li><span class="status-good">0115 applied to production on 2026-11-27 with Kevin's yes (ledger version 20261127195350).</span> Before that: applied twice on a local Postgres, 18 of 18 behaviour checks (<code>supabase/tests/local/suspended_points_*.sql</code>), rollback run, and an independent database review. After applying: tried with real accounts inside a transaction that was rolled back, and each rule behaved as written. The ledger was unchanged afterwards (2,123 rows).</li>
+<li><span class="status-good">Checked on production.</span> Both merges verified with gh; tests, secret scan and deploy passed on main. Signed in as an owner at 1,621 wide: the search button shows between the menu and the Admin button, the search box is hidden, everything fits with no sideways scroll.</li>
+<li><span class="status-warn">Not checked.</span> The search button was not clicked through. The Suspend wording was not seen on screen. Tablet width signed in is still unmeasured.</li>
+<li><b>Display limit.</b> A few screens announce points from a fixed number and a few logs record the nominal amount, so a suspended fan may still see "+N points". Nothing is paid. Spending points a fan already has is unchanged; Kevin has not been asked to rule on that yet.</li>
+<li><b>One more item.</b> A recommendation Kevin asked for about an account setting is recorded in the private online copy of this handoff.</li>
+<li>Housekeeping: #231 (the docs update for the header fix) merged as 1747ed2. The #231, #232 and #233 branches and their local folders were deleted at Kevin's word after each tip was matched to its pull request. Next migration number is 0116; 0104 is still on main and not applied.</li>
+</ul>
 </section>
 
 <section>
