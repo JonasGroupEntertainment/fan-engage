@@ -105,3 +105,10 @@ export function getClientIp(headers: Headers): string {
   // Fallback for direct connections (localhost dev)
   return "127.0.0.1";
 }
+
+/** Error reports from fans' browsers: a few per IP per minute, so a broken
+ *  page or a bot cannot flood app_errors (0114). */
+export const clientErrorRateLimiter = new RateLimiter({
+  maxRequests: 10,
+  windowMs: 60 * 1000,
+});

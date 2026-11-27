@@ -35,6 +35,7 @@ const adminNav: Array<{
   { href: "/admin/moderation", label: "Moderation" },
   { href: "/admin/briefs", label: "Briefs" },
   { href: "/admin/ai-gates", label: "AI Gates", superAdminOnly: true },
+  { href: "/admin/errors", label: "Errors", superAdminOnly: true },
 ];
 
 export default async function AdminLayout({

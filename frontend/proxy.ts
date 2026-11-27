@@ -195,6 +195,6 @@ export const config = {
     // auth round-trip, and crons authenticate with CRON_SECRET at the route.
     // Note: api/fan-engage is explicitly excluded here — rate limiting is
     // handled at the route level (route.ts files) instead.
-    "/((?!_next/static|_next/image|favicon\\.ico|api/fan-engage|api/cron/|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml|icons/|images/|videos/|icon-[^/]*\\.png|badge-[^/]*\\.png|apple-icon|opengraph-image|icon$|icon\\.png).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|api/fan-engage|api/client-error|api/cron/|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml|icons/|images/|videos/|icon-[^/]*\\.png|badge-[^/]*\\.png|apple-icon|opengraph-image|icon$|icon\\.png).*)",
   ],
 };
