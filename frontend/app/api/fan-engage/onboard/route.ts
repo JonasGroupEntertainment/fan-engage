@@ -24,33 +24,15 @@ import {
   type EmailConsentFields,
 } from "@/lib/marketing-consent";
 import { overLimitField } from "@/lib/fan-field-limits";
+import {
+  ONBOARD_BAD_REQUEST_ERROR,
+  isJoinComplete,
+  validateOnboardPayload,
+} from "@/lib/onboard-payload";
 
 export const runtime = "nodejs";
 
 const POINTS_SIGNUP_BONUS = 100;
-
-type OnboardPayload = {
-  firstName?: string;
-  lastName?: string;
-  city?: string;
-  phone?: string;
-  handle?: string;
-  musicOutlet?: string;
-  interest?: string;
-  referralCode?: string; // optional — the ref code that was passed in the invite link
-  communitySlug?: string; // optional — artist/community slug the fan joined through
-  smsOptedIn?: boolean;
-  /** True only when the fan ticked the SMS consent box. */
-  smsConsent?: boolean;
-  /** Separate parent tick for a fan aged 13 to 17. Not the join tick. */
-  smsParentConsent?: boolean;
-  /** Ignored. The old form sent true for every fan who gave an email. */
-  emailOptedIn?: boolean;
-  /** True only when the fan ticked the marketing email box. */
-  emailConsent?: boolean;
-  /** When the fan ticked the Terms box (client clock, validated here). */
-  consentAcceptedAt?: string;
-};
 
 /**
  * Finalizes an onboarding submission for the currently-signed-in fan.
@@ -93,7 +75,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     }
 
-    const payload = (await request.json()) as OnboardPayload;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: ONBOARD_BAD_REQUEST_ERROR }, { status: 400 });
+    }
+    const checked = validateOnboardPayload(body);
+    if (!checked.ok) {
+      return NextResponse.json({ error: checked.error }, { status: 400 });
+    }
+    const payload = checked.payload;
 
     // Phone is optional, but anything provided must normalize to E.164 so
     // Mailchimp and phone-based lookups always see one canonical shape.
@@ -327,6 +319,32 @@ export async function POST(request: NextRequest) {
       console.warn("onboard: community join failed", err);
     }
 
+    // Welcome points, the referral reward and the founding number wait until
+    // the saved record has a name and agreed Terms. The text confirmation
+    // step saves earlier than that and stops here.
+    const savedConsent = await supabase
+      .from("fans")
+      .select("first_name, consent_accepted_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (savedConsent.error) {
+      console.warn("onboard: could not re-read the saved record", savedConsent.error);
+    }
+    const joinComplete = isJoinComplete(
+      savedConsent.data
+        ? {
+            firstName: savedConsent.data.first_name as string | null,
+            consentAcceptedAt: savedConsent.data.consent_accepted_at as string | null,
+          }
+        : {
+            firstName: payload.firstName,
+            consentAcceptedAt: consent.consent?.consent_accepted_at ?? null,
+          },
+    );
+    if (!joinComplete) {
+      return NextResponse.json({ success: true, fan, communityJoined, joinComplete });
+    }
+
     // 2. Handle referral code — service-role so we can look up the referrer.
     if (payload.referralCode) {
       try {
@@ -439,7 +457,7 @@ export async function POST(request: NextRequest) {
       // non-fatal — profile save still succeeded
     }
 
-    return NextResponse.json({ success: true, fan, communityJoined });
+    return NextResponse.json({ success: true, fan, communityJoined, joinComplete });
   } catch (err) {
     console.error("onboard route error:", err);
     return NextResponse.json(

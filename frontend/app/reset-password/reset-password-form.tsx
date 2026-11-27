@@ -6,6 +6,7 @@ import { PasswordInput } from "@/components/password-input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ensureImportedFanMembership } from "@/app/auth/ensure-membership";
 import { isAuthEmailOtpType } from "@/lib/auth-callback";
+import { resetPageState, type ResetPageState } from "@/lib/reset-session";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordForm({
@@ -17,14 +18,14 @@ export default function ResetPasswordForm({
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [sessionState, setSessionState] = useState<"checking" | "ready" | "missing">(
-    "checking",
-  );
+  const [sessionState, setSessionState] = useState<"checking" | ResetPageState>("checking");
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "done">("idle");
   const [message, setMessage] = useState("");
   // Recovery token from our own reset email. Kept in memory and only used on
   // submit, so a mail scanner opening the link can't burn it.
   const recoveryTokenHash = useRef<string | null>(null);
+  // True once this page load itself opened a valid emailed link.
+  const linkOpenedHere = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +52,11 @@ export default function ResetPasswordForm({
             type,
           });
           if (error) throw error;
+          linkOpenedHere.current = true;
         } else if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
+          linkOpenedHere.current = true;
         }
         const {
           data: { session },
@@ -62,7 +65,13 @@ export default function ResetPasswordForm({
         if (session && (code || tokenHash)) {
           window.history.replaceState(null, "", "/reset-password");
         }
-        if (session) {
+        // A session from an ordinary password sign-in may not set a new
+        // password here. That needs a reset link.
+        const next = resetPageState({
+          linkOpenedHere: linkOpenedHere.current,
+          accessToken: session?.access_token ?? null,
+        });
+        if (next === "ready") {
           try {
             await ensureImportedFanMembership();
           } catch {
@@ -70,7 +79,7 @@ export default function ResetPasswordForm({
           }
         }
         if (cancelled) return;
-        setSessionState(session ? "ready" : "missing");
+        setSessionState(next);
       } catch {
         if (!cancelled) setSessionState("missing");
       }
@@ -109,11 +118,24 @@ export default function ResetPasswordForm({
           return;
         }
         recoveryTokenHash.current = null;
+        linkOpenedHere.current = true;
         try {
           await ensureImportedFanMembership();
         } catch {
           // Setting a password still works if the membership repair cannot run.
         }
+      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const allowed = resetPageState({
+        linkOpenedHere: linkOpenedHere.current,
+        accessToken: session?.access_token ?? null,
+      });
+      if (allowed !== "ready") {
+        setStatus("idle");
+        setSessionState(allowed);
+        return;
       }
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
@@ -132,6 +154,36 @@ export default function ResetPasswordForm({
     return (
       <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-6 py-12">
         <div className="glass-card p-8 text-center text-sm text-white/60">Loading…</div>
+      </main>
+    );
+  }
+
+  if (sessionState === "needs_link") {
+    return (
+      <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-6 px-6 py-12">
+        <div className="glass-card space-y-6 p-8">
+          <div className="space-y-2">
+            <p className="text-sm uppercase tracking-wide text-white/60">Fan Engage</p>
+            <h1 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              Use a reset link
+            </h1>
+            <p className="text-sm text-white/70">
+              To keep your account safe, a new password needs a reset link sent to your
+              email. Ask for one, then open it in this browser.
+            </p>
+          </div>
+          <Link
+            href="/forgot-password"
+            className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-aurora to-ember px-4 py-3 text-sm font-semibold text-white shadow-glass"
+          >
+            Send me a reset link
+          </Link>
+          <p className="text-center text-sm text-white/60">
+            <Link href="/" className="text-white underline-offset-4 hover:underline">
+              Back to home
+            </Link>
+          </p>
+        </div>
       </main>
     );
   }
