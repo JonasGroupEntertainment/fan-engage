@@ -1,6 +1,10 @@
 -- 0110_community_write_guard.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127174947), before
+-- this file was pushed.
+-- Checked after: no stored post, comment, reaction, vote, entry or point
+-- changed. Each rule was then tried against production inside a
+-- transaction that was rolled back.
 --
 -- The rules for writing to the community are moved into the database, so
 -- they hold for every writer. Port of Brand Engage Pro 0124, adapted to

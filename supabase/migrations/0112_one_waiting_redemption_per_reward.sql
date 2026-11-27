@@ -1,6 +1,7 @@
 -- 0112_one_waiting_redemption_per_reward.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127175012), before
+-- this file was pushed.
 --
 -- A fan can have one waiting (pending) redemption of a reward at a time.
 -- The app already checks this before it redeems

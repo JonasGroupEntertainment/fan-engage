@@ -1,6 +1,7 @@
 -- 0111_storage_upload_limits.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127175007), before
+-- this file was pushed.
 --
 -- Size and file type limits on the three upload buckets. Port of Brand
 -- Engage Pro 0125. Storage enforces these on every upload, however it is

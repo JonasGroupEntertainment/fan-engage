@@ -1,6 +1,7 @@
 -- 0113_fan_text_limits.sql
 --
--- Not yet applied to production.
+-- Applied to production on 2026-11-27 (ledger version 20261127175021), before
+-- this file was pushed.
 --
 -- Length limits on the text a fan can save about themselves, as a
 -- backstop for every writer. Port of Brand Engage Pro 0127.
