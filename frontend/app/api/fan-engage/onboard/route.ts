@@ -168,12 +168,15 @@ export async function POST(request: NextRequest) {
     // lets the fan finish joining.
     const emailRecord = await supabase
       .from("fans")
-      .select("email_opted_in, email_consent_at")
+      .select("email_opted_in, email_consent_at, sms_consent_at")
       .eq("id", user.id)
       .maybeSingle();
     const existingEmail: EmailConsentFields = emailRecord.error
       ? { email_opted_in: existingFan?.email_opted_in === true, email_consent_at: null }
       : ((emailRecord.data as EmailConsentFields | null) ?? {});
+    const hasTextRecord =
+      existingFan?.sms_opted_in === true &&
+      Boolean((emailRecord.data as { sms_consent_at?: string | null } | null)?.sms_consent_at);
     const now = new Date();
     const emailUpdates = emailJoinUpdates(
       payload.emailConsent === true && Boolean(user.email),
@@ -195,7 +198,9 @@ export async function POST(request: NextRequest) {
       email_opted_in: nextEmailOptedIn,
       ...emailUpdates,
       // Texts are only accepted here when the fan ticked the box this time.
-      ...(smsOptedIn ? smsConsentStamp(now) : {}),
+      // A fan who already has a text consent on record keeps its time when
+      // they run the join form again.
+      ...(smsOptedIn && !hasTextRecord ? smsConsentStamp(now) : {}),
       // Stamp the channel time only on a false → true flip. Opt-out leaves
       // the previous timestamp in place (see lib/channel-opt-in.ts).
       ...channelOptInTimestampPatch(

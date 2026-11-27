@@ -52,7 +52,7 @@ describe("the join route records a tick and nothing else", () => {
   });
 
   it("records text consent only when texts were accepted this time", () => {
-    assert.match(route, /\.\.\.\(smsOptedIn \? smsConsentStamp\(now\) : \{\}\),/);
+    assert.match(route, /\.\.\.\(smsOptedIn && !hasTextRecord \? smsConsentStamp\(now\) : \{\}\),/);
   });
 
   it("still saves the join when the consent columns do not exist yet", () => {
@@ -109,6 +109,26 @@ describe("every marketing email sender needs a recorded consent", () => {
     assert.match(route, /recipients = recipients\.filter\(\(r\) => allowed\.has\(r\.fan_id\)\);/);
   });
 
+  it("the weekly digest checks consent in chunks, not one long request", () => {
+    assert.match(read("app/api/cron/weekly-digest/route.ts"), /await pageAllIn<\{ id: string \}, string>\(/);
+  });
+
+  it("the weekly digest prepares nobody while its campaign is on hold", () => {
+    // Arrange
+    const route = read("app/api/cron/weekly-digest/route.ts");
+    const hold = route.indexOf("const digestHold = digestCampaignHoldReason();");
+    const campaign = route.indexOf("await fireDigestCampaign(");
+
+    // Assert: the hold empties the list before any fan is prepared.
+    assert.notEqual(hold, -1);
+    assert.ok(hold < campaign);
+    assert.match(route, /if \(digestHold\) \{[\s\S]*?recipients = \[\];/);
+  });
+
+  it("the digest campaign really does go to the whole list, which is why it is held", () => {
+    assert.match(read("lib/digest/send.ts"), /recipients: \{ list_id/);
+  });
+
   it("the streak and leaderboard reminder emails read the consent record", () => {
     assert.match(read("lib/fan-reminder-email-run.ts"), /email_opted_in, email_consent_at,/);
     assert.match(read("lib/fan-reminder-email.ts"), /if \(!hasRecordedEmailConsent\(fan\)\) return "no_recorded_consent";/);
@@ -133,7 +153,7 @@ describe("a fan can change their mind", () => {
 
     // Assert
     assert.match(page, /const marketingEmailOn = hasRecordedEmailConsent\(emailRow\);/);
-    assert.match(page, /<EmailMarketingSwitch initialOn=\{marketingEmailOn\} hasEmail=\{hasEmail\} \/>/);
+    assert.match(page, /<EmailMarketingSwitch\s+initialOn=\{marketingEmailOn\}\s+hasEmail=\{hasEmail\}/);
   });
 
   it("turning it on needs a tick and records it on the server", () => {
@@ -166,6 +186,15 @@ describe("fans the old form opted in are asked again", () => {
     // Assert
     assert.match(prompt, /const \[ticked, setTicked\] = useState\(false\);/);
     assert.match(prompt, /disabled=\{!ticked \|\| pending\}/);
+  });
+
+  it("the thank you message follows what was saved, not what was pressed", () => {
+    assert.match(read("components/email-reask-prompt.tsx"), /else setDone\(result\.agreed \? "yes" : "no"\);/);
+  });
+
+  it("settings lets such a fan stop all email before they answer", () => {
+    assert.match(read("app/me/notifications/page.tsx"), /unconfirmed=\{needsEmailReask\(emailRow\)\}/);
+    assert.match(read("app/me/notifications/email-marketing-switch.tsx"), /Stop all email/);
   });
 
   it("the answer is saved once, for the signed-in fan only", () => {

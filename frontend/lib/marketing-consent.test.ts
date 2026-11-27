@@ -10,6 +10,8 @@ import {
   emailConsentStamp,
   emailJoinUpdates,
   emailMarketingUpdates,
+  DIGEST_CAMPAIGN_HOLD_REASON,
+  digestCampaignHoldReason,
   emailReaskUpdates,
   hasRecordedEmailConsent,
   isMissingMarketingConsentColumn,
@@ -181,5 +183,22 @@ describe("migration 0109", () => {
 
   it("has no em dashes", () => {
     assert.equal(sql.includes(EM_DASH), false);
+  });
+});
+
+describe("the weekly digest campaign hold", () => {
+  it("is on hold unless the flag is exactly 1", () => {
+    assert.equal(digestCampaignHoldReason({}), DIGEST_CAMPAIGN_HOLD_REASON);
+    assert.equal(digestCampaignHoldReason({ WEEKLY_DIGEST_CAMPAIGN_ENABLED: "true" }), DIGEST_CAMPAIGN_HOLD_REASON);
+    assert.equal(digestCampaignHoldReason({ WEEKLY_DIGEST_CAMPAIGN_ENABLED: "0" }), DIGEST_CAMPAIGN_HOLD_REASON);
+  });
+
+  it("is released by the flag", () => {
+    assert.equal(digestCampaignHoldReason({ WEEKLY_DIGEST_CAMPAIGN_ENABLED: " 1 " }), null);
+  });
+
+  it("says why in plain words", () => {
+    assert.match(DIGEST_CAMPAIGN_HOLD_REASON, /whole mailing list/);
+    assert.equal(DIGEST_CAMPAIGN_HOLD_REASON.includes(EM_DASH), false);
   });
 });

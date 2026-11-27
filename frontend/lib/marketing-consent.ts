@@ -124,3 +124,27 @@ export function omitMarketingConsent<T extends Record<string, unknown>>(updates:
   for (const column of MARKETING_CONSENT_COLUMNS) delete next[column];
   return next as T;
 }
+
+/**
+ * The weekly digest goes out as one Mailchimp campaign to the whole
+ * audience (lib/digest/send.ts fireDigestCampaign). The consent check in
+ * the digest route only decides whose content is prepared: everyone else
+ * on the list would still receive the campaign, and the list holds every
+ * fan the old join form added without a tick.
+ *
+ * So the digest stays on hold until that send is changed to reach only
+ * fans with a recorded consent. Setting the flag to "1" is a statement
+ * that this has been done; do not set it to get a digest out.
+ */
+export const DIGEST_CAMPAIGN_FLAG = "WEEKLY_DIGEST_CAMPAIGN_ENABLED";
+export const DIGEST_CAMPAIGN_HOLD_REASON =
+  "The weekly digest is on hold: its campaign goes to the whole mailing list, " +
+  "not only to fans with a recorded email consent.";
+
+export function digestCampaignHoldReason(
+  env: Record<string, string | undefined> = {
+    [DIGEST_CAMPAIGN_FLAG]: process.env.WEEKLY_DIGEST_CAMPAIGN_ENABLED,
+  },
+): string | null {
+  return env[DIGEST_CAMPAIGN_FLAG]?.trim() === "1" ? null : DIGEST_CAMPAIGN_HOLD_REASON;
+}

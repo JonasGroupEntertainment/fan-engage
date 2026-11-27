@@ -13,11 +13,15 @@ const NOT_SAVED = "We could not save your email setting. Check your connection a
 export default function EmailMarketingSwitch({
   initialOn,
   hasEmail,
+  unconfirmed = false,
 }: {
   initialOn: boolean;
   hasEmail: boolean;
+  /** Email is on from the old join form, with no recorded tick. */
+  unconfirmed?: boolean;
 }) {
   const [on, setOn] = useState(initialOn);
+  const [stillUnconfirmed, setStillUnconfirmed] = useState(unconfirmed);
   const [ticked, setTicked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -38,6 +42,7 @@ export default function EmailMarketingSwitch({
         return;
       }
       setOn(result.on);
+      setStillUnconfirmed(false);
       setTicked(false);
     });
   };
@@ -67,7 +72,9 @@ export default function EmailMarketingSwitch({
       ) : (
         <>
           <p className="mt-1 text-white/70" role="status">
-            Off.
+            {stillUnconfirmed
+              ? "Not confirmed. You are not sent marketing email, but event reminder emails still reach you."
+              : "Off."}
           </p>
           <label className="mt-3 flex items-start gap-2">
             <input
@@ -87,6 +94,16 @@ export default function EmailMarketingSwitch({
           >
             {pending ? "Saving…" : "Turn on"}
           </button>
+          {stillUnconfirmed && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => save(false)}
+              className="ml-2 mt-3 rounded-lg border border-white/20 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:opacity-50"
+            >
+              Stop all email
+            </button>
+          )}
         </>
       )}
       {error && (

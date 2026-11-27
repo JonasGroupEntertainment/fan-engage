@@ -9,7 +9,11 @@ import {
 import { unsentCampaignError } from "@/lib/digest/outcomes";
 import { runLapsedPass, type LapsedClient, type LapsedPassResult } from "@/lib/digest/lapsed-pass";
 import { cronAuthProblem } from "@/lib/cron-observability";
-import { MARKETING_EMAIL_CONSENT_COLUMN } from "@/lib/marketing-consent";
+import {
+  MARKETING_EMAIL_CONSENT_COLUMN,
+  digestCampaignHoldReason,
+} from "@/lib/marketing-consent";
+import { pageAllIn, type PageQuery } from "@/lib/supabase/page-all";
 import { getAdminContext } from "@/lib/admin";
 
 export const runtime = "nodejs";
@@ -165,23 +169,36 @@ async function weeklyDigest(request: Request) {
     // does not exist yet (migration 0109) this read fails and nobody is
     // sent a digest.
     if (recipients.length > 0) {
-      const { data: consented, error: consentErr } = await admin
-        .from("fans")
-        .select("id")
-        .in(
-          "id",
-          recipients.map((r) => r.fan_id),
-        )
-        .eq("email_opted_in", true)
-        .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null);
-      if (consentErr) {
+      const consented = await pageAllIn<{ id: string }, string>(
+        recipients.map((r) => r.fan_id),
+        (part) =>
+          admin
+            .from("fans")
+            .select("id")
+            .in("id", part)
+            .eq("email_opted_in", true)
+            .not(MARKETING_EMAIL_CONSENT_COLUMN, "is", null)
+            .order("id", { ascending: true }) as PageQuery<{ id: string }>,
+      );
+      if (consented.error) {
         return NextResponse.json(
-          { error: `email consent check failed: ${consentErr.message}` },
+          { error: `email consent check failed: ${consented.error.message}` },
           { status: 500 },
         );
       }
-      const allowed = new Set((consented ?? []).map((row) => row.id as string));
+      const allowed = new Set(consented.data.map((row) => row.id));
       recipients = recipients.filter((r) => allowed.has(r.fan_id));
+    }
+
+    // The campaign itself still goes to the whole Mailchimp audience, so
+    // the digest stays on hold until that send reaches consented fans only
+    // (lib/marketing-consent.ts). On hold nobody is prepared and no
+    // campaign fires; the lapsed pass below still runs, since it sends one
+    // message per fan and checks consent itself.
+    const digestHold = digestCampaignHoldReason();
+    if (digestHold) {
+      console.warn(`[cron weekly-digest] ${digestHold}`);
+      recipients = [];
     }
 
     // Test-mode: filter to a single email so manual smoke tests don't

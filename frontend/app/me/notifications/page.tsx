@@ -9,7 +9,7 @@ import { pointsToGold } from "@/lib/tier-thresholds";
 import { PreferencesForm } from "./preferences-form";
 import EmailMarketingSwitch from "./email-marketing-switch";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { hasRecordedEmailConsent } from "@/lib/marketing-consent";
+import { hasRecordedEmailConsent, needsEmailReask } from "@/lib/marketing-consent";
 import {
   DEFAULT_PREFS,
   TOGGLE_KEYS,
@@ -158,7 +158,11 @@ export default async function NotificationPreferencesPage() {
         </div>
       )}
 
-      <EmailMarketingSwitch initialOn={marketingEmailOn} hasEmail={hasEmail} />
+      <EmailMarketingSwitch
+        initialOn={marketingEmailOn}
+        hasEmail={hasEmail}
+        unconfirmed={needsEmailReask(emailRow)}
+      />
 
       <PreferencesForm
         initial={prefs}

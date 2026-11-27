@@ -44,7 +44,9 @@ export default function EmailReaskPrompt({ className = "" }: { className?: strin
         return;
       }
       if (!result.ok) setError(result.error);
-      else setDone(agree ? "yes" : "no");
+      // Show what is actually saved. If the fan answered in another tab or
+      // unsubscribed meanwhile, that earlier answer stands.
+      else setDone(result.agreed ? "yes" : "no");
     });
   };
 
