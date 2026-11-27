@@ -13,6 +13,10 @@ describe("one waiting redemption per reward (BEP #197 port)", () => {
     assert.match(src, /\.eq\("fan_id", user\.id\)\s*\.eq\("reward_id", rewardId\)\s*\.eq\("status", "pending"\)/);
   });
   it("tells the fan no more points were spent", () => {
-    assert.match(src, /No more points were spent/);
+    // The wording lives in reward-redeem-error.ts and is used by both the
+    // check before redeeming and the database's own refusal.
+    const wording = readFileSync(fileURLToPath(new URL("./reward-redeem-error.ts", import.meta.url)), "utf8");
+    assert.match(wording, /No more points were spent/);
+    assert.match(src, /return \{ ok: false, error: ALREADY_WAITING_MESSAGE \};/);
   });
 });

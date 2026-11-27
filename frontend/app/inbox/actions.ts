@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeAppPath } from "@/lib/safe-app-path";
 
 /**
  * Mark a single notification read. Uses the user-scoped client so RLS enforces
@@ -31,8 +32,10 @@ export async function markNotificationReadAction(formData: FormData) {
   revalidatePath("/inbox");
   revalidatePath("/", "layout"); // refresh header badge count
 
-  if (redirectTo && redirectTo.startsWith("/")) {
-    redirect(redirectTo);
+  // Only a path on this site. "//other-site" and similar are ignored.
+  const target = safeAppPath(redirectTo);
+  if (target) {
+    redirect(target);
   }
 }
 

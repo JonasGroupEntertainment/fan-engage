@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { savePrivacyAction } from "./actions";
 
+const NOT_SAVED =
+  "We couldn't save that change. Your setting is the same as before. Check your connection and try again.";
+
 export default function PrivacyForm({
   initialPublicProfileEnabled,
   profileSlug,
@@ -15,13 +18,28 @@ export default function PrivacyForm({
   );
   const [pending, startTransition] = useTransition();
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function onChange(next: boolean) {
+    const previous = publicProfile;
     setPublicProfile(next);
+    setError(null);
+    setSavedAt(null);
     const fd = new FormData();
     fd.set("public_profile_enabled", String(next));
     startTransition(async () => {
-      await savePrivacyAction(fd);
+      let result: Awaited<ReturnType<typeof savePrivacyAction>>;
+      try {
+        result = await savePrivacyAction(fd);
+      } catch {
+        result = { ok: false, error: NOT_SAVED };
+      }
+      if (!result.ok) {
+        // Put the switch back so it shows what is really saved.
+        setPublicProfile(previous);
+        setError(result.error);
+        return;
+      }
       setSavedAt(Date.now());
     });
   }
@@ -56,7 +74,12 @@ export default function PrivacyForm({
         disabled={pending}
       />
 
-      {savedAt && !pending && (
+      {error && !pending && (
+        <p className="text-xs text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+      {savedAt && !pending && !error && (
         <p className="text-xs text-emerald-300/80">Saved.</p>
       )}
 

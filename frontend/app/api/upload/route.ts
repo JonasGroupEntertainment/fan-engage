@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { IMAGE_SIGNATURE_BYTES, imageFileName, sniffImageType } from "@/lib/image-signature";
 
 /**
  * POST /api/upload
@@ -60,7 +61,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const path = `${user.id}/${Date.now()}-${safeFilename(file.name)}`;
+  // Judge the file by its first bytes, not by the type the browser claims.
+  const head = new Uint8Array(await file.slice(0, IMAGE_SIGNATURE_BYTES).arrayBuffer());
+  const realType = sniffImageType(head);
+  if (!realType) {
+    return NextResponse.json(
+      { error: "That file isn't a JPEG, PNG, WebP, or GIF image" },
+      { status: 400 },
+    );
+  }
+
+  // The extension comes from the detected type, not from the name sent.
+  const path = `${user.id}/${Date.now()}-${imageFileName(safeFilename(file.name), realType)}`;
 
   // Use admin client for the upload so we bypass any RLS hiccups around
   // anon-derived JWTs in server actions. Ownership is enforced by the path
@@ -69,7 +81,7 @@ export async function POST(req: NextRequest) {
   const { error: uploadErr } = await admin.storage
     .from(bucket)
     .upload(path, file, {
-      contentType: file.type,
+      contentType: realType,
       cacheControl: "3600",
       upsert: false,
     });

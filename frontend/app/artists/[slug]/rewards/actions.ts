@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redeemReward } from "@/lib/data/rewards";
+import { overLimitField } from "@/lib/fan-field-limits";
 
 export async function redeemRewardAction(formData: FormData) {
   const supabase = await createClient();
@@ -22,6 +23,10 @@ export async function redeemRewardAction(formData: FormData) {
 
   if (!rewardId) {
     return { error: "Invalid reward" };
+  }
+  const over = overLimitField({ deliveryDetails });
+  if (over) {
+    return { error: over.message };
   }
 
   const result = await redeemReward({

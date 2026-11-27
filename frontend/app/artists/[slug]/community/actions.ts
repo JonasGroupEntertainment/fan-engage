@@ -24,6 +24,8 @@ import {
 import { defaultSocialDeps } from "@/lib/data/social-accounts";
 import { sendAnnouncementToSocial } from "@/lib/social/announce";
 import { ALSO_POST_FIELD, ALSO_POST_VALUE, SUBMIT_KEY_FIELD } from "@/lib/social/social-post";
+import { isAllowedReaction } from "@/lib/community/reactions";
+import { FAN_FIELD_LIMITS } from "@/lib/fan-field-limits";
 type Visibility = "public" | "premium" | "founder-only";
 
 /**
@@ -156,6 +158,8 @@ export async function toggleReactionAction(formData: FormData): Promise<PointsAc
   const emoji = String(formData.get("emoji") ?? "");
   const artistSlug = String(formData.get("artist_slug") ?? "");
   if (!postId || !emoji || !artistSlug) return;
+  // Only the reactions the buttons offer. Anything else is ignored.
+  if (!isAllowedReaction(emoji)) return;
 
   const { supabase, userId } = await requireUser();
 
@@ -388,6 +392,8 @@ export async function submitEntryAction(formData: FormData): Promise<PointsActio
   const body = String(formData.get("body") ?? "").trim();
   const imageUrlRaw = String(formData.get("image_url") ?? "").trim();
   if (!postId || !artistSlug || (!body && !imageUrlRaw)) return;
+  // The entry box stops at this length too; the database holds the limit.
+  if (body.length > FAN_FIELD_LIMITS.challengeEntry) return;
 
   const { supabase, userId } = await requireUser();
   const imageUrl = normalizeUrl(imageUrlRaw);

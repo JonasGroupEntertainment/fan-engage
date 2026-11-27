@@ -1,5 +1,6 @@
 "use client";
 
+import { authCallbackErrorMessage } from "@/lib/auth-callback";
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { PasswordInput } from "@/components/password-input";
@@ -68,7 +69,9 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   // Surface errors passed back by /auth/callback (e.g. a failed or
   // rate-limited magic-link exchange) — otherwise they die silently.
-  const callbackError = searchParams.get("error");
+  // Only a known short code is turned into a line. Other text in the
+  // address is ignored.
+  const callbackError = authCallbackErrorMessage(searchParams.get("error"));
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "magic-sent">(
     callbackError ? "error" : "idle",
   );

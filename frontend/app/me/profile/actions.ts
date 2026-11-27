@@ -10,6 +10,7 @@ import {
   SAVE_FAILED_MESSAGE,
   type ProfileFormState,
 } from "@/lib/profile-form";
+import { overLimitField } from "@/lib/fan-field-limits";
 
 const orNull = (value: string): string | null => value || null;
 
@@ -28,6 +29,20 @@ export async function updateProfileAction(
   const phoneResult = normalizePhoneE164(values.phone);
   if (!phoneResult.ok) {
     return rejectedProfileSubmit(prevState, "phone", phoneResult.error, values);
+  }
+
+  // The database holds the same limits (migration 0113). Checking here
+  // lets the page say which field is too long.
+  const over = overLimitField({
+    firstName: values.firstName,
+    lastName: values.lastName,
+    city: values.city,
+    interest: values.interest,
+    musicOutlet: values.musicOutlet,
+    instagramOrTiktok: values.instagramOrTiktok,
+  });
+  if (over) {
+    return rejectedProfileSubmit(prevState, "save", over.message, values);
   }
 
   // Merge into the existing socials object so other keys are preserved.
