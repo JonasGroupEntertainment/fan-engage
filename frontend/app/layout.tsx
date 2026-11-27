@@ -198,9 +198,23 @@ export default async function RootLayout({
               <MobileNav navItems={navItems} isSignedIn={Boolean(user)} joinHref={joinHref} />
             </div>
             <DesktopNav navItems={navItems} />
-            <div className="hidden min-w-0 max-w-xs flex-1 md:block">
+            {/* Beside the full menu an admin's header has no room for a usable
+                search box, so from xl they get a search button instead. */}
+            <div
+              className={`hidden min-w-0 max-w-xs flex-1 md:block${isAdmin ? " xl:hidden" : ""}`}
+            >
               <SearchInput compact placeholder="Search Fan Engage…" />
             </div>
+            {isAdmin && (
+              <Link
+                href="/search"
+                aria-label="Search"
+                title="Search"
+                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/80 hover:bg-white/10 xl:inline-flex"
+              >
+                <span aria-hidden>🔍</span>
+              </Link>
+            )}
             {user ? (
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 {/* Hidden on phones, where it crowded the logo and menu
