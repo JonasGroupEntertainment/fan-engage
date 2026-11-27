@@ -2,6 +2,7 @@ import { getAdminContext } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -324,6 +325,12 @@ export default async function AdminCommunityAnalyticsPage({
         <p className="mt-1 text-sm text-white/60">
           {data.community.display_name} — community health dashboard
         </p>
+        <Link
+          href={`/admin/analytics/${communityId}/weeks`}
+          className="mt-2 inline-block text-sm text-white underline underline-offset-4 hover:text-white/80"
+        >
+          Week by week numbers →
+        </Link>
       </div>
 
       {/* KPI Row */}
